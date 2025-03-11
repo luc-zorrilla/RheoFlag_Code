@@ -1,3 +1,7 @@
+""" This script aims at visualizing multiple simulation outputs at the same time, 
+from the model of viscoelastic filament. """
+
+
 from audioop import mul
 import multiprocessing
 from re import A

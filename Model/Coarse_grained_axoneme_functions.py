@@ -1,4 +1,4 @@
-""" This file """
+""" This file contains all functions used to simulate a viscoelastic filament. """
 
 ### libraries ###
 from turtle import color
@@ -562,23 +562,19 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
     file.write("T_span = " + str(T_span) + "\n")
     file.write("T_eval = " + str(T_eval) + "\n")
     # file.write(np.array2string(T_eval, precision = 15, floatmode="maxprec").replace('\n','')+"\n")
+    
     file.write("\n")
 
     # Creates an interpolation function of the flow field to inject it in the solver
     if X_flow_field_string != "NO FLOW":
-        # print("X_flow_field.shape and type = ", X_flow_field.shape, X_flow_field.dtype)
         # T_eval = np.array(T_eval).reshape(len(T_eval),)
 
-        # print("T_eval.shape and type = ", T_eval.shape, T_eval.dtype)
-        # print("length of T_eval = ", len(T_eval))
         
         InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate") # Beware of that extrapolation option - might be due to the period being much higher than actual time step
         
         Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
-        # print("Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow: ", Args)
     else:
         Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas)
-        # print("Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas: ", Args)
 
     start_time = time.time()
     # warnings.filterwarnings(action='ignore')
@@ -598,6 +594,7 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
         file.write("\n")
         file.close()
         res = False
+
     except np.linalg.LinAlgError:
         print("LinAlgError")
         file.write("LinAlgError" + "\n")

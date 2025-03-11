@@ -1,4 +1,5 @@
-""" This file"""
+""" This file compiles all functions used for analysis of an individual 
+simulation of a viscoelastic filament, which takes the form of a file. """
 
 from audioop import mul
 import multiprocessing
@@ -416,7 +417,6 @@ def CheckEquilibrium(X, N, T_eval, A, gamma, Sp4, n_L = [0,0], Lambdas=[[0,0]], 
 
     return fig_one_set
 
-
 def Kymograph(X, bool_fig=False):
 
     """ Computes Kymograph of X and mean angle. 
@@ -462,7 +462,6 @@ def Covariance(Theta, Theta_0, bool_fig = False):
     else:
         return C
 
-
 def fit_ellipse(x, y):
     """
 
@@ -494,8 +493,6 @@ def fit_ellipse(x, y):
         # print("Cannot fit this ellipse. Most probably signal is zero.")
         return [None, None, None, None, None, None]
     
-
-
 def cart_to_pol(coeffs):
     """
 
@@ -629,7 +626,6 @@ def LissajousPhase(x, y, t_start=0, bool_coeffs = False):
         else:
             return phase_sign * phase_modulus
 
-
 def PCA(Theta, bool_from_scratch = False, bool_fig=False):
 
     """ Computes PCA from a Kymograph Theta.
@@ -730,7 +726,6 @@ def PCA_vs_Flow(Theta, Theta_0, P, flow_field, k=1, bool_fig=False):
     else:
         return PCA_phases, polar_coeffs_ellipses
 
-
 def SpatialFourier(X, T_eval, w0, bool_fig=False):
 
     """ Performs Fourier transform on the spatial axis (axis #0) and returns Fourier transform and corresponding spatial modes.
@@ -814,7 +809,6 @@ def SpatialFourier_vs_Flow(Xq, modes, flow_field, w0, k=1, bool_fig=False):
         return Fourier_phases, polar_coeffs_ellipses, fig_ellipse
     else:
         return Fourier_phases, polar_coeffs_ellipses
-
 
 ###################################
 ### Plot animated shape in time ###
@@ -903,7 +897,6 @@ def AnimatedShape(X, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
     # fig_shapes.show()
 
     return fig_shapes
-
 
 def AnimatedShapes(X, Y, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
     fig_dict = dict(data = [], layout = {}, frames = [])
@@ -996,7 +989,6 @@ def AnimatedShapes(X, Y, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
 
 ### ----- Plotting animated shape in time ----- ###
 ######################################
-
 
 def IsEqual(a,b):
     " Compares a and b, or does not compare them if at least one of them is None."

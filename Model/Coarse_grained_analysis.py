@@ -1,4 +1,7 @@
-from audioop import mul
+""" This file aims at analyzing a single simulation of a viscoelastic filament. 
+In particular, one can visualize the waveform in space-time as a video. """
+
+# from audioop import mul
 import multiprocessing
 from re import A
 
@@ -24,7 +27,7 @@ folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/reno
 # periodic_pure_bending_filename = "data_20240710-072407387487.dat"
 # periodic_bending_all_filename = "data_20240710-072612423428.dat"
 
-filename = "data_20240710-072407387487.dat"
+filename = "data_20250311-034227331518.dat"
 parameters, X = ExtractParametersData(folder_name + filename)
 
 N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval = parameters
@@ -70,9 +73,8 @@ T_eval = np.array(T_eval)
 X_flow = A*np.sin(w0*T_eval)
 
 # Animated shape
-fig_shape = AnimatedShape(X, X_flow, N, w0, Sp4, Beta, tau_b, T_eval, bool_fig = False)
+fig_shape = AnimatedShape(X, X_flow, N, w0, Sp4, Beta, tau_b, T_eval)
 fig_shape.show()
-exit()
 
 # Kymograph
 Theta, Theta_0, fig_kymograph = Kymograph(X, True)
@@ -96,10 +98,10 @@ PCA_phase, polar_coeffs_ellipse, figs_ellipse = PCA_vs_Flow(Theta, Theta_0, P, X
 # Xq, spatial_modes, fig_spatial_modes = SpatialFourier(X, N, T_eval, w0, True)
 # fig_spatial_modes.show()
 Theta_q, spatial_modes, fig_spatial_modes = SpatialFourier(np.transpose(Theta), T_eval, w0, True)
-fig_spatial_modes.show()
+# fig_spatial_modes.show()
 
 # Phases between Spatial Fourier and flow
-Fourier_phases, polar_coeffs_ellipses, fig_ellipses = SpatialFourier_vs_Flow(Theta_q, spatial_modes, X_flow, w0, Theta_q.shape[0], True)
+# Fourier_phases, polar_coeffs_ellipses, fig_ellipses = SpatialFourier_vs_Flow(Theta_q, spatial_modes, X_flow, w0, Theta_q.shape[0], True)
 # fig_ellipses.show()
 # print(Fourier_phases)
 
@@ -142,7 +144,7 @@ fig = go.Figure(data=trace, layout=layout)
 fig.show()
 
 
-exit()
+# exit()
 
 ### ----- Shape analysis ----- ###
 ##################################

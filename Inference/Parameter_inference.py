@@ -1,3 +1,5 @@
+""" This script aims at inferring viscoelastic parameters from a model of viscoelastic filament, given "truth" data (which in this case is simulation output data). For now only the grid search is implemented. """
+
 import numpy as np
 from Coarse_grained_axoneme_functions import *
 from Coarse_grained_analysis_functions import *

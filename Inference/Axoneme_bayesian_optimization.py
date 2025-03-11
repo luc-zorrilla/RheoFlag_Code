@@ -1,23 +1,19 @@
 
+"""
 
-##############################################################################
+This file is to build and test parameter inference on simple models using
+its analytically-derived weak form for regularizing the problem and
+solving in parameter space using BFGS (quasi-Newton) to do a gradient
+descent that requires knowledge of the analytical gradient, a BFGS
+approximation of the Hessian. The analytical gradient in parameter space
+is derived from the adjoint problem of the functional minimization.
 
-# This file is to build and test parameter inference on simple models using
-# its analytically-derived weak form for regularizing the problem and
-# solving in parameter space using BFGS (quasi-Newton) to do a gradient
-# descent that requires knowledge of the analytical gradient, a BFGS
-# approximation of the Hessian. The analytical gradient in parameter space
-# is derived from the adjoint problem of the functional minimization.
+    - Model 1: Euler-Bernoulli (pure bending) at equilibrium with charge q(s)
+    is corresponds to the Coarse-grained model for beta = 0, tau_b = 0 and
+    a flow field corresponding to q(s). This flow field should be taken so
+    that we have an analytical solution, to check the solution is right.
 
-##############################################################################
-
-# Model 1: Euler-Bernoulli (pure bending) at equilibrium with charge q(s)
-# is corresponds to the Coarse-grained model for beta = 0, tau_b = 0 and
-# a flow field corresponding to q(s). This flow field should be taken so
-# that we have an analytical solution, to check the solution is right.
-
-##############################################################################
-
+"""
 import numpy as np
 from Coarse_grained_axoneme_functions import *
 from Coarse_grained_analysis_functions import *
@@ -212,7 +208,6 @@ def BFGS(X2N_star, Sp4_0, l, params, max_it):
 
 ########## FUNCTIONS ##########
 ###############################
-
 
 if __name__ == "__main__":
 

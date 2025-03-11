@@ -1,3 +1,5 @@
+""" This script analyzes a list of files that correspond to simulation outputs 
+of the coarse-grained model of a viscoelastic filament."""
 
 from cmath import phase
 from socketserver import DatagramRequestHandler

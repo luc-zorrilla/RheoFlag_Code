@@ -1,4 +1,5 @@
-""" This file is """
+""" This file compiles all the functions to perform a bayesian-BFGS (change name) 
+optimization of an inverse problem on a differential equation."""
 
 
 import numpy as np
@@ -171,7 +172,6 @@ def BFGS_adjoint_optimization(Omega, phi_star, C_primal, Solve_Primal_Dual, J, G
     except:
         print("Something went wrong!")
         return p_list, primal_dual_list, J_list, nabla_J_list, H_list
-    
 
 # Uncertainty functions
 

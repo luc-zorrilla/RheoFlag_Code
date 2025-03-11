@@ -1,3 +1,5 @@
+""" This script tests out parallelization by means of the multiprocessing library. """
+
 import numpy as np
 import time
 import multiprocessing as mp
