@@ -24,179 +24,179 @@ from datetime import datetime
 ########################################
 ### ----- Extracting Functions ----- ###
 
-def ExtractParametersData(filename):
+# def ExtractParametersData(filename):
 
-    file = open(filename, "r")
+#     file = open(filename, "r")
 
-    ## Metadata extraction
-    file.readline()
-    N = int(file.readline()[4:])
-    taus_b = file.readline()[9:]
-    taus_b = list(map(float, taus_b.strip('][\n').split(', ')))
-    init_conf = file.readline()[12:]
-    Beta = float(file.readline()[7:])
-    gamma = float(file.readline()[8:])
+#     ## Metadata extraction
+#     file.readline()
+#     N = int(file.readline()[4:])
+#     taus_b = file.readline()[9:]
+#     taus_b = list(map(float, taus_b.strip('][\n').split(', ')))
+#     init_conf = file.readline()[12:]
+#     Beta = float(file.readline()[7:])
+#     gamma = float(file.readline()[8:])
 
-    n_L = file.readline()[6:] ##
-    n_L = list(map(float,n_L.strip('][\n').split(', ')))
+#     n_L = file.readline()[6:] ##
+#     n_L = list(map(float,n_L.strip('][\n').split(', ')))
 
-    m_L = float(file.readline()[6:]) ##
+#     m_L = float(file.readline()[6:]) ##
 
-    A = float(file.readline()[4:])
+#     A = float(file.readline()[4:])
 
-    w0 = float(file.readline()[5:])
+#     w0 = float(file.readline()[5:])
 
-    Sp4 = float(file.readline()[6:])
+#     Sp4 = float(file.readline()[6:])
 
-    Lambdas = file.readline()[10:] ##
-    Lambdas = list(map(str, Lambdas.strip('][\n').split(', ')))
-    for k in range(len(Lambdas)):
-        Lambdas[k] = list(map(float, Lambdas[k].strip('][').split('; ')))
+#     Lambdas = file.readline()[10:] ##
+#     Lambdas = list(map(str, Lambdas.strip('][\n').split(', ')))
+#     for k in range(len(Lambdas)):
+#         Lambdas[k] = list(map(float, Lambdas[k].strip('][').split('; ')))
 
-    Zetas = file.readline()[8:] ##
-    Zetas = list(map(float, Zetas.strip('][\n').split(', ')))
+#     Zetas = file.readline()[8:] ##
+#     Zetas = list(map(float, Zetas.strip('][\n').split(', ')))
 
-    X_flow_field = file.readline()[15:]
-    if X_flow_field[:9] == "SINE FLOW":
-        X_flow_field_type = "SINE FLOW: (psi, A, w0)"
-        X_flow_field_params = list(map(float, X_flow_field[26:].strip(")(\n").split(", ")))
-    elif X_flow_field[:13] == "CONSTANT FLOW":
-        X_flow_field_type = "CONSTANT FLOW: (psi, A)"
-        X_flow_field_params = list(map(float, X_flow_field[26:].strip(")(\n").split(", ")))
-    elif X_flow_field[:12] == "PIV-IMPORTED":
-        X_flow_field_type = "PIV-IMPORTED: filename"
-        X_flow_field_params = X_flow_field[18:] # Filename of the PIV import
-    else: # X_flow_field == "NO FLOW":
-        X_flow_field_type = "NO FLOW"
-        X_flow_field_params = 0
+#     X_flow_field = file.readline()[15:]
+#     if X_flow_field[:9] == "SINE FLOW":
+#         X_flow_field_type = "SINE FLOW: (psi, A, w0)"
+#         X_flow_field_params = list(map(float, X_flow_field[26:].strip(")(\n").split(", ")))
+#     elif X_flow_field[:13] == "CONSTANT FLOW":
+#         X_flow_field_type = "CONSTANT FLOW: (psi, A)"
+#         X_flow_field_params = list(map(float, X_flow_field[26:].strip(")(\n").split(", ")))
+#     elif X_flow_field[:12] == "PIV-IMPORTED":
+#         X_flow_field_type = "PIV-IMPORTED: filename"
+#         X_flow_field_params = X_flow_field[18:] # Filename of the PIV import
+#     else: # X_flow_field == "NO FLOW":
+#         X_flow_field_type = "NO FLOW"
+#         X_flow_field_params = 0
         
-    T_span = file.readline()[9:] ##
-    T_span = list(map(float, T_span.strip('][\n').split(', ')))
-    T_eval = file.readline()[9:] ##
-    T_eval = list(map(float, T_eval.strip('][\n').split(', ')))
+#     T_span = file.readline()[9:] ##
+#     T_span = list(map(float, T_span.strip('][\n').split(', ')))
+#     T_eval = file.readline()[9:] ##
+#     T_eval = list(map(float, T_eval.strip('][\n').split(', ')))
 
-    method = file.readline()
+#     method = file.readline()
 
-    ## Create data arrays in functions of the metadata
-    X = np.zeros((N+2, len(T_eval)))
-    file.readline()
-    file.readline()
+#     ## Create data arrays in functions of the metadata
+#     X = np.zeros((N+2, len(T_eval)))
+#     file.readline()
+#     file.readline()
 
-    first_line = file.readline()
-    if first_line[:10] == "ValueError":
-        for t in range(1, len(T_eval)):
-            file.readline()
-    else:
-        X[:,0] = list(map(float, first_line.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
-        for t in range(1, len(T_eval)):
-            X[:,t] = list(map(float, file.readline().strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
+#     first_line = file.readline()
+#     if first_line[:10] == "ValueError":
+#         for t in range(1, len(T_eval)):
+#             file.readline()
+#     else:
+#         X[:,0] = list(map(float, first_line.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
+#         for t in range(1, len(T_eval)):
+#             X[:,t] = list(map(float, file.readline().strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
 
-    file.close()
-    parameters = [N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval, method]
-    return parameters, X
+#     file.close()
+#     parameters = [N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval, method]
+#     return parameters, X
 
-def ExtractParameters(filename):
+# def ExtractParameters(filename):
 
-    file = open(filename, "r")
+#     file = open(filename, "r")
 
-    ## Metadata extraction
-    file.readline()
-    N = int(file.readline()[4:])
-    taus_b = file.readline()[9:]
-    taus_b = list(map(float, taus_b.strip('][\n').split(', ')))
-    init_conf = file.readline()[12:]
-    Beta = float(file.readline()[7:])
-    gamma = float(file.readline()[8:])
+#     ## Metadata extraction
+#     file.readline()
+#     N = int(file.readline()[4:])
+#     taus_b = file.readline()[9:]
+#     taus_b = list(map(float, taus_b.strip('][\n').split(', ')))
+#     init_conf = file.readline()[12:]
+#     Beta = float(file.readline()[7:])
+#     gamma = float(file.readline()[8:])
 
-    n_L = file.readline()[6:] ##
-    n_L = list(map(float,n_L.strip('][\n').split(', ')))
+#     n_L = file.readline()[6:] ##
+#     n_L = list(map(float,n_L.strip('][\n').split(', ')))
 
-    m_L = float(file.readline()[6:]) ##
+#     m_L = float(file.readline()[6:]) ##
 
-    A = float(file.readline()[4:])
+#     A = float(file.readline()[4:])
 
-    w0 = float(file.readline()[5:])
+#     w0 = float(file.readline()[5:])
 
-    Sp4 = float(file.readline()[6:])
+#     Sp4 = float(file.readline()[6:])
 
-    Lambdas = file.readline()[10:] ##
-    Lambdas = list(map(str, Lambdas.strip('][\n').split(', ')))
-    for k in range(len(Lambdas)):
-        Lambdas[k] = list(map(float, Lambdas[k].strip('][').split('; ')))
+#     Lambdas = file.readline()[10:] ##
+#     Lambdas = list(map(str, Lambdas.strip('][\n').split(', ')))
+#     for k in range(len(Lambdas)):
+#         Lambdas[k] = list(map(float, Lambdas[k].strip('][').split('; ')))
 
-    Zetas = file.readline()[8:] ##
-    Zetas = list(map(float, Zetas.strip('][\n').split(', ')))
+#     Zetas = file.readline()[8:] ##
+#     Zetas = list(map(float, Zetas.strip('][\n').split(', ')))
 
-    X_flow_field = file.readline()[15:]
-    if X_flow_field[:9] == "SINE FLOW":
-        X_flow_field_type = "SINE FLOW: (psi, A, w0)"
-        X_flow_field_params = list(map(float, X_flow_field[26:].strip(")(\n").split(", ")))
-    elif X_flow_field[:13] == "CONSTANT FLOW":
-        X_flow_field_type = "CONSTANT FLOW: (psi, A)"
-        X_flow_field_params = list(map(float, X_flow_field[26:].strip(")(\n").split(", ")))
-    elif X_flow_field[:12] == "PIV-IMPORTED":
-        X_flow_field_type = "PIV-IMPORTED: filename"
-        X_flow_field_params = X_flow_field[18:] # Filename of the PIV import
-    else: # X_flow_field == "NO FLOW":
-        X_flow_field_type = "NO FLOW"
-        X_flow_field_params = 0
+#     X_flow_field = file.readline()[15:]
+#     if X_flow_field[:9] == "SINE FLOW":
+#         X_flow_field_type = "SINE FLOW: (psi, A, w0)"
+#         X_flow_field_params = list(map(float, X_flow_field[26:].strip(")(\n").split(", ")))
+#     elif X_flow_field[:13] == "CONSTANT FLOW":
+#         X_flow_field_type = "CONSTANT FLOW: (psi, A)"
+#         X_flow_field_params = list(map(float, X_flow_field[26:].strip(")(\n").split(", ")))
+#     elif X_flow_field[:12] == "PIV-IMPORTED":
+#         X_flow_field_type = "PIV-IMPORTED: filename"
+#         X_flow_field_params = X_flow_field[18:] # Filename of the PIV import
+#     else: # X_flow_field == "NO FLOW":
+#         X_flow_field_type = "NO FLOW"
+#         X_flow_field_params = 0
         
-    T_span = file.readline()[9:] ##
-    T_span = list(map(float, T_span.strip('][\n').split(', ')))
-    T_eval = file.readline()[9:] ##
-    T_eval = list(map(float, T_eval.strip('][\n').split(', '))) # T_eval = list(map(float, T_eval.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
+#     T_span = file.readline()[9:] ##
+#     T_span = list(map(float, T_span.strip('][\n').split(', ')))
+#     T_eval = file.readline()[9:] ##
+#     T_eval = list(map(float, T_eval.strip('][\n').split(', '))) # T_eval = list(map(float, T_eval.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
 
-    method = file.readline()
+#     method = file.readline()
 
-    file.close()
-    parameters = [N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval, method]
-    return parameters
+#     file.close()
+#     parameters = [N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval, method]
+#     return parameters
 
-def ExtractData(filename):
+# def ExtractData(filename):
 
-    file = open(filename, "r")
+#     file = open(filename, "r")
 
-    ## Metadata extraction
-    file.readline()
+#     ## Metadata extraction
+#     file.readline()
 
-    N = int(file.readline()[4:])
+#     N = int(file.readline()[4:])
 
-    file.readline()
-    file.readline()
-    file.readline()
-    file.readline()
-    file.readline()
-    file.readline()
-    file.readline()
-    file.readline()
-    file.readline()
-    file.readline()
-    file.readline()
-    file.readline()
-    file.readline()
+#     file.readline()
+#     file.readline()
+#     file.readline()
+#     file.readline()
+#     file.readline()
+#     file.readline()
+#     file.readline()
+#     file.readline()
+#     file.readline()
+#     file.readline()
+#     file.readline()
+#     file.readline()
+#     file.readline()
 
-    T_eval = file.readline()[9:] ##
-    T_eval = list(map(float, T_eval.strip('][\n').split(', ')))#list(map(float, T_eval.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
+#     T_eval = file.readline()[9:] ##
+#     T_eval = list(map(float, T_eval.strip('][\n').split(', ')))#list(map(float, T_eval.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
 
-    file.readline()
+#     file.readline()
     
-    ## Create data arrays in functions of the metadata
-    X = np.zeros((N+2, len(T_eval)))
-    file.readline()
-    file.readline()
+#     ## Create data arrays in functions of the metadata
+#     X = np.zeros((N+2, len(T_eval)))
+#     file.readline()
+#     file.readline()
 
 
-    first_line = file.readline()
-    if first_line[:10] == "ValueError":
-        for t in range(1, len(T_eval)):
-            file.readline()
-    else:
-        X[:,0] = list(map(float, first_line.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
-        for t in range(1, len(T_eval)):
-            X[:,t] = list(map(float, file.readline().strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
+#     first_line = file.readline()
+#     if first_line[:10] == "ValueError":
+#         for t in range(1, len(T_eval)):
+#             file.readline()
+#     else:
+#         X[:,0] = list(map(float, first_line.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
+#         for t in range(1, len(T_eval)):
+#             X[:,t] = list(map(float, file.readline().strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
 
-    file.close()
-    return X
+#     file.close()
+#     return X
 
 ### ----- Extracting Functions ----- ###
 ########################################
@@ -820,6 +820,7 @@ def SpatialFourier_vs_Flow(Xq, modes, flow_field, w0, k=1, bool_fig=False):
 ### Plot animated shape in time ###
 
 def AnimatedShape(X, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
+    """ What is the difference with animated_shapes ?"""    
     fig_dict = dict(data = [], layout = {}, frames = [])
 
     # data
@@ -905,6 +906,7 @@ def AnimatedShape(X, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
     return fig_shapes
 
 def AnimatedShapes(X, Y, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
+    """ Plot two overlapping shapes. To be generalized to N_s shapes. """
     fig_dict = dict(data = [], layout = {}, frames = [])
 
     # data

@@ -19,51 +19,31 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 from datetime import datetime
 
-#######################################
-### ----- Read data from file ----- ###
-# exit()
+################################################################################
+### Read metadata and data
 
 folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
 
-filename = "data_20250312-113226101654.dat"
-parameters, X = ExtractParametersData(folder_name + filename)
+id_filename = "20250312-072050109325"
 
-N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval, method = parameters
+metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
+data_filename = folder_name + 'data_' + id_filename + '.csv'
+
+solver_dict = get_metadata(metadata_filename)
+t_sim, X = get_data(data_filename)
+
+output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = list(solver_dict.values())
 tau_b = taus_b[0]
-print("N = ", N)
-print("A = ", A)
-print("w0 = ", w0)
-print("Bending elasticity / drag timescale: Sp4 = ", Sp4)
-print("Shear/bending elasticity ratio: Beta = ", Beta)
-print("tau_b = ", tau_b)
 
-# print(X_flow_field_type)
-# exit()
-# print("shape(X) = ", X.shape)
-# print("X[0] = ", X[:,0])
-# print("parameters = ", parameters)
+keys_toprint = ['N', 'A', 'w0', 'Sp4', 'Beta', 'taus_b']
+for key in keys_toprint:
+    print(key, solver_dict[key])
 
-### ----- Read data from file ----- ###
-#######################################
-
-##############################################################
-### ----- Parameter choice from the chosen data file ----- ###
-
-# Empty #
-
-### ----- Parameter choice from the chosen data file ----- ###
-##############################################################
+################################################################################
 
 
-#################################
-### ----- Visualisation ----- ###
-
-#############################
-## --- Plot parameters --- ##
-
-
-## --- Plot parameters --- ##
-#############################
+################################################################################
+### Visualisation
 
 ##################################
 ### ----- Shape analysis ----- ###

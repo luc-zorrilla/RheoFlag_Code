@@ -104,7 +104,8 @@ def write_array_to_csv(array, filename):
         # Flatten the array and write the data
         np.savetxt(f, array.flatten(), delimiter=',')
 
-    print(f"Array successfully written to {filename}.csv")
+    print(f"Array successfully written to {filename}")
+
 def read_array_from_csv(filename):
     """
     Read a NumPy array of any shape from a CSV file.
@@ -117,7 +118,7 @@ def read_array_from_csv(filename):
     - NumPy array reshaped to its original dimensions
     """
     # Open the CSV file and read the first line (shape)
-    with open(f'{filename}.csv', 'r') as f:
+    with open(f'{filename}', 'r') as f:
         # Read the first line which contains the shape
         shape_line = f.readline().strip()
         shape = tuple(map(int, shape_line.split(',')))
@@ -133,22 +134,41 @@ def read_array_from_csv(filename):
 
 ##############################
 
+################################################################################
+## --- Reading metadata and data
+
+def get_metadata(metadata_filename):
+
+    solver_dict = read_dict_from_json_file(metadata_filename) # contains '.json' in the name
+    return solver_dict
+
+def get_data(data_filename):
+
+    sol = read_array_from_csv(data_filename) # contains '.csv' in the name
+    t_sim = sol[0,:]
+    sol_y = sol[1:,:]
+
+    return t_sim, sol_y
+################################################################################
 
 ################################
 ## --- Initial conditions --- ##
+
 def StraightLine(N):
+    """ A straight line """
     X_0 = np.zeros(N+2, dtype = np.double)
     return X_0
 
 def ProximalBend(N):
+    """ A bend after the first segment """
     X_0 = np.zeros(N+2, np.double)
     X_0[3] = np.pi/4
     return X_0
 
 def SmoothCurve(N):
+    """ A curve with constant curvature, so that the total shear angle is pi/2 """
     X_0 = np.zeros(N+2, np.double)
-    X_0[2] = np.pi/2
-    X_0[3:] = -np.pi/20
+    X_0[3:] = (np.pi/2)/N
     return X_0
 
 # Add reading the last position from a file and start from there? e.g. for changing integration method.
@@ -610,6 +630,22 @@ def f(t, X, Sp4, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, Inte
 ## --- Differential system AQX_dot = B --- ##
 #############################################
 
+# Define a custom event function to stop based on time
+class StopOnTime:
+    def __init__(self, max_simulation_time):
+        self.start_time = time.time()  # Track the start time
+        self.max_simulation_time = max_simulation_time
+
+    def event(self, t, y, *args):
+        # Check elapsed time
+        elapsed_time = time.time() - self.start_time
+        if elapsed_time > self.max_simulation_time:
+            return 0  # Event triggers when this returns zero
+        return 1      # Otherwise, continue integration
+    
+    def terminate_integration(self, t, y, *args):
+        # This ensures we only terminate the integration when crossing zero
+        return np.sign(self.event(t, y, *args))
 
 ## --- Test --- ##
 # def g(x, a, b, c):
@@ -618,8 +654,10 @@ def f(t, X, Sp4, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, Inte
 
 ######################################################
 ## --- Solves and saves the differential system --- ##
-def Solve(f, taus_b, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, X_flow_field, X_0, method = 'LSODA'):
+def Solve(f, taus_b, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = 'LSODA'):
     """Solves the linear system for a set of parameters and returns the solution. """
+
+    time_limiter = StopOnTime(max_simulation_time=T_sim_max)
 
     # Creates an interpolation function of the flow field to inject it in the solver
     if X_flow_field_string != "NO FLOW":
@@ -631,8 +669,8 @@ def Solve(f, taus_b, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_f
 
     start_time = time.time()
     try:
-        sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method).y
-        res = sol
+        sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method, events=time_limiter.terminate_integration).y
+        solving_time = time.time() - start_time
 
     except ValueError:
         print("ValueError")
@@ -641,11 +679,17 @@ def Solve(f, taus_b, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_f
         print("LinAlgError")
         res = False
 
-    print("Solving took %s seconds." % (time.time() - start_time))
+    if sol.t_events[0].size > 0:
+        # If an event triggered, i.e., the time limit was exceeded
+        res = np.inf
+        print("Solving aborted: too long.")
+    else:
+        res = solving_time, sol
+        print("Solving took %s seconds." % solving_time)
 
     return res
 
-def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, X_flow_field, X_0, method = 'LSODA'):
+def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = 'LSODA'):
     
     """ Solves the linear system for a set of parameters and saves the resulting dynamics in a file. 
     Returns True if the algorithm converges, False otherwise. 
@@ -666,7 +710,8 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
     - Zetas: ad hoc torque on filament segments
     - X_flow_field_string: flow field metadata
     - T_span: simulation time
-    - T_eval: ? 
+    - T_eval: time points to evaluate the dynamical system
+    - T_sim_max: maximum simulation time before abort (in seconds).
     - X_flow_field: prescribed flow field
     - X_0: initial position of the filament
     - method: solving method for solve_ivp. Can be any of ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
@@ -675,24 +720,30 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
         If not sure, first try to run ‘RK45’. If it makes unusually many iterations, diverges, or fails, your problem is likely to be stiff and you should use ‘Radau’ or ‘BDF’. ‘LSODA’ can also be a good universal choice, but it might be somewhat less convenient to work with as it wraps old Fortran code.
     """
 
+    # print('Solving...')
+
     ############################################################################
     #### Metadata
+    # print("Writing metadata...")
 
     date = datetime.now().strftime("%Y%m%d-%I%M%S%f")
     metadata_filename = output_folder + "metadata_" + str(date) + ".json"
     data_filename = output_folder + "data_" + str(date) + ".csv"
 
-    solver_values = [output_folder, N, taus_b, str(init_conf), Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, X_flow_field, X_0, method]
+    solver_values = [output_folder, N, taus_b, str(init_conf), Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method]
 
-    solver_keys = ["output_folder", "N", "taus_b", "init_conf", "Beta", "gamma", "n_L", "m_L", "A", "w0", "Sp4", "Lambdas", "Zetas", "X_flow_field_string", "T_span", "T_eval", "X_flow_field", "X_0", "method"]
+    solver_keys = ["output_folder", "N", "taus_b", "init_conf", "Beta", "gamma", "n_L", "m_L", "A", "w0", "Sp4", "Lambdas", "Zetas", "X_flow_field_string", "T_span", "T_eval", "T_sim_max", "X_flow_field", "X_0", "method"]
     solver_dict = {f"{solver_keys[k]}": solver_values[k] for k in range(len(solver_values))}
 
     write_dict_to_json_file(solver_dict, metadata_filename)
-    # read_solver_dict = read_dict_from_json_file(metadata_filename)
+
+    # print("Metadata written.")
     ############################################################################
 
     ############################################################################
     #### Flow field
+
+    # print("Interpolating flow field...")
 
     # Creates an interpolation function of the flow field to inject it in the solver
     if X_flow_field_string != "NO FLOW":
@@ -702,33 +753,59 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
         Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
     else:
         Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas)
-    
+
+    # print("Flow field interpolated. ")
     ############################################################################
 
     ############################################################################
     #### Solving and writing solution
+
+    time_limiter = StopOnTime(max_simulation_time=T_sim_max)
     start_time = time.time()
     try:
-        sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method).y
-        write_array_to_csv(sol, data_filename)
-        # sol = read_array_from_csv(data_filename)
-        res = True
+        sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method, events=time_limiter.terminate_integration)
+        solving_time = time.time() - start_time
+
+        if sol.t_events[0].size > 0:
+            print("Solving aborted: too long.")
+            solving_time = np.inf
+            res = False
+        else:
+            print("Solving took %s seconds." % solving_time)
+            res = True
+
+        array = np.vstack(( np.ones((1, (sol.y).shape[1])) * solving_time, sol.y ))
+        write_array_to_csv(array, data_filename)
+
+        print("Solving took %s seconds." % (time.time() - start_time))
+        return res
 
     except ValueError:
         print("ValueError")
         sol = np.array(['ValueError'])
-        write_array_to_csv(sol, data_filename)
+        solving_time = np.inf
+        array = np.hstack(( np.ones((1, sol.shape[1])) * solving_time, sol ))        
+        write_array_to_csv(array, data_filename)
         res = False
+        return res
 
     except np.linalg.LinAlgError:
-        sol = np.array(['LinAlgError'])
         print("LinAlgError")
-        write_array_to_csv(sol, data_filename)
+        sol = np.array(['LinAlgError'])
+        solving_time = np.inf
+        array = np.hstack(( np.ones((1, sol.shape[1])) * solving_time, sol ))
+        write_array_to_csv(array, data_filename)
         res = False
+        return res
+
+    except Exception as ex:
+        print(ex)
+        res = False
+        return res
+
     ############################################################################
 
-    print("Solving took %s seconds." % (time.time() - start_time))
-    return res
+
 
 def SolveAndSave_callback(result):
     """ Callback function to use pool.apply_async to SolveAndSave. """

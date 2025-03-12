@@ -17,6 +17,7 @@ if __name__ == "__main__":
     ###########################################
     ### ----- Adimensional Parameters ----- ###
 
+    print("Preparing parameter space...")
 
     ####################
     ## RFT parameters ##
@@ -35,18 +36,18 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1e-2, 1e2]
+    Sp4_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
     ################
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [0]
+    Beta_list = [0] #, 1e-2, 1e-1, 1e0, 1e1, 1e2]
     ####################################
 
     ###############################
     # Bending viscosity timescale #
     # remark : it is in tau_s units
-    Tau_b_list = [0]
+    Tau_b_list = [0] #, 1e-2, 1e-1, 1e0, 1e1, 1e2]
     taus_b_list = [[[tau_b]*N for tau_b in Tau_b_list] for N in N_list]
     ###############################
 
@@ -63,17 +64,22 @@ if __name__ == "__main__":
     n_L_list = [[0, 0]] # No force at s = L
     m_L_list = [0] # No torque at s = L
     ######################
+    print("Parameter space prepared.")
 
     #######################
     # Temporal conditions #
 
-    init_conf_list = [StraightLine] ## Initial conditions
+    print("Preparing initial conditions...")
+
+    init_conf_list = [SmoothCurve] ## Initial conditions in [StraightLine, ProximalBend, SmoothCurve]
     # Eq_vertical_boundary_force = np.array([0.000000000000000e+00, 0.000000000000000e+00, 0.000000000000000e+00, 5.877222997995371e-04, 5.532385567299844e-04, 5.184944574676916e-04, 4.842262606778126e-04, 4.492680707413920e-04, 4.151914704003446e-04, 3.800651712615969e-04, 3.461225606184570e-04, 3.108923972790254e-04, 2.770099861024614e-04, 2.417517203724261e-04, 2.078481007731863e-04, 1.726401011219769e-04, 1.386356075533087e-04, 1.035495750841326e-04, 6.937505495678696e-05, 3.446260135614057e-05])   
 
+    print("Initial conditions prepared. ")
     #######################  
 
     #########################
 
+    print("External forces and torques...")
     #############################
     ## External forces: ad hoc ##
 
@@ -147,7 +153,9 @@ if __name__ == "__main__":
     # print("Zetas_list: ", Zetas_list)
     ##########
 
+    print("External forces and torques ready.")
     #############################
+
 
     ################
     ## Flow field ##
@@ -157,8 +165,8 @@ if __name__ == "__main__":
     # Constant vertical flow
     # X_flow_field_list = [np.array([0, 10**(-6)])]
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
-    A_list = [1e-3]
-    w0_list = [1e-3, 1e0, 1e3]
+    A_list = [1e-2] # 1e-2, 1e-1, 1e0, 1e1, 1e2]
+    w0_list = [1] # 1e-2, 1e-1, 1e0, 1e1, 1e2]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -169,23 +177,32 @@ if __name__ == "__main__":
 
     ######################
     # Integration scheme #
-    method_list = ['BDF'] # ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
+    method_list = ['RK45'] # ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
     ######################
 
     ################################
     # Time, counted in tau_s units #
+    print("Setting time...")
 
-    # dT = 10**(-1) # 1*10**(0)
-    # T_max = 10**(2) # 5*10**(-3)
-    # T_span = [0, T_max]
-    # T_eval = [dT*i for i in range(int(T_max/dT)+1)]
-    dT_list = [2*np.pi/(100*w0) for w0 in w0_list]
-    T_max_list = [2*np.pi*20/w0 for w0 in w0_list]
+    # time determined by the flow timescale
+    # dT_list = [2*np.pi/(100*w0) for w0 in w0_list]
+    # T_max_list = [2*np.pi*20/w0 for w0 in w0_list]
+
+    # Aiming big
+    dT_list = [1e-2 for w0 in w0_list]
+    T_max_list = [1e1 for w0 in w0_list]
+
     T_span_list = [[0, T_max] for T_max in T_max_list]
     T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l])+1)] for l in range(len(w0_list))]
-    
+
     ################################
 
+    ###############################
+    # Maximum simulation time (s) #
+    T_sim_max = 120 # 2 minutes
+    ###############################
+
+    print("Time set.")
     ###########################
 
     ### ----- Adimensional parameters ----- ###
@@ -194,22 +211,29 @@ if __name__ == "__main__":
 
     ###################################
     ### ---- Create flow field ---- ###
+    print('Creating flow field...')
 
     Flow_field_filename = ""
     X_flow_field_list = []
     X_flow_field_string_list = []
+    s = 0
     for k in range(len(A_list)):
         for l in range(len(w0_list)):
+            s += 1
+            print('s = ', s, 'flow fields have been created out of', len(A_list) + len(w0_list), '(', 100 * s / (len(A_list) + len(w0_list)), 'percent).')
             X_flow_field_string, X_flow_field = CreateFlowField(A_list[k], w0_list[l], psi, T_eval_list[l], filename = Flow_field_filename)
             X_flow_field_list.append(X_flow_field)
             X_flow_field_string_list.append(X_flow_field_string)
 
+    print('Flow field created.')
     ### ---- Create flow field ---- ###
     ###################################
 
 
     ############################################
     ### ----- Adimensional Computation ----- ###
+
+    print("Computations will start...")
 
     # Parameters of interest:
     # - Initial conditions: X_0, init_conf
@@ -252,13 +276,14 @@ if __name__ == "__main__":
 
                                                 #########################################
                                                 ### ---- Gather solver arguments ---- ###
-                                                solver_dict = dict(output_folder = output_folder, N = N, taus_b = taus_b, init_conf = init_conf, Beta = Beta, gamma = gamma, n_L = n_L, m_L = m_L, A = A, w0 = w0, Sp4 = Sp4, Lambdas = Lambdas, Zetas = Zetas, X_flow_field_string = X_flow_field_string, T_span = T_span, T_eval = T_eval, X_flow_field = X_flow_field, X_0 = X_0, method = method)
+                                                solver_dict = dict(output_folder = output_folder, N = N, taus_b = taus_b, init_conf = init_conf, Beta = Beta, gamma = gamma, n_L = n_L, m_L = m_L, A = A, w0 = w0, Sp4 = Sp4, Lambdas = Lambdas, Zetas = Zetas, X_flow_field_string = X_flow_field_string, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, X_flow_field = X_flow_field, X_0 = X_0, method = method)
                                                 #########################################
 
                                                 res = pool.apply_async(func = SolveAndSave, args = list(solver_dict.values()), callback = SolveAndSave_callback)
                                         
     pool.close()
     pool.join() # postpones the execution of next line of code until all processes in the queue are done.
+    print("All problems have been solved (one way or another!). ")
     
     ### ----- Adimensional Computation ----- ###
     ############################################
