@@ -10,6 +10,9 @@ from datetime import datetime
 import warnings
 import multiprocessing as mp
 
+# Folder in which simulation outputs are stored
+output_folder = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+
 if __name__ == "__main__":
     ###########################################
     ### ----- Adimensional Parameters ----- ###
@@ -23,7 +26,7 @@ if __name__ == "__main__":
 
     ################################
     ## Coarse-graining parameters ##
-    N_list = [100]                            
+    N_list = [10]                            
     ################################
 
 
@@ -32,7 +35,7 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [10**(-1)]
+    Sp4_list = [1e-2, 1e2]
     ################
 
     ####################################
@@ -43,7 +46,7 @@ if __name__ == "__main__":
     ###############################
     # Bending viscosity timescale #
     # remark : it is in tau_s units
-    Tau_b_list = [0, 1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3, 1e4]
+    Tau_b_list = [0]
     taus_b_list = [[[tau_b]*N for tau_b in Tau_b_list] for N in N_list]
     ###############################
 
@@ -154,8 +157,8 @@ if __name__ == "__main__":
     # Constant vertical flow
     # X_flow_field_list = [np.array([0, 10**(-6)])]
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
-    A_list = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]
-    w0_list = [1e-3,1e-2,1e-1,1e0,1e1,1e2,1e3]
+    A_list = [1e-3]
+    w0_list = [1e-3, 1e0, 1e3]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -166,9 +169,7 @@ if __name__ == "__main__":
 
     ######################
     # Integration scheme #
-
-    # Finite difference
-
+    method_list = ['BDF'] # ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
     ######################
 
     ################################
@@ -207,60 +208,25 @@ if __name__ == "__main__":
     ###################################
 
 
-    ##############################
-    ### ----- Data files ----- ###
-
-    # File with data on parameter loops
-    date = datetime.now().strftime("%Y%m%d-%I%M%S%f")
-    output_folder = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/renormalized/bending_elasticity_viscosity/periodic_response/"
-    list_file = open(output_folder + "list_data_" + str(date) + ".dat", "w")
-
-    ## Write metadata content
-
-    list_file.write("METADATA:" + "\n")
-    list_file.write("N_list = " + str(N_list) + "\n")
-    list_file.write("init_conf_List = " + str(init_conf_list) + "\n")
-    list_file.write("Beta_list = " + str(Beta_list) + "\n")
-    list_file.write("Tau_b_list = " + str(taus_b_list) + "\n")
-    list_file.write("n_L_list = " + str(n_L_list) + "\n")
-    list_file.write("m_L_List = " + str(m_L_list) + "\n")
-    list_file.write("Lambdas_list = " + str(Lambdas_list) + "\n")
-    list_file.write("Zetas_list = " + str(Zetas_list) + "\n")
-
-    X_flow_field_list_string = "X_flow_field_list = " + "["
-    for p in range(len(X_flow_field_string_list)):
-        X_flow_field_list_string += X_flow_field_string_list[p]
-        if p<len(X_flow_field_string_list)-1:
-            X_flow_field_list_string += ", "
-    X_flow_field_list_string += "]" + "\n"
-    list_file.write(X_flow_field_list_string)
-
-    list_file.write("Sp4_list = " + str(Sp4_list) + "\n")
-    list_file.write("gamma_list = " + str(gamma_list) + "\n")
-    list_file.write("T_span_list = " + str(T_span_list)+"\n")
-    list_file.write("T_eval_list = " + str(T_eval_list)+"\n")
-    list_file.write("\n")
-    list_file.close()
-
-    ### ----- Data files ----- ###
-    #############################
-
-
     ############################################
     ### ----- Adimensional Computation ----- ###
 
     # Parameters of interest:
+    # - Initial conditions: X_0, init_conf
+    # - Boundary conditions: n_L, m_L
     # - Internal parameters: Sp4, Beta, Tau_s, Tau_b, K_b
-    # - External forcing parameters: A, w0
-    # - Simulation parameters: N or Delta_s
+    # - External force and torque parameters: Lambdas, Zetas
+    # - External flow parameters: A, w0, X_flow_field_string, X_flow_field
+    # - Simulation parameters: N, T_span, T_eval, method
 
-    # Number of systems to integrate = 
-    files_number = len(N_list)*len(init_conf_list)*len(Beta_list)*len(n_L_list)*len(m_L_list)*len(A_list)*len(w0_list)*len(Sp4_list)*len(gamma_list)
-    print(files_number, "different problems will be integrated")
-    progression_number = 0
+    # Number of systems to integrate
+    files_number = len(N_list)*len(init_conf_list)*len(Beta_list)*len(n_L_list)*len(m_L_list)*len(A_list)*len(w0_list)*len(Sp4_list)*len(gamma_list)*len(method_list)
+    print(files_number, "problems will be integrated")
 
+    # Start parallel computation
     pool = mp.Pool(mp.cpu_count())
 
+    # Loop over all parameters
     for n in range(len(N_list)):
         N = N_list[n]
         taus_b_real_list = taus_b_list[n]
@@ -280,17 +246,16 @@ if __name__ == "__main__":
                                     T_eval = T_eval_list[l]
                                     X_flow_field = X_flow_field_list[k*len(w0_list)+l] ## 
                                     X_flow_field_string = X_flow_field_string_list[k*len(w0_list)+l]
-
                                     for Sp4 in Sp4_list:
                                         for gamma in gamma_list:
-                                            # Write individual data
+                                            for method in method_list:
 
-                                            args_SolveAndSave = (output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, X_flow_field, X_0)
-                                            # args_g = (N, Sp4, w0, A)
-                                            # print("Before pool.apply_async")
-                                            res = pool.apply_async(func = SolveAndSave, args = args_SolveAndSave, callback = SolveAndSave_callback)
-                                            # progression_number += 1
-                                            # print("progression: ", progression_number/files_number, "%% of the problems have been solved.")
+                                                #########################################
+                                                ### ---- Gather solver arguments ---- ###
+                                                solver_dict = dict(output_folder = output_folder, N = N, taus_b = taus_b, init_conf = init_conf, Beta = Beta, gamma = gamma, n_L = n_L, m_L = m_L, A = A, w0 = w0, Sp4 = Sp4, Lambdas = Lambdas, Zetas = Zetas, X_flow_field_string = X_flow_field_string, T_span = T_span, T_eval = T_eval, X_flow_field = X_flow_field, X_0 = X_0, method = method)
+                                                #########################################
+
+                                                res = pool.apply_async(func = SolveAndSave, args = list(solver_dict.values()), callback = SolveAndSave_callback)
                                         
     pool.close()
     pool.join() # postpones the execution of next line of code until all processes in the queue are done.

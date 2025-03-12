@@ -75,6 +75,8 @@ def ExtractParametersData(filename):
     T_eval = file.readline()[9:] ##
     T_eval = list(map(float, T_eval.strip('][\n').split(', ')))
 
+    method = file.readline()
+
     ## Create data arrays in functions of the metadata
     X = np.zeros((N+2, len(T_eval)))
     file.readline()
@@ -90,7 +92,7 @@ def ExtractParametersData(filename):
             X[:,t] = list(map(float, file.readline().strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
 
     file.close()
-    parameters = [N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval]
+    parameters = [N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval, method]
     return parameters, X
 
 def ExtractParameters(filename):
@@ -144,8 +146,10 @@ def ExtractParameters(filename):
     T_eval = file.readline()[9:] ##
     T_eval = list(map(float, T_eval.strip('][\n').split(', '))) # T_eval = list(map(float, T_eval.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
 
+    method = file.readline()
+
     file.close()
-    parameters = [N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval]
+    parameters = [N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval, method]
     return parameters
 
 def ExtractData(filename):
@@ -174,6 +178,8 @@ def ExtractData(filename):
     T_eval = file.readline()[9:] ##
     T_eval = list(map(float, T_eval.strip('][\n').split(', ')))#list(map(float, T_eval.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
 
+    file.readline()
+    
     ## Create data arrays in functions of the metadata
     X = np.zeros((N+2, len(T_eval)))
     file.readline()

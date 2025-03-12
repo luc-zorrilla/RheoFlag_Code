@@ -14,9 +14,125 @@ import matplotlib.pyplot as plt
 import time
 from datetime import datetime
 
+import json
+import codecs
+
 #############################
 ### ----- Functions ----- ###
 #############################
+
+################################
+## --- Metadata as a dict --- ##
+
+def write_dict_to_json_file(dictionary, file_name):
+    """
+    Writes a Python dictionary to a JSON file in a user-friendly format.
+    Converts NumPy arrays to lists for JSON serialization.
+
+    Args:
+        dictionary (dict): The dictionary to write to the JSON file.
+        file_name (str): The name of the JSON file to write to.
+    """
+    def convert_numpy(obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()  # Convert NumPy array to list
+        raise TypeError(f"Type {type(obj)} is not JSON serializable")
+
+    try:
+        with open(file_name, 'w') as json_file:
+            json.dump(dictionary, json_file, indent=4, default=convert_numpy)
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+def read_dict_from_json_file(file_name):
+    """
+    Reads a Python dictionary from a JSON file.
+    Converts lists back to NumPy arrays where applicable.
+
+    Args:
+        file_name (str): The name of the JSON file to read from.
+
+    Returns:
+        dict: The dictionary read from the JSON file, with lists converted back to NumPy arrays.
+    """
+    def convert_back_to_numpy(obj):
+        if isinstance(obj, list):
+            return np.array(obj)  # Convert lists back to NumPy arrays
+        return obj
+
+    try:
+        with open(file_name, 'r') as json_file:
+            dictionary = json.load(json_file)
+
+        # Recursively convert lists back to NumPy arrays
+        for key, value in dictionary.items():
+            if isinstance(value, list):
+                dictionary[key] = convert_back_to_numpy(value)
+
+        print(f"Dictionary with NumPy arrays has been successfully read from {file_name}")
+        return dictionary
+    except FileNotFoundError:
+        print(f"The file {file_name} does not exist.")
+    except json.JSONDecodeError:
+        print("Error decoding JSON from file.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+################################
+
+##############################
+## --- Data as csv file --- ##
+
+def write_array_to_csv(array, filename):
+    """
+    Write a NumPy array of any shape to a CSV file.
+    The shape is saved in the first line of the CSV file.
+
+    Parameters:
+    - array: NumPy array of any shape
+    - filename: the name of the CSV file (without extension)
+    """
+    array = np.array(array)
+    shape = array.shape
+
+    # Open the file in write mode
+    with open(f'{filename}', 'w') as f:
+        # Write the shape in the first line
+        f.write(','.join(map(str, shape)) + '\n')
+
+        # Flatten the array and write the data
+        np.savetxt(f, array.flatten(), delimiter=',')
+
+    print(f"Array successfully written to {filename}.csv")
+def read_array_from_csv(filename):
+    """
+    Read a NumPy array of any shape from a CSV file.
+    The shape is obtained from the first line of the CSV file.
+
+    Parameters:
+    - filename: the name of the CSV file (without extension)
+
+    Returns:
+    - NumPy array reshaped to its original dimensions
+    """
+    # Open the CSV file and read the first line (shape)
+    with open(f'{filename}.csv', 'r') as f:
+        # Read the first line which contains the shape
+        shape_line = f.readline().strip()
+        shape = tuple(map(int, shape_line.split(',')))
+
+        # Read the flattened array data
+        flat_array = np.loadtxt(f, delimiter=',')
+
+    # Reshape it back to its original shape
+    array = flat_array.reshape(shape)
+    
+    print(f"Array successfully read from {filename}.csv")
+    return array
+
+##############################
+
 
 ################################
 ## --- Initial conditions --- ##
@@ -502,7 +618,7 @@ def f(t, X, Sp4, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, Inte
 
 ######################################################
 ## --- Solves and saves the differential system --- ##
-def Solve(f, taus_b, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, X_flow_field, X_0):
+def Solve(f, taus_b, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, X_flow_field, X_0, method = 'LSODA'):
     """Solves the linear system for a set of parameters and returns the solution. """
 
     # Creates an interpolation function of the flow field to inject it in the solver
@@ -515,7 +631,7 @@ def Solve(f, taus_b, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_f
 
     start_time = time.time()
     try:
-        sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = 'LSODA').y
+        sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method).y
         res = sol
 
     except ValueError:
@@ -529,81 +645,89 @@ def Solve(f, taus_b, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_f
 
     return res
 
-def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, X_flow_field, X_0):
+def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, X_flow_field, X_0, method = 'LSODA'):
     
     """ Solves the linear system for a set of parameters and saves the resulting dynamics in a file. 
-    Returns True if the algorithm converges, False otherwise. """
+    Returns True if the algorithm converges, False otherwise. 
+    
+    INPUTS
+    - output_folder: where the metadata+data file is saved
+    - N: number of segments
+    - taus_b: bending characteristic time
+    - init_conf: initial spatial configuration of the filament (string)
+    - Beta: ratio of the shear elasticity over the bending elasticity. 0 means only bending elasticity is present
+    - gamma: RFT parameter
+    - n_L: point force at s = L
+    - m_L: point torque at s = L
+    - A: flow amplitude
+    - w0: flow frequency
+    - Sp4: Sperm number^4, i.e., ratio of fluid viscosity over bending elasticity
+    - Lambdas: ad hoc force on filament segments
+    - Zetas: ad hoc torque on filament segments
+    - X_flow_field_string: flow field metadata
+    - T_span: simulation time
+    - T_eval: ? 
+    - X_flow_field: prescribed flow field
+    - X_0: initial position of the filament
+    - method: solving method for solve_ivp. Can be any of ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
+        Explicit Runge-Kutta methods (‘RK23’, ‘RK45’, ‘DOP853’) should be used for non-stiff problems and implicit methods (‘Radau’, ‘BDF’) for stiff problems [9]. Among Runge-Kutta methods, ‘DOP853’ is recommended for solving with high precision (low values of rtol and atol).
+
+        If not sure, first try to run ‘RK45’. If it makes unusually many iterations, diverges, or fails, your problem is likely to be stiff and you should use ‘Radau’ or ‘BDF’. ‘LSODA’ can also be a good universal choice, but it might be somewhat less convenient to work with as it wraps old Fortran code.
+    """
+
+    ############################################################################
+    #### Metadata
 
     date = datetime.now().strftime("%Y%m%d-%I%M%S%f")
-    file = open(output_folder + "data_" + str(date) + ".dat", "a")
-    
-    # Write metadata of individual simulation
-    file.write("METADATA:"+"\n")
-    file.write("N = " + str(N)+"\n")
-    file.write("taus_b = " + str(taus_b)+"\n")
-    file.write("init_conf = " + str(init_conf)+"\n")
-    file.write("Beta = " + str(Beta)+"\n")
-    file.write("gamma = " + str(gamma) + "\n")
-    file.write("n_L = " + str(n_L)+"\n")
-    file.write("m_L = " + str(m_L)+"\n")
-    file.write("A = " + str(A)+"\n")
-    file.write("w0 = " + str(w0)+"\n")
-    file.write("Sp4 = " + str(Sp4)+"\n")
-    Lambdas_string = "Lambdas = " + "["
-    for p in range(len(Lambdas)):
-        Lambda_vector = Lambdas[p]
-        Lambdas_string += str(Lambda_vector).replace(',', ';')
-        if p<len(Lambdas)-1:
-            Lambdas_string += ", "
-    Lambdas_string += "]\n"
-    file.write(Lambdas_string)
-    file.write("Zetas = " + str(Zetas) + "\n")
-    file.write("X_flow_field = " + str(X_flow_field_string) + "\n")
-    file.write("T_span = " + str(T_span) + "\n")
-    file.write("T_eval = " + str(T_eval) + "\n")
-    # file.write(np.array2string(T_eval, precision = 15, floatmode="maxprec").replace('\n','')+"\n")
-    
-    file.write("\n")
+    metadata_filename = output_folder + "metadata_" + str(date) + ".json"
+    data_filename = output_folder + "data_" + str(date) + ".csv"
+
+    solver_values = [output_folder, N, taus_b, str(init_conf), Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, X_flow_field, X_0, method]
+
+    solver_keys = ["output_folder", "N", "taus_b", "init_conf", "Beta", "gamma", "n_L", "m_L", "A", "w0", "Sp4", "Lambdas", "Zetas", "X_flow_field_string", "T_span", "T_eval", "X_flow_field", "X_0", "method"]
+    solver_dict = {f"{solver_keys[k]}": solver_values[k] for k in range(len(solver_values))}
+
+    write_dict_to_json_file(solver_dict, metadata_filename)
+    # read_solver_dict = read_dict_from_json_file(metadata_filename)
+    ############################################################################
+
+    ############################################################################
+    #### Flow field
 
     # Creates an interpolation function of the flow field to inject it in the solver
     if X_flow_field_string != "NO FLOW":
-        # T_eval = np.array(T_eval).reshape(len(T_eval),)
 
-        
         InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate") # Beware of that extrapolation option - might be due to the period being much higher than actual time step
         
         Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
     else:
         Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas)
+    
+    ############################################################################
 
+    ############################################################################
+    #### Solving and writing solution
     start_time = time.time()
-    # warnings.filterwarnings(action='ignore')
     try:
-        sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = 'LSODA').y
-        file.write("DATA:\n")
-        for t in range(len(T_eval)):
-            file.write(np.array2string(sol[:,t], precision = 15, floatmode="maxprec").replace('\n','')+"\n")
-        file.write("\n")
-        file.close()
+        sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method).y
+        write_array_to_csv(sol, data_filename)
+        # sol = read_array_from_csv(data_filename)
         res = True
 
     except ValueError:
         print("ValueError")
-        file.write("DATA:\n")
-        file.write("ValueError" + "\n")
-        file.write("\n")
-        file.close()
+        sol = np.array(['ValueError'])
+        write_array_to_csv(sol, data_filename)
         res = False
 
     except np.linalg.LinAlgError:
+        sol = np.array(['LinAlgError'])
         print("LinAlgError")
-        file.write("LinAlgError" + "\n")
-        file.write("\n")
-        file.close()
+        write_array_to_csv(sol, data_filename)
         res = False
+    ############################################################################
 
     print("Solving took %s seconds." % (time.time() - start_time))
-
     return res
 
 def SolveAndSave_callback(result):
@@ -614,6 +738,7 @@ def SolveAndSave_callback(result):
     return
 
 if __name__ == "__main__":
+
     theta = np.linspace(0, 2*np.pi, 1000)
     gamma = np.array([1,2])
 

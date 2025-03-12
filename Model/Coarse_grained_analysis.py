@@ -23,14 +23,12 @@ from datetime import datetime
 ### ----- Read data from file ----- ###
 # exit()
 
-folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/renormalized/bending_elasticity_viscosity/periodic_response/"
-# periodic_pure_bending_filename = "data_20240710-072407387487.dat"
-# periodic_bending_all_filename = "data_20240710-072612423428.dat"
+folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
 
-filename = "data_20250311-034227331518.dat"
+filename = "data_20250312-113226101654.dat"
 parameters, X = ExtractParametersData(folder_name + filename)
 
-N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval = parameters
+N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval, method = parameters
 tau_b = taus_b[0]
 print("N = ", N)
 print("A = ", A)
