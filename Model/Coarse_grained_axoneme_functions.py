@@ -630,22 +630,25 @@ def f(t, X, Sp4, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, Inte
 ## --- Differential system AQX_dot = B --- ##
 #############################################
 
-# Define a custom event function to stop based on time
+# Class to track total simulation time and trigger an event when time limit is exceeded
 class StopOnTime:
     def __init__(self, max_simulation_time):
-        self.start_time = time.time()  # Track the start time
         self.max_simulation_time = max_simulation_time
-
-    def event(self, t, y, *args):
-        # Check elapsed time
-        elapsed_time = time.time() - self.start_time
-        if elapsed_time > self.max_simulation_time:
-            return 0  # Event triggers when this returns zero
-        return 1      # Otherwise, continue integration
+        self.start_time = time.time()
     
+    # This event function will check the total simulation time elapsed and stop if necessary
+    def event(self, t, y, *args):
+        elapsed_time = time.time() - self.start_time
+        # Return 0 to trigger the event when time exceeds the limit
+        return self.max_simulation_time - elapsed_time
+
+    # Ensure the event is terminal (integration stops when the event triggers)
     def terminate_integration(self, t, y, *args):
-        # This ensures we only terminate the integration when crossing zero
-        return np.sign(self.event(t, y, *args))
+        return self.event(t, y, *args)
+    
+    # Set event properties
+    terminate_integration.terminal = True
+    terminate_integration.direction = 0
 
 ## --- Test --- ##
 # def g(x, a, b, c):
@@ -654,40 +657,40 @@ class StopOnTime:
 
 ######################################################
 ## --- Solves and saves the differential system --- ##
-def Solve(f, taus_b, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = 'LSODA'):
-    """Solves the linear system for a set of parameters and returns the solution. """
+# def Solve(f, taus_b, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = 'LSODA'):
+#     """Solves the linear system for a set of parameters and returns the solution. """
 
-    time_limiter = StopOnTime(max_simulation_time=T_sim_max)
+#     time_limiter = StopOnTime(max_simulation_time=T_sim_max)
+    
+#     # Creates an interpolation function of the flow field to inject it in the solver
+#     if X_flow_field_string != "NO FLOW":
+#         InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate") # Beware of that extrapolation option - might be due to the period being much higher than actual time step
+#         Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
 
-    # Creates an interpolation function of the flow field to inject it in the solver
-    if X_flow_field_string != "NO FLOW":
-        InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate") # Beware of that extrapolation option - might be due to the period being much higher than actual time step
-        Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
+#     else: # no flow
+#         Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas)
 
-    else: # no flow
-        Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas)
+#     try:
+#         sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method, events = time_limiter.terminate_integration).y
+#         solving_time = time.time() - time_limiter.start_time
 
-    start_time = time.time()
-    try:
-        sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method, events=time_limiter.terminate_integration).y
-        solving_time = time.time() - start_time
+#     except ValueError:
+#         print("ValueError")
+#         res = False
+#     except np.linalg.LinAlgError:
+#         print("LinAlgError")
+#         res = False
 
-    except ValueError:
-        print("ValueError")
-        res = False
-    except np.linalg.LinAlgError:
-        print("LinAlgError")
-        res = False
+#     # Check if the solver was stopped due to exceeding the time limit
+#     if sol.t_events[0].size > 0:
+#         # If an event triggered, i.e., the time limit was exceeded
+#         res = np.inf
+#         print("Solving aborted: too long.")
+#     else:
+#         res = solving_time, sol
+#         print("Solving took %s seconds." % solving_time)
 
-    if sol.t_events[0].size > 0:
-        # If an event triggered, i.e., the time limit was exceeded
-        res = np.inf
-        print("Solving aborted: too long.")
-    else:
-        res = solving_time, sol
-        print("Solving took %s seconds." % solving_time)
-
-    return res
+#     return res
 
 def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = 'LSODA'):
     
@@ -760,11 +763,11 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
     ############################################################################
     #### Solving and writing solution
 
-    time_limiter = StopOnTime(max_simulation_time=T_sim_max)
-    start_time = time.time()
+    
     try:
+        time_limiter = StopOnTime(max_simulation_time=T_sim_max)
         sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method, events=time_limiter.terminate_integration)
-        solving_time = time.time() - start_time
+        solving_time = time.time() - time_limiter.start_time
 
         if sol.t_events[0].size > 0:
             print("Solving aborted: too long.")
@@ -777,7 +780,6 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
         array = np.vstack(( np.ones((1, (sol.y).shape[1])) * solving_time, sol.y ))
         write_array_to_csv(array, data_filename)
 
-        print("Solving took %s seconds." % (time.time() - start_time))
         return res
 
     except ValueError:

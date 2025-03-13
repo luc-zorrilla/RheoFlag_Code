@@ -24,7 +24,7 @@ from datetime import datetime
 
 folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
 
-id_filename = "20250312-072050109325"
+id_filename = "20250312-073438743266"
 
 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
 data_filename = folder_name + 'data_' + id_filename + '.csv'
