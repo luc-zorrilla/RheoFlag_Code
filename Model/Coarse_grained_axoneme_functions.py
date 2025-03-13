@@ -16,6 +16,7 @@ from datetime import datetime
 
 import json
 import codecs
+import csv
 
 #############################
 ### ----- Functions ----- ###
@@ -90,19 +91,27 @@ def write_array_to_csv(array, filename):
     The shape is saved in the first line of the CSV file.
 
     Parameters:
-    - array: NumPy array of any shape
+    - array: NumPy array of any shape (can contain strings or numbers)
     - filename: the name of the CSV file (without extension)
     """
-    array = np.array(array)
+    array = np.array(array)  # Ensure the input is a NumPy array
     shape = array.shape
 
-    # Open the file in write mode
-    with open(f'{filename}', 'w') as f:
+    # Open the file in write mode (with .csv extension)
+    with open(f'{filename}', 'w', newline='') as f:
+        writer = csv.writer(f)
+        
         # Write the shape in the first line
-        f.write(','.join(map(str, shape)) + '\n')
-
-        # Flatten the array and write the data
-        np.savetxt(f, array.flatten(), delimiter=',')
+        writer.writerow(shape)
+        
+        # Check if the array contains strings
+        if np.issubdtype(array.dtype, np.number):
+            # Use np.savetxt for numerical arrays
+            np.savetxt(f, array.flatten(), delimiter=',')
+        else:
+            # Use csv.writer for arrays containing strings
+            for item in array.flatten():
+                writer.writerow([item])
 
     print(f"Array successfully written to {filename}")
 
@@ -119,15 +128,24 @@ def read_array_from_csv(filename):
     """
     # Open the CSV file and read the first line (shape)
     with open(f'{filename}', 'r') as f:
+        reader = csv.reader(f)
+        
         # Read the first line which contains the shape
-        shape_line = f.readline().strip()
-        shape = tuple(map(int, shape_line.split(',')))
+        shape_line = next(reader)
+        shape = tuple(map(int, shape_line))
+        
+        # Read the flattened array data (as strings initially)
+        flat_data = [row[0] for row in reader]
 
-        # Read the flattened array data
-        flat_array = np.loadtxt(f, delimiter=',')
-
-    # Reshape it back to its original shape
-    array = flat_array.reshape(shape)
+    # Check if the data is numeric or not
+    try:
+        # Attempt to convert the data to floats
+        flat_array = np.array(flat_data, dtype=float)
+        # Reshape it back to its original shape if successful
+        array = flat_array.reshape(shape)
+    except ValueError:
+        # If the data contains strings, keep it as a string array
+        array = np.array(flat_data, dtype=object).reshape(shape)
     
     print(f"Array successfully read from {filename}.csv")
     return array
@@ -145,10 +163,8 @@ def get_metadata(metadata_filename):
 def get_data(data_filename):
 
     sol = read_array_from_csv(data_filename) # contains '.csv' in the name
-    t_sim = sol[0,:]
-    sol_y = sol[1:,:]
 
-    return t_sim, sol_y
+    return sol
 ################################################################################
 
 ################################
@@ -655,43 +671,6 @@ class StopOnTime:
 #     print(x,a,b,c)
 #     return 
 
-######################################################
-## --- Solves and saves the differential system --- ##
-# def Solve(f, taus_b, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = 'LSODA'):
-#     """Solves the linear system for a set of parameters and returns the solution. """
-
-#     time_limiter = StopOnTime(max_simulation_time=T_sim_max)
-    
-#     # Creates an interpolation function of the flow field to inject it in the solver
-#     if X_flow_field_string != "NO FLOW":
-#         InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate") # Beware of that extrapolation option - might be due to the period being much higher than actual time step
-#         Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
-
-#     else: # no flow
-#         Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas)
-
-#     try:
-#         sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method, events = time_limiter.terminate_integration).y
-#         solving_time = time.time() - time_limiter.start_time
-
-#     except ValueError:
-#         print("ValueError")
-#         res = False
-#     except np.linalg.LinAlgError:
-#         print("LinAlgError")
-#         res = False
-
-#     # Check if the solver was stopped due to exceeding the time limit
-#     if sol.t_events[0].size > 0:
-#         # If an event triggered, i.e., the time limit was exceeded
-#         res = np.inf
-#         print("Solving aborted: too long.")
-#     else:
-#         res = solving_time, sol
-#         print("Solving took %s seconds." % solving_time)
-
-#     return res
-
 def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = 'LSODA'):
     
     """ Solves the linear system for a set of parameters and saves the resulting dynamics in a file. 
@@ -726,21 +705,10 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
     # print('Solving...')
 
     ############################################################################
-    #### Metadata
-    # print("Writing metadata...")
-
+    #### Prepare metadata and data files
     date = datetime.now().strftime("%Y%m%d-%I%M%S%f")
     metadata_filename = output_folder + "metadata_" + str(date) + ".json"
     data_filename = output_folder + "data_" + str(date) + ".csv"
-
-    solver_values = [output_folder, N, taus_b, str(init_conf), Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method]
-
-    solver_keys = ["output_folder", "N", "taus_b", "init_conf", "Beta", "gamma", "n_L", "m_L", "A", "w0", "Sp4", "Lambdas", "Zetas", "X_flow_field_string", "T_span", "T_eval", "T_sim_max", "X_flow_field", "X_0", "method"]
-    solver_dict = {f"{solver_keys[k]}": solver_values[k] for k in range(len(solver_values))}
-
-    write_dict_to_json_file(solver_dict, metadata_filename)
-
-    # print("Metadata written.")
     ############################################################################
 
     ############################################################################
@@ -761,39 +729,42 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
     ############################################################################
 
     ############################################################################
-    #### Solving and writing solution
+    #### Solving and writing solution and metadata
 
-    
     try:
         time_limiter = StopOnTime(max_simulation_time=T_sim_max)
         sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method, events=time_limiter.terminate_integration)
-        solving_time = time.time() - time_limiter.start_time
+        T_sim = time.time() - time_limiter.start_time
 
         if sol.t_events[0].size > 0:
-            print("Solving aborted: too long.")
-            solving_time = np.inf
+            T_sim = np.inf
+            mistake = np.array(["Solving aborted: too long."])
+            print(mistake)
+            write_array_to_csv(mistake, data_filename)
             res = False
         else:
-            print("Solving took %s seconds." % solving_time)
+            print("Solving took %s seconds." % T_sim)
+            write_array_to_csv(sol.y, data_filename)
             res = True
 
-        array = np.vstack(( np.ones((1, (sol.y).shape[1])) * solving_time, sol.y ))
-        write_array_to_csv(array, data_filename)
-
-        return res
-
-    except Exception as ex:
-        print(ex)
-        sol = np.array([ex])
-        solving_time = np.inf
-        array = np.hstack(( np.ones((1, sol.shape[1])) * solving_time, sol ))
-        write_array_to_csv(array, data_filename)        
+    except BaseException as ex:
+        T_sim = np.inf
+        mistake = np.array([str(ex)])
+        print(mistake)
+        write_array_to_csv(mistake, data_filename)
         res = False
-        return res
-
+    
     ############################################################################
-
-
+    # Write metadata
+    # print("Writing metadata...")
+    solver_values = [output_folder, N, taus_b, str(init_conf), Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method]
+    solver_keys = ["output_folder", "N", "taus_b", "init_conf", "Beta", "gamma", "n_L", "m_L", "A", "w0", "Sp4", "Lambdas", "Zetas", "X_flow_field_string", "T_span", "T_eval", "T_sim_max", "T_sim", "X_flow_field", "X_0", "method"]
+    solver_dict = {f"{solver_keys[k]}": solver_values[k] for k in range(len(solver_values))}
+    write_dict_to_json_file(solver_dict, metadata_filename)
+    # print("Metadata written.")
+    ############################################################################
+    
+    return res
 
 def SolveAndSave_callback(result):
     """ Callback function to use pool.apply_async to SolveAndSave. """
