@@ -71,7 +71,6 @@ def read_dict_from_json_file(file_name):
             if isinstance(value, list):
                 dictionary[key] = convert_back_to_numpy(value)
 
-        print(f"Dictionary with NumPy arrays has been successfully read from {file_name}")
         return dictionary
     except FileNotFoundError:
         print(f"The file {file_name} does not exist.")
@@ -113,8 +112,6 @@ def write_array_to_csv(array, filename):
             for item in array.flatten():
                 writer.writerow([item])
 
-    print(f"Array successfully written to {filename}")
-
 def read_array_from_csv(filename):
     """
     Read a NumPy array of any shape from a CSV file.
@@ -147,7 +144,6 @@ def read_array_from_csv(filename):
         # If the data contains strings, keep it as a string array
         array = np.array(flat_data, dtype=object).reshape(shape)
     
-    print(f"Array successfully read from {filename}.csv")
     return array
 
 ##############################
@@ -766,11 +762,10 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
     
     return res
 
-def SolveAndSave_callback(result):
-    """ Callback function to use pool.apply_async to SolveAndSave. """
-    # result += 1
+def SolveAndSave_callback():
+    """ Callback function to use pool.apply_async to SolveAndSave. """    
     # global results
-    # results.append(result)
+    # results += 1
     return
 
 if __name__ == "__main__":

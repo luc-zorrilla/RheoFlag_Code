@@ -24,15 +24,20 @@ from datetime import datetime
 
 folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
 
-id_filename = "20250313-115312602365"
+id_filename = "20250313-115413068901"
 
 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
 data_filename = folder_name + 'data_' + id_filename + '.csv'
 
 solver_dict = get_metadata(metadata_filename)
+output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+
 X = get_data(data_filename)
 
-output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+if T_sim == np.inf:
+    print('Not solved. Error: ', X)
+    exit()
+
 tau_b = taus_b[0]
 
 keys_toprint = ['N', 'A', 'w0', 'Sp4', 'Beta', 'taus_b']
