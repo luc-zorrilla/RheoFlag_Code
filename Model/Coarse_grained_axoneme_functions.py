@@ -782,26 +782,12 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
 
         return res
 
-    except ValueError:
-        print("ValueError")
-        sol = np.array(['ValueError'])
-        solving_time = np.inf
-        array = np.hstack(( np.ones((1, sol.shape[1])) * solving_time, sol ))        
-        write_array_to_csv(array, data_filename)
-        res = False
-        return res
-
-    except np.linalg.LinAlgError:
-        print("LinAlgError")
-        sol = np.array(['LinAlgError'])
-        solving_time = np.inf
-        array = np.hstack(( np.ones((1, sol.shape[1])) * solving_time, sol ))
-        write_array_to_csv(array, data_filename)
-        res = False
-        return res
-
     except Exception as ex:
         print(ex)
+        sol = np.array([ex])
+        solving_time = np.inf
+        array = np.hstack(( np.ones((1, sol.shape[1])) * solving_time, sol ))
+        write_array_to_csv(array, data_filename)        
         res = False
         return res
 
