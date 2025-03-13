@@ -13,6 +13,28 @@ import pandas as pd
 import glob
 import os
 
+import webbrowser
+# Set default web browser for webbrowser as VSCode (can also be done manually)
+VS_path = "C:\\Users\\Luc\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
+webbrowser.register('VS', None, webbrowser.BackgroundBrowser(VS_path))
+web = webbrowser.get('VS')
+# This scripts adds a method to go.Figure class so that one can plot figures in html format inside VS code.
+def vs_show(self):
+
+    temp_dir = "C:\\Users\\Luc\\Documents\\MEGASync\\PhD\\RheoFlag\\Code\\Temp\\"
+    temp_file_number = round(datetime.now().timestamp())
+    save_url = temp_dir + "temp_" + str(temp_file_number) + "_.html"
+
+    self.write_html(save_url, include_mathjax = 'cdn')
+    web.open(save_url)
+
+    return save_url
+go.Figure.vs_show = vs_show
+
+
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import plotly.io as pio
 
 def fetch_files(directory, metadata_condition, data_condition = None):
     """ Fetches all the filename ids in directory which comply with some conditions, 
@@ -113,6 +135,34 @@ def observable_1D_dataframe(directory, ids_list, columns, observable, obs_type =
     return df
 
 
+def plot_2D(df, column_0, column_1):
+    """ Plot two columns of a dataframe in a 2D axis. """
+
+    fig = go.Figure()
+    fig.add_scatter(x = df[column_0], y = df[column_1], mode = 'markers')
+    fig.update_xaxes(title = column_0)
+    fig.update_yaxes(title = column_1)
+    fig.vs_show()
+
+    return fig
+
+def plot_heatmap(df, column_0, column_1, column_2):
+    """ Plot two columns of a dataframe in a 2D axis and a third column as a 
+    heatmap. """
+
+    fig = go.Figure(data = go.Heatmap(
+        x = df[column_0],
+        y = df[column_1],
+        z = df[column_2],
+        ))
+    
+    fig.update_xaxes(title = column_0)
+    fig.update_yaxes(title = column_1)
+    fig.vs_show()
+
+    return fig
+
+
 if __name__ == '__main__':
 
     # Fetch files satisfying required conditions
@@ -122,7 +172,7 @@ if __name__ == '__main__':
     def metadata_condition_0(solver_dict):
         output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
-        bool_condition = (N == 10) & (taus_b[0] == 0) & ("SmoothCurve" in init_conf) & (Beta == 0) & (gamma == 2) & ((A < 0.1) & (A>0.001)) & (method == 'RK45')
+        bool_condition = (N == 10) & (taus_b[0] == 0) & ("SmoothCurve" in init_conf) & (Beta == 0) & (gamma == 2) & ((w0 < 0.1) & (w0>0.001)) & (method == 'RK45')
 
         return bool_condition
 
@@ -130,15 +180,15 @@ if __name__ == '__main__':
 
     # Compute observable on these files and put this new data into a dataframe
 
-    columns = ['Sp4']
+    columns = ['Sp4', 'A']
 
     def simulation_time(solver_dict, X = None):
         output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
         return T_sim    
     
     df = observable_1D_dataframe(sim_directory, ids_list, columns, simulation_time, obs_type = 'metadata')
-    # print(df)
-    # df.info()
-    # df.describe()
+    df.columns = [*df.columns[:-1], 'T_sim']
 
-    # Plot T_sim against: Sp4
+    # Plot T_sim against Sp4
+    plot_2D(df, columns[0], 'T_sim')
+    plot_heatmap(df, columns[0], columns[1], 'T_sim')
