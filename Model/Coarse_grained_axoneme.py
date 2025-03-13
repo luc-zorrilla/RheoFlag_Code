@@ -39,9 +39,14 @@ if __name__ == "__main__":
     Sp4_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
     ################
 
+    ###############################
+    # basal hinge spring constant #
+    k0_list = [1e-2, 1e-1, 1e0, 1e1, 1e2]
+    ###############################
+
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [0,  1e-2, 1e-1, 1e0, 1e1, 1e2]
+    Beta_list = [0, 1e-2, 1e-1, 1e0, 1e1, 1e2]
     ####################################
 
     ###############################
@@ -71,7 +76,7 @@ if __name__ == "__main__":
 
     print("Preparing initial conditions...")
 
-    init_conf_list = [SmoothCurve] ## Initial conditions in [StraightLine, ProximalBend, SmoothCurve]
+    init_conf_list = [StraightLine] ## Initial conditions in [StraightLine, ProximalBend, SmoothCurve]
     # Eq_vertical_boundary_force = np.array([0.000000000000000e+00, 0.000000000000000e+00, 0.000000000000000e+00, 5.877222997995371e-04, 5.532385567299844e-04, 5.184944574676916e-04, 4.842262606778126e-04, 4.492680707413920e-04, 4.151914704003446e-04, 3.800651712615969e-04, 3.461225606184570e-04, 3.108923972790254e-04, 2.770099861024614e-04, 2.417517203724261e-04, 2.078481007731863e-04, 1.726401011219769e-04, 1.386356075533087e-04, 1.035495750841326e-04, 6.937505495678696e-05, 3.446260135614057e-05])   
 
     print("Initial conditions prepared. ")
@@ -177,7 +182,7 @@ if __name__ == "__main__":
 
     ######################
     # Integration scheme #
-    method_list = ['RK45'] # ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
+    method_list = ['Radau'] # ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
     ######################
 
     ################################
@@ -244,7 +249,7 @@ if __name__ == "__main__":
     # - Simulation parameters: N, T_span, T_eval, method
 
     # Number of systems to integrate
-    files_number = len(N_list)*len(init_conf_list)*len(Beta_list)*len(n_L_list)*len(m_L_list)*len(A_list)*len(w0_list)*len(Sp4_list)*len(gamma_list)*len(method_list)
+    files_number = len(N_list)*len(init_conf_list)*len(Tau_b_list)*len(Beta_list)*len(n_L_list)*len(m_L_list)*len(A_list)*len(w0_list)*len(Sp4_list)*len(gamma_list)*len(method_list)
     print(files_number, "problems will be integrated")
 
     # Start parallel computation

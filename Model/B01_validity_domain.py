@@ -142,7 +142,7 @@ def plot_2D(df, column_0, column_1):
     fig.add_scatter(x = df[column_0], y = df[column_1], mode = 'markers')
     fig.update_xaxes(title = column_0)
     fig.update_yaxes(title = column_1)
-    fig.vs_show()
+    # fig.vs_show()
 
     return fig
 
@@ -158,7 +158,7 @@ def plot_heatmap(df, column_0, column_1, column_2):
     
     fig.update_xaxes(title = column_0)
     fig.update_yaxes(title = column_1)
-    fig.vs_show()
+    # fig.vs_show()
 
     return fig
 
@@ -172,15 +172,16 @@ if __name__ == '__main__':
     def metadata_condition_0(solver_dict):
         output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
-        bool_condition = (N == 10) & (taus_b[0] == 0) & ("SmoothCurve" in init_conf) & (Beta == 0) & (gamma == 2) & ((w0 < 0.1) & (w0>0.001)) & (method == 'RK45')
+        bool_condition = (N == 10) & (Beta == 0) & ("SmoothCurve" in init_conf) & (gamma == 2) & ((A < 1e-2) & (w0 < 1e-2)) & (method == 'Radau')
 
         return bool_condition
 
     ids_list = fetch_files(sim_directory, metadata_condition_0, None)
+    print("# files: ", len(ids_list))
 
     # Compute observable on these files and put this new data into a dataframe
 
-    columns = ['Sp4', 'A']
+    columns = ['Sp4', 'taus_b']
 
     def simulation_time(solver_dict, X = None):
         output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
@@ -188,7 +189,8 @@ if __name__ == '__main__':
     
     df = observable_1D_dataframe(sim_directory, ids_list, columns, simulation_time, obs_type = 'metadata')
     df.columns = [*df.columns[:-1], 'T_sim']
+    df['tau_b'] = df.apply(lambda x: x['taus_b'][0], axis = 1)
 
     # Plot T_sim against Sp4
-    plot_2D(df, columns[0], 'T_sim')
-    plot_heatmap(df, columns[0], columns[1], 'T_sim')
+    plot_2D(df, 'tau_b', 'T_sim').show()
+    plot_heatmap(df, 'Sp4', 'tau_b', 'T_sim').show()

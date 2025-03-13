@@ -762,7 +762,7 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
     
     return res
 
-def SolveAndSave_callback():
+def SolveAndSave_callback(result):
     """ Callback function to use pool.apply_async to SolveAndSave. """    
     # global results
     # results += 1
