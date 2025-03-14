@@ -621,7 +621,7 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
     n_0 = [0,0] # No displacement at the base
     if k0 == np.inf:
         k0=0
-    m_0 = k0*X_tilde[2] # Rotation at the base is allowed --> Not sure about the sign
+    m_0 = -k0*X_tilde[2] # Rotation at the base is allowed --> Not sure about the sign
 
     ##################################################################
     ###### Solve the linear system with infinite basal stiffness #####
