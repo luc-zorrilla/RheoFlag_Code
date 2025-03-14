@@ -154,7 +154,7 @@ if __name__ == '__main__':
 
         # bool_condition = (N == 10) & (Beta == 0) & ("SmoothCurve" in init_conf) & (gamma == 2) & ((A < 1e-2) & (w0 < 1e-2)) & (method == 'Radau')
         eps = 1e-6
-        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("ProximalBend" in init_conf) & (gamma == 2) & ((np.abs(A - 0) < eps) & (np.abs(w0 - 0) < eps)) & (np.abs(Sp4 - 1e0) < eps) & (np.abs(k0 - 1e1) < eps) & (method == 'Radau')
+        bool_condition = (N == 1) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("ProximalBend" in init_conf) & (gamma == 2) & ((np.abs(A - 0) < eps) & (np.abs(w0 - 0) < eps)) & (np.abs(Sp4 - 1e0) < eps) & (np.abs(k0 - 1e-12) < eps) & (method == 'Radau')
 
         return bool_condition
 

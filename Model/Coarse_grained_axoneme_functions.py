@@ -311,6 +311,11 @@ def GG(theta, gamma):
     G[2,0] = - G[1,2]
     G[2,2] = - gamma/3
 
+    G[0,3] = 0
+    G[0,4] = 0
+    G[1,3] = 0
+    G[1,4] = 0    
+
     # Components used for external flow only
     G[2,3] = - gamma * sin
     G[2,4] = gamma * cos
@@ -345,8 +350,8 @@ def AA(X_3N, gamma):
 
     A[0,0] = 1 # 1*x0_dot = b_0
     A[1,N] = 1 # 1*y0_dot = b_1
-    A[2,2*N] = 1 # 1*theta_0_dot = b_2
-    for j in range(1, N):
+    # A[2,2*N] = 1 # 1*theta_0_dot = b_2
+    for j in range(0, N):
         for i in range(j, N):
             A[j+2,:] = A[j+2,:] + DD(X_3N, i, j) @ UU(X_3N, i, gamma)
     return A
