@@ -498,15 +498,13 @@ def BC_0(X_3N):
     """ Returns non-dimensional right-hand side of the differential system for boundary conditions
     at s = 0 (proximal end). """
 
+    N = X_3N.shape[0]//3
     B_C = np.zeros((N+2,1))
-    if k0 == np.inf:
-        return B_C
-    else:
-        B_C[0] = 0 # force equation (here on x axis) is not affected by elasticity
-        B_C[1] = 0 # force equation (here on y axis) is not affected by elasticity   
-        B_C[2] = -(X_3N[2*N])
-        # Partial filament torque balance (B_C[3:]) does not depend on torque at s = 0.
-        return B_C
+    B_C[0] = 0 # force equation (here on x axis) is not affected by elasticity
+    B_C[1] = 0 # force equation (here on y axis) is not affected by elasticity   
+    B_C[2] = -(X_3N[2*N])
+    # Partial filament torque balance (B_C[3:]) does not depend on torque at s = 0.
+    return B_C
 
 def BB(X_3N):
     """ Returns non-dimensional right-hand side of the differential system for bending elasticity. """
@@ -652,6 +650,8 @@ def f(t, X, Sp4, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, Inte
         X_flow = InterpFlow(t)
         X_dot_flow = Flow(X_3N, X_flow)
 
+    if k0 == np.inf:
+        k0 = 0
     B_time = time.time()
     B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + k0 * BC_0(X_3N) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
     B_time = time.time() - B_time
@@ -734,7 +734,7 @@ def g(t, X, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, 
         X_dot_flow = Flow(X_3N, X_flow)
 
     B_time = time.time()
-    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + k_0 * BC_0(X_3N) * Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
+    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + k0 * BC_0(X_3N) * Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
     B_time = time.time() - B_time
     if B_time>1:
         print("Getting B took %s seconds." % (B_time))
