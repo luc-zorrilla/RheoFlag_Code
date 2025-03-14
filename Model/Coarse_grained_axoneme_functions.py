@@ -499,12 +499,13 @@ def BB(X_3N):
 
     N = X_3N.shape[0]//3
     B = np.zeros((N+2,1))
-    # Boundary conditions at proximal end
-    B[0] = 0 
-    B[1] = 0
-    B[2] = 0
+
+    B[0] = 0 # force equation (here on x axis) is not affected by elasticity
+    B[1] = 0 # force equation (here on y axis) is not affected by elasticity    
+    B[2] = 0 # total torque equation does not depend on bending resistance
+
     # Bending resistance (constitutive equations)
-    B[3:] = B[3:] + (X_3N[2*N+1:]-X_3N[2*N:-1]) # Bending resistance
+    B[3:] = (X_3N[2*N+1:]-X_3N[2*N:-1]) # Bending resistance
     
     return B
 
