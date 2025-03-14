@@ -186,18 +186,18 @@ def get_data(data_filename):
 
 def StraightLine(N):
     """ A straight line """
-    X_0 = np.zeros(N+2, dtype = np.double)
+    X_0 = np.zeros(N+3, dtype = np.double)
     return X_0
 
 def ProximalBend(N):
     """ A proximal bend (of the first segment) """
-    X_0 = np.zeros(N+2, np.double)
+    X_0 = np.zeros(N+3, np.double)
     X_0[2] = np.pi/4
     return X_0
 
 def SmoothCurve(N):
     """ A curve with constant curvature, so that the total shear angle is pi/2 """
-    X_0 = np.zeros(N+2, np.double)
+    X_0 = np.zeros(N+3, np.double)
     X_0[2:-1] = np.arange(1,N+1) * (np.pi/4) / N
     return X_0
 
@@ -619,6 +619,8 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
     # theta_0_dot = -X_tilde[2] * np.sin(np.sqrt(k0)*t)
     # theta_0 = X_tilde[2] * np.cos(np.sqrt(k0)*t)
     n_0 = [0,0] # No displacement at the base
+    if k0 == np.inf:
+        k0=0
     m_0 = k0*X_tilde[2] # Rotation at the base is allowed --> Not sure about the sign
 
     ##################################################################
@@ -679,7 +681,7 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
     ##################################################################
     
     # Extend the linear system to the basal hinge conditions
-    # X_dot[2] = X_tilde[-1] # \dot(theta_0) = theta_0_dot
+    X_dot[2] = X_tilde[-1] # \dot(theta_0) = theta_0_dot
     theta_0_dot_dot = -k0*X[2]
     X_tilde_dot = np.hstack((X_dot, [theta_0_dot_dot]))
 
@@ -690,7 +692,7 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
     if max_time>1:
         print("The longest computation took %s seconds and was" %max_time , time_dict[time_list.index(max_time)])
     
-    return X_dot
+    return X_tilde_dot
 
 
 ## --- Differential system AQX_dot = B --- ##
