@@ -494,16 +494,16 @@ def BC_L(X_3N, n_L=[0,0], m_L=0):
 
     return B_C
 
-def BC_0(X_3N):
+def BC_0(X_3N, n_0 = [0,0], m_0 = 0):
     """ Returns non-dimensional right-hand side of the differential system for boundary conditions
     at s = 0 (proximal end). """
 
     N = X_3N.shape[0]//3
     B_C = np.zeros((N+2,1))
-    B_C[0] = 0 # force equation (here on x axis) is not affected by elasticity
-    B_C[1] = 0 # force equation (here on y axis) is not affected by elasticity   
-    B_C[2] = (X_3N[2*N])
-    # Partial filament torque balance (B_C[3:]) does not depend on torque at s = 0.
+    B_C[0] = n_0[0] # force equation (here on x axis)
+    B_C[1] = n_0[1] # force equation (here on y axis)
+    B_C[2] = m_0 # k0 * (X_3N[2*N])
+    # Partial filament torque balances (B_C[3:]) does not depend on torque at s = 0.
     return B_C
 
 def BB(X_3N):
@@ -605,77 +605,8 @@ def ActiveBending(X):
 
 #############################################
 ## --- Differential system AQX_dot = B --- ##
-
-def f(t, X, Sp4, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, InterpFlow = 0):
-
-    """ Returns the non-dimensionalized equation X_dot = f(X; t; parameters). """
-
-    N = X.shape[0]-2
-
-    X_3N_time = time.time()
-    # X_3N = X3N(X, Delta_S)
-    X_3N = X3N(X)
-    X_3N_time = time.time() - X_3N_time
-    if X_3N_time>1:
-        print("Getting X_3N from X took %s seconds." % (X_3N_time))
-
-    A_time = time.time()
-    A = AA(X_3N, gamma)
-    A_time = time.time() - A_time
-    if A_time>1:
-        print("Getting A took %s seconds." % (A_time))
-
-    Q_time = time.time()
-    Q = QQ(X_3N)
-    Q_time = time.time() - Q_time
-    if Q_time>1:
-        print("Getting Q took %s seconds." % (Q_time))
-
-    ADB_time = time.time()
-    A_DB = ADB(taus_b, N)
-    ADB_time = time.time() - ADB_time
-    if ADB_time>1:
-        print("Getting A_DB took %s seconds." % (ADB_time))
-
-    ADS_time = time.time()
-    A_DS = ADS(N)
-    ADS_time = time.time() - ADS_time
-    if ADS_time>1:
-        print("Getting A_DS took %s seconds." % (ADS_time))
-
-    if InterpFlow == 0:
-        X_dot_flow = Flow(X_3N)
-    else:
-        # print("Time t = ", t)
-        X_flow = InterpFlow(t)
-        X_dot_flow = Flow(X_3N, X_flow)
-
-    if k0 == np.inf:
-        k0 = 0
-    B_time = time.time()
-    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + k0 * BC_0(X_3N) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
-    B_time = time.time() - B_time
-    if B_time>1:
-        print("Getting B took %s seconds." % (B_time))
-
-    X_dot_time = time.time()
-
-    X_dot = (np.linalg.inv(Sp4 * A @ Q - A_DB - Beta * A_DS) @ B).ravel()
-    X_dot_time = time.time() - X_dot_time
-    if X_dot_time>1:
-        print("Inverting to get X_dot took %s seconds." % (X_dot_time))
-
-    # Result
-    time_list = [X_3N_time, A_time, ADB_time, ADS_time, Q_time, B_time, X_dot_time]
-    time_dict = ["X_3N","A", "A_D", "Q", "B", "X_dot"]
-    max_time = np.max(time_list)
-    if max_time>1:
-        print("The longest computation took %s seconds and was" %max_time , time_dict[time_list.index(max_time)])
     
-    return X_dot
-
-    
-def g(t, X, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, InterpFlow = 0):
+def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, InterpFlow = 0):
 
     """ Returns the non-dimensionalized equation X_tilde_dot = g(X_tilde; t; parameters). 
     The difference with f(t,X) is that X is extended to add theta_0_dot, giving X_tilde. 
@@ -687,12 +618,12 @@ def g(t, X, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, 
     # theta_0_dot_dot = -k0*X_tilde[2]
     # theta_0_dot = -X_tilde[2] * np.sin(np.sqrt(k0)*t)
     # theta_0 = X_tilde[2] * np.cos(np.sqrt(k0)*t)
-    # n_0 = 0 # No displacement at the base
-    # m_0 = -k0*X_tilde[2] # Rotation at the base is allowed
+    n_0 = [0,0] # No displacement at the base
+    m_0 = k0*X_tilde[2] # Rotation at the base is allowed --> Not sure about the sign
 
     ##################################################################
     ###### Solve the linear system with infinite basal stiffness #####
-    # X = X_tilde[:-1]
+    X = X_tilde[:-1]
     N = X.shape[0]-2
 
     X_3N_time = time.time()
@@ -734,7 +665,7 @@ def g(t, X, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, 
         X_dot_flow = Flow(X_3N, X_flow)
 
     B_time = time.time()
-    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + k0 * BC_0(X_3N) * Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
+    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + BC_0(X_3N, n_0, m_0) * Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
     B_time = time.time() - B_time
     if B_time>1:
         print("Getting B took %s seconds." % (B_time))
@@ -749,8 +680,8 @@ def g(t, X, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, 
     
     # Extend the linear system to the basal hinge conditions
     # X_dot[2] = X_tilde[-1] # \dot(theta_0) = theta_0_dot
-    # theta_0_dot_dot = -k0*X[2] + 0
-    # X_tilde_dot = np.hstack((X_dot, [theta_0_dot_dot]))
+    theta_0_dot_dot = -k0*X[2]
+    X_tilde_dot = np.hstack((X_dot, [theta_0_dot_dot]))
 
     # Result
     time_list = [X_3N_time, A_time, ADB_time, ADS_time, Q_time, B_time, X_dot_time]
