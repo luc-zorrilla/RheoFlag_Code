@@ -186,18 +186,18 @@ def get_data(data_filename):
 
 def StraightLine(N):
     """ A straight line """
-    X_0 = np.zeros(N+3, dtype = np.double)
+    X_0 = np.zeros(N+2, dtype = np.double)
     return X_0
 
 def ProximalBend(N):
     """ A proximal bend (of the first segment) """
-    X_0 = np.zeros(N+3, np.double)
+    X_0 = np.zeros(N+2, np.double)
     X_0[2] = np.pi/4
     return X_0
 
 def SmoothCurve(N):
     """ A curve with constant curvature, so that the total shear angle is pi/2 """
-    X_0 = np.zeros(N+3, np.double)
+    X_0 = np.zeros(N+2, np.double)
     X_0[2:-1] = np.arange(1,N+1) * (np.pi/4) / N
     return X_0
 
@@ -494,18 +494,19 @@ def BC_L(X_3N, n_L=[0,0], m_L=0):
 
     return B_C
 
-def BH(X_3N, k0):
+def BC_0(X_3N):
     """ Returns non-dimensional right-hand side of the differential system for boundary conditions
-    at s = 0 (proximal end). The boundary condition  """
+    at s = 0 (proximal end). """
 
-    B = np.zeros((N+2,1))
+    B_C = np.zeros((N+2,1))
     if k0 == np.inf:
-        return B_H
+        return B_C
     else:
-        B_H[0] = 0 # force equation (here on x axis) is not affected by elasticity
-        B_H[1] = 0 # force equation (here on y axis) is not affected by elasticity   
-        B_H[2] = -k0*(X_3N[2*N])
-        return B_H
+        B_C[0] = 0 # force equation (here on x axis) is not affected by elasticity
+        B_C[1] = 0 # force equation (here on y axis) is not affected by elasticity   
+        B_C[2] = -(X_3N[2*N])
+        # Partial filament torque balance (B_C[3:]) does not depend on torque at s = 0.
+        return B_C
 
 def BB(X_3N):
     """ Returns non-dimensional right-hand side of the differential system for bending elasticity. """
@@ -652,7 +653,7 @@ def f(t, X, Sp4, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, Inte
         X_dot_flow = Flow(X_3N, X_flow)
 
     B_time = time.time()
-    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
+    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + k0 * BC_0(X_3N) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
     B_time = time.time() - B_time
     if B_time>1:
         print("Getting B took %s seconds." % (B_time))
@@ -674,7 +675,7 @@ def f(t, X, Sp4, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, Inte
     return X_dot
 
     
-def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, InterpFlow = 0):
+def g(t, X, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, InterpFlow = 0):
 
     """ Returns the non-dimensionalized equation X_tilde_dot = g(X_tilde; t; parameters). 
     The difference with f(t,X) is that X is extended to add theta_0_dot, giving X_tilde. 
@@ -691,7 +692,7 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
 
     ##################################################################
     ###### Solve the linear system with infinite basal stiffness #####
-    X = X_tilde[:-1]
+    # X = X_tilde[:-1]
     N = X.shape[0]-2
 
     X_3N_time = time.time()
@@ -733,7 +734,7 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
         X_dot_flow = Flow(X_3N, X_flow)
 
     B_time = time.time()
-    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
+    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + k_0 * BC_0(X_3N) * Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
     B_time = time.time() - B_time
     if B_time>1:
         print("Getting B took %s seconds." % (B_time))
@@ -747,9 +748,9 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
     ##################################################################
     
     # Extend the linear system to the basal hinge conditions
-    X_dot[2] = X_tilde[-1] # \dot(theta_0) = theta_0_dot
+    # X_dot[2] = X_tilde[-1] # \dot(theta_0) = theta_0_dot
     # theta_0_dot_dot = -k0*X[2] + 0
-    X_tilde_dot = np.hstack((X_dot, [theta_0_dot_dot]))
+    # X_tilde_dot = np.hstack((X_dot, [theta_0_dot_dot]))
 
     # Result
     time_list = [X_3N_time, A_time, ADB_time, ADS_time, Q_time, B_time, X_dot_time]
@@ -758,7 +759,7 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
     if max_time>1:
         print("The longest computation took %s seconds and was" %max_time , time_dict[time_list.index(max_time)])
     
-    return X_tilde_dot
+    return X_dot
 
 
 ## --- Differential system AQX_dot = B --- ##
