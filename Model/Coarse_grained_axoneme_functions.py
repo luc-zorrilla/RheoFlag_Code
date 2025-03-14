@@ -494,6 +494,19 @@ def BC_L(X_3N, n_L=[0,0], m_L=0):
 
     return B_C
 
+def BH(X_3N, k0):
+    """ Returns non-dimensional right-hand side of the differential system for boundary conditions
+    at s = 0 (proximal end). The boundary condition  """
+
+    B = np.zeros((N+2,1))
+    if k0 == np.inf:
+        return B_H
+    else:
+        B_H[0] = 0 # force equation (here on x axis) is not affected by elasticity
+        B_H[1] = 0 # force equation (here on y axis) is not affected by elasticity   
+        B_H[2] = -k0*(X_3N[2*N])
+        return B_H
+
 def BB(X_3N):
     """ Returns non-dimensional right-hand side of the differential system for bending elasticity. """
 
