@@ -22,15 +22,15 @@ from datetime import datetime
 ################################################################################
 ### Read metadata and data
 
-folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/" #"StraightLine_PeriodicFlow_Radau/"
 
-id_filename = "20250313-115413068901"
+id_filename = "20250314-045711235621"
 
 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
 data_filename = folder_name + 'data_' + id_filename + '.csv'
 
 solver_dict = get_metadata(metadata_filename)
-output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
 X = get_data(data_filename)
 
@@ -40,7 +40,7 @@ if T_sim == np.inf:
 
 tau_b = taus_b[0]
 
-keys_toprint = ['N', 'A', 'w0', 'Sp4', 'Beta', 'taus_b']
+keys_toprint = ['N', 'A', 'w0', 'Sp4', 'k0', 'Beta', 'taus_b']
 for key in keys_toprint:
     print(key, solver_dict[key])
 
@@ -65,16 +65,16 @@ Theta, Theta_0, fig_kymograph = Kymograph(X, True)
 Theta = Theta[:,1:]
 Theta_0 = Theta_0[:,1:]
 print("Kymograph shape: ", Theta.shape) # Should be M x (N-1) now
-fig_kymograph.show()
+fig_kymograph.vs_show()
 
 # PCA
 psi = np.pi/2
 P, Lambda, fig_eigenspectrum = PCA(Theta, False, True)
 print("Explained variance of first and second PCA components: ", Lambda[0] / np.sum(Lambda), Lambda[1] / np.sum(Lambda))
-fig_eigenspectrum.show()
+fig_eigenspectrum.vs_show()
 
 # Phase between PCA and flow
-PCA_phase, polar_coeffs_ellipse, figs_ellipse = PCA_vs_Flow(Theta, Theta_0, P, X_flow, 1, True)
+# PCA_phase, polar_coeffs_ellipse, figs_ellipse = PCA_vs_Flow(Theta, Theta_0, P, X_flow, 1, True)
 # figs_ellipse[0].show()
 
 # Spatial Fourier
@@ -124,7 +124,7 @@ layout = go.Layout(
     xaxis = dict(title = 'Time [# Flow periods]'), # x-axis label
     )
 fig = go.Figure(data=trace, layout=layout)
-fig.show()
+fig.vs_show()
 
 
 # exit()

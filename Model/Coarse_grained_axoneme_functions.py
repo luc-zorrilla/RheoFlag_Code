@@ -22,6 +22,24 @@ import csv
 ### ----- Functions ----- ###
 #############################
 
+import webbrowser
+# Set default web browser for webbrowser as VSCode (can also be done manually)
+VS_path = "C:\\Users\\Luc\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
+webbrowser.register('VS', None, webbrowser.BackgroundBrowser(VS_path))
+web = webbrowser.get('VS')
+# This scripts adds a method to go.Figure class so that one can plot figures in html format inside VS code.
+def vs_show(self):
+    temp_dir = "C:\\Users\\Luc\\Documents\\MEGASync\\PhD\\RheoFlag\\Results\\Temp\\"
+    temp_file_number = round(datetime.now().timestamp())
+    save_url = temp_dir + "temp_" + str(temp_file_number) + "_.html"
+
+    self.write_html(save_url, include_mathjax = 'cdn')
+    web.open(save_url)
+
+    return save_url
+go.Figure.vs_show = vs_show
+
+
 ################################
 ## --- Metadata as a dict --- ##
 
@@ -168,19 +186,19 @@ def get_data(data_filename):
 
 def StraightLine(N):
     """ A straight line """
-    X_0 = np.zeros(N+2, dtype = np.double)
+    X_0 = np.zeros(N+3, dtype = np.double)
     return X_0
 
 def ProximalBend(N):
-    """ A bend after the first segment """
-    X_0 = np.zeros(N+2, np.double)
-    X_0[3] = np.pi/4
+    """ A proximal bend (of the first segment) """
+    X_0 = np.zeros(N+3, np.double)
+    X_0[2] = np.pi/4
     return X_0
 
 def SmoothCurve(N):
     """ A curve with constant curvature, so that the total shear angle is pi/2 """
-    X_0 = np.zeros(N+2, np.double)
-    X_0[3:] = (np.pi/2)/N
+    X_0 = np.zeros(N+3, np.double)
+    X_0[2:-1] = np.arange(1,N+1) * (np.pi/4) / N
     return X_0
 
 # Add reading the last position from a file and start from there? e.g. for changing integration method.
@@ -279,10 +297,10 @@ def Xi(mu, r, L, h = -1):
 def GG(theta, gamma):
     """ Computes the matrix G of fluid drag for RFT computation. """
 
+    G = np.zeros((3,5))
     cos = np.cos(theta)
     sin = np.sin(theta)
 
-    G = np.zeros((3,5))
     G[0,0] = (gamma-1)*cos*sin
     G[1,1] = - G[0,0]
     G[0,1] = - sin**2 - gamma*cos**2
@@ -324,13 +342,13 @@ def AA(X_3N, gamma):
 
     N = X_3N.shape[0]//3
     A = np.zeros((N+2,3*N))
-    A[0,0] = 1
-    A[1,N] = 1
-    A[2,2*N] = 1
+
+    A[0,0] = 1 # 1*x0_dot = b_0
+    A[1,N] = 1 # 1*y0_dot = b_1
+    A[2,2*N] = 1 # 1*theta_0_dot = b_2
     for j in range(1, N):
         for i in range(j, N):
             A[j+2,:] = A[j+2,:] + DD(X_3N, i, j) @ UU(X_3N, i, gamma)
-        # A[j+2,:] = A[j+2,:]
     return A
 
 ## A dashpots
@@ -459,9 +477,9 @@ def TT_flow(X_dot_flow, k):
 #############################
 ## --- Right-hand side --- ##
 
-def BC(X_3N, n_L=[0,0], m_L=0):
+def BC_L(X_3N, n_L=[0,0], m_L=0):
     """Returns non-dimensional B_C representing boundary conditions at the distal end. 
-    Zero is default for a free end. n_L and m_L are chosen adimensionally too."""
+    Zero is default for a free end. n_L and m_L are chosen adimensionally."""
 
     N = X_3N.shape[0]//3
     B_C = np.zeros((N+2,1))
@@ -469,8 +487,10 @@ def BC(X_3N, n_L=[0,0], m_L=0):
     ## point force and point moment at distal end.
     x_L = X_3N[N-1] + np.cos(X_3N[-1])
     y_L = X_3N[2*N-1] + np.sin(X_3N[-1])
-
-    B_C[3:] = (y_L - X_3N[N+1:2*N])*n_L[0] - (x_L - X_3N[1:N])*n_L[1] - m_L
+    
+    B_C[0] = - n_L[0]
+    B_C[1] = - n_L[1]
+    B_C[2:] = (y_L - X_3N[N:2*N])*n_L[0] - (x_L - X_3N[:N])*n_L[1] - m_L
 
     return B_C
 
@@ -480,7 +500,7 @@ def BB(X_3N):
     N = X_3N.shape[0]//3
     B = np.zeros((N+2,1))
     # Boundary conditions at proximal end
-    B[0] = 0
+    B[0] = 0 
     B[1] = 0
     B[2] = 0
     # Bending resistance (constitutive equations)
@@ -618,7 +638,7 @@ def f(t, X, Sp4, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, Inte
         X_dot_flow = Flow(X_3N, X_flow)
 
     B_time = time.time()
-    B = BB(X_3N) + BC(X_3N, n_L, m_L) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
+    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
     B_time = time.time() - B_time
     if B_time>1:
         print("Getting B took %s seconds." % (B_time))
@@ -638,6 +658,94 @@ def f(t, X, Sp4, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, Inte
         print("The longest computation took %s seconds and was" %max_time , time_dict[time_list.index(max_time)])
     
     return X_dot
+
+    
+def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, InterpFlow = 0):
+
+    """ Returns the non-dimensionalized equation X_tilde_dot = g(X_tilde; t; parameters). 
+    The difference with f(t,X) is that X is extended to add theta_0_dot, giving X_tilde. 
+    Since a second order equation in time is perscribed at the base, it can be turned 
+    into a first order equation and added to the matricial system.
+    """
+
+    # Apply the spring equation first
+    # theta_0_dot_dot = -k0*X_tilde[2]
+    # theta_0_dot = -X_tilde[2] * np.sin(np.sqrt(k0)*t)
+    # theta_0 = X_tilde[2] * np.cos(np.sqrt(k0)*t)
+    # n_0 = 0 # No displacement at the base
+    # m_0 = -k0*X_tilde[2] # Rotation at the base is allowed
+
+    ##################################################################
+    ###### Solve the linear system with infinite basal stiffness #####
+    X = X_tilde[:-1]
+    N = X.shape[0]-2
+
+    X_3N_time = time.time()
+    # X_3N = X3N(X, Delta_S)
+    X_3N = X3N(X)
+    X_3N_time = time.time() - X_3N_time
+    if X_3N_time>1:
+        print("Getting X_3N from X took %s seconds." % (X_3N_time))
+
+    A_time = time.time()
+    A = AA(X_3N, gamma)
+    A_time = time.time() - A_time
+    if A_time>1:
+        print("Getting A took %s seconds." % (A_time))
+
+    Q_time = time.time()
+    Q = QQ(X_3N)
+    Q_time = time.time() - Q_time
+    if Q_time>1:
+        print("Getting Q took %s seconds." % (Q_time))
+
+    ADB_time = time.time()
+    A_DB = ADB(taus_b, N)
+    ADB_time = time.time() - ADB_time
+    if ADB_time>1:
+        print("Getting A_DB took %s seconds." % (ADB_time))
+
+    ADS_time = time.time()
+    A_DS = ADS(N)
+    ADS_time = time.time() - ADS_time
+    if ADS_time>1:
+        print("Getting A_DS took %s seconds." % (ADS_time))
+
+    if InterpFlow == 0:
+        X_dot_flow = Flow(X_3N)
+    else:
+        # print("Time t = ", t)
+        X_flow = InterpFlow(t)
+        X_dot_flow = Flow(X_3N, X_flow)
+
+    B_time = time.time()
+    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
+    B_time = time.time() - B_time
+    if B_time>1:
+        print("Getting B took %s seconds." % (B_time))
+
+    X_dot_time = time.time()
+
+    X_dot = (np.linalg.inv(Sp4 * A @ Q - A_DB - Beta * A_DS) @ B).ravel()
+    X_dot_time = time.time() - X_dot_time
+    if X_dot_time>1:
+        print("Inverting to get X_dot took %s seconds." % (X_dot_time))
+    ##################################################################
+    
+    # Extend the linear system to the basal hinge conditions
+    X_dot[2] = X_tilde[-1] # \dot(theta_0) = theta_0_dot
+    # theta_0_dot_dot = -k0*X[2] + 0
+    X_tilde_dot = np.hstack((X_dot, [theta_0_dot_dot]))
+
+    # Result
+    time_list = [X_3N_time, A_time, ADB_time, ADS_time, Q_time, B_time, X_dot_time]
+    time_dict = ["X_3N","A", "A_D", "Q", "B", "X_dot"]
+    max_time = np.max(time_list)
+    if max_time>1:
+        print("The longest computation took %s seconds and was" %max_time , time_dict[time_list.index(max_time)])
+    
+    return X_tilde_dot
+
 
 ## --- Differential system AQX_dot = B --- ##
 #############################################
@@ -667,7 +775,7 @@ class StopOnTime:
 #     print(x,a,b,c)
 #     return 
 
-def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = 'LSODA'):
+def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = 'LSODA'):
     
     """ Solves the linear system for a set of parameters and saves the resulting dynamics in a file. 
     Returns True if the algorithm converges, False otherwise. 
@@ -684,6 +792,7 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
     - A: flow amplitude
     - w0: flow frequency
     - Sp4: Sperm number^4, i.e., ratio of fluid viscosity over bending elasticity
+    - k0: elasticity at the base (s = 0)
     - Lambdas: ad hoc force on filament segments
     - Zetas: ad hoc torque on filament segments
     - X_flow_field_string: flow field metadata
@@ -691,7 +800,7 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
     - T_eval: time points to evaluate the dynamical system
     - T_sim_max: maximum simulation time before abort (in seconds).
     - X_flow_field: prescribed flow field
-    - X_0: initial position of the filament
+    - X_0: initial position of the filament (now including theta_0_dot)
     - method: solving method for solve_ivp. Can be any of ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
         Explicit Runge-Kutta methods (‘RK23’, ‘RK45’, ‘DOP853’) should be used for non-stiff problems and implicit methods (‘Radau’, ‘BDF’) for stiff problems [9]. Among Runge-Kutta methods, ‘DOP853’ is recommended for solving with high precision (low values of rtol and atol).
 
@@ -717,9 +826,9 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
 
         InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate") # Beware of that extrapolation option - might be due to the period being much higher than actual time step
         
-        Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
+        Args = (Sp4, k0, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
     else:
-        Args = (Sp4, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas)
+        Args = (Sp4, k0, Beta, taus_b, gamma, n_L, m_L, Lambdas, Zetas)
 
     # print("Flow field interpolated. ")
     ############################################################################
@@ -729,7 +838,7 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
 
     try:
         time_limiter = StopOnTime(max_simulation_time=T_sim_max)
-        sol = solve_ivp(fun = f, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method, events=time_limiter.terminate_integration)
+        sol = solve_ivp(fun = g, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method, events=time_limiter.terminate_integration)
         T_sim = time.time() - time_limiter.start_time
 
         if sol.t_events[0].size > 0:
@@ -753,8 +862,8 @@ def SolveAndSave(output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, 
     ############################################################################
     # Write metadata
     # print("Writing metadata...")
-    solver_values = [output_folder, N, taus_b, str(init_conf), Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method]
-    solver_keys = ["output_folder", "N", "taus_b", "init_conf", "Beta", "gamma", "n_L", "m_L", "A", "w0", "Sp4", "Lambdas", "Zetas", "X_flow_field_string", "T_span", "T_eval", "T_sim_max", "T_sim", "X_flow_field", "X_0", "method"]
+    solver_values = [output_folder, N, taus_b, str(init_conf), Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method]
+    solver_keys = ["output_folder", "N", "taus_b", "init_conf", "Beta", "gamma", "n_L", "m_L", "A", "w0", "Sp4", "k0", "Lambdas", "Zetas", "X_flow_field_string", "T_span", "T_eval", "T_sim_max", "T_sim", "X_flow_field", "X_0", "method"]
     solver_dict = {f"{solver_keys[k]}": solver_values[k] for k in range(len(solver_values))}
     write_dict_to_json_file(solver_dict, metadata_filename)
     # print("Metadata written.")

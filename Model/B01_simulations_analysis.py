@@ -13,25 +13,6 @@ import pandas as pd
 import glob
 import os
 
-import webbrowser
-# Set default web browser for webbrowser as VSCode (can also be done manually)
-VS_path = "C:\\Users\\Luc\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
-webbrowser.register('VS', None, webbrowser.BackgroundBrowser(VS_path))
-web = webbrowser.get('VS')
-# This scripts adds a method to go.Figure class so that one can plot figures in html format inside VS code.
-def vs_show(self):
-
-    temp_dir = "C:\\Users\\Luc\\Documents\\MEGASync\\PhD\\RheoFlag\\Code\\Temp\\"
-    temp_file_number = round(datetime.now().timestamp())
-    save_url = temp_dir + "temp_" + str(temp_file_number) + "_.html"
-
-    self.write_html(save_url, include_mathjax = 'cdn')
-    web.open(save_url)
-
-    return save_url
-go.Figure.vs_show = vs_show
-
-
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.io as pio
@@ -134,7 +115,6 @@ def observable_1D_dataframe(directory, ids_list, columns, observable, obs_type =
 
     return df
 
-
 def plot_2D(df, column_0, column_1):
     """ Plot two columns of a dataframe in a 2D axis. """
 
@@ -167,17 +147,22 @@ if __name__ == '__main__':
 
     # Fetch files satisfying required conditions
 
-    sim_directory = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+    sim_directory = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/" # "StraightLine_PeriodicFlow_Radau/"
 
     def metadata_condition_0(solver_dict):
-        output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+        output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
-        bool_condition = (N == 10) & (Beta == 0) & ("SmoothCurve" in init_conf) & (gamma == 2) & ((A < 1e-2) & (w0 < 1e-2)) & (method == 'Radau')
+        # bool_condition = (N == 10) & (Beta == 0) & ("SmoothCurve" in init_conf) & (gamma == 2) & ((A < 1e-2) & (w0 < 1e-2)) & (method == 'Radau')
+        eps = 1e-6
+        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("ProximalBend" in init_conf) & (gamma == 2) & ((np.abs(A - 0) < eps) & (np.abs(w0 - 0) < eps)) & (np.abs(Sp4 - 1e0) < eps) & (np.abs(k0 - 1e-2) < eps) & (method == 'Radau')
 
         return bool_condition
 
     ids_list = fetch_files(sim_directory, metadata_condition_0, None)
     print("# files: ", len(ids_list))
+
+    print(ids_list[0])
+    exit()
 
     # Compute observable on these files and put this new data into a dataframe
 

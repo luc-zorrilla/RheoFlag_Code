@@ -903,6 +903,8 @@ def AnimatedShape(X, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
     fig_shapes = go.Figure(fig_dict)
     # fig_shapes.show()
 
+    fig_shapes.update_yaxes(scaleanchor="x", scaleratio=1)
+
     return fig_shapes
 
 def AnimatedShapes(X, Y, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
