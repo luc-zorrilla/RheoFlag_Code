@@ -24,7 +24,7 @@ from datetime import datetime
 
 folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/" #"StraightLine_PeriodicFlow_Radau/"
 
-id_filename = "20250314-045711235621"
+id_filename = "20250314-073003546590"
 
 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
 data_filename = folder_name + 'data_' + id_filename + '.csv'

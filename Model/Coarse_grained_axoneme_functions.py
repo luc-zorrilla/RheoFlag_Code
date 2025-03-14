@@ -502,7 +502,7 @@ def BC_0(X_3N):
     B_C = np.zeros((N+2,1))
     B_C[0] = 0 # force equation (here on x axis) is not affected by elasticity
     B_C[1] = 0 # force equation (here on y axis) is not affected by elasticity   
-    B_C[2] = -(X_3N[2*N])
+    B_C[2] = (X_3N[2*N])
     # Partial filament torque balance (B_C[3:]) does not depend on torque at s = 0.
     return B_C
 
