@@ -350,7 +350,7 @@ def AA(X_3N, gamma):
 
     A[0,0] = 1 # 1*x0_dot = b_0
     A[1,N] = 1 # 1*y0_dot = b_1
-    A[2,2*N] = 1 # 1*theta_0_dot = b_2
+    # A[2,2*N] = 1 # 1*theta_0_dot = b_2
     for j in range(0, N):
         for i in range(j, N):
             A[j+2,:] = A[j+2,:] + DD(X_3N, i, j) @ UU(X_3N, i, gamma)
@@ -531,10 +531,11 @@ def BS(X_3N):
 
     N = X_3N.shape[0]//3
     B = np.zeros((N+2,1))
+
     # Boundary conditions at proximal end
-    B[0] = 0
-    B[1] = 0
-    B[2] = 0
+    B[0] = 0 # No force on x axis due to shear at s = 0
+    B[1] = 0 # No force on y axis due to shear at s = 0
+    B[2] = 0 # No torque due to shear at s = 0 --> Is that correct
     for i in range(2,N+1):
         B[i+1] = B[i+1] + (np.sum(X_3N[2*N+i-1:]) - (N-i+1)*X_3N[2*N] ) # Sliding resistance
     return B
@@ -626,7 +627,7 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
     n_0 = [0,0] # No displacement at the base
     if k0 == np.inf:
         k0=0
-    m_0 = -k0*X_tilde[2] # Rotation at the base is allowed --> Not sure about the sign
+    m_0 = k0*X_tilde[2] # Rotation at the base is allowed --> Not sure about the sign
 
     ##################################################################
     ###### Solve the linear system with infinite basal stiffness #####
@@ -634,7 +635,6 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
     N = X.shape[0]-2
 
     X_3N_time = time.time()
-    # X_3N = X3N(X, Delta_S)
     X_3N = X3N(X)
     X_3N_time = time.time() - X_3N_time
     if X_3N_time>1:
@@ -645,24 +645,28 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
     A_time = time.time() - A_time
     if A_time>1:
         print("Getting A took %s seconds." % (A_time))
+    # print("A", A)
 
     Q_time = time.time()
     Q = QQ(X_3N)
     Q_time = time.time() - Q_time
     if Q_time>1:
         print("Getting Q took %s seconds." % (Q_time))
+    # print("Q", Q)
 
     ADB_time = time.time()
     A_DB = ADB(taus_b, N)
     ADB_time = time.time() - ADB_time
     if ADB_time>1:
         print("Getting A_DB took %s seconds." % (ADB_time))
+    # print("A_DB", A_DB)
 
     ADS_time = time.time()
     A_DS = ADS(N)
     ADS_time = time.time() - ADS_time
     if ADS_time>1:
         print("Getting A_DS took %s seconds." % (ADS_time))
+    # print("A_DS", A_DS)        
 
     if InterpFlow == 0:
         X_dot_flow = Flow(X_3N)
@@ -672,10 +676,19 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
         X_dot_flow = Flow(X_3N, X_flow)
 
     B_time = time.time()
-    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + BC_0(X_3N, n_0, m_0) * Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
+    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + BC_0(X_3N, n_0, m_0) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
     B_time = time.time() - B_time
     if B_time>1:
         print("Getting B took %s seconds." % (B_time))
+    # print("BB", BB(X_3N))
+    # print("BC_L", BC_L(X_3N, n_L, m_L))
+    # print("BC_0", BC_0(X_3N, n_0, m_0))
+    # print("Beta * BS", Beta * BS(X_3N))
+    # print("BF", BF(X_3N, Lambdas))
+    # print("BM", BM(Zetas))
+    # print("ActiveBending", ActiveBending(X))
+    # print("Sp4 * BFlow", Sp4 * BFlow(X_3N, X_dot_flow, gamma))
+    # print("B", B)
 
     X_dot_time = time.time()
 
