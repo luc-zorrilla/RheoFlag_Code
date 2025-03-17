@@ -507,8 +507,8 @@ def BC_0(X_3N, n_0 = [0,0], m_0 = 0):
     B_C = np.zeros((N+2,1))
     B_C[0] = n_0[0] # force equation (here on x axis)
     B_C[1] = n_0[1] # force equation (here on y axis)
-    B_C[2] = m_0 # k0 * (X_3N[2*N])
-    # Partial filament torque balances (B_C[3:]) does not depend on torque at s = 0.
+    B_C[2] = m_0
+    # Partial filament torque balances (B_C[3:]) does not depend on torque or force at s = 0.
     return B_C
 
 def BB(X_3N):
@@ -686,7 +686,7 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
     ##################################################################
     
     # Extend the linear system to the basal hinge conditions
-    X_dot[2] = X_tilde[-1] # \dot(theta_0) = theta_0_dot
+    # X_dot[2] = X_tilde[-1] # \dot(theta_0) = theta_0_dot
     theta_0_dot_dot = -k0*X[2]
     X_tilde_dot = np.hstack((X_dot, [theta_0_dot_dot]))
 
