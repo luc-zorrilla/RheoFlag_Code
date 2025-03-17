@@ -3,9 +3,6 @@ In particular, one can visualize the waveform in space-time as a video. """
 
 # from audioop import mul
 import multiprocessing
-from re import A
-
-from regex import R
 from Coarse_grained_axoneme_functions import *
 from Coarse_grained_analysis_functions import *
 
@@ -18,13 +15,16 @@ from sklearn.metrics import mean_squared_error, r2_score
 import plotly.express as px
 from plotly.subplots import make_subplots
 from datetime import datetime
+colorscale = "BuPu"
+
+temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/" 
 
 ################################################################################
 ### Read metadata and data
 
-folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/" #"StraightLine_PeriodicFlow_Radau/"
+folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/" 
 
-id_filename = "20250317-125452341699"
+id_filename = "20250317-042954080521"
 
 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
 data_filename = folder_name + 'data_' + id_filename + '.csv'
@@ -32,8 +32,7 @@ data_filename = folder_name + 'data_' + id_filename + '.csv'
 solver_dict = get_metadata(metadata_filename)
 output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
-X_tilde = get_data(data_filename)
-X = X_tilde[:-1]
+X = get_data(data_filename) # s, t
 
 if T_sim == np.inf:
     print('Not solved. Error: ', X)
@@ -54,24 +53,62 @@ for key in keys_toprint:
 ##################################
 ### ----- Shape analysis ----- ###
 T_eval = np.array(T_eval)
+if (A > 0) & (w0 > 0):
+    T_eval_norm = T_eval * w0 / (2*np.pi)
+else:
+    T_eval_norm = T_eval
 X_flow = A*np.sin(w0*T_eval)
 
 # Animated shape
-fig_shape = AnimatedShape(X, X_flow, N, w0, Sp4, Beta, tau_b, T_eval)
-fig_shape.show()
+# fig_shape = AnimatedShape(X, X_flow, N, w0, Sp4, Beta, tau_b, T_eval)
+# fig_shape.show()
 
-# Kymograph
-Theta, Theta_0, fig_kymograph = Kymograph(X, True)
-# Popping out the first angle, fixed because of clamped BC
-Theta = Theta[:,1:]
-Theta_0 = Theta_0[:,1:]
-print("Kymograph shape: ", Theta.shape) # Should be M x (N-1) now
-fig_kymograph.vs_show()
+# Kymograph for alpha
+Alpha = np.transpose(X[2:,:])
+fig = go.Figure(data = go.Heatmap(
+    y = T_eval_norm,
+    x = np.linspace(start = 0, stop = 1, num = N),
+    z = Alpha,
+    ))
+
+fig.update_xaxes(title = 's')
+fig.update_yaxes(title = 'w0 * t if w0>0, t otherwise')
+fig.vs_show()
+filename = temp_folder + 'kymograph_alpha.pdf'
+fig.write_image(filename)
+
+# Kymograph for theta
+Theta, Theta_0 = Kymograph(X) # t, s
+
+fig = go.Figure(data = go.Heatmap(
+    y = T_eval_norm,
+    x = np.linspace(start = 0, stop = 1, num = N),
+    z = Theta,
+    ))
+
+fig.update_xaxes(title = 's')
+fig.update_yaxes(title = 'w0 * t if w0>0, t otherwise')
+fig.vs_show()
+filename = temp_folder + 'kymograph_theta.pdf'
+fig.write_image(filename)
+
+# Stroboscopic view
+
+X_s = StroboscopicView(X[:, (T_eval_norm > 9) & (T_eval_norm <= 10)], T_eval_norm[(T_eval_norm > 9) & (T_eval_norm <= 10)] - 9, T_s = 0.1, eps = 1e-6)
+
+fig = go.Figure()
+c = sample_colorscale('BuPu', np.linspace(0, 1, num = X_s.shape[1]))
+for k in range(X_s.shape[1]):
+    fig.add_scatter(x = X3N(X_s[:,k])[:N, 0], y = X3N(X_s[:,k])[N:2*N, 0], marker_color = c[k])
+fig.vs_show()
+exit()
 
 # PCA
 psi = np.pi/2
 P, Lambda, fig_eigenspectrum = PCA(Theta, False, True)
 print("Explained variance of first and second PCA components: ", Lambda[0] / np.sum(Lambda), Lambda[1] / np.sum(Lambda))
+# filename = temp_folder + 'eigenspectrum.pdf'
+# fig_eigenspectrum.write_image(filename)
 fig_eigenspectrum.vs_show()
 
 # Phase between PCA and flow

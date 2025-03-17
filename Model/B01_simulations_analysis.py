@@ -149,12 +149,10 @@ if __name__ == '__main__':
 
     sim_directory = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/" # "StraightLine_PeriodicFlow_Radau/"
 
-    def metadata_condition_0(solver_dict):
+    def metadata_condition_0(solver_dict, eps = 1e-6):
         output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
-        # bool_condition = (N == 10) & (Beta == 0) & ("SmoothCurve" in init_conf) & (gamma == 2) & ((A < 1e-2) & (w0 < 1e-2)) & (method == 'Radau')
-        eps = 1e-6
-        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("ProximalBend" in init_conf) & (gamma == 2) & ((np.abs(A - 0) < eps) & (np.abs(w0 - 0) < eps)) & (np.abs(Sp4 - 1e0) < eps) & (np.abs(k0 - 1e0) < eps) & (method == 'Radau')
+        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("StraightLine" in init_conf) & (gamma == 2) & ((np.abs(A - 1e-3) < eps) & (np.abs(w0 - 1e0) < eps)) & (np.abs(Sp4 - 1e3) < eps) & (np.abs(k0 - 0) < eps) & (method == 'RK45')
 
         return bool_condition
 

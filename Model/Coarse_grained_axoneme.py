@@ -36,23 +36,23 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1e0]
+    Sp4_list = [1e-3, 1e0, 1e3]
     ################
 
     ###############################
     # basal hinge spring constant #
-    k0_list = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]
+    k0_list = [0, 1e-3, 1e0, 1e3]
     ###############################
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [0]
+    Beta_list = [0, 1e-3, 1e0, 1e3]
     ####################################
 
     ###############################
     # Bending viscosity timescale #
     # remark : it is in tau_s units
-    Tau_b_list = [0]
+    Tau_b_list = [0, 1e-3, 1e0, 1e3]
     taus_b_list = [[[tau_b]*N for tau_b in Tau_b_list] for N in N_list]
     ###############################
 
@@ -76,7 +76,7 @@ if __name__ == "__main__":
 
     print("Preparing initial conditions...")
 
-    init_conf_list = [ProximalBend] ## Initial conditions in [StraightLine, ProximalBend, SmoothCurve]
+    init_conf_list = [StraightLine] ## Initial conditions in [StraightLine, ProximalBend]
 
     print("Initial conditions prepared. ")
     #######################  
@@ -169,8 +169,8 @@ if __name__ == "__main__":
     # Constant vertical flow
     # X_flow_field_list = [np.array([0, 10**(-6)])]
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
-    A_list = [0]
-    w0_list = [0] # 1e-2, 1e-1, 1e0, 1e1, 1e2]
+    A_list = [0, 1e-3, 1e0, 1e3]
+    w0_list = [0, 1e-3, 1e0, 1e3] # 1e-2, 1e-1, 1e0, 1e1, 1e2]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -181,7 +181,7 @@ if __name__ == "__main__":
 
     ######################
     # Integration scheme #
-    method_list = ['Radau'] # ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
+    method_list = ['RK45'] # ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
     ######################
 
     ################################

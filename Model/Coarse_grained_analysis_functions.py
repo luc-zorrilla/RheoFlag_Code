@@ -4,7 +4,7 @@ simulation of a viscoelastic filament, which takes the form of a file. """
 from audioop import mul
 import multiprocessing
 
-from regex import R
+# from regex import R
 from Coarse_grained_axoneme_functions import *
 import math
 import numpy as np
@@ -18,191 +18,15 @@ from sklearn.metrics import mean_squared_error, r2_score
 import plotly.express as px
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
+from plotly.express.colors import sample_colorscale
 
 from datetime import datetime
 
-########################################
-### ----- Extracting Functions ----- ###
-
-# def ExtractParametersData(filename):
-
-#     file = open(filename, "r")
-
-#     ## Metadata extraction
-#     file.readline()
-#     N = int(file.readline()[4:])
-#     taus_b = file.readline()[9:]
-#     taus_b = list(map(float, taus_b.strip('][\n').split(', ')))
-#     init_conf = file.readline()[12:]
-#     Beta = float(file.readline()[7:])
-#     gamma = float(file.readline()[8:])
-
-#     n_L = file.readline()[6:] ##
-#     n_L = list(map(float,n_L.strip('][\n').split(', ')))
-
-#     m_L = float(file.readline()[6:]) ##
-
-#     A = float(file.readline()[4:])
-
-#     w0 = float(file.readline()[5:])
-
-#     Sp4 = float(file.readline()[6:])
-
-#     Lambdas = file.readline()[10:] ##
-#     Lambdas = list(map(str, Lambdas.strip('][\n').split(', ')))
-#     for k in range(len(Lambdas)):
-#         Lambdas[k] = list(map(float, Lambdas[k].strip('][').split('; ')))
-
-#     Zetas = file.readline()[8:] ##
-#     Zetas = list(map(float, Zetas.strip('][\n').split(', ')))
-
-#     X_flow_field = file.readline()[15:]
-#     if X_flow_field[:9] == "SINE FLOW":
-#         X_flow_field_type = "SINE FLOW: (psi, A, w0)"
-#         X_flow_field_params = list(map(float, X_flow_field[26:].strip(")(\n").split(", ")))
-#     elif X_flow_field[:13] == "CONSTANT FLOW":
-#         X_flow_field_type = "CONSTANT FLOW: (psi, A)"
-#         X_flow_field_params = list(map(float, X_flow_field[26:].strip(")(\n").split(", ")))
-#     elif X_flow_field[:12] == "PIV-IMPORTED":
-#         X_flow_field_type = "PIV-IMPORTED: filename"
-#         X_flow_field_params = X_flow_field[18:] # Filename of the PIV import
-#     else: # X_flow_field == "NO FLOW":
-#         X_flow_field_type = "NO FLOW"
-#         X_flow_field_params = 0
-        
-#     T_span = file.readline()[9:] ##
-#     T_span = list(map(float, T_span.strip('][\n').split(', ')))
-#     T_eval = file.readline()[9:] ##
-#     T_eval = list(map(float, T_eval.strip('][\n').split(', ')))
-
-#     method = file.readline()
-
-#     ## Create data arrays in functions of the metadata
-#     X = np.zeros((N+2, len(T_eval)))
-#     file.readline()
-#     file.readline()
-
-#     first_line = file.readline()
-#     if first_line[:10] == "ValueError":
-#         for t in range(1, len(T_eval)):
-#             file.readline()
-#     else:
-#         X[:,0] = list(map(float, first_line.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
-#         for t in range(1, len(T_eval)):
-#             X[:,t] = list(map(float, file.readline().strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
-
-#     file.close()
-#     parameters = [N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval, method]
-#     return parameters, X
-
-# def ExtractParameters(filename):
-
-#     file = open(filename, "r")
-
-#     ## Metadata extraction
-#     file.readline()
-#     N = int(file.readline()[4:])
-#     taus_b = file.readline()[9:]
-#     taus_b = list(map(float, taus_b.strip('][\n').split(', ')))
-#     init_conf = file.readline()[12:]
-#     Beta = float(file.readline()[7:])
-#     gamma = float(file.readline()[8:])
-
-#     n_L = file.readline()[6:] ##
-#     n_L = list(map(float,n_L.strip('][\n').split(', ')))
-
-#     m_L = float(file.readline()[6:]) ##
-
-#     A = float(file.readline()[4:])
-
-#     w0 = float(file.readline()[5:])
-
-#     Sp4 = float(file.readline()[6:])
-
-#     Lambdas = file.readline()[10:] ##
-#     Lambdas = list(map(str, Lambdas.strip('][\n').split(', ')))
-#     for k in range(len(Lambdas)):
-#         Lambdas[k] = list(map(float, Lambdas[k].strip('][').split('; ')))
-
-#     Zetas = file.readline()[8:] ##
-#     Zetas = list(map(float, Zetas.strip('][\n').split(', ')))
-
-#     X_flow_field = file.readline()[15:]
-#     if X_flow_field[:9] == "SINE FLOW":
-#         X_flow_field_type = "SINE FLOW: (psi, A, w0)"
-#         X_flow_field_params = list(map(float, X_flow_field[26:].strip(")(\n").split(", ")))
-#     elif X_flow_field[:13] == "CONSTANT FLOW":
-#         X_flow_field_type = "CONSTANT FLOW: (psi, A)"
-#         X_flow_field_params = list(map(float, X_flow_field[26:].strip(")(\n").split(", ")))
-#     elif X_flow_field[:12] == "PIV-IMPORTED":
-#         X_flow_field_type = "PIV-IMPORTED: filename"
-#         X_flow_field_params = X_flow_field[18:] # Filename of the PIV import
-#     else: # X_flow_field == "NO FLOW":
-#         X_flow_field_type = "NO FLOW"
-#         X_flow_field_params = 0
-        
-#     T_span = file.readline()[9:] ##
-#     T_span = list(map(float, T_span.strip('][\n').split(', ')))
-#     T_eval = file.readline()[9:] ##
-#     T_eval = list(map(float, T_eval.strip('][\n').split(', '))) # T_eval = list(map(float, T_eval.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
-
-#     method = file.readline()
-
-#     file.close()
-#     parameters = [N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_type, X_flow_field_params, T_span, T_eval, method]
-#     return parameters
-
-# def ExtractData(filename):
-
-#     file = open(filename, "r")
-
-#     ## Metadata extraction
-#     file.readline()
-
-#     N = int(file.readline()[4:])
-
-#     file.readline()
-#     file.readline()
-#     file.readline()
-#     file.readline()
-#     file.readline()
-#     file.readline()
-#     file.readline()
-#     file.readline()
-#     file.readline()
-#     file.readline()
-#     file.readline()
-#     file.readline()
-#     file.readline()
-
-#     T_eval = file.readline()[9:] ##
-#     T_eval = list(map(float, T_eval.strip('][\n').split(', ')))#list(map(float, T_eval.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
-
-#     file.readline()
-    
-#     ## Create data arrays in functions of the metadata
-#     X = np.zeros((N+2, len(T_eval)))
-#     file.readline()
-#     file.readline()
-
-
-#     first_line = file.readline()
-#     if first_line[:10] == "ValueError":
-#         for t in range(1, len(T_eval)):
-#             file.readline()
-#     else:
-#         X[:,0] = list(map(float, first_line.strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
-#         for t in range(1, len(T_eval)):
-#             X[:,t] = list(map(float, file.readline().strip('][\n').lstrip().rstrip().replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').replace('  ', ' ').split(' ')))
-
-#     file.close()
-#     return X
-
-### ----- Extracting Functions ----- ###
-########################################
-
 ######################################
 ### ----- Plotting functions ----- ###
+
+# x = np.linspace(0, 1, 25)
+# c = sample_colorscale('BuPu', list(x))
 
 # HEX colors for plotting
 red = "#d62728"
@@ -423,14 +247,13 @@ def CheckEquilibrium(X, N, T_eval, A, gamma, Sp4, n_L = [0,0], Lambdas=[[0,0]], 
 
     return fig_one_set
 
-def Kymograph(X, bool_fig=False):
+def Kymograph(X):
 
-    """ Computes Kymograph of X and mean angle. 
-    Returns the associated figure if desired. """
+    """ Computes Kymograph of X and mean angle."""
 
     N = X.shape[0]-2
     M = X.shape[1] # Number of time samples 
-    # Theta = np.reshape(np.array([X3N(X[t,:])[2*N:] for t in range(M)]), newshape = (M, N))
+    
     Theta = np.zeros((M,N))
     for k in range(N):
         Theta[:,k] = np.sum(X[2:k+3,:], axis=0)
@@ -439,11 +262,19 @@ def Kymograph(X, bool_fig=False):
     # Careful with 2*pi limit!
     Theta_0 = np.repeat(np.reshape(np.mean(Theta, axis = 0), newshape=(1,N)), M, axis=0)
 
-    if bool_fig:
-        fig_Kymograph = px.imshow(Theta, labels=dict(x="Arclength from second segment", y="Time", color="Tangent angle"), aspect='auto')
-        return Theta, Theta_0, fig_Kymograph
-    else:
-        return Theta, Theta_0
+    return Theta, Theta_0
+
+def StroboscopicView(X, T_eval, T_s, eps = 1e-6):
+    """ Return values of X at t = k * T_s.
+    Remark: X is of the form (s,t) """
+    
+    l = int(T_eval[-1] // T_s)
+    X_s = np.zeros((X.shape[0], l+1))
+    
+    for k in range(l+1):
+        X_s[:,k] = X[:, np.argmin(np.abs(T_eval - k * T_s))] # t = k * T_s
+        
+    return X_s
 
 def Covariance(Theta, Theta_0, bool_fig = False):
 
@@ -468,37 +299,6 @@ def Covariance(Theta, Theta_0, bool_fig = False):
     else:
         return C
 
-def fit_ellipse(x, y):
-    """
-
-    Fit the coefficients a,b,c,d,e,f, representing an ellipse described by
-    the formula F(x,y) = ax^2 + bxy + cy^2 + dx + ey + f = 0 to the provided
-    arrays of data points x=[x1, x2, ..., xn] and y=[y1, y2, ..., yn].
-
-    Based on the algorithm of Halir and Flusser, "Numerically stable direct
-    least squares fitting of ellipses'.
-
-
-    """
-
-    D1 = np.vstack([x**2, x*y, y**2]).T
-    D2 = np.vstack([x, y, np.ones(len(x))]).T
-    S1 = D1.T @ D1
-    S2 = D1.T @ D2
-    S3 = D2.T @ D2
-    try:
-        T = -np.linalg.inv(S3) @ S2.T
-        M = S1 + S2 @ T
-        C = np.array(((0, 0, 2), (0, -1, 0), (2, 0, 0)), dtype=float)
-        M = np.linalg.inv(C) @ M
-        eigval, eigvec = np.linalg.eig(M)
-        con = 4 * eigvec[0]* eigvec[2] - eigvec[1]**2
-        ak = eigvec[:, np.nonzero(con > 0)[0]]
-        return list(np.concatenate((ak, T @ ak)).ravel())
-    except:
-        # print("Cannot fit this ellipse. Most probably signal is zero.")
-        return [None, None, None, None, None, None]
-    
 def cart_to_pol(coeffs):
     """
 
@@ -564,73 +364,6 @@ def cart_to_pol(coeffs):
     phi = phi % np.pi
 
     return [x0, y0, ap, bp, e, phi]
-
-def make_ellipse_pts(params, npts=100, tmin=0, tmax=2*np.pi):
-    """
-    Return npts points on the ellipse described by the params = x0, y0, ap,
-    bp, e, phi for values of the parametric variable t between tmin and tmax.
-
-    """
-
-    x0, y0, ap, bp, e, phi = params
-    # A grid of the parametric variable, t.
-    t = np.linspace(tmin, tmax, npts)
-    x = x0 + ap * np.cos(t) * np.cos(phi) - bp * np.sin(t) * np.sin(phi)
-    y = y0 + ap * np.cos(t) * np.sin(phi) + bp * np.sin(t) * np.cos(phi)
-    return x, y
-
-    # We use the formulas from https://mathworld.wolfram.com/Ellipse.html
-
-def LissajousPhase(x, y, t_start=0, bool_coeffs = False):
-
-    """ Returns phase extracted from the Lissajous curve fitted to an ellipse. 
-    Possibility to return ellipse coefficients and to choose when the limit cycle starts. 
-    """
-
-    cartesian_coeffs_ellipse = fit_ellipse(x[t_start:], y[t_start:])
-    polar_coeffs_ellipse = cart_to_pol(cartesian_coeffs_ellipse)
-    x0, y0, ap, bp, e, phi = polar_coeffs_ellipse
-
-    if polar_coeffs_ellipse == [None, None, None, None, None, None]:
-        phase_modulus = None
-        phase_sign = None
-
-    # y_max = np.max(y[t_start:])-y0
-    # print("y_max = ", y_max)
-    else:
-        # Create ellipse and extract y_max
-        Ell_x, Ell_y = make_ellipse_pts(polar_coeffs_ellipse, npts=10000)
-        y_max = np.max(Ell_y)-y0
-        x_0_index = np.where(np.abs(Ell_x-x0) == np.min(np.abs(Ell_x-x0)))[0][0]
-        y_x_0 = np.abs(Ell_y[x_0_index]-y0)
-        if phi < np.pi/2:
-            phase_modulus = np.arcsin(y_x_0/y_max)
-        elif phi < np.pi:
-            phase_modulus = np.pi - np.arcsin(y_x_0/y_max)
-        m = 10 # Number of vertices chosen to calculate orientation
-        d = 2 # distance between "successive" points considered
-        Q_m = 0
-        for k in range(m):
-            det_k = (x[t_start+k+d]-x[t_start+k])*(y[t_start+k+2*d]-y[t_start+k]) - (x[t_start+k+2*d]-x[t_start+k])*(y[t_start+k+d]-y[t_start+k])
-            sign_det_k = np.sign(det_k)
-            # print("sign_det_k = ", sign_det_k)
-            Q_m += sign_det_k
-        Q_m /= m
-        # print("Q_m = ", Q_m)
-        phase_sign = -np.sign(Q_m)
-    
-    # print("phase_modulus = ", phase_modulus, ", phase_sign = ", phase_sign)
-
-    if bool_coeffs:
-        if phase_sign == None:
-            return polar_coeffs_ellipse, phase_sign
-        else:
-            return polar_coeffs_ellipse, phase_sign * phase_modulus
-    else:
-        if phase_sign == None:
-            return phase_sign
-        else:
-            return phase_sign * phase_modulus
 
 def PCA(Theta, bool_from_scratch = False, bool_fig=False):
 

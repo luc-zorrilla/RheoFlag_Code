@@ -5,7 +5,7 @@ from turtle import color
 from matplotlib import markers
 import numpy as np
 import pandas as pd
-from regex import E
+# from regex import E
 from scipy.integrate import solve_ivp
 from scipy import interpolate
 import plotly.express as px
@@ -17,6 +17,7 @@ from datetime import datetime
 import json
 import codecs
 import csv
+import os
 
 #############################
 ### ----- Functions ----- ###
@@ -31,11 +32,11 @@ web = webbrowser.get('VS')
 def vs_show(self):
     temp_dir = "C:\\Users\\Luc\\Documents\\MEGASync\\PhD\\RheoFlag\\Results\\Temp\\"
     temp_file_number = round(datetime.now().timestamp())
-    save_url = temp_dir + "temp_" + str(temp_file_number) + "_.html"
+    save_url = temp_dir + "temp_" + str(temp_file_number) + ".html"
 
     self.write_html(save_url, include_mathjax = 'cdn')
     web.open(save_url)
-
+    
     return save_url
 go.Figure.vs_show = vs_show
 
@@ -186,19 +187,13 @@ def get_data(data_filename):
 
 def StraightLine(N):
     """ A straight line """
-    X_0 = np.zeros(N+3, dtype = np.double)
+    X_0 = np.zeros(N+2, dtype = np.double)
     return X_0
 
 def ProximalBend(N):
     """ A proximal bend (of the first segment) """
-    X_0 = np.zeros(N+3, np.double)
+    X_0 = np.zeros(N+2, np.double)
     X_0[2] = np.pi/4
-    return X_0
-
-def SmoothCurve(N):
-    """ A curve with constant curvature, so that the total shear angle is pi/2 """
-    X_0 = np.zeros(N+3, np.double)
-    X_0[2:-1] = np.arange(1,N+1) * (np.pi/4) / N
     return X_0
 
 # Add reading the last position from a file and start from there? e.g. for changing integration method.
@@ -612,7 +607,7 @@ def ActiveBending(X):
 #############################################
 ## --- Differential system AQX_dot = B --- ##
     
-def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, InterpFlow = 0):
+def g(t, X, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, InterpFlow = 0):
 
     """ Returns the non-dimensionalized equation X_tilde_dot = g(X_tilde; t; parameters). 
     The difference with f(t,X) is that X is extended to add theta_0_dot, giving X_tilde. 
@@ -620,18 +615,14 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
     into a first order equation and added to the matricial system.
     """
 
-    # Apply the spring equation first
-    # theta_0_dot_dot = -k0*X_tilde[2]
-    # theta_0_dot = -X_tilde[2] * np.sin(np.sqrt(k0)*t)
-    # theta_0 = X_tilde[2] * np.cos(np.sqrt(k0)*t)
+    # Boundary conditions (basal hinge, free distal end)
     n_0 = [0,0] # No displacement at the base
     if k0 == np.inf:
         k0=0
-    m_0 = k0*X_tilde[2] # Rotation at the base is allowed --> Not sure about the sign
+    m_0 = k0*X[2] # Rotation at the base is allowed
 
     ##################################################################
     ###### Solve the linear system with infinite basal stiffness #####
-    X = X_tilde[:-1]
     N = X.shape[0]-2
 
     X_3N_time = time.time()
@@ -697,11 +688,6 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
     if X_dot_time>1:
         print("Inverting to get X_dot took %s seconds." % (X_dot_time))
     ##################################################################
-    
-    # Extend the linear system to the basal hinge conditions
-    # X_dot[2] = X_tilde[-1] # \dot(theta_0) = theta_0_dot
-    theta_0_dot_dot = -k0*X[2]
-    X_tilde_dot = np.hstack((X_dot, [theta_0_dot_dot]))
 
     # Result
     time_list = [X_3N_time, A_time, ADB_time, ADS_time, Q_time, B_time, X_dot_time]
@@ -710,7 +696,7 @@ def g(t, X_tilde, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zet
     if max_time>1:
         print("The longest computation took %s seconds and was" %max_time , time_dict[time_list.index(max_time)])
     
-    return X_tilde_dot
+    return X_dot
 
 
 ## --- Differential system AQX_dot = B --- ##
