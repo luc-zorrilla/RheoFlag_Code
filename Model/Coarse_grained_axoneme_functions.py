@@ -334,7 +334,7 @@ def UU(X_3N, k, gamma):
     return U
 
 def DD(X_3N, k, i):
-    """ Returns non-dimensional (x_i-x_j, y_i-y_j, 1) """
+    """ Returns non-dimensional (x_k-x_j, y_k-y_j, 1) """
     D = np.zeros((1,3))
     N = X_3N.shape[0]//3
     D[0,0] = X_3N[k] - X_3N[i]
@@ -350,7 +350,7 @@ def AA(X_3N, gamma):
 
     A[0,0] = 1 # 1*x0_dot = b_0
     A[1,N] = 1 # 1*y0_dot = b_1
-    # A[2,2*N] = 1 # 1*theta_0_dot = b_2
+    A[2,2*N] = 1 # 1*theta_0_dot = b_2
     for j in range(0, N):
         for i in range(j, N):
             A[j+2,:] = A[j+2,:] + DD(X_3N, i, j) @ UU(X_3N, i, gamma)
