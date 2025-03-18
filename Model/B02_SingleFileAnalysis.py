@@ -34,7 +34,7 @@ folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
 # folder_name += "AnalyticalComparisons/PureBending_Clamped_TipVerticalPointForce/"
 folder_name += "ProximalBend_NoFlow/BendingElasticity_Clamped_VaryingShearBending/"
 
-id_filename = "20250318-061051236731"
+id_filename = "20250318-072049004728"
 
 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
 data_filename = folder_name + 'data_' + id_filename + '.csv'
@@ -72,33 +72,6 @@ X_flow = A*np.sin(w0*T_eval)
 # fig_shape = AnimatedShape(X, X_flow, N, w0, Sp4, Beta, tau_b, T_eval)
 # fig_shape.show()
 
-# # Kymograph for alpha
-# Alpha = np.transpose(X[2:,:])
-# fig = go.Figure(data = go.Heatmap(
-#     y = T_eval_norm,
-#     x = np.linspace(start = 0, stop = 1, num = N),
-#     z = Alpha,
-#     colorscale = 'BuPu',
-#     ))
-
-# fig.update_xaxes(title = 's')
-# fig.update_yaxes(title = 'w0 * t if w0>0, t otherwise')
-# fig.vs_show()
-
-# # Kymograph for theta
-# Theta, Theta_0 = Kymograph(X) # t, s
-
-# fig = go.Figure(data = go.Heatmap(
-#     y = T_eval_norm,
-#     x = np.linspace(start = 0, stop = 1, num = N),
-#     z = Theta,
-#     colorscale = 'BuPu',
-#     ))
-
-# fig.update_xaxes(title = 's')
-# fig.update_yaxes(title = 'w0 * t if w0>0, t otherwise')
-# fig.vs_show()
-
 # Stroboscopic view
 n_strobes = 100
 t_s = T_eval[-1] / n_strobes
@@ -121,12 +94,6 @@ fig.vs_show()
 
 time.sleep(1)
 
-# Solution and analytical solution
-# Analytical Equilbrium Profile
-# n_eq = 1000
-# X_3N_eq = CheckEquilibrium(N, A, gamma, Sp4, n_L = n_L, Lambdas=Lambdas, conditions = "vertical_point_tip", n_eq = n_eq)
-# ["vertical_point_tip", "vertical_density_tip", "vertical_density_uniform", "vertical_flow_uniform"]
-
 fig = go.Figure()
 for k in range(indices_s.shape[0]):
     fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k])
@@ -134,6 +101,43 @@ for k in range(indices_s.shape[0]):
 # fig.update_xaxes()
 # fig.update_yaxes()
 fig.update_layout(showlegend = True)
+fig.vs_show()
+
+time.sleep(1)
+
+################
+## Kymographs ##
+################
+
+# Kymograph for alpha
+Alpha = np.transpose(X[2:,indices_s])
+fig = go.Figure(data = go.Heatmap(
+    y = T_eval_norm[indices_s],
+    x = np.linspace(start = 0, stop = 1, num = indices_s.shape[0]),
+    z = Alpha,
+    colorscale = 'BuPu',
+    ))
+
+fig.update_xaxes(title = 's')
+fig.update_yaxes(title = 'w0 * t if w0>0, t otherwise')
+fig.update_layout(title = "alpha")
+fig.vs_show()
+
+time.sleep(1)
+
+# Kymograph for theta
+Theta = Kymograph(X[:,indices_s]) # t, s
+
+fig = go.Figure(data = go.Heatmap(
+    y = T_eval_norm[indices_s],
+    x = np.linspace(start = 0, stop = 1, num = indices_s.shape[0]),
+    z = Theta,
+    colorscale = 'BuPu',
+    ))
+
+fig.update_xaxes(title = 's')
+fig.update_yaxes(title = 'w0 * t if w0>0, t otherwise')
+fig.update_layout(title = "theta")
 fig.vs_show()
 
 

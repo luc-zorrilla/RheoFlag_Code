@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     ################################
     ## Coarse-graining parameters ##
-    N_list = [15]
+    N_list = [20]
     ################################
 
     #############################
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1e3]
+    Sp4_list = [1e6]
     ################
 
     ###############################
@@ -46,10 +46,10 @@ if __name__ == "__main__":
     # Shear viscosity #
     # Keep delta_t >> 1, tau_b >> 1, Sp4 >> 1, 1/sqrt(k0)>>1, Sp4 / Beta >> 1 to neglect shear viscosity
     ###################
-    
+
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [0, 1e-3, 1e-2, 1e-1, 1e0]
+    Beta_list = [1e0, 1e1, 1e2, 1e3]
     ####################################
 
     ###############################
@@ -197,7 +197,7 @@ if __name__ == "__main__":
 
     # Same time for all simulations
     dT_list = [1e3 for w0 in w0_list]
-    T_max_list = [1e6 for w0 in w0_list]
+    T_max_list = [1e8 for w0 in w0_list]
 
     T_span_list = [[0, T_max] for T_max in T_max_list]
     T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l])+1)] for l in range(len(w0_list))]
@@ -206,7 +206,7 @@ if __name__ == "__main__":
 
     ########################################
     # Maximum simulation time (s) per step #
-    T_sim_max = 120
+    T_sim_max = 240
     ########################################
 
     print("Time set.")

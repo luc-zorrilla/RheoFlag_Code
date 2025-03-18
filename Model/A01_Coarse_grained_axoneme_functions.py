@@ -696,6 +696,10 @@ def g(t, X, Sp4, k0, Beta, taus_b, gamma, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, 
     if max_time>1:
         print("The longest computation took %s seconds and was" %max_time , time_dict[time_list.index(max_time)])
     
+    # Enforce \dot(x0) = \dot(y0) = 0, because error propagation breaks it.
+    X_dot[0] = 0
+    X_dot[1] = 0
+    
     return X_dot
 
 

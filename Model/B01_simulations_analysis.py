@@ -309,11 +309,7 @@ def Kymograph(X):
     for k in range(N):
         Theta[:,k] = np.sum(X[2:k+3,:], axis=0)
 
-    # Mean angle
-    # Careful with 2*pi limit!
-    Theta_0 = np.repeat(np.reshape(np.mean(Theta, axis = 0), newshape=(1,N)), M, axis=0)
-
-    return Theta, Theta_0
+    return Theta
 
 def StroboscopicView(T_eval, t_s):
     """ Return values of X at t = k * T_s.
