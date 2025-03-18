@@ -31,9 +31,10 @@ temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/" 
 # folder_name += "AnalyticalComparisons/PureBending_Clamped_Relaxation/"
 # folder_name += "AnalyticalComparisons/PureBending_Clamped_UniformVerticalFlow/"    
-folder_name += "AnalyticalComparisons/PureBending_Clamped_TipVerticalPointForce/"
+# folder_name += "AnalyticalComparisons/PureBending_Clamped_TipVerticalPointForce/"
+folder_name += "ProximalBend_NoFlow/BendingElasticity_Clamped_VaryingShearBending/"
 
-id_filename = "20250318_N_35_052122084524"
+id_filename = "20250318-061051236731"
 
 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
 data_filename = folder_name + 'data_' + id_filename + '.csv'
@@ -83,8 +84,6 @@ X_flow = A*np.sin(w0*T_eval)
 # fig.update_xaxes(title = 's')
 # fig.update_yaxes(title = 'w0 * t if w0>0, t otherwise')
 # fig.vs_show()
-# filename = temp_folder + 'kymograph_alpha.pdf'
-# fig.write_image(filename)
 
 # # Kymograph for theta
 # Theta, Theta_0 = Kymograph(X) # t, s
@@ -99,18 +98,10 @@ X_flow = A*np.sin(w0*T_eval)
 # fig.update_xaxes(title = 's')
 # fig.update_yaxes(title = 'w0 * t if w0>0, t otherwise')
 # fig.vs_show()
-# filename = temp_folder + 'kymograph_theta.pdf'
-# fig.write_image(filename)
 
 # Stroboscopic view
-if N == 10:
-    t_s = 500
-elif N == 20:
-    t_s = 5000
-elif N in [5, 15, 25, 30]:
-    t_s = 50000
-elif N in [35]:
-    t_s = 250000
+n_strobes = 100
+t_s = T_eval[-1] / n_strobes
 
 condition = (T_eval_norm >= 0)
 min_index = np.arange(T_eval_norm.shape[0])[condition][0]
@@ -132,14 +123,14 @@ time.sleep(1)
 
 # Solution and analytical solution
 # Analytical Equilbrium Profile
-n_eq = 1000
-X_3N_eq = CheckEquilibrium(N, A, gamma, Sp4, n_L = n_L, Lambdas=Lambdas, conditions = "vertical_point_tip", n_eq = n_eq)
+# n_eq = 1000
+# X_3N_eq = CheckEquilibrium(N, A, gamma, Sp4, n_L = n_L, Lambdas=Lambdas, conditions = "vertical_point_tip", n_eq = n_eq)
 # ["vertical_point_tip", "vertical_density_tip", "vertical_density_uniform", "vertical_flow_uniform"]
 
 fig = go.Figure()
 for k in range(indices_s.shape[0]):
     fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k])
-fig.add_scatter(x = X_3N_eq[:n_eq,0], y = X_3N_eq[n_eq:2*n_eq,0], marker_color = cb_orange)
+# fig.add_scatter(x = X_3N_eq[:n_eq,0], y = X_3N_eq[n_eq:2*n_eq,0], marker_color = cb_orange)
 # fig.update_xaxes()
 # fig.update_yaxes()
 fig.update_layout(showlegend = True)

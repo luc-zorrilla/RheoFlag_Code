@@ -26,26 +26,30 @@ if __name__ == "__main__":
 
     ################################
     ## Coarse-graining parameters ##
-    N_list = [35]
+    N_list = [15]
     ################################
-
 
     #############################
     ## Constitutive parameters ##
     
     ################
     # Sperm number #
-    Sp4_list = [1e0]
+    Sp4_list = [1e3]
     ################
 
     ###############################
     # basal hinge spring constant #
     k0_list = [1e3]
     ###############################
-
+    
+    ###################
+    # Shear viscosity #
+    # Keep delta_t >> 1, tau_b >> 1, Sp4 >> 1, 1/sqrt(k0)>>1, Sp4 / Beta >> 1 to neglect shear viscosity
+    ###################
+    
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [0]
+    Beta_list = [0, 1e-3, 1e-2, 1e-1, 1e0]
     ####################################
 
     ###############################
@@ -65,7 +69,7 @@ if __name__ == "__main__":
     ######################
     # Spatial conditions #
     # and at s = 0 ?
-    n_L_list = [[0, 1e-5]] # No force at s = L
+    n_L_list = [[0, 0]] # No force at s = L
     m_L_list = [0] # No torque at s = L
     ######################
     print("Parameter space prepared.")
@@ -75,7 +79,7 @@ if __name__ == "__main__":
 
     print("Preparing initial conditions...")
 
-    init_conf_list = [StraightLine] ## Initial conditions in [StraightLine, ProximalBend]
+    init_conf_list = [ProximalBend] ## Initial conditions in [StraightLine, ProximalBend]
 
     print("Initial conditions prepared. ")
     #######################  
@@ -191,9 +195,9 @@ if __name__ == "__main__":
     # dT_list = [2*np.pi/(100*w0) for w0 in w0_list]
     # T_max_list = [2*np.pi*20/w0 for w0 in w0_list]
 
-    # Aiming big
-    dT_list = [1e4 for w0 in w0_list]
-    T_max_list = [1e7 for w0 in w0_list]
+    # Same time for all simulations
+    dT_list = [1e3 for w0 in w0_list]
+    T_max_list = [1e6 for w0 in w0_list]
 
     T_span_list = [[0, T_max] for T_max in T_max_list]
     T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l])+1)] for l in range(len(w0_list))]
@@ -202,7 +206,7 @@ if __name__ == "__main__":
 
     ########################################
     # Maximum simulation time (s) per step #
-    T_sim_max = 360 # 60
+    T_sim_max = 120
     ########################################
 
     print("Time set.")
