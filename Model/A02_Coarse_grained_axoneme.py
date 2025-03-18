@@ -2,8 +2,7 @@
 input parameters. Then each simulation is saved individually. """
 
 ### libraries ###
-# from Coarse_grained_analysis import *
-from Coarse_grained_axoneme_functions import *
+from A01_Coarse_grained_axoneme_functions import *
 import numpy as np
 import plotly.express as px
 from datetime import datetime
@@ -27,7 +26,7 @@ if __name__ == "__main__":
 
     ################################
     ## Coarse-graining parameters ##
-    N_list = [10]                            
+    N_list = [35]
     ################################
 
 
@@ -36,23 +35,23 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1e-3, 1e0, 1e3]
+    Sp4_list = [1e0]
     ################
 
     ###############################
     # basal hinge spring constant #
-    k0_list = [0, 1e-3, 1e0, 1e3]
+    k0_list = [1e3]
     ###############################
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [0, 1e-3, 1e0, 1e3]
+    Beta_list = [0]
     ####################################
 
     ###############################
     # Bending viscosity timescale #
     # remark : it is in tau_s units
-    Tau_b_list = [0, 1e-3, 1e0, 1e3]
+    Tau_b_list = [0]
     taus_b_list = [[[tau_b]*N for tau_b in Tau_b_list] for N in N_list]
     ###############################
 
@@ -66,7 +65,7 @@ if __name__ == "__main__":
     ######################
     # Spatial conditions #
     # and at s = 0 ?
-    n_L_list = [[0, 0]] # No force at s = L
+    n_L_list = [[0, 1e-5]] # No force at s = L
     m_L_list = [0] # No torque at s = L
     ######################
     print("Parameter space prepared.")
@@ -169,8 +168,8 @@ if __name__ == "__main__":
     # Constant vertical flow
     # X_flow_field_list = [np.array([0, 10**(-6)])]
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
-    A_list = [0, 1e-3, 1e0, 1e3]
-    w0_list = [0, 1e-3, 1e0, 1e3] # 1e-2, 1e-1, 1e0, 1e1, 1e2]
+    A_list = [0]
+    w0_list = [0] # 1e-2, 1e-1, 1e0, 1e1, 1e2]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -181,7 +180,7 @@ if __name__ == "__main__":
 
     ######################
     # Integration scheme #
-    method_list = ['RK45'] # ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
+    method_list = ['BDF'] # ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
     ######################
 
     ################################
@@ -193,8 +192,8 @@ if __name__ == "__main__":
     # T_max_list = [2*np.pi*20/w0 for w0 in w0_list]
 
     # Aiming big
-    dT_list = [1e-2 for w0 in w0_list]
-    T_max_list = [1e2 for w0 in w0_list]
+    dT_list = [1e4 for w0 in w0_list]
+    T_max_list = [1e7 for w0 in w0_list]
 
     T_span_list = [[0, T_max] for T_max in T_max_list]
     T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l])+1)] for l in range(len(w0_list))]
@@ -203,7 +202,7 @@ if __name__ == "__main__":
 
     ########################################
     # Maximum simulation time (s) per step #
-    T_sim_max = 60
+    T_sim_max = 360 # 60
     ########################################
 
     print("Time set.")
