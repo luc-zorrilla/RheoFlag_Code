@@ -27,14 +27,16 @@ temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 ################################################################################
 ### Read metadata and data
 
-
 folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/" 
 # folder_name += "AnalyticalComparisons/PureBending_Clamped_Relaxation/"
 # folder_name += "AnalyticalComparisons/PureBending_Clamped_UniformVerticalFlow/"    
 # folder_name += "AnalyticalComparisons/PureBending_Clamped_TipVerticalPointForce/"
-folder_name += "ProximalBend_NoFlow/BendingElasticity_Clamped_VaryingShearBending/"
+# folder_name += "ProximalBend_NoFlow/BendingElasticity_Clamped_VaryingShearBending/"
+folder_name += "StraightLine_PeriodicFlow/Bending_elasticity_viscosity/"
 
-id_filename = "20250318-072049004728"
+################################################################################
+id_filename = "20250319-033226557491"
+################################################################################
 
 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
 data_filename = folder_name + 'data_' + id_filename + '.csv'
@@ -51,7 +53,7 @@ if T_sim == np.inf:
 
 tau_b = taus_b[0]
 
-keys_toprint = ['N', 'A', 'w0', 'Sp4', 'k0', 'Beta', 'taus_b', 'n_L', 'm_L']
+keys_toprint = ['N', 'init_conf', 'A', 'w0', 'Sp4', 'k0', 'Beta', 'taus_b', 'n_L', 'm_L', 'Lambdas', 'Zetas']
 for key in keys_toprint:
     print(key, solver_dict[key])
 
@@ -73,10 +75,18 @@ X_flow = A*np.sin(w0*T_eval)
 # fig_shape.show()
 
 # Stroboscopic view
-n_strobes = 100
-t_s = T_eval[-1] / n_strobes
+eps = 1e-6
+if (w0 - 0) < eps:
+    # Static view: divided all dynamics in n_strobes points equally distant
+    n_strobes = 100
+    t_s = T_eval_norm[-1] / n_strobes
+    condition = (T_eval_norm >= 0)
+else:
+    # Dynamic view: divided permanent regime in n_strobes points equally distant within one flow period
+    n_strobes = 10
+    t_s = 1 / n_strobes
+    condition = (T_eval_norm > round(T_eval_norm[-1]) - 2) & (T_eval_norm <= round(T_eval_norm[-1]) - 1)
 
-condition = (T_eval_norm >= 0)
 min_index = np.arange(T_eval_norm.shape[0])[condition][0]
 max_index = np.arange(T_eval_norm.shape[0])[condition][-1]
 indices_s = StroboscopicView(T_eval_norm[min_index:max_index], t_s = t_s)

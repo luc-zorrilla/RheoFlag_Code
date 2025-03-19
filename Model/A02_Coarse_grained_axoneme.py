@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     ################################
     ## Coarse-graining parameters ##
-    N_list = [20]
+    N_list = [10]
     ################################
 
     #############################
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1e6]
+    Sp4_list = [1e0]
     ################
 
     ###############################
@@ -49,13 +49,13 @@ if __name__ == "__main__":
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [1e0, 1e1, 1e2, 1e3]
+    Beta_list = [0]
     ####################################
 
     ###############################
     # Bending viscosity timescale #
     # remark : it is in tau_s units
-    Tau_b_list = [0]
+    Tau_b_list = [0, 1e-3, 1e0, 1e3]
     taus_b_list = [[[tau_b]*N for tau_b in Tau_b_list] for N in N_list]
     ###############################
 
@@ -79,7 +79,7 @@ if __name__ == "__main__":
 
     print("Preparing initial conditions...")
 
-    init_conf_list = [ProximalBend] ## Initial conditions in [StraightLine, ProximalBend]
+    init_conf_list = [StraightLine] ## Initial conditions in [StraightLine, ProximalBend]
 
     print("Initial conditions prepared. ")
     #######################  
@@ -93,8 +93,16 @@ if __name__ == "__main__":
     #########
     # Force #
     # Lambda_List = [[[Lambda_0_x, Lambda_0_y], ..., [Lambda_Nm1_x, Lambda_Nm1_y]]]
-    Lambda = 0
-    Lambdas_list = [[[Lambda, Lambda] for k in range(N)] for N in N_list]
+
+    # Negative horizontal force at s = L/2
+    # Lambda = [-5e0,0]
+    # Lambdas_list = [[[0,0]]*((N-1)//2) + [Lambda] + [[0,0]]*(N//2) for N in N_list]
+
+    # Uniform force along length
+    Lambda = [0,0]
+    Lambdas_list = [[Lambda for k in range(N)] for N in N_list]
+    
+    
     #########
 
     ##########
@@ -169,11 +177,13 @@ if __name__ == "__main__":
 
     # No flow
     # X_flow_field_list = [-1]
+
     # Constant vertical flow
     # X_flow_field_list = [np.array([0, 10**(-6)])]
+    
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
-    A_list = [0]
-    w0_list = [0] # 1e-2, 1e-1, 1e0, 1e1, 1e2]
+    A_list = [1e-6]
+    w0_list = [1e0] # 1e-2, 1e-1, 1e0, 1e1, 1e2]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -196,8 +206,8 @@ if __name__ == "__main__":
     # T_max_list = [2*np.pi*20/w0 for w0 in w0_list]
 
     # Same time for all simulations
-    dT_list = [1e3 for w0 in w0_list]
-    T_max_list = [1e8 for w0 in w0_list]
+    dT_list = [1e-3 for w0 in w0_list]
+    T_max_list = [1e3 for w0 in w0_list]
 
     T_span_list = [[0, T_max] for T_max in T_max_list]
     T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l])+1)] for l in range(len(w0_list))]
