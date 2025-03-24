@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     ###############################
     # basal hinge spring constant #
-    k0_list = [1e3]
+    k0_list = [1e12]
     ###############################
     
     ###################
@@ -55,9 +55,15 @@ if __name__ == "__main__":
     ###############################
     # Bending viscosity timescale #
     # remark : it is in tau_s units
-    Tau_b_list = [0, 1e-3, 1e0, 1e3]
+    Tau_b_list = [0]
     taus_b_list = [[[tau_b]*N for tau_b in Tau_b_list] for N in N_list]
     ###############################
+
+    ##############################
+    # Shear viscosity activation #
+    bool_tau_s = False
+    bool_tau_s_list = [bool_tau_s for N in N_list]
+    ##############################
 
     ####################################
 
@@ -183,7 +189,7 @@ if __name__ == "__main__":
     
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
     A_list = [1e-6]
-    w0_list = [1e0] # 1e-2, 1e-1, 1e0, 1e1, 1e2]
+    w0_list = [1e-6]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -202,21 +208,21 @@ if __name__ == "__main__":
     print("Setting time...")
 
     # time determined by the flow timescale
-    # dT_list = [2*np.pi/(100*w0) for w0 in w0_list]
-    # T_max_list = [2*np.pi*20/w0 for w0 in w0_list]
+    dT_list = [2*np.pi/(100*w0) for w0 in w0_list]
+    T_max_list = [2*np.pi*100/w0 for w0 in w0_list]
 
     # Same time for all simulations
-    dT_list = [1e-3 for w0 in w0_list]
-    T_max_list = [1e3 for w0 in w0_list]
+    # dT_list = [1e2 for w0 in w0_list]
+    # T_max_list = [1e6 for w0 in w0_list]
 
     T_span_list = [[0, T_max] for T_max in T_max_list]
-    T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l])+1)] for l in range(len(w0_list))]
+    T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l]))] for l in range(len(w0_list))]
 
     ################################
 
     ########################################
     # Maximum simulation time (s) per step #
-    T_sim_max = 240
+    T_sim_max = 600
     ########################################
 
     print("Time set.")
@@ -271,6 +277,7 @@ if __name__ == "__main__":
     for n in range(len(N_list)):
         N = N_list[n]
         taus_b_real_list = taus_b_list[n]
+        bool_tau_s = bool_tau_s_list[n]
         Lambdas = Lambdas_list[n]
         Zetas = Zetas_list[n]
         for taus_b in taus_b_real_list:

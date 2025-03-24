@@ -19,7 +19,8 @@ from sklearn import linear_model
 from sklearn.metrics import mean_squared_error, r2_score
 
 from plotting_functions import * 
-pio.templates.default = "figure_template"
+pio.templates.default = "custom_template"
+cyclic_color = ['Twilight', 'IceFire', 'Edge', 'Phase', 'HSV', 'mrybm', 'mygbm'][3]
 ################################################################################
 
 temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
@@ -32,10 +33,10 @@ folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
 # folder_name += "AnalyticalComparisons/PureBending_Clamped_UniformVerticalFlow/"    
 # folder_name += "AnalyticalComparisons/PureBending_Clamped_TipVerticalPointForce/"
 # folder_name += "ProximalBend_NoFlow/BendingElasticity_Clamped_VaryingShearBending/"
-folder_name += "StraightLine_PeriodicFlow/Bending_elasticity_viscosity/"
+folder_name += "StraightLine_PeriodicFlow/PureBending_Clamped_NoViscosity/"
 
 ################################################################################
-id_filename = "20250319-033226557491"
+id_filename = "20250321_w0_1e-5_043024751748"
 ################################################################################
 
 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
@@ -68,62 +69,91 @@ if (A > 0) & (w0 > 0):
     T_eval_norm = T_eval * w0 / (2*np.pi)
 else:
     T_eval_norm = T_eval
-X_flow = A*np.sin(w0*T_eval)
+X_flow = A*np.sin(2 * np.pi * T_eval_norm)
 
-# Animated shape
-# fig_shape = AnimatedShape(X, X_flow, N, w0, Sp4, Beta, tau_b, T_eval)
-# fig_shape.show()
+# # Fourier of the flow
+# X_flow_f = np.fft.rfft(X_flow, axis=0)
+# f = np.fft.rfftfreq(X_flow.shape[0])
+# f /= T_eval_norm[1] - T_eval_norm[0]
+
+# fig = go.Figure()
+# fig.add_scatter(x = f, y = np.abs(X_flow_f))
+# fig.vs_show()
+
+# time.sleep(1)
+# fig = go.Figure()
+# fig.add_scatter(x = f, y = np.angle(X_flow_f) / (2 * np.pi))
+# fig.vs_show()
+
+# exit()
+
+# Crop part of the data
+# n_max = 101
+# X = X[:, :n_max]
+# T_eval_norm = T_eval_norm[:n_max]
+# c = sample_colorscale('BuPu', np.linspace(0, 1, num = T_eval_norm.shape[0]))[::-1]
+
+# fig = go.Figure()
+# for t in range(X.shape[1]):
+    
+#     fig.add_scatter(x = X3N(X[:,t])[:N, 0], y = X3N(X[:,t])[N:2*N, 0], marker_color = c[t])
+
+# fig.update_layout(showlegend = True)
+# fig.vs_show()
+
+# time.sleep(1)
+
+# fig = go.Figure()
+# fig.add_scatter(x = np.arange(T_eval_norm.shape[0]), y = T_eval_norm)
+# fig.vs_show()
+# exit()
 
 # Stroboscopic view
-eps = 1e-6
-if (w0 - 0) < eps:
+eps = 1/1e-12 # -1, np.inf
+if np.abs(w0 - 0) < eps:
     # Static view: divided all dynamics in n_strobes points equally distant
-    n_strobes = 100
-    t_s = T_eval_norm[-1] / n_strobes
-    condition = (T_eval_norm >= 0)
+    n_strobes = T_eval_norm.shape[0] #10000
+    condition = (T_eval_norm >= 0) #T_eval_norm[-1]/2)
 else:
     # Dynamic view: divided permanent regime in n_strobes points equally distant within one flow period
-    n_strobes = 10
-    t_s = 1 / n_strobes
-    condition = (T_eval_norm > round(T_eval_norm[-1]) - 2) & (T_eval_norm <= round(T_eval_norm[-1]) - 1)
+    n_strobes = 101
+    condition = (T_eval_norm >= round(T_eval_norm[-1]) - 2) & (T_eval_norm <= round(T_eval_norm[-1]) - 1)
+    # condition = (T_eval_norm >= 0) & (T_eval_norm <= 1)
 
-min_index = np.arange(T_eval_norm.shape[0])[condition][0]
-max_index = np.arange(T_eval_norm.shape[0])[condition][-1]
-indices_s = StroboscopicView(T_eval_norm[min_index:max_index], t_s = t_s)
+indices_s = StroboscopicView(T_eval_norm[condition], n_strobes = n_strobes)
 c = sample_colorscale('BuPu', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]
 
 # Kinetic energy
-K = KineticEnergy(X, N, T_eval) # t
-fig = go.Figure()
-fig.add_scatter(x = T_eval, y = K)
-for k in range(indices_s.shape[0]):
-    fig.add_scatter(x = [T_eval[indices_s[k]]], y = [K[indices_s[k]]], marker_color = c[k], mode = 'markers')
-fig.update_xaxes(type = 'log')
-fig.update_yaxes(type = 'log')
-fig.vs_show()
+# K = KineticEnergy(X, N, T_eval_norm) # t
+# fig = go.Figure()
+# for k in range(indices_s.shape[0]):
+#     fig.add_scatter(x = [T_eval_norm[condition][indices_s[k]]], y = [K[condition][indices_s[k]]], marker_color = c[k], mode = 'markers')
+# fig.update_xaxes(type = 'linear')
+# fig.update_yaxes(type = 'log')
+# fig.vs_show()
 
-time.sleep(1)
+# time.sleep(1)
 
-fig = go.Figure()
-for k in range(indices_s.shape[0]):
-    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k])
-# fig.add_scatter(x = X_3N_eq[:n_eq,0], y = X_3N_eq[n_eq:2*n_eq,0], marker_color = cb_orange)
-# fig.update_xaxes()
-# fig.update_yaxes()
-fig.update_layout(showlegend = True)
-fig.vs_show()
+# fig = go.Figure()
+# for k in range(indices_s.shape[0]):
+#     fig.add_scatter(x = X3N(X[:, condition][:,indices_s[k]])[:N, 0], y = X3N(X[:, condition][:,indices_s[k]])[N:2*N, 0], marker_color = c[k])
+# # fig.add_scatter(x = X_3N_eq[:n_eq,0], y = X_3N_eq[n_eq:2*n_eq,0], marker_color = cb_orange)
+# # fig.update_xaxes()
+# # fig.update_yaxes()
+# fig.update_layout(showlegend = True)
+# fig.vs_show()
 
-time.sleep(1)
+# time.sleep(1)
 
 ################
 ## Kymographs ##
 ################
 
 # Kymograph for alpha
-Alpha = np.transpose(X[2:,indices_s])
+Alpha = np.transpose(X[2:, condition][:,indices_s]) # t, s
 fig = go.Figure(data = go.Heatmap(
-    y = T_eval_norm[indices_s],
-    x = np.linspace(start = 0, stop = 1, num = indices_s.shape[0]),
+    y = T_eval_norm[condition][indices_s],
+    x = np.linspace(start = 0, stop = 1, num = Alpha.shape[1]),
     z = Alpha,
     colorscale = 'BuPu',
     ))
@@ -136,11 +166,11 @@ fig.vs_show()
 time.sleep(1)
 
 # Kymograph for theta
-Theta = Kymograph(X[:,indices_s]) # t, s
+Theta = Kymograph(X[:, condition][:,indices_s]) # t, s
 
 fig = go.Figure(data = go.Heatmap(
-    y = T_eval_norm[indices_s],
-    x = np.linspace(start = 0, stop = 1, num = indices_s.shape[0]),
+    y = T_eval_norm[condition][indices_s],
+    x = np.linspace(start = 0, stop = 1, num = Theta.shape[1]),
     z = Theta,
     colorscale = 'BuPu',
     ))
@@ -150,71 +180,210 @@ fig.update_yaxes(title = 'w0 * t if w0>0, t otherwise')
 fig.update_layout(title = "theta")
 fig.vs_show()
 
-
-exit()
-# PCA
-psi = np.pi/2
-P, Lambda, fig_eigenspectrum = PCA(Theta, False, True)
-print("Explained variance of first and second PCA components: ", Lambda[0] / np.sum(Lambda), Lambda[1] / np.sum(Lambda))
-# filename = temp_folder + 'eigenspectrum.pdf'
-# fig_eigenspectrum.write_image(filename)
-fig_eigenspectrum.vs_show()
-
-# Phase between PCA and flow
-# PCA_phase, polar_coeffs_ellipse, figs_ellipse = PCA_vs_Flow(Theta, Theta_0, P, X_flow, 1, True)
-# figs_ellipse[0].show()
+time.sleep(1)
 
 # Spatial Fourier
-# Xq, spatial_modes, fig_spatial_modes = SpatialFourier(X, N, T_eval, w0, True)
-# fig_spatial_modes.show()
-Theta_q, spatial_modes, fig_spatial_modes = SpatialFourier(np.transpose(Theta), T_eval, w0, True)
-# fig_spatial_modes.show()
+Alpha_q, q_alpha = SpatialFourier(np.transpose(Alpha)) # Alpha_q: q, t
+Theta_q, q_theta = SpatialFourier(np.transpose(Theta)) # Theta_q: q, t
 
-# Phases between Spatial Fourier and flow
-# Fourier_phases, polar_coeffs_ellipses, fig_ellipses = SpatialFourier_vs_Flow(Theta_q, spatial_modes, X_flow, w0, Theta_q.shape[0], True)
-# fig_ellipses.show()
-# print(Fourier_phases)
+delta_s = 1
+q_alpha *= 1/delta_s
+q_theta *= 1/delta_s
 
-# Spectrogram heat map: x-axis is time, y-axis is frequency, z-axis (color) is the power
-# f, bins, Pxx = scipy.signal.spectrogram(Theta[:,0], 1, axis=0)
-# # Plot with plotly
-# trace = [go.Heatmap(
-#     x= bins,
-#     y= f,
-#     z= 10*np.log10(Pxx),
-#     colorscale='Jet',
-#     )]
-# layout = go.Layout(
-#     title = 'Spectrogram with plotly',
-#     yaxis = dict(title = 'Frequency'), # y-axis label
-#     xaxis = dict(title = 'Time'), # x-axis label
-#     )
-# fig = go.Figure(data=trace, layout=layout)
-# fig.show()
-
-Pxx_array = np.zeros((spatial_modes.shape[0], T_eval.shape[0]))
-for t in range(len(T_eval)):
-    q, bins, Pxx = scipy.signal.spectrogram(Theta[t,:], 1, axis=0)
-    Pxx_array[:,t] = Pxx.reshape(spatial_modes.shape[0],)
-# print("Pxx_array.shape = ", Pxx_array.shape)
-# print("Spatial modes shape = ", spatial_modes.shape)
-# # Plot with plotly
 trace = [go.Heatmap(
-    x= T_eval * w0 / (2*np.pi),
-    y= spatial_modes,
-    z= Pxx_array, #10*np.log10(Pxx_array),
-    colorscale='Jet',
+    x= T_eval_norm[condition][indices_s],
+    y= q_alpha,
+    z= np.abs(Alpha_q),
+    colorscale='BuPu',
     )]
 layout = go.Layout(
-    title = 'Spatial Spectrogram over time',
+    title = 'Spatial Spectrogram of Alpha',
     yaxis = dict(title = 'Wave number'), # y-axis label
     xaxis = dict(title = 'Time [# Flow periods]'), # x-axis label
     )
 fig = go.Figure(data=trace, layout=layout)
 fig.vs_show()
 
+time.sleep(1)
 
-# exit()
+trace = [go.Heatmap(
+    x= T_eval_norm[condition][indices_s],
+    y= q_theta,
+    z= np.abs(Theta_q),
+    colorscale='BuPu',
+    )]
+layout = go.Layout(
+    title = 'Spatial Spectrogram of Theta',
+    yaxis = dict(title = 'Wave number'), # y-axis label
+    xaxis = dict(title = 'Time [# Flow periods]'), # x-axis label
+    )
+fig = go.Figure(data=trace, layout=layout)
+fig.vs_show()
+
+time.sleep(1)
+
+# Temporal Fourier
+Alpha_f, f_alpha = TemporalFourier(np.transpose(Alpha)) # Alpha_f: s, f
+Theta_f, f_theta = TemporalFourier(np.transpose(Theta)) # Theta_f: s, f
+
+delta_t_norm = T_eval_norm[condition][indices_s[1]] - T_eval_norm[condition][indices_s[0]]
+print("Delta_t = ", delta_t_norm)
+f_alpha *= 1/delta_t_norm
+f_theta *= 1/delta_t_norm
+
+trace = [go.Heatmap(
+    x= f_alpha,
+    y= np.linspace(0, 1, num = Alpha_f.shape[0]),
+    z= np.abs(Alpha_f),
+    colorscale='BuPu',
+    )]
+layout = go.Layout(
+    title = 'abs(Alpha(s,f))',
+    yaxis = dict(title = 'Arclength'),
+    xaxis = dict(title = 'Frequency [in flow frequency units]'), 
+    )
+fig = go.Figure(data=trace, layout=layout)
+fig.vs_show()
+
+time.sleep(1)
+
+trace = [go.Heatmap(
+    x= f_alpha,
+    y= np.linspace(0, 1, num = Alpha_f.shape[0]),
+    z= np.angle(Alpha_f) / (2 * np.pi),
+    colorscale=cyclic_color,
+    )]
+layout = go.Layout(
+    title = 'phi(Alpha(s, f))',
+    yaxis = dict(title = 'Arclength'),
+    xaxis = dict(title = 'Frequency [in flow frequency units]'), 
+    )
+fig = go.Figure(data=trace, layout=layout)
+fig.vs_show()
+
+time.sleep(1)
+
+trace = [go.Heatmap(
+    x= f_theta,
+    y= np.linspace(0, 1, num = Theta_f.shape[0]),
+    z= np.abs(Theta_f),
+    colorscale='BuPu',
+    )]
+layout = go.Layout(
+    title = 'abs(Theta(s,f))',
+    yaxis = dict(title = 'Arclength'),
+    xaxis = dict(title = 'Frequency [in flow frequency units]'), 
+    )
+fig = go.Figure(data=trace, layout=layout)
+fig.vs_show()
+
+time.sleep(1)
+
+trace = [go.Heatmap(
+    x= f_theta,
+    y= np.linspace(0, 1, num = Theta_f.shape[0]),
+    z= np.angle(Theta_f)/(2*np.pi),
+    colorscale=cyclic_color,
+    )]
+layout = go.Layout(
+    title = 'phi(Theta(s,f))',
+    yaxis = dict(title = 'Arclength'),
+    xaxis = dict(title = 'Frequency [in flow frequency units]'), 
+    )
+fig = go.Figure(data=trace, layout=layout)
+fig.vs_show()
+
+time.sleep(1)
+
+# (Spatial + Temporal) Fourier
+
+Alpha_q, q_alpha = SpatialFourier(np.transpose(Alpha)) # Alpha_q: q, t
+Theta_q, q_theta = SpatialFourier(np.transpose(Theta)) # Theta_q: q, t
+Alpha_fq, f_alpha = TemporalFourier(Alpha_q) # q, f
+Theta_fq, f_theta = TemporalFourier(Theta_q) # q, f
+
+# print("indices_s", indices_s[:50])
+delta_t_norm = T_eval_norm[condition][indices_s[1]] - T_eval_norm[condition][indices_s[0]]
+# print("delta_t_norm: ", delta_t_norm)
+f_alpha *= 1/delta_t_norm
+f_theta *= 1/delta_t_norm
+
+# Plots in (q, f)
+trace = [go.Heatmap(
+    x= f_alpha,
+    y= q_alpha,
+    z= np.log(np.abs(Alpha_fq)),
+    colorscale='BuPu',
+    )]
+layout = go.Layout(
+    title = 'log|F_t(F_s(Alpha))|',
+    yaxis = dict(title = 'Wave number'), # y-axis label
+    xaxis = dict(title = 'Frequency (in flow frequency units)'), # x-axis label
+    )
+fig = go.Figure(data=trace, layout=layout)
+fig.vs_show()
+
+time.sleep(1)
+
+# Plots in (q, f) 
+
+# Modulus
+trace = [go.Heatmap(
+    x= f_theta,
+    y= q_theta,
+    z= np.log(np.abs(Theta_fq)),
+    colorscale='BuPu',
+    )]
+layout = go.Layout(
+    title = 'log|F_t(F_s(Theta))|',
+    yaxis = dict(title = 'Wave number'), # y-axis label
+    xaxis = dict(title = 'Frequency (in flow frequency units)'), # x-axis label
+    )
+fig = go.Figure(data=trace, layout=layout)
+fig.vs_show()
+
+time.sleep(1)
+
+# Phase
+trace = [go.Heatmap(
+    x= f_alpha,
+    y= q_alpha,
+    z= np.angle(Alpha_fq)/(2*np.pi),
+    colorscale=cyclic_color,
+    )]
+layout = go.Layout(
+    title = 'phi(F_t(F_s(Alpha)))',
+    yaxis = dict(title = 'Wave number'), # y-axis label
+    xaxis = dict(title = 'Frequency (in flow frequency units)'), # x-axis label
+    )
+fig = go.Figure(data=trace, layout=layout)
+fig.vs_show()
+
+time.sleep(1)
+# Phase
+trace = [go.Heatmap(
+    x= f_theta,
+    y= q_theta,
+    z= np.angle(Theta_fq)/(2*np.pi),
+    colorscale=cyclic_color,
+    )]
+layout = go.Layout(
+    title = 'phi(F_t(F_s(Theta)))',
+    yaxis = dict(title = 'Wave number'), # y-axis label
+    xaxis = dict(title = 'Frequency (in flow frequency units)'), # x-axis label
+    )
+fig = go.Figure(data=trace, layout=layout)
+fig.vs_show()
+
+# stroboscopic Animation with flow
+# fig_shape = AnimatedShape(X[:, condition][:,indices_s], X_flow[indices_s], N, w0, Sp4, Beta, tau_b, T_eval_norm[indices_s])
+# fig_shape.show()
+
+# PCA
+# psi = np.pi/2
+# P, Lambda = PCA(Theta, bool_from_scratch=False)
+# print("Explained variance of first and second PCA components: ", Lambda[0] / np.sum(Lambda), Lambda[1] / np.sum(Lambda))
+# fig_eigenspectrum.vs_show()
 
 ### ----- Shape analysis ----- ###
 ##################################

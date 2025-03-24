@@ -311,17 +311,10 @@ def Kymograph(X):
 
     return Theta
 
-def StroboscopicView(T_eval, t_s):
-    """ Return values of X at t = k * T_s.
-    Remark: X is of the form (s,t) """
+def StroboscopicView(T_eval, n_strobes):
+    """ Return n_s regularly spaced indices of T_eval"""
     
-    l = int(T_eval[-1] // t_s)
-    indices_s = np.zeros((l+1,), dtype = int)
-    
-    for k in range(l+1):
-        k_s = np.argmin(np.abs(T_eval - k * t_s))
-        indices_s[k] = k_s
-        
+    indices_s = np.linspace(start = 0, stop = T_eval.shape[0] - 1, num = n_strobes, dtype = int)
     return indices_s
 
 def Covariance(Theta, Theta_0, bool_fig = False):
@@ -413,11 +406,10 @@ def cart_to_pol(coeffs):
 
     return [x0, y0, ap, bp, e, phi]
 
-def PCA(Theta, bool_from_scratch = False, bool_fig=False):
+def PCA(Theta, bool_from_scratch = False):
 
     """ Computes PCA from a Kymograph Theta.
-    Returns Principal components (eigenvectors) with associated eigenvalues.
-    Possibility to return figure of the eigenspectrum """
+    Returns Principal components (eigenvectors) with associated eigenvalues. """
 
     ########################
     ### PCA from scratch ###
@@ -426,7 +418,6 @@ def PCA(Theta, bool_from_scratch = False, bool_fig=False):
 
         # Covariance matrix
         C = Covariance(Theta) # This function standardizes Theta (mean and std)
-        print("Covariance shape: ", C.shape)
         # Covariance_figure = px.imshow(C, labels=dict(x="Arclength", y="Arclength", color="Covariance"))
         # Covariance_figure.show()
 
@@ -435,11 +426,6 @@ def PCA(Theta, bool_from_scratch = False, bool_fig=False):
         idx = w.argsort()[::-1]
         w = w[idx]
         v = v[:,idx]
-        if bool_fig:
-            fig_Eigenspectrum = px.scatter(x=np.arange(w.shape[0]), y=np.real(w), title="Eigenvalues of covariance matrix")
-            return w, v, fig_Eigenspectrum
-        else:
-            return w, v
 
     ### PCA from scratch ###
     ########################
@@ -461,87 +447,32 @@ def PCA(Theta, bool_from_scratch = False, bool_fig=False):
         u, s, vh = np.linalg.svd(Theta_std, full_matrices = True)
 
         # Retrieve PCA from SVD
-        Lambda = np.diag((np.diag(s) @ np.diag(s)) / M) # Eigenvalues of covariance matrix
-        P = np.transpose(vh) # Matrix whose columns are principal components
+        v = np.diag((np.diag(s) @ np.diag(s)) / M) # Eigenvalues of covariance matrix
+        w = np.transpose(vh) # Matrix whose columns are principal components
         # print("Eigenvalues of covariance matrix: ", Lambda)
-        if bool_fig:
-            fig_Eigenspectrum = px.scatter(x=range(np.shape(Lambda)[0]), y=Lambda, title = "Eigenspectrum of covariance matrix from SVD")
-            return P, Lambda, fig_Eigenspectrum
-        else:
-            return P, Lambda
 
-def PCA_vs_Flow(Theta, Theta_0, P, flow_field, k=1, bool_fig=False):
+    # fig_Eigenspectrum = px.scatter(x=np.arange(w.shape[0]), y=np.real(w), title="Eigenvalues of covariance matrix")
 
-    """ Computes the phase between first k components of PCA and Flow field.
-    Possibility to show PCA first k components against flow field. """
+    return w, v
 
-    # Extract shape scores
-    shape_scores = (Theta-Theta_0) @ P
+def SpatialFourier(X):
 
-    # shape_scores_figure = px.scatter(x=B_0, y=B_1, title="Shape scores 1 over 0")
-    # shape_scores_figure.show()
-
-    # Shape score 0 versus Flow field - normalized to angle dimension
-    # print("Type of flow field: ", X_flow_field_type)
-    # print("Parameters of flow field: ", X_flow_field_params)
-    # w0 = 0
-    # normalized_flow_field = np.array([A * xi * Delta_s / K_b ] * len(T_eval)) # Assuming vertical flow
-
-    # Fit ellipse on PCA curve
-    
-    t_start = 750
-    polar_coeffs_ellipses = []
-    PCA_phases = []
-    figs_ellipse = []
-    for l in range(k):
-        B_l = shape_scores[:,l]
-        polar_coeffs_ellipse_l, PCA_phase_l = LissajousPhase(flow_field, B_l, t_start, True) # 5 last periods are used for limit cycle computations
-        polar_coeffs_ellipses.append(polar_coeffs_ellipse_l)
-        PCA_phases.append(PCA_phase_l)
-
-        # Plot the least squares ellipse
-        x, y = make_ellipse_pts(polar_coeffs_ellipse_l, npts = 100, tmin = 0, tmax = 2*np.pi)
-        fig_ellipse_l = go.Figure()
-        fig_ellipse_l.add_scatter(x=x, y=y, mode = 'lines', name = "ellipse - Least square fit")
-        fig_ellipse_l.add_scatter(x=flow_field[:t_start], y=B_l[:t_start], name = "Phase cycle - starting points")
-        fig_ellipse_l.add_scatter(x=flow_field[t_start:], y=B_l[t_start:], name = "Phase cycle - simulation points")
-        # fig_ellipse.update_layout(width =600, height=525)
-        figs_ellipse.append(fig_ellipse_l)
-
-    if bool_fig:
-        return PCA_phases, polar_coeffs_ellipses, figs_ellipse
-    else:
-        return PCA_phases, polar_coeffs_ellipses
-
-def SpatialFourier(X, T_eval, w0, bool_fig=False):
-
-    """ Performs Fourier transform on the spatial axis (axis #0) and returns Fourier transform and corresponding spatial modes.
-    Possibility to return figure of spatial spectrum."""
+    """ Performs Fourier transform on the spatial axis (axis #0) and returns Fourier transform and corresponding wavenumber modes.
+    This assumes that X = X(s, _) where s is the spatial coordinate. """
 
     Xq = np.fft.rfft(X, axis=0)
-    # Xs = np.fft.irfft(Xq, axis=0)
-    # print("Xq.shape = ", Xq.shape)
     modes = np.fft.rfftfreq(X.shape[0])
-    # wavelength = [np.inf] + N+2 / modes[1:]
-    fig_modes_temporal = make_subplots(
-        rows=1, cols=2, 
-        subplot_titles=("Amplitude of fourier modes", "Phase of Fourier modes")
-        )
-    for q in range(Xq.shape[0]):
-        sign_q = np.sign(np.real(Xq[q,:])) # keep sign information
-        mod_q = np.abs(Xq[q,:])
-        signed_mod_q = np.multiply(np.abs(Xq[q,:]), sign_q)
-        angle_q = np.angle(np.multiply(np.exp(np.angle(Xq[q,:])*1j), sign_q))
-        test_trace = go.Scatter(x=T_eval*w0/(2*np.pi), y=mod_q, name="signed Modulus(Mode q = " + str(q) + ")")
-        fig_modes_temporal.add_trace(test_trace, row=1, col=1)
-        test_trace = go.Scatter(x=T_eval*w0/(2*np.pi), y=angle_q, name="Phase(Mode q = " + str(q) + ") between -pi/2 and pi/2")
-        fig_modes_temporal.add_trace(test_trace, row=1, col=2)
 
-    fig_modes_temporal.update_layout(title_text="Fourier spatial modes against time - normalized by flow period.")
-    if bool_fig:
-        return Xq, modes, fig_modes_temporal
-    else:
-        return Xq, modes
+    return Xq, modes
+
+def TemporalFourier(X):
+    """ Performs Fourier transform on the temporal axis (axis #1) and returns Fourier transform and corresponding frequency modes.
+    This assumes that X = X(_, t) where t is the temporal coordinate. """
+
+    Xf = np.fft.rfft(X, axis=1)
+    modes = np.fft.rfftfreq(X.shape[1])
+
+    return Xf, modes
 
 def SpatialFourier_vs_Flow(Xq, modes, flow_field, w0, k=1, bool_fig=False):
 
@@ -601,7 +532,7 @@ def SpatialFourier_vs_Flow(Xq, modes, flow_field, w0, k=1, bool_fig=False):
 ### Plot animated shape in time ###
 
 def AnimatedShape(X, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
-    """ What is the difference with animated_shapes ?"""    
+    """ Animation of a viscoelastic filament"""    
     fig_dict = dict(data = [], layout = {}, frames = [])
 
     # data
