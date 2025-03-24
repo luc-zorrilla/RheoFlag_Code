@@ -21,6 +21,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from plotting_functions import * 
 pio.templates.default = "custom_template"
 cyclic_color = ['Twilight', 'IceFire', 'Edge', 'Phase', 'HSV', 'mrybm', 'mygbm'][3]
+diverging_color = [reverted_Tealrose, 'Fall', 'Geyser', 'Temps', 'Tealrose', 'Tropic'][0]
 ################################################################################
 
 temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
@@ -33,17 +34,18 @@ folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
 # folder_name += "AnalyticalComparisons/PureBending_Clamped_UniformVerticalFlow/"    
 # folder_name += "AnalyticalComparisons/PureBending_Clamped_TipVerticalPointForce/"
 # folder_name += "ProximalBend_NoFlow/BendingElasticity_Clamped_VaryingShearBending/"
-folder_name += "StraightLine_PeriodicFlow/PureBending_Clamped_NoViscosity/"
+# folder_name += "StraightLine_PeriodicFlow/PureBending_Clamped_NoViscosity/"
+folder_name += "StraightLine_PeriodicFlow/BendingShear_Clamped_NoViscosity/"
 
 ################################################################################
-id_filename = "20250321_w0_1e-5_043024751748"
+id_filename = "20250324-054729163116_N_10_bool_tau_s_False_taus_b_0_Beta_1000.0_gamma_2_A_1.0_w0_1.0_Sp4_1.0_k0_1000000000000.0"
 ################################################################################
 
 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
 data_filename = folder_name + 'data_' + id_filename + '.csv'
 
 solver_dict = get_metadata(metadata_filename)
-output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+output_folder, N, taus_b, bool_tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
 X = get_data(data_filename) # s, t
 X_3N_final = X3N(X[:,-1])
@@ -54,7 +56,7 @@ if T_sim == np.inf:
 
 tau_b = taus_b[0]
 
-keys_toprint = ['N', 'init_conf', 'A', 'w0', 'Sp4', 'k0', 'Beta', 'taus_b', 'n_L', 'm_L', 'Lambdas', 'Zetas']
+keys_toprint = ['N', 'init_conf', 'A', 'w0', 'Sp4', 'k0', 'Beta', 'taus_b', 'bool_tau_s', 'n_L', 'm_L', 'Lambdas', 'Zetas']
 for key in keys_toprint:
     print(key, solver_dict[key])
 
@@ -112,8 +114,8 @@ X_flow = A*np.sin(2 * np.pi * T_eval_norm)
 eps = 1/1e-12 # -1, np.inf
 if np.abs(w0 - 0) < eps:
     # Static view: divided all dynamics in n_strobes points equally distant
-    n_strobes = T_eval_norm.shape[0] #10000
-    condition = (T_eval_norm >= 0) #T_eval_norm[-1]/2)
+    n_strobes = T_eval_norm.shape[0]//2 #10000
+    condition = (T_eval_norm >= T_eval_norm[-1]/2)
 else:
     # Dynamic view: divided permanent regime in n_strobes points equally distant within one flow period
     n_strobes = 101
@@ -152,14 +154,14 @@ c = sample_colorscale('BuPu', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]
 # Kymograph for alpha
 Alpha = np.transpose(X[2:, condition][:,indices_s]) # t, s
 fig = go.Figure(data = go.Heatmap(
-    y = T_eval_norm[condition][indices_s],
-    x = np.linspace(start = 0, stop = 1, num = Alpha.shape[1]),
-    z = Alpha,
+    x = T_eval_norm[condition][indices_s],
+    y = np.linspace(start = 0, stop = 1, num = Alpha.shape[1]),
+    z = np.transpose(Alpha),
     colorscale = 'BuPu',
     ))
 
-fig.update_xaxes(title = 's')
-fig.update_yaxes(title = 'w0 * t if w0>0, t otherwise')
+fig.update_yaxes(title = 's')
+fig.update_xaxes(title = 'w0 * t if w0>0, t otherwise')
 fig.update_layout(title = "alpha")
 fig.vs_show()
 
@@ -169,14 +171,14 @@ time.sleep(1)
 Theta = Kymograph(X[:, condition][:,indices_s]) # t, s
 
 fig = go.Figure(data = go.Heatmap(
-    y = T_eval_norm[condition][indices_s],
-    x = np.linspace(start = 0, stop = 1, num = Theta.shape[1]),
-    z = Theta,
+    x = T_eval_norm[condition][indices_s],
+    y = np.linspace(start = 0, stop = 1, num = Theta.shape[1]),
+    z = np.transpose(Theta),
     colorscale = 'BuPu',
     ))
 
-fig.update_xaxes(title = 's')
-fig.update_yaxes(title = 'w0 * t if w0>0, t otherwise')
+fig.update_yaxes(title = 's')
+fig.update_xaxes(title = 'w0 * t if w0>0, t otherwise')
 fig.update_layout(title = "theta")
 fig.vs_show()
 
@@ -186,7 +188,7 @@ time.sleep(1)
 Alpha_q, q_alpha = SpatialFourier(np.transpose(Alpha)) # Alpha_q: q, t
 Theta_q, q_theta = SpatialFourier(np.transpose(Theta)) # Theta_q: q, t
 
-delta_s = 1
+delta_s = 1/N
 q_alpha *= 1/delta_s
 q_theta *= 1/delta_s
 
@@ -251,7 +253,7 @@ trace = [go.Heatmap(
     x= f_alpha,
     y= np.linspace(0, 1, num = Alpha_f.shape[0]),
     z= np.angle(Alpha_f) / (2 * np.pi),
-    colorscale=cyclic_color,
+    colorscale=diverging_color,
     )]
 layout = go.Layout(
     title = 'phi(Alpha(s, f))',
@@ -283,7 +285,7 @@ trace = [go.Heatmap(
     x= f_theta,
     y= np.linspace(0, 1, num = Theta_f.shape[0]),
     z= np.angle(Theta_f)/(2*np.pi),
-    colorscale=cyclic_color,
+    colorscale=diverging_color,
     )]
 layout = go.Layout(
     title = 'phi(Theta(s,f))',
@@ -349,7 +351,7 @@ trace = [go.Heatmap(
     x= f_alpha,
     y= q_alpha,
     z= np.angle(Alpha_fq)/(2*np.pi),
-    colorscale=cyclic_color,
+    colorscale=diverging_color,
     )]
 layout = go.Layout(
     title = 'phi(F_t(F_s(Alpha)))',
@@ -365,7 +367,7 @@ trace = [go.Heatmap(
     x= f_theta,
     y= q_theta,
     z= np.angle(Theta_fq)/(2*np.pi),
-    colorscale=cyclic_color,
+    colorscale=diverging_color,
     )]
 layout = go.Layout(
     title = 'phi(F_t(F_s(Theta)))',

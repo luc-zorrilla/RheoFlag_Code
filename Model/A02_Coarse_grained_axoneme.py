@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [0]
+    Beta_list = [1e3]
     ####################################
 
     ###############################
@@ -188,8 +188,8 @@ if __name__ == "__main__":
     # X_flow_field_list = [np.array([0, 10**(-6)])]
     
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
-    A_list = [1e-6]
-    w0_list = [1e-6]
+    A_list = [1e0]
+    w0_list = [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1e0, 1e6, 1e5, 1e4, 1e3, 1e2, 1e1]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -301,7 +301,7 @@ if __name__ == "__main__":
 
                                                     #########################################
                                                     ### ---- Gather solver arguments ---- ###
-                                                    solver_dict = dict(output_folder = output_folder, N = N, taus_b = taus_b, init_conf = init_conf, Beta = Beta, gamma = gamma, n_L = n_L, m_L = m_L, A = A, w0 = w0, Sp4 = Sp4, k0 = k0, Lambdas = Lambdas, Zetas = Zetas, X_flow_field_string = X_flow_field_string, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, X_flow_field = X_flow_field, X_0 = X_0, method = method)
+                                                    solver_dict = dict(output_folder = output_folder, N = N, taus_b = taus_b, bool_tau_s = bool_tau_s, init_conf = init_conf, Beta = Beta, gamma = gamma, n_L = n_L, m_L = m_L, A = A, w0 = w0, Sp4 = Sp4, k0 = k0, Lambdas = Lambdas, Zetas = Zetas, X_flow_field_string = X_flow_field_string, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, X_flow_field = X_flow_field, X_0 = X_0, method = method)
                                                     #########################################
 
                                                     res = pool.apply_async(func = SolveAndSave, args = list(solver_dict.values()), callback = SolveAndSave_callback)
