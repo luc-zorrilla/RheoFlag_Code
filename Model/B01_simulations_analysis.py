@@ -78,6 +78,26 @@ def fetch_files(directory, metadata_condition, data_condition = None):
 
     return ids_list
 
+def nondimensionalize(eta, E_b, nu_b, K_s, nu_s, L, N):
+    """ Returns non-dimensional parameters (directly used in the model) from physical parameters """
+    
+    Sp4 = eta * (L/N)**4 / E_b
+    tau_b = nu_b / E_b
+    beta = K_s * (L/N)**2 / E_b
+    tau_s = nu_s/E_s
+
+    return Sp4, tau_b, beta, tau_s
+
+def dimensionalize(Sp4, tau_b, beta, tau_s, eta, N, L):
+    """ Returns physical dimensional parameters from non-dimensional parameters(directly used in the model). Requires the knowledge of the filament length L and the drag coefficient eta. """
+
+    E_b = eta * (L/N)**4 / Sp4
+    nu_b = tau_b * E_b
+    K_s = beta * E_b * (N/L)**2
+    nu_s = tau_s * K_s
+
+    return E_b, nu_b, K_s, nu_s
+
 def observable_1D_dataframe(directory, ids_list, columns, observable, obs_type = 'metadata'):
     """ Takes as input a list of ids corresponding to simulations and makes a 
     dataframe in parameter space specified by columns where the value of the dataframe 

@@ -30,15 +30,34 @@ temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 ### Read metadata and data
 
 folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/" 
-# folder_name += "AnalyticalComparisons/PureBending_Clamped_Relaxation/"
-# folder_name += "AnalyticalComparisons/PureBending_Clamped_UniformVerticalFlow/"    
-# folder_name += "AnalyticalComparisons/PureBending_Clamped_TipVerticalPointForce/"
-# folder_name += "ProximalBend_NoFlow/BendingElasticity_Clamped_VaryingShearBending/"
-# folder_name += "StraightLine_PeriodicFlow/PureBending_Clamped_NoViscosity/"
-folder_name += "StraightLine_PeriodicFlow/BendingShear_Clamped_NoViscosity/"
+
+# folder_name += "AnalyticalComparisons/"
+# folder_name += "ProximalBend_NoFlow/"
+folder_name += "StraightLine_PeriodicFlow/"
+
+# Analytical Comparisons
+# folder_name += "PureBending_Clamped_Relaxation/"
+# folder_name += "PureBending_Clamped_UniformVerticalFlow/"    
+# folder_name += "PureBending_Clamped_TipVerticalPointForce/"
+
+# Relaxation from proximal bend initial configuration
+# folder_name += "BendingElasticity_Clamped_VaryingShearBending/"
+
+# Harmonic response
+# folder_name += "PureBending_Clamped_NoViscosity/"
+# folder_name += "BendingShear_Clamped_NoViscosity/"
+# folder_name += "PureBending_Clamped_BendingViscosity/"
+folder_name += "PureShear_Clamped_ShearViscosity/"
+
+# Bending and Shear elasticity
+# folder_name += "PureShear/"
+
+# Shear elasticity and shear viscosity
+# folder_name += "NoViscosity/"
+folder_name += "NoElasticity/"
 
 ################################################################################
-id_filename = "20250324-054729163116_N_10_bool_tau_s_False_taus_b_0_Beta_1000.0_gamma_2_A_1.0_w0_1.0_Sp4_1.0_k0_1000000000000.0"
+id_filename = "20250327-040001863730_N_10_bool_tau_s_True_taus_b_0_Beta_1000.0_gamma_2_A_0.001_w0_1e-09_Sp4_1.0_k0_1000000000000.0"
 ################################################################################
 
 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
@@ -111,7 +130,7 @@ X_flow = A*np.sin(2 * np.pi * T_eval_norm)
 # exit()
 
 # Stroboscopic view
-eps = 1/1e-12 # -1, np.inf
+eps = 1e-12 # -1, np.inf
 if np.abs(w0 - 0) < eps:
     # Static view: divided all dynamics in n_strobes points equally distant
     n_strobes = T_eval_norm.shape[0]//2 #10000
@@ -136,16 +155,16 @@ c = sample_colorscale('BuPu', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]
 
 # time.sleep(1)
 
-# fig = go.Figure()
-# for k in range(indices_s.shape[0]):
-#     fig.add_scatter(x = X3N(X[:, condition][:,indices_s[k]])[:N, 0], y = X3N(X[:, condition][:,indices_s[k]])[N:2*N, 0], marker_color = c[k])
-# # fig.add_scatter(x = X_3N_eq[:n_eq,0], y = X_3N_eq[n_eq:2*n_eq,0], marker_color = cb_orange)
-# # fig.update_xaxes()
-# # fig.update_yaxes()
-# fig.update_layout(showlegend = True)
-# fig.vs_show()
+fig = go.Figure()
+for k in range(indices_s.shape[0]):
+    fig.add_scatter(x = X3N(X[:, condition][:,indices_s[k]])[:N, 0], y = X3N(X[:, condition][:,indices_s[k]])[N:2*N, 0], marker_color = c[k])
+# fig.add_scatter(x = X_3N_eq[:n_eq,0], y = X_3N_eq[n_eq:2*n_eq,0], marker_color = cb_orange)
+# fig.update_xaxes()
+# fig.update_yaxes()
+fig.update_layout(showlegend = True)
+fig.vs_show()
 
-# time.sleep(1)
+time.sleep(1)
 
 ################
 ## Kymographs ##

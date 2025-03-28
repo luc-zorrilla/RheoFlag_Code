@@ -34,7 +34,7 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1e0]
+    Sp4_list = [1e3]
     ################
 
     ###############################
@@ -61,8 +61,7 @@ if __name__ == "__main__":
 
     ##############################
     # Shear viscosity activation #
-    bool_tau_s = False
-    bool_tau_s_list = [bool_tau_s for N in N_list]
+    tau_s_list = [1e-3]
     ##############################
 
     ####################################
@@ -188,8 +187,8 @@ if __name__ == "__main__":
     # X_flow_field_list = [np.array([0, 10**(-6)])]
     
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
-    A_list = [1e0]
-    w0_list = [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1e0, 1e6, 1e5, 1e4, 1e3, 1e2, 1e1]
+    A_list = [1e-3]
+    w0_list = [1e-3]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -222,7 +221,7 @@ if __name__ == "__main__":
 
     ########################################
     # Maximum simulation time (s) per step #
-    T_sim_max = 600
+    T_sim_max = 1200
     ########################################
 
     print("Time set.")
@@ -277,35 +276,35 @@ if __name__ == "__main__":
     for n in range(len(N_list)):
         N = N_list[n]
         taus_b_real_list = taus_b_list[n]
-        bool_tau_s = bool_tau_s_list[n]
         Lambdas = Lambdas_list[n]
         Zetas = Zetas_list[n]
         for taus_b in taus_b_real_list:
-            for init_conf in init_conf_list:
-                X_0 = init_conf(N)
-                for Beta in Beta_list:
-                    for n_L in n_L_list:
-                        for m_L in m_L_list:
-                            for k in range(len(A_list)):
-                                A = A_list[k]
-                                for l in range(len(w0_list)):
-                                    w0 = w0_list[l]
-                                    T_span = T_span_list[l]
-                                    T_eval = T_eval_list[l]
-                                    X_flow_field = X_flow_field_list[k*len(w0_list)+l] ## 
-                                    X_flow_field_string = X_flow_field_string_list[k*len(w0_list)+l]
-                                    for Sp4 in Sp4_list:
-                                        for k0 in k0_list:
-                                            for gamma in gamma_list:
-                                                for method in method_list:
+            for tau_s in tau_s_list:
+                for init_conf in init_conf_list:
+                    X_0 = init_conf(N)
+                    for Beta in Beta_list:
+                        for n_L in n_L_list:
+                            for m_L in m_L_list:
+                                for k in range(len(A_list)):
+                                    A = A_list[k]
+                                    for l in range(len(w0_list)):
+                                        w0 = w0_list[l]
+                                        T_span = T_span_list[l]
+                                        T_eval = T_eval_list[l]
+                                        X_flow_field = X_flow_field_list[k*len(w0_list)+l] ## 
+                                        X_flow_field_string = X_flow_field_string_list[k*len(w0_list)+l]
+                                        for Sp4 in Sp4_list:
+                                            for k0 in k0_list:
+                                                for gamma in gamma_list:
+                                                    for method in method_list:
 
-                                                    #########################################
-                                                    ### ---- Gather solver arguments ---- ###
-                                                    solver_dict = dict(output_folder = output_folder, N = N, taus_b = taus_b, bool_tau_s = bool_tau_s, init_conf = init_conf, Beta = Beta, gamma = gamma, n_L = n_L, m_L = m_L, A = A, w0 = w0, Sp4 = Sp4, k0 = k0, Lambdas = Lambdas, Zetas = Zetas, X_flow_field_string = X_flow_field_string, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, X_flow_field = X_flow_field, X_0 = X_0, method = method)
-                                                    #########################################
+                                                        #########################################
+                                                        ### ---- Gather solver arguments ---- ###
+                                                        solver_dict = dict(output_folder = output_folder, N = N, taus_b = taus_b, tau_s = tau_s, init_conf = init_conf, Beta = Beta, gamma = gamma, n_L = n_L, m_L = m_L, A = A, w0 = w0, Sp4 = Sp4, k0 = k0, Lambdas = Lambdas, Zetas = Zetas, X_flow_field_string = X_flow_field_string, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, X_flow_field = X_flow_field, X_0 = X_0, method = method)
+                                                        #########################################
 
-                                                    res = pool.apply_async(func = SolveAndSave, args = list(solver_dict.values()), callback = SolveAndSave_callback)
-                                            
+                                                        res = pool.apply_async(func = SolveAndSave, args = list(solver_dict.values()), callback = SolveAndSave_callback)
+                                                
     pool.close()
     pool.join() # postpones the execution of next line of code until all processes in the queue are done.
     print("All problems have been solved (one way or another!). ")
