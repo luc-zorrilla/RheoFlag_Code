@@ -32,8 +32,8 @@ temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/" 
 
 # folder_name += "AnalyticalComparisons/"
-# folder_name += "ProximalBend_NoFlow/"
-folder_name += "StraightLine_PeriodicFlow/"
+folder_name += "ProximalBend_NoFlow/"
+# folder_name += "StraightLine_PeriodicFlow/"
 
 # Analytical Comparisons
 # folder_name += "PureBending_Clamped_Relaxation/"
@@ -42,29 +42,37 @@ folder_name += "StraightLine_PeriodicFlow/"
 
 # Relaxation from proximal bend initial configuration
 # folder_name += "BendingElasticity_Clamped_VaryingShearBending/"
+folder_name += "PureBending_Clamped_BendingViscosity/"
+folder_name += "NoClamp/"
 
 # Harmonic response
 # folder_name += "PureBending_Clamped_NoViscosity/"
 # folder_name += "BendingShear_Clamped_NoViscosity/"
 # folder_name += "PureBending_Clamped_BendingViscosity/"
-folder_name += "PureShear_Clamped_ShearViscosity/"
+# folder_name += "PureShear_Clamped_ShearViscosity/"
 
 # Bending and Shear elasticity
 # folder_name += "PureShear/"
 
 # Shear elasticity and shear viscosity
 # folder_name += "NoViscosity/"
-folder_name += "NoElasticity/"
+# folder_name += "NoElasticity/"
 
 ################################################################################
-id_filename = "20250327-040001863730_N_10_bool_tau_s_True_taus_b_0_Beta_1000.0_gamma_2_A_0.001_w0_1e-09_Sp4_1.0_k0_1000000000000.0"
+id_filename = "20250328-020001192697_N_10_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0.001_Sp4_1.0_k0_0"
 ################################################################################
 
 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
 data_filename = folder_name + 'data_' + id_filename + '.csv'
 
 solver_dict = get_metadata(metadata_filename)
-output_folder, N, taus_b, bool_tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+
+eta = 1
+L = 1e-5
+tau_b = taus_b[0]
+E_b, nu_b, K_s, nu_s = dimensionalize(Sp4, tau_b, Beta, tau_s, eta, N, L)
+print("eta, L; E_b, nu_b, K_s, nu_s:", eta, L, E_b, nu_b, K_s, nu_s)
 
 X = get_data(data_filename) # s, t
 X_3N_final = X3N(X[:,-1])
@@ -75,7 +83,7 @@ if T_sim == np.inf:
 
 tau_b = taus_b[0]
 
-keys_toprint = ['N', 'init_conf', 'A', 'w0', 'Sp4', 'k0', 'Beta', 'taus_b', 'bool_tau_s', 'n_L', 'm_L', 'Lambdas', 'Zetas']
+keys_toprint = ['N', 'init_conf', 'A', 'w0', 'Sp4', 'k0', 'Beta', 'taus_b', 'tau_s', 'n_L', 'm_L', 'Lambdas', 'Zetas']
 for key in keys_toprint:
     print(key, solver_dict[key])
 
@@ -130,11 +138,11 @@ X_flow = A*np.sin(2 * np.pi * T_eval_norm)
 # exit()
 
 # Stroboscopic view
-eps = 1e-12 # -1, np.inf
+eps = 1/1e-12
 if np.abs(w0 - 0) < eps:
     # Static view: divided all dynamics in n_strobes points equally distant
-    n_strobes = T_eval_norm.shape[0]//2 #10000
-    condition = (T_eval_norm >= T_eval_norm[-1]/2)
+    n_strobes = T_eval_norm.shape[0] # T_eval_norm.shape[0]//2 #10000
+    condition = (T_eval_norm >= 0) # (T_eval_norm >= T_eval_norm[-1]/2)
 else:
     # Dynamic view: divided permanent regime in n_strobes points equally distant within one flow period
     n_strobes = 101
@@ -202,6 +210,8 @@ fig.update_layout(title = "theta")
 fig.vs_show()
 
 time.sleep(1)
+
+exit()
 
 # Spatial Fourier
 Alpha_q, q_alpha = SpatialFourier(np.transpose(Alpha)) # Alpha_q: q, t

@@ -34,12 +34,12 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1e3]
+    Sp4_list = [1e0]
     ################
 
     ###############################
     # basal hinge spring constant #
-    k0_list = [1e12]
+    k0_list = [0] #[1e12]
     ###############################
     
     ###################
@@ -49,19 +49,19 @@ if __name__ == "__main__":
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [1e3]
+    Beta_list = [0]
     ####################################
 
     ###############################
     # Bending viscosity timescale #
     # remark : it is in tau_s units
-    Tau_b_list = [0]
-    taus_b_list = [[[tau_b]*N for tau_b in Tau_b_list] for N in N_list]
+    Tau_b_list = [0, 1e-6, 1e-3, 1e0, 1e3, 1e6]
+    taus_b_list = [[[tau_b]*(N-1) for tau_b in Tau_b_list] for N in N_list]
     ###############################
 
     ##############################
     # Shear viscosity activation #
-    tau_s_list = [1e-3]
+    tau_s_list = [0]
     ##############################
 
     ####################################
@@ -84,7 +84,7 @@ if __name__ == "__main__":
 
     print("Preparing initial conditions...")
 
-    init_conf_list = [StraightLine] ## Initial conditions in [StraightLine, ProximalBend]
+    init_conf_list = [ProximalBend] ## Initial conditions in [StraightLine, ProximalBend]
 
     print("Initial conditions prepared. ")
     #######################  
@@ -187,7 +187,7 @@ if __name__ == "__main__":
     # X_flow_field_list = [np.array([0, 10**(-6)])]
     
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
-    A_list = [1e-3]
+    A_list = [0]
     w0_list = [1e-3]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
@@ -266,7 +266,7 @@ if __name__ == "__main__":
     # - Simulation parameters: N, T_span, T_eval, method
 
     # Number of systems to integrate
-    files_number = len(N_list)*len(init_conf_list)*len(Tau_b_list)*len(Beta_list)*len(n_L_list)*len(m_L_list)*len(A_list)*len(w0_list)*len(Sp4_list)*len(k0_list)*len(gamma_list)*len(method_list)
+    files_number = len(N_list)*len(init_conf_list)*len(Tau_b_list)*len(tau_s_list)*len(Beta_list)*len(n_L_list)*len(m_L_list)*len(A_list)*len(w0_list)*len(Sp4_list)*len(k0_list)*len(gamma_list)*len(method_list)
     print(files_number, "problems will be integrated")
 
     # Start parallel computation
@@ -282,6 +282,7 @@ if __name__ == "__main__":
             for tau_s in tau_s_list:
                 for init_conf in init_conf_list:
                     X_0 = init_conf(N)
+                    X_0[2] = 0 # TEST
                     for Beta in Beta_list:
                         for n_L in n_L_list:
                             for m_L in m_L_list:

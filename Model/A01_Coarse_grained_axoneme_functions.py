@@ -356,8 +356,8 @@ def ADB(taus_b, N):
     """ Returns the matrix used to model bending dashpots all along the axoneme.
     taus_b is a list of non-dimensional internal bending viscosities. """
 
-    if len(taus_b)==N:
-        A_DB = np.diag([0,0] + taus_b)
+    if len(taus_b)==(N-1):
+        A_DB = np.diag([0,0,0] + taus_b)
     else:
         A_DB = np.zeros((N+2, N+2))
     return A_DB
@@ -365,8 +365,8 @@ def ADB(taus_b, N):
 def ADS(N):
     """ Returns the matrix used to model shear dissipation all along the axoneme.
     taus_s is a list of non-dimensional internal shearing viscosity. """
-    taus_s = [1]*N
-    A_DS = np.tril(np.tile([0,0] + taus_s, (N+2,1)))
+    taus_s = [1]*(N-1)
+    A_DS = np.tril(np.tile([0,0,0] + taus_s, (N+2,1)))
     return A_DS
 
 # Nus_b = [1,1,1,1,1]
@@ -495,8 +495,7 @@ def BC_L(X_3N, n_L=[0,0], m_L=0):
     return B_C
 
 def BC_0(X_3N, n_0 = [0,0], m_0 = 0):
-    """ Returns non-dimensional right-hand side of the differential system for boundary conditions
-    at s = 0 (proximal end). """
+    """ Returns non-dimensional right-hand side of the differential system for boundary conditions at s = 0 (proximal end). """
 
     N = X_3N.shape[0]//3
     B_C = np.zeros((N+2,1))
@@ -506,7 +505,7 @@ def BC_0(X_3N, n_0 = [0,0], m_0 = 0):
     # Partial filament torque balances (B_C[3:]) does not depend on torque or force at s = 0.
     return B_C
 
-def BB(X_3N):
+def BB(X_3N): # Argument X_3N could be replaced by X
     """ Returns non-dimensional right-hand side of the differential system for bending elasticity. """
 
     N = X_3N.shape[0]//3
@@ -531,8 +530,8 @@ def BS(X_3N):
     B[0] = 0 # No force on x axis due to shear at s = 0
     B[1] = 0 # No force on y axis due to shear at s = 0
     B[2] = 0 # No torque due to shear at s = 0 --> Is that correct
-    for i in range(2,N+1):
-        B[i+1] = B[i+1] + (np.sum(X_3N[2*N+i-1:]) - (N-i+1)*X_3N[2*N] ) # Sliding resistance
+    for i in range(N-1):
+        B[3+i] = np.sum(X_3N[2*N+i+1:]) - (N-i-1)*X_3N[2*N] # Sliding resistance        
     return B
 
 def BFlow(X_3N, X_dot_flow, gamma):
@@ -569,7 +568,7 @@ def BFlow(X_3N, X_dot_flow, gamma):
 # exit()
 
 def BF(X_3N, Lambdas):
-    """returns B_F representing non-dimensional moments of uniform density forces on each segment. """
+    """ returns B_F representing non-dimensional moments of uniform density forces on each segment. """
     N = len(Lambdas)
     B_F = np.zeros((N+2,1))
     if Lambdas == [0]*N:
