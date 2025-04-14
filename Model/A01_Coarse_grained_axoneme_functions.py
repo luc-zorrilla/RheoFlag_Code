@@ -351,6 +351,8 @@ def AA(X_3N, gamma):
             A[j+2,:] = A[j+2,:] + DD(X_3N, i, j) @ UU(X_3N, i, gamma)
     return A
 
+
+
 ## A dashpots
 def ADB(taus_b, N):
     """ Returns the matrix used to model bending dashpots all along the axoneme.
@@ -535,8 +537,7 @@ def BS(X_3N):
     return B
 
 def BFlow(X_3N, X_dot_flow, gamma):
-    """ Returns non-dimensional B_flow representing moments due to background flow. This is similar to computations
-    on the left-hand side of the differential equation.
+    """ Returns non-dimensional B_flow representing moments due to background flow. This is similar to computations on the left-hand side of the differential equation.
     Importantly, when put on the right-hand side of the equation one should add a minus sign. """
 
     N = X_3N.shape[0]//3
@@ -544,13 +545,11 @@ def BFlow(X_3N, X_dot_flow, gamma):
 
     B_flow[0,0] = 0
     B_flow[1,0] = 0
-    B_flow[2,0] = 0
 
-    for j in range(1, N):
+    for j in range(N):
         for i in range(j, N):
             theta_i = X_3N[2*N+i]
             B_flow[j+2,0] = B_flow[j+2,0] + DD(X_3N, i, j) @ GG(theta_i, gamma) @ TT_flow(X_dot_flow, i)
-        # B_flow[j+2,0] = B_flow[j+2,0]
     return B_flow
 
 # # Unit test
