@@ -421,7 +421,9 @@ def CreateFlowField(A = 0., w0 = 0., psi = 0., T_meas = [], filename = ""):
 def Flow(X_3N, X_flow_field = np.array([0]) ):
 
     """ Computes non-dimensional average flow speed and 1st moment of flow speed on each axoneme segment
-    given a flow vector field X_flow_field. There are N segments, numerated from 0 to N-1."""
+    given a flow vector field X_flow_field. There are N segments, numerated from 0 to N-1.
+    If a homogeneous flow is imposed, the flow is supposed to be constant within the same segment and
+    the first moment is a simple average. """
 
     N = X_3N.shape[0]//3
     X_dot_flow = np.zeros((4*N,1))
@@ -432,27 +434,33 @@ def Flow(X_3N, X_flow_field = np.array([0]) ):
 
     # A homogeneous flow is imposed
     elif np.shape(X_flow_field)[0] == 2:
-        X_dot_flow[:N, 0] = X_flow_field[0]
-        X_dot_flow[N:2*N, 0] = X_flow_field[1]
-        X_dot_flow[2*N:3*N, 0] = (1 / 2) * X_flow_field[0]
-        X_dot_flow[3*N:, 0] = (1 / 2) * X_flow_field[1]
+        X_dot_flow[:N, 0] = X_flow_field[0] # Flow velocity on x axis
+        X_dot_flow[N:2*N, 0] = X_flow_field[1] # Flow velocity on y axis
+        X_dot_flow[2*N:3*N, 0] = (1 / 2) * X_flow_field[0] # First moment of flow velocity on x axis
+        X_dot_flow[3*N:, 0] = (1 / 2) * X_flow_field[1] # First moment of flow velocity on y axis
         return X_dot_flow
 
-    # A inhomogeneous flow is imposed, e.g. with PIV experiments
+    # An inhomogeneous flow is imposed, e.g. with PIV experiments
     else: 
         # Add things here later
         return X_dot_flow
 
 def TT_flow(X_dot_flow, k):
-    """ Non-dimensional operator [X_dot_flow]_k where X_dot_flow is of shape (4*N x 1). """
+    """ Non-dimensional operator [X_dot_flow]_k where X_dot_flow is of shape (4*N x 1). 
+    Returns the external flow components that contribute to the hydrodynamic drag, i.e.,
+        - the flow speed on each segment (2 scalars),
+        - the first moment of flow speed on each segment (2 scalars),
+        - there is no direct contribution for the angle (see equations) (1 scalar). 
+    """
 
     T_flow_k = np.zeros((5,1))
     N = X_dot_flow.shape[0]//4
+    T_flow_k[2] = 0 # No (direct!) contribution for the filament angle
 
-    T_flow_k[0] = - X_dot_flow[k]
-    T_flow_k[1] = - X_dot_flow[N+k]
-    T_flow_k[3] = X_dot_flow[2*N+k]
-    T_flow_k[4] = X_dot_flow[3*N+k]
+    T_flow_k[0] = - X_dot_flow[k] # Opposite of Flow velocity on x axis
+    T_flow_k[1] = - X_dot_flow[N+k] # Opposite of Flow velocity on y axis
+    T_flow_k[3] = X_dot_flow[2*N+k] # First moment of flow velocity on x axis
+    T_flow_k[4] = X_dot_flow[3*N+k] # First moment of flow velocity on y axis
 
     return T_flow_k
 
@@ -549,7 +557,7 @@ def BFlow(X_3N, X_dot_flow, gamma):
     for j in range(N):
         for i in range(j, N):
             theta_i = X_3N[2*N+i]
-            B_flow[j+2,0] = B_flow[j+2,0] + DD(X_3N, i, j) @ GG(theta_i, gamma) @ TT_flow(X_dot_flow, i)
+            B_flow[j+2,0] += DD(X_3N, i, j) @ GG(theta_i, gamma) @ TT_flow(X_dot_flow, i)
     return B_flow
 
 # # Unit test
