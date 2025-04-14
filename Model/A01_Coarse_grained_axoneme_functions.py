@@ -577,7 +577,7 @@ def BF(X_3N, Lambdas):
         for j in range(1, N):
             for i in range(j, N):
                 Lambda_i = Lambdas[i]
-                B_F[j+2,0] = B_F[j+2,0] + Lambda_i[1] * (X_3N[i] - X_3N[j] + 2*np.cos(X_3N[2*N+i])) - Lambda_i[0] * (X_3N[N+i] - X_3N[N+j] + 2*np.sin(X_3N[2*N+i]))
+                B_F[j+2,0] = B_F[j+2,0] + Lambda_i[1] * (X_3N[i] - X_3N[j] + np.cos(X_3N[2*N+i])/2) - Lambda_i[0] * (X_3N[N+i] - X_3N[N+j] + np.sin(X_3N[2*N+i])/2)
         return B_F
 
 def BM(Zetas):
