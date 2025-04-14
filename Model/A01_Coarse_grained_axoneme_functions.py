@@ -351,8 +351,6 @@ def AA(X_3N, gamma):
             A[j+2,:] = A[j+2,:] + DD(X_3N, i, j) @ UU(X_3N, i, gamma)
     return A
 
-
-
 ## A dashpots
 def ADB(taus_b, N):
     """ Returns the matrix used to model bending dashpots all along the axoneme.
@@ -501,10 +499,12 @@ def BC_0(X_3N, n_0 = [0,0], m_0 = 0):
 
     N = X_3N.shape[0]//3
     B_C = np.zeros((N+2,1))
-    B_C[0] = n_0[0] # force equation (here on x axis)
-    B_C[1] = n_0[1] # force equation (here on y axis)
+
+    B_C[0] = n_0[0] # force equation on x axis
+    B_C[1] = n_0[1] # force equation y axis
     B_C[2] = m_0
     # Partial filament torque balances (B_C[3:]) does not depend on torque or force at s = 0.
+    
     return B_C
 
 def BB(X_3N): # Argument X_3N could be replaced by X
@@ -614,7 +614,7 @@ def g(t, X, Sp4, k0, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L=0, Lambd
     """
 
     # Boundary conditions (basal hinge, free distal end)
-    n_0 = n_L # No displacement at the base
+    # n_0 = n_L # No displacement at the base
     if k0 == np.inf:
         k0=0
     m_0 = k0*X[2] # Rotation at the base is allowed
@@ -666,6 +666,8 @@ def g(t, X, Sp4, k0, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L=0, Lambd
 
     B_time = time.time()
     B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + BC_0(X_3N, n_0, m_0) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
+    B[0] = 0 # No displacement in x at s = 0
+    B[1] = 0 # No displacement in y at s = 0
     B_time = time.time() - B_time
     if B_time>1:
         print("Getting B took %s seconds." % (B_time))
@@ -695,8 +697,8 @@ def g(t, X, Sp4, k0, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L=0, Lambd
         print("The longest computation took %s seconds and was" %max_time , time_dict[time_list.index(max_time)])
     
     # Enforce \dot(x0) = \dot(y0) = 0, because error propagation breaks it.
-    X_dot[0] = 0
-    X_dot[1] = 0
+    # X_dot[0] = 0
+    # X_dot[1] = 0
     
     return X_dot
 
