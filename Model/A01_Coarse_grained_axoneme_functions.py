@@ -574,7 +574,7 @@ def BF(X_3N, Lambdas):
     if Lambdas == [0]*N:
         return B_F
     else:
-        for j in range(1, N):
+        for j in range(N):
             for i in range(j, N):
                 Lambda_i = Lambdas[i]
                 B_F[j+2,0] = B_F[j+2,0] + Lambda_i[1] * (X_3N[i] - X_3N[j] + np.cos(X_3N[2*N+i])/2) - Lambda_i[0] * (X_3N[N+i] - X_3N[N+j] + np.sin(X_3N[2*N+i])/2)
@@ -587,7 +587,7 @@ def BM(Zetas):
     if Zetas == [0]*N:
         return B_M
     else:
-        for j in range(1, N):
+        for j in range(N):
             B_M[j+2,0] = np.sum(Zetas[j:])
         return B_M
 
