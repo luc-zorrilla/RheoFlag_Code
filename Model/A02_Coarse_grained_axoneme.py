@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     ################################
     ## Coarse-graining parameters ##
-    N_list = [10]
+    N_list = [40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100] # 5, 10, 15, 20, 25, 30, 35, 
     ################################
 
     #############################
@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     ###############################
     # basal hinge spring constant #
-    k0_list = [0] #[1e12]
+    k0_list = [1e10]
     ###############################
     
     ###################
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     ###############################
     # Bending viscosity timescale #
     # remark : it is in tau_s units
-    Tau_b_list = [0, 1e-6, 1e-3, 1e0, 1e3, 1e6]
+    Tau_b_list = [0]
     taus_b_list = [[[tau_b]*(N-1) for tau_b in Tau_b_list] for N in N_list]
     ###############################
 
@@ -84,7 +84,7 @@ if __name__ == "__main__":
 
     print("Preparing initial conditions...")
 
-    init_conf_list = [ProximalBend] ## Initial conditions in [StraightLine, ProximalBend]
+    init_conf_list = [StraightLine] ## Initial conditions in [StraightLine, ProximalBend]
 
     print("Initial conditions prepared. ")
     #######################  
@@ -187,8 +187,8 @@ if __name__ == "__main__":
     # X_flow_field_list = [np.array([0, 10**(-6)])]
     
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
-    A_list = [0]
-    w0_list = [1e-3]
+    A_list = [1e-8]
+    w0_list = [0]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -207,12 +207,12 @@ if __name__ == "__main__":
     print("Setting time...")
 
     # time determined by the flow timescale
-    dT_list = [2*np.pi/(100*w0) for w0 in w0_list]
-    T_max_list = [2*np.pi*100/w0 for w0 in w0_list]
+    # dT_list = [2*np.pi/(100*w0) for w0 in w0_list]
+    # T_max_list = [2*np.pi*100/w0 for w0 in w0_list]
 
     # Same time for all simulations
-    # dT_list = [1e2 for w0 in w0_list]
-    # T_max_list = [1e6 for w0 in w0_list]
+    dT_list = [1e3 for w0 in w0_list]
+    T_max_list = [1e7 for w0 in w0_list]
 
     T_span_list = [[0, T_max] for T_max in T_max_list]
     T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l]))] for l in range(len(w0_list))]
@@ -221,7 +221,7 @@ if __name__ == "__main__":
 
     ########################################
     # Maximum simulation time (s) per step #
-    T_sim_max = 1200
+    T_sim_max = 39600 # 12h
     ########################################
 
     print("Time set.")

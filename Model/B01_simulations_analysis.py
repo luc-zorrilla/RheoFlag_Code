@@ -281,16 +281,20 @@ def CheckEquilibrium(N, A, gamma, Sp4, n_L = [0,0], Lambdas=[[0,0]], conditions 
     - vertical density force on tip - "vertical_density_tip"
     - vertical uniform density force along the beam - "vertical_density_uniform"
     - vertical uniform flow - "vertical_flow_uniform"
+
     All analytical solutions are computed in the case of an initial horizontal beam, assuming equilibrium and small deflection.
+    References for analytical solutions: [Felgner et. al. , Journal of Cell Science, 1996]
     
     Remark: total filament length = N but only N-1 segments are represented (N first points). 
-    Returns X_eq with 3 * n_eq points:
-        - n_eq points for x and n_eq points for y and n_eq points for theta, such that s in [0, N-1 = L-1]
+
+    Returns X_eq with 2 * n_eq points:
+        - n_eq points for x = s (small deflection approximation), such that s in [0,N] -> [0,L]
+        - n_eq points for y, 
     """
 
     ## Analytical equilibrium solution
     X_eq = np.zeros((2*n_eq))
-    X_eq[:n_eq] = np.linspace(start = 0, stop = N, num = n_eq)
+    X_eq[:n_eq] = np.linspace(start = 0, stop = N, num = n_eq) # Arclength
 
     # For a vertical point force at distal end
     if conditions == "vertical_point_tip":
@@ -310,7 +314,7 @@ def CheckEquilibrium(N, A, gamma, Sp4, n_L = [0,0], Lambdas=[[0,0]], conditions 
     # For a uniform small vertical flow
     elif conditions == "vertical_flow_uniform":
         X_eq[n_eq:] = ( (X_eq[:n_eq]/N)**4 - 4*(X_eq[:n_eq]/N)**3 + 6*(X_eq[:n_eq]/N)**2 ) * A * gamma * Sp4 *(N**4) / 24
-        
+        # 
     else:
         print("No condition for exact solution has been specified.")
         return NameError

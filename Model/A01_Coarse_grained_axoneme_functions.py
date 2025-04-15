@@ -622,9 +622,7 @@ def g(t, X, Sp4, k0, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L=0, Lambd
     """
 
     # Boundary conditions (basal hinge, free distal end)
-    # n_0 = n_L # No displacement at the base
-    if k0 == np.inf:
-        k0=0
+    n_0 = n_L # No displacement at the base
     m_0 = k0*X[2] # Rotation at the base is allowed
 
     ##################################################################
@@ -674,8 +672,8 @@ def g(t, X, Sp4, k0, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L=0, Lambd
 
     B_time = time.time()
     B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + BC_0(X_3N, n_0, m_0) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
-    B[0] = 0 # No displacement in x at s = 0
-    B[1] = 0 # No displacement in y at s = 0
+    # B[0] = 0 # No displacement in x at s = 0
+    # B[1] = 0 # No displacement in y at s = 0
     B_time = time.time() - B_time
     if B_time>1:
         print("Getting B took %s seconds." % (B_time))
@@ -705,8 +703,8 @@ def g(t, X, Sp4, k0, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L=0, Lambd
         print("The longest computation took %s seconds and was" %max_time , time_dict[time_list.index(max_time)])
     
     # Enforce \dot(x0) = \dot(y0) = 0, because error propagation breaks it.
-    # X_dot[0] = 0
-    # X_dot[1] = 0
+    X_dot[0] = 0
+    X_dot[1] = 0
     
     return X_dot
 

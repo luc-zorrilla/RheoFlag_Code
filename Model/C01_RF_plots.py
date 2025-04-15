@@ -40,8 +40,8 @@ writing_dir = temp_folder
     # Panel a - stroboscopic view of the filament in 3 different regimes of shear / bending.
     # Panel b - Counterbend 
 
-fig_nbr = 2
-panel_nbr = 1
+fig_nbr = 0
+panel_nbr = 2
 
 if __name__ == '__main__':
 
@@ -53,7 +53,7 @@ if __name__ == '__main__':
         folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
         folder_name += "AnalyticalComparisons/PureBending_Clamped_UniformVerticalFlow/"
 
-        id_filenames = ["20250318_N_5_035950022795", "20250318_N_10_025957138534", "20250318_N_15_035950205972", "20250318_N_20_030248179364", "20250318_N_25_035950257314", "20250318_N_30_030512701827", "20250318_N_35_041039114888"]
+        id_filenames = ["20250415-111946800826_N_5_tau_s_0_taus_b_0_Beta_0_gamma_2_A_1e-08_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-111946825696_N_10_tau_s_0_taus_b_0_Beta_0_gamma_2_A_1e-08_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-111946863118_N_15_tau_s_0_taus_b_0_Beta_0_gamma_2_A_1e-08_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-111946894785_N_20_tau_s_0_taus_b_0_Beta_0_gamma_2_A_1e-08_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-111946920750_N_25_tau_s_0_taus_b_0_Beta_0_gamma_2_A_1e-08_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-111946929903_N_30_tau_s_0_taus_b_0_Beta_0_gamma_2_A_1e-08_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-111946930900_N_35_tau_s_0_taus_b_0_Beta_0_gamma_2_A_1e-08_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-112025796860_N_40_tau_s_0_taus_b_0_Beta_0_gamma_2_A_1e-08_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-112025855976_N_45_tau_s_0_taus_b_0_Beta_0_gamma_2_A_1e-08_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-112025990187_N_50_tau_s_0_taus_b_0_Beta_0_gamma_2_A_1e-08_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-112025990187_N_55_tau_s_0_taus_b_0_Beta_0_gamma_2_A_1e-08_w0_0_Sp4_1.0_k0_10000000000.0"]
 
         # Equilibrium solution - stroboscopic view and analytical solution (N = 35) + kinetic energy
         if panel_nbr in [0, 1]:
@@ -62,7 +62,7 @@ if __name__ == '__main__':
             metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
             data_filename = folder_name + 'data_' + id_filename + '.csv'
             solver_dict = get_metadata(metadata_filename)
-            output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+            output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
             X = get_data(data_filename) # s, t
             X_3N_final = X3N(X[:,-1])
 
@@ -75,19 +75,18 @@ if __name__ == '__main__':
 
             # Stroboscopic view
             n_strobes = 20
-            t_s = T_eval[-1] / n_strobes
 
             condition = (T_eval_norm >= 0)
             min_index = np.arange(T_eval_norm.shape[0])[condition][0]
             max_index = np.arange(T_eval_norm.shape[0])[condition][-1]
-            indices_s = StroboscopicView(T_eval_norm[min_index:max_index], t_s = t_s)
+            indices_s = StroboscopicView(T_eval_norm[min_index:max_index], n_strobes = n_strobes)
             c = sample_colorscale('BuPu', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]
 
             # Analytical Equilbrium Profile
             if panel_nbr == 0:
                 
                 n_eq = 1000
-                X_3N_eq = CheckEquilibrium(N, A, gamma, Sp4, n_L = n_L, Lambdas=lambdas, conditions = "vertical_flow_uniform", n_eq = n_eq)
+                X_3N_eq = CheckEquilibrium(N, A, gamma, Sp4, n_L = n_L, Lambdas=Lambdas, conditions = "vertical_flow_uniform", n_eq = n_eq)
                 # ["vertical_point_tip", "vertical_density_tip", "vertical_density_uniform", "vertical_flow_uniform"]
 
                 fig = go.Figure()
@@ -120,11 +119,11 @@ if __name__ == '__main__':
                 data_filename = folder_name + 'data_' + id_filename + '.csv'
 
                 solver_dict = get_metadata(metadata_filename)
-                output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                tau_b = taus_b[0]
                 if T_sim == np.inf:
                     print('Not solved. Error: ', X)
                     exit()
-                tau_b = taus_b[0]
 
                 # Equilibrium profile
                 X = get_data(data_filename) # s, t
@@ -138,9 +137,10 @@ if __name__ == '__main__':
                 L2_error_array[l] = L2_error
 
             fig = go.Figure()
-            fig.add_scatter(x = 1 / np.array([5, 10, 15, 20, 25, 30, 35]), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red)
-            fig.update_xaxes(title = '1/N')
+            fig.add_scatter(x = 1 / np.arange(5, 60, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red)
+            fig.update_xaxes(title = 'log(1/N)', type = 'log')
             fig.update_yaxes(title = 'log L2(sim, analytical) / L2(analytical)', type = 'log')
+            fig.update_layout(margin = dict(l = 100, r = 100, t = 100, b = 100))
             
     # Pure Bending, vertical point force at the tip
     elif fig_nbr == 1:
