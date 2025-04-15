@@ -41,7 +41,7 @@ writing_dir = temp_folder
     # Panel b - Counterbend 
 
 fig_nbr = 0
-panel_nbr = 2
+panel_nbr = 0
 
 if __name__ == '__main__':
 
@@ -74,13 +74,13 @@ if __name__ == '__main__':
             X_flow = A*np.sin(w0*T_eval)            
 
             # Stroboscopic view
-            n_strobes = 20
+            n_strobes = 50
 
             condition = (T_eval_norm >= 0)
             min_index = np.arange(T_eval_norm.shape[0])[condition][0]
             max_index = np.arange(T_eval_norm.shape[0])[condition][-1]
             indices_s = StroboscopicView(T_eval_norm[min_index:max_index], n_strobes = n_strobes)
-            c = sample_colorscale('BuPu', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]
+            c = sample_colorscale('matter_r', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]
 
             # Analytical Equilbrium Profile
             if panel_nbr == 0:
@@ -91,11 +91,11 @@ if __name__ == '__main__':
 
                 fig = go.Figure()
                 for k in range(indices_s.shape[0]):
-                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k])
-                fig.add_scatter(x = X_3N_eq[:n_eq,0], y = X_3N_eq[n_eq:2*n_eq,0], marker_color = cb_orange)
+                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], line_width = 1)
+                fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1], y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = cb_dark_red, line_width = 2)
                 # fig.update_xaxes()
                 # fig.update_yaxes()
-                fig.update_layout(showlegend = True)            
+                fig.update_layout(showlegend = True, margin = dict(l = 100, r = 100, t = 100, b = 100))
 
             # Convergence to equilibrium - kinetic energy decays (log-log plot)
             elif panel_nbr == 1:
@@ -103,11 +103,12 @@ if __name__ == '__main__':
                 # Kinetic energy
                 K = KineticEnergy(X, N, T_eval) # t
                 fig = go.Figure()
-                fig.add_scatter(x = T_eval, y = K)
+                fig.add_scatter(x = T_eval, y = K, line_width = 2)
                 for k in range(indices_s.shape[0]):
-                    fig.add_scatter(x = [T_eval[indices_s[k]]], y = [K[indices_s[k]]], marker_color = c[k], mode = 'markers')
+                    fig.add_scatter(x = [T_eval[indices_s[k]]], y = [K[indices_s[k]]], marker_color = c[k], mode = 'markers', marker_size = 6)
                 fig.update_xaxes(type = 'log')
-                fig.update_yaxes(type = 'log')             
+                fig.update_yaxes(type = 'log')
+                fig.update_layout(showlegend = False, margin = dict(l = 100, r = 100, t = 100, b = 100)) 
 
         # L2 Error (Solution - analytical solution) for varying N (1/N, log(relative L2 error))
         elif panel_nbr == 2:
@@ -137,7 +138,7 @@ if __name__ == '__main__':
                 L2_error_array[l] = L2_error
 
             fig = go.Figure()
-            fig.add_scatter(x = 1 / np.arange(5, 60, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red)
+            fig.add_scatter(x = 1 / np.arange(5, 60, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red, marker_size = 6)
             fig.update_xaxes(title = 'log(1/N)', type = 'log')
             fig.update_yaxes(title = 'log L2(sim, analytical) / L2(analytical)', type = 'log')
             fig.update_layout(margin = dict(l = 100, r = 100, t = 100, b = 100))
@@ -148,7 +149,7 @@ if __name__ == '__main__':
         folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
         folder_name += "AnalyticalComparisons/PureBending_Clamped_TipVerticalPointForce/"
 
-        id_filenames = ["20250318_N_5_050718197323", "20250318_N_10_050718279494", "20250318_N_15_050546109420", "20250318_N_20_050718330565", "20250318_N_25_050718350355", "20250318_N_30_051643250389", "20250318_N_35_052122084524"]
+        id_filenames = ["20250415-120922564262_N_5_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-120922601564_N_10_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-120922621337_N_15_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-120922659220_N_20_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-120922662966_N_25_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-120922679084_N_30_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-120922716650_N_35_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-120922805353_N_40_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250415-122526334494_N_45_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0"]
 
         # Equilibrium solution - stroboscopic view and analytical solution (N = 35) + kinetic energy
         if panel_nbr in [0, 1]:
@@ -157,7 +158,7 @@ if __name__ == '__main__':
             metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
             data_filename = folder_name + 'data_' + id_filename + '.csv'
             solver_dict = get_metadata(metadata_filename)
-            output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+            output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
             X = get_data(data_filename) # s, t
             X_3N_final = X3N(X[:,-1])
 
@@ -170,13 +171,12 @@ if __name__ == '__main__':
 
             # Stroboscopic view
             n_strobes = 20
-            t_s = T_eval[-1] / n_strobes
 
             condition = (T_eval_norm >= 0)
             min_index = np.arange(T_eval_norm.shape[0])[condition][0]
             max_index = np.arange(T_eval_norm.shape[0])[condition][-1]
-            indices_s = StroboscopicView(T_eval_norm[min_index:max_index], t_s = t_s)
-            c = sample_colorscale('BuPu', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]
+            indices_s = StroboscopicView(T_eval_norm[min_index:max_index], n_strobes=n_strobes)
+            c = sample_colorscale('matter_r', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]
 
             # Analytical Equilbrium Profile
             if panel_nbr == 0:
@@ -213,9 +213,8 @@ if __name__ == '__main__':
                 id_filename = id_filenames[l]
                 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
                 data_filename = folder_name + 'data_' + id_filename + '.csv'
-
                 solver_dict = get_metadata(metadata_filename)
-                output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
                 if T_sim == np.inf:
                     print('Not solved. Error: ', X)
                     exit()
@@ -233,9 +232,10 @@ if __name__ == '__main__':
                 L2_error_array[l] = L2_error
 
             fig = go.Figure()
-            fig.add_scatter(x = 1 / np.array([5, 10, 15, 20, 25, 30, 35]), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red)
-            fig.update_xaxes(title = '1/N')
+            fig.add_scatter(x = 1 / np.arange(5, 50, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red)
+            fig.update_xaxes(title = 'log(1/N)', type = 'log')
             fig.update_yaxes(title = 'log L2(sim, analytical) / L2(analytical)', type = 'log')
+            fig.update_layout(margin = dict(l = 100, r = 100, t = 100, b = 100))
             
     # Bending + Shear elasticity, no viscosity, clamped axoneme.
     elif fig_nbr == 2:
@@ -256,7 +256,7 @@ if __name__ == '__main__':
                 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
                 data_filename = folder_name + 'data_' + id_filename + '.csv'
                 solver_dict = get_metadata(metadata_filename)
-                output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
                 X = get_data(data_filename) # s, t
                 X_3N_final = X3N(X[:,-1])
 
@@ -268,14 +268,14 @@ if __name__ == '__main__':
                 X_flow = A*np.sin(w0*T_eval)            
 
                 # Stroboscopic view
-                n_strobes = 20
+                n_strobes = 200
                 t_s = T_eval[-1] / n_strobes                
                 
                 condition = (T_eval_norm >= 0)
                 min_index = np.arange(T_eval_norm.shape[0])[condition][0]
                 max_index = np.arange(T_eval_norm.shape[0])[condition][-1]
                 indices_s = StroboscopicView(T_eval_norm[min_index:max_index], t_s = t_s)
-                c = sample_colorscale('BuPu', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
+                c = sample_colorscale('matter_r', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
 
                 for k in range(indices_s.shape[0]):
                     fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], row = 1 + l, col = 1)
@@ -299,7 +299,7 @@ if __name__ == '__main__':
                 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
                 data_filename = folder_name + 'data_' + id_filename + '.csv'
                 solver_dict = get_metadata(metadata_filename)
-                output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
                 X = get_data(data_filename) # s, t
                 X_3N_final = X3N(X[:,-1])
 
@@ -318,7 +318,7 @@ if __name__ == '__main__':
                 min_index = np.arange(T_eval_norm.shape[0])[condition][0]
                 max_index = np.arange(T_eval_norm.shape[0])[condition][-1]
                 indices_s = StroboscopicView(T_eval_norm[min_index:max_index], t_s = t_s)
-                c = sample_colorscale('BuPu', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
+                c = sample_colorscale('matter_r', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
 
                 for k in range(indices_s.shape[0]):
                     fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], row = 1 + l, col = 1)

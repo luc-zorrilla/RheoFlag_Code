@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     ################################
     ## Coarse-graining parameters ##
-    N_list = [40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100] # 5, 10, 15, 20, 25, 30, 35, 
+    N_list = [45, 50, 55, 60, 65, 70]
     ################################
 
     #############################
@@ -74,8 +74,8 @@ if __name__ == "__main__":
     ######################
     # Spatial conditions #
     # and at s = 0 ?
-    n_L_list = [[0, 0]] # No force at s = L
-    m_L_list = [0] # No torque at s = L
+    n_L_list = [[0, 1e-6]] # Force at s = L
+    m_L_list = [0] # Torque at s = L
     ######################
     print("Parameter space prepared.")
 
@@ -187,7 +187,7 @@ if __name__ == "__main__":
     # X_flow_field_list = [np.array([0, 10**(-6)])]
     
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
-    A_list = [1e-8]
+    A_list = [0]
     w0_list = [0]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
