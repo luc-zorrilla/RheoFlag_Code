@@ -26,12 +26,12 @@ pio.templates.default = "figure_template"
 temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 writing_dir = temp_folder
 
-# Figure 0: analytical results for pure bending, clamped axoneme, with uniform vertical flow
+# Figure 0: analytical results for pure bending, clamped axoneme, with point force at the tip
     # Panel a - stroboscopic view of the filament along with analytical solution
     # Panel b - kinetic energy vs time, showing equilibrium is reached
     # Panel c - L2(Equilibrium - Analytical solution) vs 1/N, showing convergence to the solution
 
-# Figure 1: analytical results for pure bending, clamped axoneme, with point force at the tip
+# Figure 1: analytical results for pure bending, clamped axoneme, with uniform vertical flow
     # Panel a - stroboscopic view of the filament along with analytical solution
     # Panel b - kinetic energy vs time, showing equilibrium is reached
     # Panel c - L2(Equilibrium - Analytical solution) vs 1/N, showing convergence to the solution
@@ -46,9 +46,9 @@ panel_nbr = 2
 if __name__ == '__main__':
 
     fig_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + ".pdf"
-  
+
     # Pure Bending, vertical point force at the tip
-    elif fig_nbr == 0:
+    if fig_nbr == 0:
 
         folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
         folder_name += "AnalyticalComparisons/PureBending_Clamped_TipVerticalPointForce/"
@@ -91,23 +91,49 @@ if __name__ == '__main__':
 
                 fig = go.Figure()
                 for k in range(indices_s.shape[0]):
-                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0]/N, y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], line_width = 1, showlegend = (k in [0, indices_s.shape[0]-1]), name = ["X(0)", "X_eq"][k > 0])
-                fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N, y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = cb_dark_red, line_width = 2, name = "X_analytical")
+                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0]/N, y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], line_width = 1, showlegend = (k in [0, indices_s.shape[0]-1]), name = [r"$\huge{\boldsymbol{y}_0}$", r"$\huge{\boldsymbol{y}_\text{eq}}$"][k > 0])
+                fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N, y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = cb_dark_red, line_width = 2, name = r"$\huge{\boldsymbol{y}^\star}$")
 
+                x_ticks = np.round(np.linspace(0,1,11),2)
+                x_ticks_text = [r"$\huge{" + str(x_tick) + "}$" for x_tick in x_ticks]
                 fig.update_xaxes(
-                    range = [0, 1],
-                    title = "X/N",
-                )
+                    title = r'$\huge{X(s)/N}$', 
+                    range = [0, 1], 
+                    tickmode = 'array',
+                    tickvals = x_ticks,
+                    ticktext = x_ticks_text
+                    )
+                y_ticks = np.round(np.linspace(0,3e-2,7),3)
+                y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
                 fig.update_yaxes(
-                    range = [0,2.5e-2],
-                    title = "Y"
-                )
+                    title = r'$\huge{Y(s)}$',
+                    range = [0,3e-2],
+                    tickmode = 'array',
+                    tickvals = y_ticks,
+                    ticktext = y_ticks_text
+                    )
                 fig.update_layout(
                     showlegend = True, 
-                    margin = dict(l = 200, r = 200, t = 200, b = 200),
-                    width = 500 + 400,
-                    height = 500 + 400,
-                )
+                    legend = dict(
+                        xref = 'paper',
+                        yref = 'paper',
+                        xanchor = 'left', 
+                        yanchor = 'top',
+                        x = 0.1, 
+                        y = 0.8,
+                        itemwidth = 50,
+                        bgcolor= 'rgba(0,0,0,0)',
+                        ),
+                    margin = dict(
+                        l = 200,
+                        r = 200,
+                        b = 200,
+                        t = 200,
+                        pad = 0,
+                        ),
+                    width = 1000 + 200 + 200,
+                    height = 500 + 200 + 200,
+                    )
 
             # Convergence to equilibrium - kinetic energy decays (log-log plot)
             elif panel_nbr == 1:
@@ -118,20 +144,46 @@ if __name__ == '__main__':
                 fig.add_scatter(x = T_eval, y = K, line_width = 2)
                 for k in range(indices_s.shape[0]):
                     fig.add_scatter(x = [T_eval[indices_s[k]]], y = [K[indices_s[k]]], marker_color = c[k], mode = 'markers', marker_size = 6)
+
+                x_ticks = 10 ** np.arange(10) + 1e-9 # needed to add 1e-3 due to approximation in sci_notation.
+                x_ticks_text = [r"$\huge{" + sci_notation(x_tick, -1, -1) + "}$" for x_tick in x_ticks] 
+                x_minor_ticks = np.hstack([np.arange(10) * x_tick for x_tick in x_ticks])
                 fig.update_xaxes(
+                    title = r'$\huge{t}$', 
                     type = 'log',
-                    title = "t",
+                    range = [3, 7], 
+                    tickmode = 'array',
+                    tickvals = x_ticks,
+                    ticktext = x_ticks_text,
+                    minor=dict(ticks = "outside", ticklen = 6, tickwidth = 3, tickvals = x_minor_ticks),
                     )
+                y_ticks = np.float_power(10, np.arange(-16, -31, -1))
+                y_ticks_text = [r"$\huge{" + sci_notation(y_tick, -1) + "}$" for y_tick in y_ticks]
+                for k in range(len(y_ticks_text)):
+                    if k % 2 == 1:
+                        y_ticks_text[k] = r"$\huge{}$" # Get rid of half the tick text
+                y_minor_ticks = np.hstack([np.arange(10) * y_tick for y_tick in y_ticks])
                 fig.update_yaxes(
+                    title = r'$\huge{K(t)}$',
                     type = 'log',
-                    title = "K(t)", 
+                    range = [-30,-16],
+                    tickmode = 'array',
+                    tickvals = y_ticks,
+                    ticktext = y_ticks_text,
+                    minor=dict(ticks = "outside", ticklen = 6, tickwidth = 3, tickvals = y_minor_ticks),
                     )
                 fig.update_layout(
-                    showlegend = False, 
-                    margin = dict(l = 400, r = 400, t = 200, b = 200),
-                    width = 500 + 800,
-                    height = 500 + 400,
-                    )                     
+                    showlegend = False,
+                    margin = dict(
+                        l = 200,
+                        r = 200,
+                        b = 200,
+                        t = 200,
+                        pad = 0,
+                        ),
+                    width = 500 + 200 + 200,
+                    height = 500 + 200 + 200,
+                    )
 
         # L2 Error (Solution - analytical solution) for varying N (1/N, log(relative L2 error))
         elif panel_nbr == 2:
@@ -162,23 +214,43 @@ if __name__ == '__main__':
             fig = go.Figure()
             fig.add_scatter(x = 1 / np.arange(5, 50, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red, marker_size = 6)
 
+            x_range = np.log10(np.array([0.02, 0.12]))
+            x_ticks = np.array([1,2,3,4,5,6,7,8,9,10,20]) * 1e-2
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, 0, 0, -2) + "}$" for x_tick in x_ticks]
             fig.update_xaxes(
-                title = '1/N', 
+                title = r'$\huge{1/N}$', 
                 type = 'log',
+                range = x_range, 
+                tickmode = 'array',
+                tickvals = x_ticks,
+                ticktext = x_ticks_text,
                 )
+            y_range = np.log10(np.array([0.02, 0.12]))
+            y_ticks = np.array([1,2,3,4,5,6,7,8,9,10,20]) * 1e-2
+            y_ticks_text = [r"$\huge{" + sci_notation(y_tick, 0, 0, -2) + "}$" for y_tick in y_ticks]
             fig.update_yaxes(
-                title = 'L2(sim, analytical) / L2(analytical)', 
+                title = r'$\huge{\epsilon}$',
                 type = 'log',
+                range = y_range,
+                tickmode = 'array',
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,
                 )
             fig.update_layout(
-                margin = dict(l = 200, r = 200, t = 200, b = 200),
-                width = 500 + 400,
-                height = 500 + 400,
                 showlegend = False,
+                margin = dict(
+                    l = 200,
+                    r = 200,
+                    b = 200,
+                    t = 200,
+                    pad = 0,
+                    ),
+                width = 500 + 200 + 200,
+                height = 500 + 200 + 200,
                 )
 
     # Pure Bending, uniform vertical flow.
-    if fig_nbr == 1:
+    elif fig_nbr == 1:
 
         folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
         folder_name += "AnalyticalComparisons/PureBending_Clamped_UniformVerticalFlow/"
