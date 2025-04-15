@@ -41,7 +41,7 @@ writing_dir = temp_folder
     # Panel b - Counterbend 
 
 fig_nbr = 0
-panel_nbr = 0
+panel_nbr = 2
 
 if __name__ == '__main__':
 
@@ -91,11 +91,23 @@ if __name__ == '__main__':
 
                 fig = go.Figure()
                 for k in range(indices_s.shape[0]):
-                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], line_width = 1)
-                fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1], y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = cb_dark_red, line_width = 2)
-                # fig.update_xaxes()
-                # fig.update_yaxes()
-                fig.update_layout(showlegend = True, margin = dict(l = 100, r = 100, t = 100, b = 100))
+                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0]/N, y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], line_width = 1, showlegend = (k in [0, indices_s.shape[0]-1]), name = ["X(0)", "X_eq"][k > 0])
+                fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N, y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = cb_dark_red, line_width = 2, name = "X_analytical")
+                
+                fig.update_xaxes(
+                    range = [0, 1],
+                    title = "X/N",
+                )
+                fig.update_yaxes(
+                    range = [0,2.5e-2],
+                    title = "Y"
+                )
+                fig.update_layout(
+                    showlegend = True, 
+                    margin = dict(l = 200, r = 200, t = 200, b = 200),
+                    width = 500 + 400,
+                    height = 500 + 400,
+                )
 
             # Convergence to equilibrium - kinetic energy decays (log-log plot)
             elif panel_nbr == 1:
@@ -106,9 +118,21 @@ if __name__ == '__main__':
                 fig.add_scatter(x = T_eval, y = K, line_width = 2)
                 for k in range(indices_s.shape[0]):
                     fig.add_scatter(x = [T_eval[indices_s[k]]], y = [K[indices_s[k]]], marker_color = c[k], mode = 'markers', marker_size = 6)
-                fig.update_xaxes(type = 'log')
-                fig.update_yaxes(type = 'log')
-                fig.update_layout(showlegend = False, margin = dict(l = 100, r = 100, t = 100, b = 100)) 
+
+                fig.update_xaxes(
+                    type = 'log',
+                    title = "t"
+                    )
+                fig.update_yaxes(
+                    type = 'log',
+                    title = "K(t)"
+                    )
+                fig.update_layout(
+                    showlegend = False, 
+                    margin = dict(l = 400, r = 400, t = 200, b = 200),
+                    width = 500 + 800,
+                    height = 500 + 400,
+                    ) 
 
         # L2 Error (Solution - analytical solution) for varying N (1/N, log(relative L2 error))
         elif panel_nbr == 2:
@@ -138,10 +162,22 @@ if __name__ == '__main__':
                 L2_error_array[l] = L2_error
 
             fig = go.Figure()
-            fig.add_scatter(x = 1 / np.arange(5, 60, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red, marker_size = 6)
-            fig.update_xaxes(title = 'log(1/N)', type = 'log')
-            fig.update_yaxes(title = 'log L2(sim, analytical) / L2(analytical)', type = 'log')
-            fig.update_layout(margin = dict(l = 100, r = 100, t = 100, b = 100))
+            fig.add_scatter(x = 1/np.arange(5, 60, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red, marker_size = 6)
+
+            fig.update_xaxes(
+                title = '1/N', 
+                type = 'log',
+                )
+            fig.update_yaxes(
+                title = 'L2(sim, analytical) / L2(analytical)', 
+                type = 'log',
+                )
+            fig.update_layout(
+                margin = dict(l = 200, r = 200, t = 200, b = 200),
+                width = 500 + 400,
+                height = 500 + 400,
+                showlegend = False,
+                )
             
     # Pure Bending, vertical point force at the tip
     elif fig_nbr == 1:
@@ -170,7 +206,7 @@ if __name__ == '__main__':
             X_flow = A*np.sin(w0*T_eval)            
 
             # Stroboscopic view
-            n_strobes = 20
+            n_strobes = 50
 
             condition = (T_eval_norm >= 0)
             min_index = np.arange(T_eval_norm.shape[0])[condition][0]
@@ -187,11 +223,23 @@ if __name__ == '__main__':
 
                 fig = go.Figure()
                 for k in range(indices_s.shape[0]):
-                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k])
-                fig.add_scatter(x = X_3N_eq[:n_eq,0], y = X_3N_eq[n_eq:2*n_eq,0], marker_color = cb_orange)
-                # fig.update_xaxes()
-                # fig.update_yaxes()
-                fig.update_layout(showlegend = True)            
+                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0]/N, y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], line_width = 1, showlegend = (k in [0, indices_s.shape[0]-1]), name = ["X(0)", "X_eq"][k > 0])
+                fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N, y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = cb_dark_red, line_width = 2, name = "X_analytical")
+
+                fig.update_xaxes(
+                    range = [0, 1],
+                    title = "X/N",
+                )
+                fig.update_yaxes(
+                    range = [0,2.5e-2],
+                    title = "Y"
+                )
+                fig.update_layout(
+                    showlegend = True, 
+                    margin = dict(l = 200, r = 200, t = 200, b = 200),
+                    width = 500 + 400,
+                    height = 500 + 400,
+                )
 
             # Convergence to equilibrium - kinetic energy decays (log-log plot)
             elif panel_nbr == 1:
@@ -199,11 +247,23 @@ if __name__ == '__main__':
                 # Kinetic energy
                 K = KineticEnergy(X, N, T_eval) # t
                 fig = go.Figure()
-                fig.add_scatter(x = T_eval, y = K)
+                fig.add_scatter(x = T_eval, y = K, line_width = 2)
                 for k in range(indices_s.shape[0]):
-                    fig.add_scatter(x = [T_eval[indices_s[k]]], y = [K[indices_s[k]]], marker_color = c[k], mode = 'markers')
-                fig.update_xaxes(type = 'log')
-                fig.update_yaxes(type = 'log')             
+                    fig.add_scatter(x = [T_eval[indices_s[k]]], y = [K[indices_s[k]]], marker_color = c[k], mode = 'markers', marker_size = 6)
+                fig.update_xaxes(
+                    type = 'log',
+                    title = "t",
+                    )
+                fig.update_yaxes(
+                    type = 'log',
+                    title = "K(t)", 
+                    )
+                fig.update_layout(
+                    showlegend = False, 
+                    margin = dict(l = 400, r = 400, t = 200, b = 200),
+                    width = 500 + 800,
+                    height = 500 + 400,
+                    )                     
 
         # L2 Error (Solution - analytical solution) for varying N (1/N, log(relative L2 error))
         elif panel_nbr == 2:
@@ -215,10 +275,10 @@ if __name__ == '__main__':
                 data_filename = folder_name + 'data_' + id_filename + '.csv'
                 solver_dict = get_metadata(metadata_filename)
                 output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                tau_b = taus_b[0]
                 if T_sim == np.inf:
                     print('Not solved. Error: ', X)
                     exit()
-                tau_b = taus_b[0]
 
                 # Equilibrium profile
                 X = get_data(data_filename) # s, t
@@ -232,10 +292,22 @@ if __name__ == '__main__':
                 L2_error_array[l] = L2_error
 
             fig = go.Figure()
-            fig.add_scatter(x = 1 / np.arange(5, 50, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red)
-            fig.update_xaxes(title = 'log(1/N)', type = 'log')
-            fig.update_yaxes(title = 'log L2(sim, analytical) / L2(analytical)', type = 'log')
-            fig.update_layout(margin = dict(l = 100, r = 100, t = 100, b = 100))
+            fig.add_scatter(x = 1 / np.arange(5, 50, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red, marker_size = 6)
+
+            fig.update_xaxes(
+                title = '1/N', 
+                type = 'log',
+                )
+            fig.update_yaxes(
+                title = 'L2(sim, analytical) / L2(analytical)', 
+                type = 'log',
+                )
+            fig.update_layout(
+                margin = dict(l = 200, r = 200, t = 200, b = 200),
+                width = 500 + 400,
+                height = 500 + 400,
+                showlegend = False,
+                )
             
     # Bending + Shear elasticity, no viscosity, clamped axoneme.
     elif fig_nbr == 2:
