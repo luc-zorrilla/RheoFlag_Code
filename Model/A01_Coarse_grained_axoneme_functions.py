@@ -190,11 +190,22 @@ def StraightLine(N):
     X_0 = np.zeros(N+2, dtype = np.double)
     return X_0
 
+def Bend(N, k = 2, phi = np.pi / 4):
+    """ A bend (of the kth segment). k = 2 and phi = pi/4 corresponds to ProximalBend """
+    X_0 = np.zeros(N+2, np.double)
+    X_0[k] = phi
+    return X_0
+
 def ProximalBend(N):
     """ A proximal bend (of the first segment) """
-    X_0 = np.zeros(N+2, np.double)
-    X_0[2] = np.pi/4
+    X_0 = Bend(N, k = 2, phi = np.pi/4)
+    return X_0    
+
+def SecondBend(N):
+    """ A proximal bend (of the second segment) """
+    X_0 = Bend(N, k = 3, phi = np.pi/16)
     return X_0
+
 
 # Add reading the last position from a file and start from there? e.g. for changing integration method.
 

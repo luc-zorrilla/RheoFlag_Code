@@ -26,7 +26,7 @@ if __name__ == "__main__":
 
     ################################
     ## Coarse-graining parameters ##
-    N_list = [45, 50, 55, 60, 65, 70]
+    N_list = [10]
     ################################
 
     #############################
@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [0]
+    Beta_list = [1e0]
     ####################################
 
     ###############################
@@ -73,8 +73,7 @@ if __name__ == "__main__":
 
     ######################
     # Spatial conditions #
-    # and at s = 0 ?
-    n_L_list = [[0, 1e-6]] # Force at s = L
+    n_L_list = [[0, 0]] # Force at s = L
     m_L_list = [0] # Torque at s = L
     ######################
     print("Parameter space prepared.")
@@ -84,7 +83,8 @@ if __name__ == "__main__":
 
     print("Preparing initial conditions...")
 
-    init_conf_list = [StraightLine] ## Initial conditions in [StraightLine, ProximalBend]
+    
+    init_conf_list = [ProximalBend] ## Initial conditions in [StraightLine, ProximalBend, SecondBend]
 
     print("Initial conditions prepared. ")
     #######################  
@@ -100,12 +100,12 @@ if __name__ == "__main__":
     # Lambda_List = [[[Lambda_0_x, Lambda_0_y], ..., [Lambda_Nm1_x, Lambda_Nm1_y]]]
 
     # Negative horizontal force at s = L/2
-    # Lambda = [-5e0,0]
-    # Lambdas_list = [[[0,0]]*((N-1)//2) + [Lambda] + [[0,0]]*(N//2) for N in N_list]
+    Lambda = [0,0]
+    Lambdas_list = [[[0,0]]*((N-1)//2) + [Lambda] + [[0,0]]*(N//2) for N in N_list]
 
     # Uniform force along length
-    Lambda = [0,0]
-    Lambdas_list = [[Lambda for k in range(N)] for N in N_list]
+    # Lambda = [0,0]
+    # Lambdas_list = [[Lambda for k in range(N)] for N in N_list]
     
     
     #########
@@ -211,8 +211,8 @@ if __name__ == "__main__":
     # T_max_list = [2*np.pi*100/w0 for w0 in w0_list]
 
     # Same time for all simulations
-    dT_list = [1e3 for w0 in w0_list]
-    T_max_list = [1e7 for w0 in w0_list]
+    dT_list = [2e-2 for w0 in w0_list]
+    T_max_list = [2e2 for w0 in w0_list]
 
     T_span_list = [[0, T_max] for T_max in T_max_list]
     T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l]))] for l in range(len(w0_list))]
@@ -221,7 +221,7 @@ if __name__ == "__main__":
 
     ########################################
     # Maximum simulation time (s) per step #
-    T_sim_max = 39600 # 12h
+    T_sim_max = 600 # 12h
     ########################################
 
     print("Time set.")
@@ -282,7 +282,6 @@ if __name__ == "__main__":
             for tau_s in tau_s_list:
                 for init_conf in init_conf_list:
                     X_0 = init_conf(N)
-                    X_0[2] = 0 # TEST
                     for Beta in Beta_list:
                         for n_L in n_L_list:
                             for m_L in m_L_list:

@@ -38,10 +38,10 @@ writing_dir = temp_folder
 
 # Figure 2: simulations for shear elasticity + bending elasticity, no viscosity, clamped axoneme
     # Panel a - stroboscopic view of the filament in 3 different regimes of shear / bending.
-    # Panel b - Counterbend 
+    # Panel b - Counterbend for two different regimes
 
-fig_nbr = 0
-panel_nbr = 2
+fig_nbr = 2
+panel_nbr = 0
 
 if __name__ == '__main__':
 
@@ -293,23 +293,49 @@ if __name__ == '__main__':
 
                 fig = go.Figure()
                 for k in range(indices_s.shape[0]):
-                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0]/N, y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], line_width = 1, showlegend = (k in [0, indices_s.shape[0]-1]), name = ["X(0)", "X_eq"][k > 0])
-                fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N, y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = cb_dark_red, line_width = 2, name = "X_analytical")
-                
+                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0]/N, y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], line_width = 1, showlegend = (k in [0, indices_s.shape[0]-1]), name = [r"$\huge{\boldsymbol{y}(0)}$", r"$\huge{\boldsymbol{y}_{eq}}$"][k > 0])
+                fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N, y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = cb_dark_red, line_width = 2, name = r"$\huge{\boldsymbol{y}^\star}$")
+
+                x_ticks = np.round(np.linspace(0,1,11),2)
+                x_ticks_text = [r"$\huge{" + str(x_tick) + "}$" for x_tick in x_ticks]
                 fig.update_xaxes(
-                    range = [0, 1],
-                    title = "X/N",
-                )
+                    title = r'$\huge{X(s)/N}$', 
+                    range = [0, 1], 
+                    tickmode = 'array',
+                    tickvals = x_ticks,
+                    ticktext = x_ticks_text
+                    )
+                y_ticks = np.round(np.linspace(0,3e-2,7),3)
+                y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
                 fig.update_yaxes(
-                    range = [0,2.5e-2],
-                    title = "Y"
-                )
+                    title = r'$\huge{Y(s)}$',
+                    range = [0,3e-2],
+                    tickmode = 'array',
+                    tickvals = y_ticks,
+                    ticktext = y_ticks_text
+                    )
                 fig.update_layout(
                     showlegend = True, 
-                    margin = dict(l = 200, r = 200, t = 200, b = 200),
-                    width = 500 + 400,
-                    height = 500 + 400,
-                )
+                    legend = dict(
+                        xref = 'paper',
+                        yref = 'paper',
+                        xanchor = 'left', 
+                        yanchor = 'top',
+                        x = 0.1, 
+                        y = 0.8,
+                        itemwidth = 50,
+                        bgcolor= 'rgba(0,0,0,0)',
+                        ),
+                    margin = dict(
+                        l = 200,
+                        r = 200,
+                        b = 200,
+                        t = 200,
+                        pad = 0,
+                        ),
+                    width = 1000 + 200 + 200,
+                    height = 500 + 200 + 200,
+                    )
 
             # Convergence to equilibrium - kinetic energy decays (log-log plot)
             elif panel_nbr == 1:
@@ -321,20 +347,45 @@ if __name__ == '__main__':
                 for k in range(indices_s.shape[0]):
                     fig.add_scatter(x = [T_eval[indices_s[k]]], y = [K[indices_s[k]]], marker_color = c[k], mode = 'markers', marker_size = 6)
 
+                x_ticks = 10 ** np.arange(10) + 1e-9 # needed to add 1e-3 due to approximation in sci_notation.
+                x_ticks_text = [r"$\huge{" + sci_notation(x_tick, -1, -1) + "}$" for x_tick in x_ticks] 
+                x_minor_ticks = np.hstack([np.arange(10) * x_tick for x_tick in x_ticks])
                 fig.update_xaxes(
+                    title = r'$\huge{t}$', 
                     type = 'log',
-                    title = "t"
+                    range = [3, 7], 
+                    tickmode = 'array',
+                    tickvals = x_ticks,
+                    ticktext = x_ticks_text,
+                    minor=dict(ticks = "outside", ticklen = 6, tickwidth = 3, tickvals = x_minor_ticks),
                     )
+                y_ticks = np.float_power(10, np.arange(-16, -31, -1))
+                y_ticks_text = [r"$\huge{" + sci_notation(y_tick, -1) + "}$" for y_tick in y_ticks]
+                for k in range(len(y_ticks_text)):
+                    if k % 2 == 1:
+                        y_ticks_text[k] = r"$\huge{}$" # Get rid of half the tick text
+                y_minor_ticks = np.hstack([np.arange(10) * y_tick for y_tick in y_ticks])
                 fig.update_yaxes(
+                    title = r'$\huge{K(t)}$',
                     type = 'log',
-                    title = "K(t)"
+                    range = [-27,-18],
+                    tickmode = 'array',
+                    tickvals = y_ticks,
+                    ticktext = y_ticks_text,
+                    minor=dict(ticks = "outside", ticklen = 6, tickwidth = 3, tickvals = y_minor_ticks),
                     )
                 fig.update_layout(
-                    showlegend = False, 
-                    margin = dict(l = 400, r = 400, t = 200, b = 200),
-                    width = 500 + 800,
-                    height = 500 + 400,
-                    ) 
+                    showlegend = False,
+                    margin = dict(
+                        l = 200,
+                        r = 200,
+                        b = 200,
+                        t = 200,
+                        pad = 0,
+                        ),
+                    width = 500 + 200 + 200,
+                    height = 500 + 200 + 200,
+                    )
 
         # L2 Error (Solution - analytical solution) for varying N (1/N, log(relative L2 error))
         elif panel_nbr == 2:
@@ -366,21 +417,40 @@ if __name__ == '__main__':
             fig = go.Figure()
             fig.add_scatter(x = 1/np.arange(5, 60, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red, marker_size = 6)
 
+            x_range = np.log10(np.array([0.017, 0.12]))
+            x_ticks = np.array([1,2,3,4,5,6,7,8,9,10,20]) * 1e-2
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, 0, 0, -2) + "}$" for x_tick in x_ticks]
             fig.update_xaxes(
-                title = '1/N', 
+                title = r'$\huge{1/N}$', 
                 type = 'log',
+                range = x_range, 
+                tickmode = 'array',
+                tickvals = x_ticks,
+                ticktext = x_ticks_text,
                 )
+            y_range = np.log10(np.array([0.017, 0.12]))
+            y_ticks = np.array([1,2,3,4,5,6,7,8,9,10,20]) * 1e-2
+            y_ticks_text = [r"$\huge{" + sci_notation(y_tick, 0, 0, -2) + "}$" for y_tick in y_ticks]
             fig.update_yaxes(
-                title = 'L2(sim, analytical) / L2(analytical)', 
+                title = r'$\huge{\epsilon}$',
                 type = 'log',
+                range = y_range,
+                tickmode = 'array',
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,
                 )
             fig.update_layout(
-                margin = dict(l = 200, r = 200, t = 200, b = 200),
-                width = 500 + 400,
-                height = 500 + 400,
                 showlegend = False,
+                margin = dict(
+                    l = 200,
+                    r = 200,
+                    b = 200,
+                    t = 200,
+                    pad = 0,
+                    ),
+                width = 500 + 200 + 200,
+                height = 500 + 200 + 200,
                 )
-          
 
     # Bending + Shear elasticity, no viscosity, clamped axoneme.
     elif fig_nbr == 2:
@@ -390,10 +460,10 @@ if __name__ == '__main__':
             folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
             folder_name += "ProximalBend_NoFlow/BendingElasticity_Clamped_VaryingShearBending/"
 
-            # id_filenames = ["20250319_Beta_1e-3_123447509552", "20250319_Beta_1e-2_123447503793", "20250319_Beta_1e-1_123447444425", "20250318_Beta_1e0_073258315126", "20250318_Beta_1e1_073258408813", "20250318_Beta_1e2_073258444692", "20250318_Beta_1e3_073258451669"]
-            id_filenames = ["20250319_Beta_1e-3_123447509552", "20250318_Beta_1e0_073258315126", "20250318_Beta_1e3_073258451669"]            
+            id_filenames = ["20250416-052857586460_N_10_tau_s_0_taus_b_0_Beta_0.001_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-052952250898_N_10_tau_s_0_taus_b_0_Beta_0.1_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-054051471468_N_10_tau_s_0_taus_b_0_Beta_1.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-053616003820_N_10_tau_s_0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0"] 
+            
 
-            fig = make_subplots(rows = len(id_filenames), cols = 1, subplot_titles = [r"$\text{Bending _ } \beta = 10^{-3}$", r"$\text{Bending + shear _ } \beta = 1$", r"$\text{Shear _ } \beta = 10^{-3}$"], shared_xaxes=True)
+            fig = make_subplots(rows = len(id_filenames), cols = 1, subplot_titles = [r"$\huge{\beta = 10^{-3}}$", r"$\huge{\beta = 10^{-1}}$", r"$\huge{\beta = 1}$", r"$\huge{\beta = 10^3}$"], shared_xaxes=True)
 
             for l in range(len(id_filenames)):
 
@@ -413,14 +483,14 @@ if __name__ == '__main__':
                 X_flow = A*np.sin(w0*T_eval)            
 
                 # Stroboscopic view
-                n_strobes = 200
+                n_strobes = 20
                 t_s = T_eval[-1] / n_strobes                
                 
                 condition = (T_eval_norm >= 0)
                 min_index = np.arange(T_eval_norm.shape[0])[condition][0]
                 max_index = np.arange(T_eval_norm.shape[0])[condition][-1]
-                indices_s = StroboscopicView(T_eval_norm[min_index:max_index], t_s = t_s)
-                c = sample_colorscale('matter_r', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
+                indices_s = StroboscopicView(T_eval_norm[min_index:max_index], n_strobes = n_strobes)
+                c = sample_colorscale(colorscale = dark_purple_scale[::-1], samplepoints = np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
 
                 for k in range(indices_s.shape[0]):
                     fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], row = 1 + l, col = 1)
@@ -433,10 +503,9 @@ if __name__ == '__main__':
 
             folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
             folder_name += "ProximalBend_NoFlow/BendingShearElasticity_Clamped_Counterbend/"
-            id_filenames = ["20250319_beta_1e0_lambda_1e0_021057191004", "20250319_beta_1e-1_lambda_5e-1_025640335717"]
+            id_filenames = ["20250416-012526174965_N_10_tau_s_0_taus_b_0_Beta_1.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0","20250416-011925928066_N_10_tau_s_0_taus_b_0_Beta_0.1_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0"]
 
-
-            fig = make_subplots(rows = len(id_filenames), cols = 1, subplot_titles = [r"$\beta = 1, \lambda = 1$", r"$\beta = 0.1, \lambda = 0.5$"], shared_xaxes=True)
+            fig = make_subplots(rows = len(id_filenames), cols = 1, subplot_titles = [r"$\huge{\beta = 1, \lambda = 2}$", r"$\huge{\beta = 0.1, \lambda = 0.5}$"], shared_xaxes=True)
 
             for l in range(len(id_filenames)):
 
@@ -456,14 +525,14 @@ if __name__ == '__main__':
                 X_flow = A*np.sin(w0*T_eval)            
 
                 # Stroboscopic view
-                n_strobes = 100
+                n_strobes = 5
                 t_s = T_eval[-1] / n_strobes                
                 
                 condition = (T_eval_norm >= 0)
                 min_index = np.arange(T_eval_norm.shape[0])[condition][0]
                 max_index = np.arange(T_eval_norm.shape[0])[condition][-1]
-                indices_s = StroboscopicView(T_eval_norm[min_index:max_index], t_s = t_s)
-                c = sample_colorscale('matter_r', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
+                indices_s = StroboscopicView(T_eval_norm[min_index:max_index], n_strobes = n_strobes)
+                c = sample_colorscale(dark_purple_scale, np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
 
                 for k in range(indices_s.shape[0]):
                     fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], row = 1 + l, col = 1)
@@ -471,7 +540,62 @@ if __name__ == '__main__':
                 # fig.update_yaxes()
             fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = False)
 
+    # Bending elasticity, varying bending viscosity, clamped axoneme
+    elif fig_nbr == 3:
+        
+        if panel_nbr == 0:
 
+            folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+            folder_name += "SecondBend_Relaxation/BendingElasticity_Clamped_VaryingBendingViscosity/"
+
+            id_filenames = ["20250416-040627112877_N_10_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-040627112877_N_10_tau_s_0_taus_b_0.001_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-040627112877_N_10_tau_s_0_taus_b_1.0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-040627114882_N_10_tau_s_0_taus_b_1000.0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-045354068702_N_10_tau_s_0_taus_b_1000000.0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0"]             
+
+            fig = make_subplots(rows = len(id_filenames), cols = 1, subplot_titles = [""], shared_xaxes=True)
+            fig_2 = make_subplots(rows = len(id_filenames), cols = 1, shared_xaxes=True)
+
+            for l in range(len(id_filenames)):
+
+                id_filename = id_filenames[l]
+                metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
+                data_filename = folder_name + 'data_' + id_filename + '.csv'
+                solver_dict = get_metadata(metadata_filename)
+                output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                X = get_data(data_filename) # s, t
+                X_3N_final = X3N(X[:,-1])
+
+                T_eval = np.array(T_eval)
+                if (A > 0) & (w0 > 0):
+                    T_eval_norm = T_eval * w0 / (2*np.pi)
+                else:
+                    T_eval_norm = T_eval
+                X_flow = A*np.sin(w0*T_eval)            
+
+                # Stroboscopic view
+                n_strobes = 20
+                t_s = T_eval[-1] / n_strobes                
+                
+                condition = (T_eval_norm >= 0)
+                min_index = np.arange(T_eval_norm.shape[0])[condition][0]
+                max_index = np.arange(T_eval_norm.shape[0])[condition][-1]
+                indices_s = StroboscopicView(T_eval_norm[min_index:max_index], n_strobes = n_strobes)
+                c = sample_colorscale(colorscale = dark_purple_scale[::-1], samplepoints = np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
+
+                for k in range(indices_s.shape[0]):
+                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], row = 1 + l, col = 1)
+                # fig.update_xaxes()
+                # fig.update_yaxes()
+
+                # Figure 2
+                X_3N = np.array([X3N(X[:,t]) for t in range(X.shape[1])]).squeeze().transpose()
+                # print("X_3N.shape", X_3N.shape)
+                x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
+                # print("x_tip.shape", x_tip.shape)
+                # exit()
+                fig_2.add_scatter(x = np.arange(x_tip.shape[1]), y = x_tip[1,:], row = 1+l, col =1)
+            fig_2.vs_show()
+
+
+            fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = False)
 
     fig.write_image(fig_filename)
     fig.vs_show()
