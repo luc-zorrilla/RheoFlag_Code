@@ -34,7 +34,7 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]
+    Sp4_list = [1e4, 1e5, 1e6]
     ################
 
     ###############################
@@ -211,7 +211,7 @@ if __name__ == "__main__":
     # T_max_list = [2*np.pi*100/w0 for w0 in w0_list]
 
     # Same time for all simulations
-    dT_list = [1e-1 for w0 in w0_list]
+    dT_list = [1e0 for w0 in w0_list]
     T_max_list = [1e4 for w0 in w0_list]
 
     T_span_list = [[0, T_max] for T_max in T_max_list]

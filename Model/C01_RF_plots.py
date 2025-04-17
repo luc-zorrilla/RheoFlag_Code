@@ -47,7 +47,7 @@ writing_dir = temp_folder
     # Panel b - relaxation for varying Sp4, tau_s = 1e3
 
 fig_nbr = 4
-panel_nbr = 1
+panel_nbr = 0
 
 if __name__ == '__main__':
 
@@ -682,15 +682,18 @@ if __name__ == '__main__':
             folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
             folder_name += "SecondBend_Relaxation/ShearElasticity_Clamped_VaryingShearViscosity/VaryingSp4/"
             
-            id_filenames = ["20250417-050341156585_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_0.001_k0_10000000000.0"]
-                # "20250417-050341156585_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_0.001_k0_10000000000.0",
-                # "20250417-050341289706_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_0.01_k0_10000000000.0",
-                # "20250417-050341318590_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_0.1_k0_10000000000.0",
-                # "20250417-050341448501_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0",
-                # "20250417-050341604537_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_10.0_k0_10000000000.0",
-                # "20250417-050341784599_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_100.0_k0_10000000000.0",
-                # "20250417-050341844358_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1000.0_k0_10000000000.0",
-                # ]                          
+            id_filenames = [
+                # "20250417-051505285138_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_0.001_k0_10000000000.0",
+                # "20250417-051505377790_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_0.01_k0_10000000000.0",
+                # "20250417-051505377790_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_0.1_k0_10000000000.0",
+                "20250417-051505442897_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0",
+                # "20250417-051505480475_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_10.0_k0_10000000000.0",
+                # "20250417-051505687573_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_100.0_k0_10000000000.0",
+                "20250417-051505760460_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1000.0_k0_10000000000.0",
+                "20250417-052302018931_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_10000.0_k0_10000000000.0",
+                "20250417-052302018931_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_100000.0_k0_10000000000.0",
+                "20250417-052302018931_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1000000.0_k0_10000000000.0",
+                ]                          
 
             fig = make_subplots(rows = len(id_filenames), cols = 1, subplot_titles = [""], shared_xaxes=True)
             fig_2 = make_subplots(rows = len(id_filenames), cols = 1, shared_xaxes=False)
