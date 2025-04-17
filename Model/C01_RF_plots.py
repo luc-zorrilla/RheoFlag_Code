@@ -43,10 +43,11 @@ writing_dir = temp_folder
 # Figure 3: simulations for bending elasticity + bending viscosity, clamped axoneme
     # Panel a - relaxation
 # Figure 4: simulations for shear elasticity + shear viscosity, clamped axoneme
-    # Panel a - relaxation
+    # Panel a - relaxation for varying shear viscosities, Sp4 = 1
+    # Panel b - relaxation for varying Sp4, tau_s = 1e3
 
-fig_nbr = 3
-panel_nbr = 0
+fig_nbr = 4
+panel_nbr = 1
 
 if __name__ == '__main__':
 
@@ -667,6 +668,73 @@ if __name__ == '__main__':
                 # print("x_tip.shape", x_tip.shape)
                 # exit()
                 fig_2.add_scatter(x = np.arange(x_tip.shape[1])*delta_t, y = x_tip[1,:]/x_tip[1,0], row = 1+l, col =1, name = "tau_s = " + str(tau_s))
+            fig_2.update_xaxes(zeroline = True)
+            fig_2.update_yaxes(zeroline = True)
+            fig_2.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = True)    
+            fig_2.vs_show()
+
+
+            fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = False)
+
+        # Varying Sp4 should change the shape of the relaxation curve
+        if panel_nbr == 1:
+
+            folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+            folder_name += "SecondBend_Relaxation/ShearElasticity_Clamped_VaryingShearViscosity/VaryingSp4/"
+            
+            id_filenames = ["20250417-050341156585_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_0.001_k0_10000000000.0"]
+                # "20250417-050341156585_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_0.001_k0_10000000000.0",
+                # "20250417-050341289706_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_0.01_k0_10000000000.0",
+                # "20250417-050341318590_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_0.1_k0_10000000000.0",
+                # "20250417-050341448501_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0",
+                # "20250417-050341604537_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_10.0_k0_10000000000.0",
+                # "20250417-050341784599_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_100.0_k0_10000000000.0",
+                # "20250417-050341844358_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1000.0_k0_10000000000.0",
+                # ]                          
+
+            fig = make_subplots(rows = len(id_filenames), cols = 1, subplot_titles = [""], shared_xaxes=True)
+            fig_2 = make_subplots(rows = len(id_filenames), cols = 1, shared_xaxes=False)
+
+            for l in range(len(id_filenames)):
+
+                id_filename = id_filenames[l]
+                metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
+                data_filename = folder_name + 'data_' + id_filename + '.csv'
+                solver_dict = get_metadata(metadata_filename)
+                output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                X = get_data(data_filename) # s, t
+                X_3N_final = X3N(X[:,-1])
+
+                delta_t = T_eval[1] - T_eval[0]
+                T_eval = np.array(T_eval)
+                if (A > 0) & (w0 > 0):
+                    T_eval_norm = T_eval * w0 / (2*np.pi)
+                else:
+                    T_eval_norm = T_eval
+                X_flow = A*np.sin(w0*T_eval)            
+
+                # Stroboscopic view
+                n_strobes = 20
+                t_s = T_eval[-1] / n_strobes                
+                
+                condition = (T_eval_norm >= 0)
+                min_index = np.arange(T_eval_norm.shape[0])[condition][0]
+                max_index = np.arange(T_eval_norm.shape[0])[condition][-1]
+                indices_s = StroboscopicView(T_eval_norm[min_index:max_index], n_strobes = n_strobes)
+                c = sample_colorscale(colorscale = dark_purple_scale[::-1], samplepoints = np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
+
+                for k in range(indices_s.shape[0]):
+                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], row = 1 + l, col = 1)
+                # fig.update_xaxes()
+                # fig.update_yaxes()
+
+                # Figure 2
+                X_3N = np.array([X3N(X[:,t]) for t in range(X.shape[1])]).squeeze().transpose()
+                # print("X_3N.shape", X_3N.shape)
+                x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
+                # print("x_tip.shape", x_tip.shape)
+                # exit()
+                fig_2.add_scatter(x = np.arange(x_tip.shape[1])*delta_t, y = x_tip[1,:]/x_tip[1,0], row = 1+l, col =1, name = "Sp4 = " + str(Sp4))
             fig_2.update_xaxes(zeroline = True)
             fig_2.update_yaxes(zeroline = True)
             fig_2.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = True)    
