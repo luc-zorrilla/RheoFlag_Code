@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [1e0]
+    Beta_list = [1e3]
     ####################################
 
     ###############################
@@ -61,7 +61,7 @@ if __name__ == "__main__":
 
     ##############################
     # Shear viscosity activation #
-    tau_s_list = [0]
+    tau_s_list = [1e-3, 1e-2, 1e-1]
     ##############################
 
     ####################################
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     print("Preparing initial conditions...")
 
     
-    init_conf_list = [ProximalBend] ## Initial conditions in [StraightLine, ProximalBend, SecondBend]
+    init_conf_list = [SecondBend] ## Initial conditions in [StraightLine, ProximalBend, SecondBend]
 
     print("Initial conditions prepared. ")
     #######################  
@@ -211,8 +211,8 @@ if __name__ == "__main__":
     # T_max_list = [2*np.pi*100/w0 for w0 in w0_list]
 
     # Same time for all simulations
-    dT_list = [2e-2 for w0 in w0_list]
-    T_max_list = [2e2 for w0 in w0_list]
+    dT_list = [2e-3 for w0 in w0_list]
+    T_max_list = [2e0 for w0 in w0_list]
 
     T_span_list = [[0, T_max] for T_max in T_max_list]
     T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l]))] for l in range(len(w0_list))]

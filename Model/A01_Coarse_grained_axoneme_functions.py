@@ -203,7 +203,7 @@ def ProximalBend(N):
 
 def SecondBend(N):
     """ A proximal bend (of the second segment) """
-    X_0 = Bend(N, k = 3, phi = np.pi/16)
+    X_0 = Bend(N, k = 3, phi = np.pi/1024)
     return X_0
 
 

@@ -40,7 +40,12 @@ writing_dir = temp_folder
     # Panel a - stroboscopic view of the filament in 3 different regimes of shear / bending.
     # Panel b - Counterbend for two different regimes
 
-fig_nbr = 2
+# Figure 3: simulations for bending elasticity + bending viscosity, clamped axoneme
+    # Panel a - relaxation
+# Figure 4: simulations for shear elasticity + shear viscosity, clamped axoneme
+    # Panel a - relaxation
+
+fig_nbr = 3
 panel_nbr = 0
 
 if __name__ == '__main__':
@@ -560,9 +565,11 @@ if __name__ == '__main__':
                 data_filename = folder_name + 'data_' + id_filename + '.csv'
                 solver_dict = get_metadata(metadata_filename)
                 output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                tau_b = taus_b[0]
                 X = get_data(data_filename) # s, t
                 X_3N_final = X3N(X[:,-1])
 
+                delta_t = T_eval[1] - T_eval[0]
                 T_eval = np.array(T_eval)
                 if (A > 0) & (w0 > 0):
                     T_eval_norm = T_eval * w0 / (2*np.pi)
@@ -591,11 +598,84 @@ if __name__ == '__main__':
                 x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
                 # print("x_tip.shape", x_tip.shape)
                 # exit()
-                fig_2.add_scatter(x = np.arange(x_tip.shape[1]), y = x_tip[1,:], row = 1+l, col =1)
+                fig_2.add_scatter(x = np.arange(x_tip.shape[1])*delta_t, y = x_tip[1,:]/x_tip[1,0], row = 1+l, col =1, name = "tau_b = " + str(tau_b))
+            fig_2.update_xaxes(zeroline = True)
+            fig_2.update_yaxes(zeroline = True)
             fig_2.vs_show()
 
 
             fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = False)
+
+    # Shear elasticity, varying shear viscosity, clamped axoneme
+    elif fig_nbr == 4:
+
+        if panel_nbr == 0:
+
+            folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+            folder_name += "SecondBend_Relaxation/ShearElasticity_Clamped_VaryingShearViscosity/"
+
+            id_filenames = [
+                "20250417-032313300149_N_10_tau_s_0.001_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", 
+                "20250417-032313302154_N_10_tau_s_0.01_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", 
+                "20250417-032313302154_N_10_tau_s_0.1_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", 
+                "20250417-032215850350_N_10_tau_s_1.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", 
+                "20250417-031556517975_N_10_tau_s_10.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", 
+                "20250417-031611475771_N_10_tau_s_100.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", 
+                "20250417-031641350954_N_10_tau_s_1000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", 
+                "20250417-031709623421_N_10_tau_s_1000000.0_taus_b_0_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0"]             
+
+            fig = make_subplots(rows = len(id_filenames), cols = 1, subplot_titles = [""], shared_xaxes=True)
+            fig_2 = make_subplots(rows = len(id_filenames), cols = 1, shared_xaxes=False)
+
+            for l in range(len(id_filenames)):
+
+                id_filename = id_filenames[l]
+                metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
+                data_filename = folder_name + 'data_' + id_filename + '.csv'
+                solver_dict = get_metadata(metadata_filename)
+                output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                X = get_data(data_filename) # s, t
+                X_3N_final = X3N(X[:,-1])
+
+                delta_t = T_eval[1] - T_eval[0]
+                T_eval = np.array(T_eval)
+                if (A > 0) & (w0 > 0):
+                    T_eval_norm = T_eval * w0 / (2*np.pi)
+                else:
+                    T_eval_norm = T_eval
+                X_flow = A*np.sin(w0*T_eval)            
+
+                # Stroboscopic view
+                n_strobes = 20
+                t_s = T_eval[-1] / n_strobes                
+                
+                condition = (T_eval_norm >= 0)
+                min_index = np.arange(T_eval_norm.shape[0])[condition][0]
+                max_index = np.arange(T_eval_norm.shape[0])[condition][-1]
+                indices_s = StroboscopicView(T_eval_norm[min_index:max_index], n_strobes = n_strobes)
+                c = sample_colorscale(colorscale = dark_purple_scale[::-1], samplepoints = np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
+
+                for k in range(indices_s.shape[0]):
+                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], row = 1 + l, col = 1)
+                # fig.update_xaxes()
+                # fig.update_yaxes()
+
+                # Figure 2
+                X_3N = np.array([X3N(X[:,t]) for t in range(X.shape[1])]).squeeze().transpose()
+                # print("X_3N.shape", X_3N.shape)
+                x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
+                # print("x_tip.shape", x_tip.shape)
+                # exit()
+                fig_2.add_scatter(x = np.arange(x_tip.shape[1])*delta_t, y = x_tip[1,:]/x_tip[1,0], row = 1+l, col =1, name = "tau_s = " + str(tau_s))
+            fig_2.update_xaxes(zeroline = True)
+            fig_2.update_yaxes(zeroline = True)
+            fig_2.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = True)    
+            fig_2.vs_show()
+
+
+            fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = False)
+
+
 
     fig.write_image(fig_filename)
     fig.vs_show()
