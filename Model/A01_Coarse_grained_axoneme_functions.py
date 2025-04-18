@@ -624,7 +624,7 @@ def ActiveBending(X):
 #############################################
 ## --- Differential system AQX_dot = B --- ##
     
-def g(t, X, Sp4, k0, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, InterpFlow = 0):
+def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, InterpFlow = 0):
 
     """ Returns the non-dimensionalized equation X_tilde_dot = g(X_tilde; t; parameters). 
     The difference with f(t,X) is that X is extended to add theta_0_dot, giving X_tilde. 
@@ -661,7 +661,7 @@ def g(t, X, Sp4, k0, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L=0, Lambd
     # print("Q", Q)
 
     ADB_time = time.time()
-    A_DB = ADB(taus_b, N)
+    A_DB = int(bool_EI) * ADB(taus_b, N)
     ADB_time = time.time() - ADB_time
     if ADB_time>1:
         print("Getting A_DB took %s seconds." % (ADB_time))
@@ -682,7 +682,7 @@ def g(t, X, Sp4, k0, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L=0, Lambd
         X_dot_flow = Flow(X_3N, X_flow)
 
     B_time = time.time()
-    B = BB(X_3N) + BC_L(X_3N, n_L, m_L) + BC_0(X_3N, n_0, m_0) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
+    B = int(bool_EI) * BB(X_3N) + BC_L(X_3N, n_L, m_L) + BC_0(X_3N, n_0, m_0) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
     # B[0] = 0 # No displacement in x at s = 0
     # B[1] = 0 # No displacement in y at s = 0
     B_time = time.time() - B_time
@@ -748,7 +748,7 @@ class StopOnTime:
 #     print(x,a,b,c)
 #     return 
 
-def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = 'LSODA'):
+def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = 'LSODA'):
     
     """ Solves the linear system for a set of parameters and saves the resulting dynamics in a file. 
     Returns True if the algorithm converges, False otherwise. 
@@ -765,6 +765,7 @@ def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m
     - m_L: point torque at s = L
     - A: flow amplitude
     - w0: flow frequency
+    - bool_EI: whether to activate bending or not (default is True)
     - Sp4: Sperm number^4, i.e., ratio of fluid viscosity over bending elasticity
     - k0: elasticity at the base (s = 0)
     - Lambdas: ad hoc force on filament segments
@@ -788,7 +789,7 @@ def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m
     date = datetime.now().strftime("%Y%m%d-%I%M%S%f")
 
     parameters_id = ""
-    for param in ["N", "tau_s", "taus_b", "Beta", "gamma", "A", "w0", "Sp4", "k0"]:
+    for param in ["N", "tau_s", "taus_b", "bool_EI", "Beta", "gamma", "A", "w0", "Sp4", "k0"]:
         if param == "taus_b":
             parameters_id += "_" + param + "_" + str(taus_b[0])
         else:
@@ -808,9 +809,9 @@ def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m
 
         InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate") # Beware of that extrapolation option - might be due to the period being much higher than actual time step
         
-        Args = (Sp4, k0, Beta, taus_b, tau_s, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
+        Args = (Sp4, k0, bool_EI, Beta, taus_b, tau_s, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
     else:
-        Args = (Sp4, k0, Beta, taus_b, tau_s, gamma, n_L, m_L, Lambdas, Zetas)
+        Args = (Sp4, k0, bool_EI, Beta, taus_b, tau_s, gamma, n_L, m_L, Lambdas, Zetas)
 
     # print("Flow field interpolated. ")
     ############################################################################
@@ -844,8 +845,8 @@ def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m
     ############################################################################
     # Write metadata
     # print("Writing metadata...")
-    solver_values = [output_folder, N, taus_b, tau_s, str(init_conf), Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method]
-    solver_keys = ["output_folder", "N", "taus_b", "tau_s", "init_conf", "Beta", "gamma", "n_L", "m_L", "A", "w0", "Sp4", "k0", "Lambdas", "Zetas", "X_flow_field_string", "T_span", "T_eval", "T_sim_max", "T_sim", "X_flow_field", "X_0", "method"]
+    solver_values = [output_folder, N, taus_b, tau_s, str(init_conf), bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method]
+    solver_keys = ["output_folder", "N", "taus_b", "tau_s", "init_conf", "bool_EI", "Beta", "gamma", "n_L", "m_L", "A", "w0", "Sp4", "k0", "Lambdas", "Zetas", "X_flow_field_string", "T_span", "T_eval", "T_sim_max", "T_sim", "X_flow_field", "X_0", "method"]
     solver_dict = {f"{solver_keys[k]}": solver_values[k] for k in range(len(solver_values))}
     write_dict_to_json_file(solver_dict, metadata_filename)
     # print("Metadata written.")

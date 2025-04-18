@@ -34,7 +34,7 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1e4, 1e5, 1e6]
+    Sp4_list = [1e0]
     ################
 
     ###############################
@@ -42,14 +42,15 @@ if __name__ == "__main__":
     k0_list = [1e10]
     ###############################
     
-    ###################
-    # Shear viscosity #
-    # Keep delta_t >> 1, tau_b >> 1, Sp4 >> 1, 1/sqrt(k0)>>1, Sp4 / Beta >> 1 to neglect shear viscosity
-    ###################
+    #################################
+    # Bending elasticity activation #
+    #################################
+    bool_EI = False # Default is True
+    #################################
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [1e3]
+    Beta_list = [1e2, 1e3, 1e4]
     ####################################
 
     ###############################
@@ -211,8 +212,8 @@ if __name__ == "__main__":
     # T_max_list = [2*np.pi*100/w0 for w0 in w0_list]
 
     # Same time for all simulations
-    dT_list = [1e0 for w0 in w0_list]
-    T_max_list = [1e4 for w0 in w0_list]
+    dT_list = [5e-1 for w0 in w0_list]
+    T_max_list = [5e3 for w0 in w0_list]
 
     T_span_list = [[0, T_max] for T_max in T_max_list]
     T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l]))] for l in range(len(w0_list))]
@@ -300,7 +301,7 @@ if __name__ == "__main__":
 
                                                         #########################################
                                                         ### ---- Gather solver arguments ---- ###
-                                                        solver_dict = dict(output_folder = output_folder, N = N, taus_b = taus_b, tau_s = tau_s, init_conf = init_conf, Beta = Beta, gamma = gamma, n_L = n_L, m_L = m_L, A = A, w0 = w0, Sp4 = Sp4, k0 = k0, Lambdas = Lambdas, Zetas = Zetas, X_flow_field_string = X_flow_field_string, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, X_flow_field = X_flow_field, X_0 = X_0, method = method)
+                                                        solver_dict = dict(output_folder = output_folder, N = N, taus_b = taus_b, tau_s = tau_s, init_conf = init_conf, bool_EI = bool_EI, Beta = Beta, gamma = gamma, n_L = n_L, m_L = m_L, A = A, w0 = w0, Sp4 = Sp4, k0 = k0, Lambdas = Lambdas, Zetas = Zetas, X_flow_field_string = X_flow_field_string, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, X_flow_field = X_flow_field, X_0 = X_0, method = method)
                                                         #########################################
 
                                                         res = pool.apply_async(func = SolveAndSave, args = list(solver_dict.values()), callback = SolveAndSave_callback)
