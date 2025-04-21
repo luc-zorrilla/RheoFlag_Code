@@ -374,15 +374,18 @@ def ADB(taus_b, N):
     return A_DB
 
 def ADS(N):
-    """ Returns the matrix used to model shear dissipation all along the axoneme.
-    taus_s is a list of non-dimensional internal shearing viscosity. """
-    taus_s = [1]*(N-1)
-    A_DS = np.tril(np.tile([0,0,0] + taus_s, (N+2,1)))
+    """ Returns the matrix A_DS used to model shear dissipation all along the axoneme.
+    taus_s is a list of non-dimensional internal shearing viscosity.
+    Remark: A_DS applies to X_3N_dot and not directly to X_Np2_dot """
+
+    A_DS = np.zeros((N+2,3*N))
+    A_DS[2:, 2*N:] = np.triu(np.ones((N, N))) # upper triangular matrix
+    A_DS[2:, 2*N] = np.arange(-N, 0, 1) # change first column
     return A_DS
 
-# Nus_b = [1,1,1,1,1]
-# A_D = AD(Nus_b)
-# print("A_D = ", A_D)
+# N = 10
+# A_DS = ADS(N)
+# print("A_DS = ", A_DS)
 # exit()
 
 # ------------------- #
@@ -550,7 +553,7 @@ def BS(X_3N):
     # Boundary conditions at proximal end
     B[0] = 0 # No force on x axis due to shear at s = 0
     B[1] = 0 # No force on y axis due to shear at s = 0
-    B[2] = 0 # No torque due to shear at s = 0 --> Is that correct
+    B[2] = 0 # No torque due to shear at s = 0
     for i in range(N-1):
         B[3+i] = np.sum(X_3N[2*N+i+1:]) - (N-i-1)*X_3N[2*N] # Sliding resistance        
     return B
@@ -700,7 +703,15 @@ def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L
 
     X_dot_time = time.time()
 
-    X_dot = (np.linalg.inv(Sp4 * A @ Q - A_DB - Beta * A_DS) @ B).ravel()
+    A_tilde = (Sp4 * A - Beta * A_DS ) @ Q - A_DB
+
+    # TEST (if Sp4 == 0)
+    # A_tilde[0,0] = 1
+    # A_tilde[1,1] = 1
+    # A_tilde[2,2] = 1
+    ####################
+
+    X_dot = (np.linalg.inv(A_tilde) @ B).ravel()
     X_dot_time = time.time() - X_dot_time
     if X_dot_time>1:
         print("Inverting to get X_dot took %s seconds." % (X_dot_time))
