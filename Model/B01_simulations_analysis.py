@@ -40,7 +40,7 @@ def fetch_files(directory, metadata_condition, data_condition = None):
     
     Example:
     def metadata_condition_0(solver_dict):
-        output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+        output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
         bool_condition = (N == 10) & ("SmoothCurve" in init_conf) & (gamma == 2) & (method == 'RK45')
 
@@ -101,9 +101,7 @@ def dimensionalize(Sp4, tau_b, beta, tau_s, eta, N, L):
 def observable_1D_dataframe(directory, ids_list, columns, observable, obs_type = 'metadata'):
     """ Takes as input a list of ids corresponding to simulations and makes a 
     dataframe in parameter space specified by columns where the value of the dataframe 
-    is an observable, which will simply be for now a number. 
-    Remark: this function could be generalized to observable_ND_dataframe() where the 
-    observable is not a necessarily a number but could be anything. 
+    is an observable, which will simply be for now a number.
     
     - observable is a function of metadata (as a dict), of the data (as 
     a numpy array), or of both and can be specified in obs_type: ['metadata', 
@@ -136,7 +134,7 @@ def observable_1D_dataframe(directory, ids_list, columns, observable, obs_type =
         if obs_type in ['metadata']:
             obs = observable(solver_dict, None)
         else:
-            data_file = 'data_' + base_id + '.csv'
+            data_file = directory + 'data_' + base_id + '.csv'
             X = get_data(data_file)            
             if obs_type in ['data']:
                 obs = observable(None, X)
@@ -148,6 +146,107 @@ def observable_1D_dataframe(directory, ids_list, columns, observable, obs_type =
         df.loc[len(df)] = col_values
 
     return df
+
+def observable_1D_list_dataframe(directory, ids_list, columns, observable_list, obs_type_list):
+    """ Takes as input a list of ids corresponding to simulations and makes a 
+    dataframe in parameter space specified by columns where the value of the dataframe 
+    is an observable, which will simply be for now a number.
+    
+    - observable_list is a list of functions of metadata (as a dict), of the data (as 
+    a numpy array), or of both and can be specified in obs_type: ['metadata', 
+    'data', 'both'].
+
+        Example of an element of observable_list:
+        def observable_0(solver_dict, None):
+            output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+
+            return T_sim
+
+    - parameters specified by axes will form the axes of the matrix, in the form 
+    of a list of strings such as ['Sp4', 'Beta'] or ['Sp4', 'Beta', 'tau_b', 'A', 'w0']
+    
+    """
+
+    # Create dataframe
+    df = pd.DataFrame(columns = columns + [str(observable)])
+
+    for base_id in ids_list:
+        
+        # Metadata
+        metadata_file = directory + 'metadata_' + base_id + '.json'
+        solver_dict = get_metadata(metadata_file)
+
+        # Get column values (except observable)
+        col_values = [solver_dict[column] for column in columns]
+
+        for observable, obs_type in zip(observable_list, obs_type_list):
+
+            # Get observable
+            if obs_type in ['metadata']:
+                obs = observable(solver_dict, None)
+            else:
+                data_file = directory + 'data_' + base_id + '.csv'
+                X = get_data(data_file)            
+                if obs_type in ['data']:
+                    obs = observable(None, X)
+                elif obs_type in ['both']:
+                    obs = observable(solver_dict, X)
+            col_values.append(obs)
+
+            # Put into table
+            df.loc[len(df)] = col_values
+
+    return df
+
+# def observable_ND_dataframe(directory, ids_list, columns, observable, obs_type = 'metadata'):
+#     """ Takes as input a list of ids corresponding to simulations and makes a 
+#     dataframe in parameter space specified by columns where the value of the dataframe 
+#     is an observable, which will simply be for now a number.
+    
+#     - observable is a function of metadata (as a dict), of the data (as 
+#     a numpy array), or of both and can be specified in obs_type: ['metadata', 
+#     'data', 'both'].
+
+#         Example:
+#         def observable_0(solver_dict, None):
+#             output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+
+#             return T_sim
+
+#     - parameters specified by axes will form the axes of the matrix, in the form 
+#     of a list of strings such as ['Sp4', 'Beta'] or ['Sp4', 'Beta', 'tau_b', 'A', 'w0']
+    
+#     """
+
+#     # Create dataframe
+#     df = pd.DataFrame(columns = columns + [str(observable)])
+
+#     for base_id in ids_list:
+        
+#         # Metadata
+#         metadata_file = directory + 'metadata_' + base_id + '.json'
+#         solver_dict = get_metadata(metadata_file)
+
+#         # Get column values (except observable)
+#         col_values = [solver_dict[column] for column in columns]
+
+#         # Get observable
+#         if obs_type in ['metadata']:
+#             obs = observable(solver_dict, None)
+#         else:
+#             data_file = directory + 'data_' + base_id + '.csv'
+#             X = get_data(data_file)            
+#             if obs_type in ['data']:
+#                 obs = observable(None, X)
+#             elif obs_type in ['both']:
+#                 obs = observable(solver_dict, X)
+#         col_values.append(obs)
+
+#         # Put into table
+#         df.loc[len(df)] = col_values
+
+#     return df
+
 
 def plot_2D(df, column_0, column_1):
     """ Plot two columns of a dataframe in a 2D axis. """

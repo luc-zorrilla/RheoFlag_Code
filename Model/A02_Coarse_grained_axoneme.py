@@ -39,30 +39,30 @@ if __name__ == "__main__":
 
     ###############################
     # basal hinge spring constant #
-    k0_list = [1e10]
+    k0_list = [1e13]
     ###############################
     
     #################################
     # Bending elasticity activation #
     #################################
-    bool_EI = False # Default is True
+    bool_EI = True # Default is True
     #################################
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [1e3]
+    Beta_list = [0]
     ####################################
 
     ###############################
     # Bending viscosity timescale #
     # remark : it is in tau_s units
-    Tau_b_list = [0]
+    Tau_b_list = [1e4, 1e5, 1e6]
     taus_b_list = [[[tau_b]*(N-1) for tau_b in Tau_b_list] for N in N_list]
     ###############################
 
     ##############################
     # Shear viscosity activation #
-    tau_s_list = [1e3] #, 1e1, 1e2, 1e3]
+    tau_s_list = [0] #, 1e1, 1e2, 1e3]
     ##############################
 
     ####################################
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     print("Preparing initial conditions...")
 
     
-    init_conf_list = [SecondBend] ## Initial conditions in [StraightLine, ProximalBend, SecondBend]
+    init_conf_list = [StraightLine] ## Initial conditions in [StraightLine, ProximalBend, SecondBend]
 
     print("Initial conditions prepared. ")
     #######################  
@@ -188,8 +188,9 @@ if __name__ == "__main__":
     # X_flow_field_list = [np.array([0, 10**(-6)])]
     
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
-    A_list = [0]
-    w0_list = [0]
+    A_list = [2.5e-3]
+    n_w0 = 100
+    w0_list = 10**(-np.linspace(0, 9, n_w0))
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -208,12 +209,12 @@ if __name__ == "__main__":
     print("Setting time...")
 
     # time determined by the flow timescale
-    # dT_list = [2*np.pi/(100*w0) for w0 in w0_list]
-    # T_max_list = [2*np.pi*100/w0 for w0 in w0_list]
+    dT_list = [2*np.pi/(100*w0) for w0 in w0_list]
+    T_max_list = [2*np.pi*100/w0 for w0 in w0_list]
 
     # Same time for all simulations
-    dT_list = [5e0 for w0 in w0_list]
-    T_max_list = [5e3 for w0 in w0_list]
+    # dT_list = [1e3 for w0 in w0_list]
+    # T_max_list = [1e6 for w0 in w0_list]
 
     T_span_list = [[0, T_max] for T_max in T_max_list]
     T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l]))] for l in range(len(w0_list))]
@@ -222,7 +223,7 @@ if __name__ == "__main__":
 
     ########################################
     # Maximum simulation time (s) per step #
-    T_sim_max = 600 # 12h
+    T_sim_max = 600 # 10min
     ########################################
 
     print("Time set.")

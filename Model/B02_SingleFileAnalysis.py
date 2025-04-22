@@ -32,41 +32,27 @@ temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/" 
 
 # folder_name += "AnalyticalComparisons/"
-folder_name += "ProximalBend_NoFlow/"
-# folder_name += "StraightLine_PeriodicFlow/"
+folder_name += "StraightLine_PeriodicFlow/"
 
 # Analytical Comparisons
 # folder_name += "PureBending_Clamped_Relaxation/"
 # folder_name += "PureBending_Clamped_UniformVerticalFlow/"    
 # folder_name += "PureBending_Clamped_TipVerticalPointForce/"
 
-# Relaxation from proximal bend initial configuration
-# folder_name += "BendingElasticity_Clamped_VaryingShearBending/"
-folder_name += "PureBending_Clamped_BendingViscosity/"
-folder_name += "NoClamp/"
+# Periodic forcing
+folder_name += "BendingElasticity_Clamped_VaryingBendingViscosity/"
+# folder_name += "StaticTest/"
 
-# Harmonic response
-# folder_name += "PureBending_Clamped_NoViscosity/"
-# folder_name += "BendingShear_Clamped_NoViscosity/"
-# folder_name += "PureBending_Clamped_BendingViscosity/"
-# folder_name += "PureShear_Clamped_ShearViscosity/"
-
-# Bending and Shear elasticity
-# folder_name += "PureShear/"
-
-# Shear elasticity and shear viscosity
-# folder_name += "NoViscosity/"
-# folder_name += "NoElasticity/"
 
 ################################################################################
-id_filename = "20250328-020001192697_N_10_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0.001_Sp4_1.0_k0_0"
+id_filename = "20250421-041743766572_N_10_tau_s_0_taus_b_1000000.0_bool_EI_True_Beta_0_gamma_2_A_0.0025_w0_1e-09_Sp4_1_k0_10000000000.0"
 ################################################################################
 
 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
 data_filename = folder_name + 'data_' + id_filename + '.csv'
 
 solver_dict = get_metadata(metadata_filename)
-output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
 eta = 1
 L = 1e-5
@@ -120,7 +106,7 @@ X_flow = A*np.sin(2 * np.pi * T_eval_norm)
 # n_max = 101
 # X = X[:, :n_max]
 # T_eval_norm = T_eval_norm[:n_max]
-# c = sample_colorscale('BuPu', np.linspace(0, 1, num = T_eval_norm.shape[0]))[::-1]
+# c = sample_colorscale(dark_purple_scale, np.linspace(0, 1, num = T_eval_norm.shape[0]))[::-1]
 
 # fig = go.Figure()
 # for t in range(X.shape[1]):
@@ -138,10 +124,10 @@ X_flow = A*np.sin(2 * np.pi * T_eval_norm)
 # exit()
 
 # Stroboscopic view
-eps = 1/1e-12
+eps = 1e-12
 if np.abs(w0 - 0) < eps:
     # Static view: divided all dynamics in n_strobes points equally distant
-    n_strobes = T_eval_norm.shape[0] # T_eval_norm.shape[0]//2 #10000
+    n_strobes = T_eval_norm.shape[0]//10 # T_eval_norm.shape[0]//2 #10000
     condition = (T_eval_norm >= 0) # (T_eval_norm >= T_eval_norm[-1]/2)
 else:
     # Dynamic view: divided permanent regime in n_strobes points equally distant within one flow period
@@ -150,7 +136,7 @@ else:
     # condition = (T_eval_norm >= 0) & (T_eval_norm <= 1)
 
 indices_s = StroboscopicView(T_eval_norm[condition], n_strobes = n_strobes)
-c = sample_colorscale('BuPu', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]
+c = sample_colorscale(dark_purple_scale, np.linspace(0, 1, num = indices_s.shape[0]))[::-1]
 
 # Kinetic energy
 # K = KineticEnergy(X, N, T_eval_norm) # t
@@ -184,7 +170,7 @@ fig = go.Figure(data = go.Heatmap(
     x = T_eval_norm[condition][indices_s],
     y = np.linspace(start = 0, stop = 1, num = Alpha.shape[1]),
     z = np.transpose(Alpha),
-    colorscale = 'BuPu',
+    colorscale = dark_purple_scale,
     ))
 
 fig.update_yaxes(title = 's')
@@ -201,7 +187,7 @@ fig = go.Figure(data = go.Heatmap(
     x = T_eval_norm[condition][indices_s],
     y = np.linspace(start = 0, stop = 1, num = Theta.shape[1]),
     z = np.transpose(Theta),
-    colorscale = 'BuPu',
+    colorscale = dark_purple_scale,
     ))
 
 fig.update_yaxes(title = 's')
@@ -225,7 +211,7 @@ trace = [go.Heatmap(
     x= T_eval_norm[condition][indices_s],
     y= q_alpha,
     z= np.abs(Alpha_q),
-    colorscale='BuPu',
+    colorscale=dark_purple_scale,
     )]
 layout = go.Layout(
     title = 'Spatial Spectrogram of Alpha',
@@ -241,7 +227,7 @@ trace = [go.Heatmap(
     x= T_eval_norm[condition][indices_s],
     y= q_theta,
     z= np.abs(Theta_q),
-    colorscale='BuPu',
+    colorscale=dark_purple_scale,
     )]
 layout = go.Layout(
     title = 'Spatial Spectrogram of Theta',
@@ -266,7 +252,7 @@ trace = [go.Heatmap(
     x= f_alpha,
     y= np.linspace(0, 1, num = Alpha_f.shape[0]),
     z= np.abs(Alpha_f),
-    colorscale='BuPu',
+    colorscale=dark_purple_scale,
     )]
 layout = go.Layout(
     title = 'abs(Alpha(s,f))',
@@ -298,7 +284,7 @@ trace = [go.Heatmap(
     x= f_theta,
     y= np.linspace(0, 1, num = Theta_f.shape[0]),
     z= np.abs(Theta_f),
-    colorscale='BuPu',
+    colorscale=dark_purple_scale,
     )]
 layout = go.Layout(
     title = 'abs(Theta(s,f))',
@@ -344,7 +330,7 @@ trace = [go.Heatmap(
     x= f_alpha,
     y= q_alpha,
     z= np.log(np.abs(Alpha_fq)),
-    colorscale='BuPu',
+    colorscale=dark_purple_scale,
     )]
 layout = go.Layout(
     title = 'log|F_t(F_s(Alpha))|',
@@ -363,7 +349,7 @@ trace = [go.Heatmap(
     x= f_theta,
     y= q_theta,
     z= np.log(np.abs(Theta_fq)),
-    colorscale='BuPu',
+    colorscale=dark_purple_scale,
     )]
 layout = go.Layout(
     title = 'log|F_t(F_s(Theta))|',

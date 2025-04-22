@@ -4,9 +4,11 @@ Paper-quality figures will also be made to illustrate that. """
 ################################################################################
 ### Libraries
 
+import os
 import sys
 plot_functions_folder = "C:/Users/Luc/Documents/MEGAsync/Code"
 sys.path.insert(0, plot_functions_folder)
+import glob
 
 import multiprocessing
 from datetime import datetime
@@ -14,10 +16,11 @@ from A01_Coarse_grained_axoneme_functions import *
 from B01_simulations_analysis import *
 
 import numpy as np
-from sklearn.preprocessing import StandardScaler
+# from sklearn.preprocessing import StandardScaler
 # from sklearn.decomposition import PCA
-from sklearn import linear_model
-from sklearn.metrics import mean_squared_error, r2_score
+# from sklearn import linear_model
+# from sklearn.metrics import mean_squared_error, r2_score
+from scipy.signal import find_peaks
 
 from plotting_functions import * 
 pio.templates.default = "figure_template"
@@ -46,8 +49,11 @@ writing_dir = temp_folder
 # Figure 4: simulations for shear elasticity + shear viscosity, clamped axoneme
     # Panel a - relaxation for varying shear viscosities, Sp4 = 1
 
+# Figure 5: simulations for a periodic flow, for a clamped axoneme with bending elasticity + bending viscosity
+    # Panel a - tip movement for varying bending viscosity and flow frequency
 
-fig_nbr = 4
+
+fig_nbr = 5
 panel_nbr = 0
 
 if __name__ == '__main__':
@@ -566,7 +572,8 @@ if __name__ == '__main__':
                 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
                 data_filename = folder_name + 'data_' + id_filename + '.csv'
                 solver_dict = get_metadata(metadata_filename)
-                output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                # output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())                
                 tau_b = taus_b[0]
                 X = get_data(data_filename) # s, t
                 X_3N_final = X3N(X[:,-1])
@@ -675,8 +682,173 @@ if __name__ == '__main__':
             fig_2.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = True)    
             fig_2.vs_show()
 
+            fig2_filename = writing_dir + "fig2" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + ".pdf"
+            fig_2.write_image(fig2_filename)
+
             fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = False)
 
+    # Bending elasticity, varying bending viscosity and flow frequency, clamped axoneme
+    elif fig_nbr == 5:
+        if panel_nbr == 0:
+
+            folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+            folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/"
+
+            filenames = glob.glob(folder_name + '*.json')
+            id_filenames = [os.path.basename(filename).removeprefix("metadata_").removesuffix(".json") for filename in filenames][:10]
+
+            # for l in range(len(id_filenames)):
+
+            #     id_filename = id_filenames[l]
+            #     metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
+            #     data_filename = folder_name + 'data_' + id_filename + '.csv'
+            #     solver_dict = get_metadata(metadata_filename)
+            #     output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+            #     tau_b = taus_b[0]
+            #     X = get_data(data_filename) # s, t
+
+            #     delta_t = T_eval[1] - T_eval[0]
+            #     T_eval = np.array(T_eval)
+            #     if (A > 0) & (w0 > 0):
+            #         T_eval_norm = T_eval * w0 / (2*np.pi)
+            #     else:
+            #         T_eval_norm = T_eval
+            #     # X_flow = A*np.sin(w0*T_eval)
+
+            #     # TIP values
+            #     X_3N = np.array([X3N(X[:,t]) for t in range(X.shape[1])]).squeeze().transpose()
+            #     x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
+
+            #     # Fourier transform of the tip (y position)
+            #     y_tip_f = np.fft.rfft(x_tip[1,:])
+            #     f_y_tip = np.fft.rfftfreq(x_tip[1,:].shape[0])
+            #     delta_t_norm = T_eval_norm[1] - T_eval_norm[0]
+            #     f_y_tip *= 1/delta_t_norm
+
+            #     # A. Plot
+            #     fig = make_subplots(rows = 2, cols = 1, subplot_titles = ["power", "phase"])
+            #     fig.add_scatter(x = f_y_tip, y = np.abs(y_tip_f)**2, row = 1, col = 1)
+            #     fig.add_scatter(x = f_y_tip, y = np.angle(y_tip_f)/(2 * np.pi), row = 2, col = 1)
+            #     fig.vs_show()
+                
+            #     # B. Get frequency peak for f>0
+            #     peaks, peaks_heights = find_peaks(np.abs(y_tip_f)**2, height = 0)
+            #     max_peak = peaks[np.argmax(peaks_heights)]
+            #     fig = go.Figure()
+            #     fig.add_scatter(x = f_y_tip, y = (np.abs(y_tip_f)**2), mode = "lines")
+            #     fig.add_scatter(x = f_y_tip[peaks], y = (np.abs(y_tip_f)**2)[peaks], mode = "markers", name = "all peaks")
+            #     fig.add_scatter(x = [f_y_tip[max_peak]], y = [(np.abs(y_tip_f)**2)[max_peak]], mode = "markers", name = "max peak")
+            #     fig.vs_show()
+
+            #     # C. Get phase at frequency peak
+            #     max_peak_phase = (np.angle(y_tip_f)/(2 * np.pi))[max_peak]
+            #     print("f_tip = " + str(f_y_tip[max_peak]) + " and phi_tip = " + str(max_peak_phase))
+            #     exit()
+
+            # Do the previous steps globally
+            columns = ['w0', 'taus_b']
+
+            def get_tip_frequency(solver_dict, X):
+
+                # Get T_eval
+                output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                tau_b = taus_b[0]
+                
+                # Normalize time in flow periods
+                delta_t = T_eval[1] - T_eval[0]
+                T_eval = np.array(T_eval)
+                if (A > 0) & (w0 > 0):
+                    T_eval_norm = T_eval * w0 / (2*np.pi)
+                else:
+                    T_eval_norm = T_eval
+
+                # TIP values
+                X_3N = np.array([X3N(X[:,t]) for t in range(X.shape[1])]).squeeze().transpose()
+                x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
+
+                # Fourier transform of the tip (y position)
+                y_tip_f = np.fft.rfft(x_tip[1,:])
+                f_y_tip = np.fft.rfftfreq(x_tip[1,:].shape[0])
+                delta_t_norm = T_eval_norm[1] - T_eval_norm[0]
+                f_y_tip *= 1/delta_t_norm
+
+                # Power spectrum (square magnitude)
+                P_tip = np.abs(y_tip_f)**2 
+                
+                # Get frequency peak
+                peaks, peaks_heights = find_peaks(P_tip, height = 0)
+                if len(peaks)>0:
+                    max_peak = peaks[np.argmax(peaks_heights)]
+                    f_tip = f_y_tip[max_peak]
+                else: # No peak was found
+                    f_tip = -1
+                
+                print("f_tip = ", f_tip)
+                
+                return f_tip
+
+            def get_tip_frequency_and_phase(solver_dict, X):
+
+                # Get T_eval
+                output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                tau_b = taus_b[0]
+                
+                # Normalize time in flow periods
+                delta_t = T_eval[1] - T_eval[0]
+                T_eval = np.array(T_eval)
+                if (A > 0) & (w0 > 0):
+                    T_eval_norm = T_eval * w0 / (2*np.pi)
+                else:
+                    T_eval_norm = T_eval
+
+                # TIP values
+                X_3N = np.array([X3N(X[:,t]) for t in range(X.shape[1])]).squeeze().transpose()
+                x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
+
+                # Fourier transform of the tip (y position)
+                y_tip_f = np.fft.rfft(x_tip[1,:])
+                f_y_tip = np.fft.rfftfreq(x_tip[1,:].shape[0])
+                delta_t_norm = T_eval_norm[1] - T_eval_norm[0]
+                f_y_tip *= 1/delta_t_norm
+
+                # Power spectrum (square magnitude)
+                P_y_tip = np.abs(y_tip_f)**2
+                # Phase
+                phi_y_tip = np.angle(y_tip_f) / (2*np.pi)
+                
+                # Get frequency peak
+                peaks, peaks_heights = find_peaks(P_y_tip, height = 0)
+                if len(peaks)>0:
+                    max_peak = peaks[np.argmax(peaks_heights)]
+                    f_tip = f_y_tip[max_peak]
+                    phi_tip = phi_y_tip[max_peak]
+
+                else: # No peak was found
+                    f_tip = -1
+                    phi_tip = np.inf
+                
+                print("f_tip = ", f_tip)
+                print("phi_tip = ", phi_tip)
+                
+                return [f_tip, phi_tip]
+            
+            df = observable_1D_dataframe(folder_name, id_filenames, columns, get_tip_frequency, obs_type = 'both')
+            df.columns = [*df.columns[:-1], 'f_tip']
+            df['tau_b'] = df.apply(lambda x: x['taus_b'][0], axis = 1)
+            # Plot f_tip against tau_b, w0
+            # plot_2D(df, 'f_tip', 'tau_b').show()
+            plot_heatmap(df, 'w0', 'tau_b', 'f_tip').show()
+
+            # df = observable_1D_dataframe(folder_name, id_filenames, columns, get_tip_frequency_and_phase, obs_type = 'both')
+            # df.columns = [*df.columns[:-1], 'f_and_phi_tip']
+            # df['f_tip'] = df.apply(lambda x: x['f_and_phi_tip'][0], axis = 1)
+            # df['phi_tip'] = df.apply(lambda x: x['f_and_phi_tip'][1], axis = 1)
+            # df['tau_b'] = df.apply(lambda x: x['taus_b'][0], axis = 1)
+
+            # # Plot f_tip against tau_b, w0
+            # # plot_2D(df, 'f_tip', 'tau_b').show()
+            # plot_heatmap(df, 'w0', 'tau_b', 'f_tip').show()
+            # plot_heatmap(df, 'w0', 'tau_b', 'phi_tip').show()
 
     fig.write_image(fig_filename)
     fig.vs_show()
