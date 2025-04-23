@@ -45,24 +45,24 @@ if __name__ == "__main__":
     #################################
     # Bending elasticity activation #
     #################################
-    bool_EI = True # Default is True
+    bool_EI = False # Default is True
     #################################
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [0]
+    Beta_list = [1e3]
     ####################################
 
     ###############################
     # Bending viscosity timescale #
     # remark : it is in tau_s units
-    Tau_b_list = [1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6]
+    Tau_b_list = [0] # [1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6]
     taus_b_list = [[[tau_b]*(N-1) for tau_b in Tau_b_list] for N in N_list]
     ###############################
 
     ##############################
     # Shear viscosity activation #
-    tau_s_list = [0] #, 1e1, 1e2, 1e3]
+    tau_s_list = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]
     ##############################
 
     ####################################
@@ -188,9 +188,9 @@ if __name__ == "__main__":
     # X_flow_field_list = [np.array([0, 10**(-6)])]
     
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
-    A_list = [2.5e-3]
+    A_list = [2.5e-3] # 10**(np.linspace(-9, 0, 10)) # [2.5e-3]
     n_w0 = 100
-    w0_list = 10**(-np.linspace(0, 9, n_w0))
+    w0_list = 10**(-np.linspace(-3, 6, n_w0))
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 

@@ -49,7 +49,7 @@ writing_dir = temp_folder
     # Panel a - tip movement for varying bending viscosity and flow frequency
 
 fig_nbr = 5
-panel_nbr = 1
+panel_nbr = 0
 
 if __name__ == '__main__':
 
