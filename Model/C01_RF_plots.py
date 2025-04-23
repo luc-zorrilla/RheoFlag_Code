@@ -48,7 +48,6 @@ writing_dir = temp_folder
 # Figure 5: simulations for a periodic flow, for a clamped axoneme with bending elasticity + bending viscosity
     # Panel a - tip movement for varying bending viscosity and flow frequency
 
-
 fig_nbr = 5
 panel_nbr = 0
 
@@ -559,8 +558,7 @@ if __name__ == '__main__':
 
             id_filenames = ["20250416-040627112877_N_10_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-040627112877_N_10_tau_s_0_taus_b_0.001_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-040627112877_N_10_tau_s_0_taus_b_1.0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-040627114882_N_10_tau_s_0_taus_b_1000.0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-045354068702_N_10_tau_s_0_taus_b_1000000.0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0"]             
 
-            fig = make_subplots(rows = len(id_filenames), cols = 1, subplot_titles = [""], shared_xaxes=True)
-            fig_2 = make_subplots(rows = len(id_filenames), cols = 1, shared_xaxes=True)
+            fig = make_subplots(rows = len(id_filenames), cols = 1, shared_xaxes=True)
 
             for l in range(len(id_filenames)):
 
@@ -592,24 +590,16 @@ if __name__ == '__main__':
                 indices_s = StroboscopicView(T_eval_norm[min_index:max_index], n_strobes = n_strobes)
                 c = sample_colorscale(colorscale = dark_purple_scale[::-1], samplepoints = np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
 
-                for k in range(indices_s.shape[0]):
-                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], row = 1 + l, col = 1)
-                # fig.update_xaxes()
-                # fig.update_yaxes()
-
                 # Figure 2
                 X_3N = np.array([X3N(X[:,t]) for t in range(X.shape[1])]).squeeze().transpose()
                 # print("X_3N.shape", X_3N.shape)
                 x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
                 # print("x_tip.shape", x_tip.shape)
                 # exit()
-                fig_2.add_scatter(x = np.arange(x_tip.shape[1])*delta_t, y = x_tip[1,:]/x_tip[1,0], row = 1+l, col =1, name = "tau_b = " + str(tau_b))
-            fig_2.update_xaxes(zeroline = True)
-            fig_2.update_yaxes(zeroline = True)
-            fig_2.vs_show()
-
-
-            fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = False)
+                fig.add_scatter(x = np.arange(x_tip.shape[1])*delta_t, y = x_tip[1,:]/x_tip[1,0], row = 1+l, col =1, name = "tau_b = " + str(tau_b))
+            fig.update_xaxes(zeroline = True)
+            fig.update_yaxes(zeroline = True)
+            fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = True)
 
     # Shear elasticity, varying shear viscosity, clamped axoneme
     elif fig_nbr == 4:
@@ -630,8 +620,7 @@ if __name__ == '__main__':
                 "20250421-122344418886_N_10_tau_s_1000.0_taus_b_0_bool_EI_False_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000.0",
                 ]             
 
-            fig = make_subplots(rows = len(id_filenames), cols = 1, subplot_titles = [""], shared_xaxes=True)
-            fig_2 = make_subplots(rows = len(id_filenames), cols = 1, shared_xaxes=False)
+            fig = make_subplots(rows = len(id_filenames), cols = 1, shared_xaxes=False)
 
             for l in range(len(id_filenames)):
 
@@ -661,27 +650,16 @@ if __name__ == '__main__':
                 indices_s = StroboscopicView(T_eval_norm[min_index:max_index], n_strobes = n_strobes)
                 c = sample_colorscale(colorscale = dark_purple_scale[::-1], samplepoints = np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
 
-                for k in range(indices_s.shape[0]):
-                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0], y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], row = 1 + l, col = 1)
-                # fig.update_xaxes()
-                # fig.update_yaxes()
-
                 # Figure 2
                 X_3N = np.array([X3N(X[:,t]) for t in range(X.shape[1])]).squeeze().transpose()
                 # print("X_3N.shape", X_3N.shape)
                 x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
                 # print("x_tip.shape", x_tip.shape)
                 # exit()
-                fig_2.add_scatter(x = np.arange(x_tip.shape[1])*delta_t, y = x_tip[1,:]/x_tip[1,0], row = 1+l, col =1, name = "tau_s = " + str(tau_s))
-            fig_2.update_xaxes(zeroline = True)
-            fig_2.update_yaxes(zeroline = True)
-            fig_2.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = True)    
-            fig_2.vs_show()
-
-            fig2_filename = writing_dir + "fig2" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + ".pdf"
-            fig_2.write_image(fig2_filename)
-
-            fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = False)
+                fig.add_scatter(x = np.arange(x_tip.shape[1])*delta_t, y = x_tip[1,:]/x_tip[1,0], row = 1+l, col =1, name = "tau_s = " + str(tau_s))
+            fig.update_xaxes(zeroline = True)
+            fig.update_yaxes(zeroline = True)
+            fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = True)
 
     # Bending elasticity, varying bending viscosity and flow frequency, clamped axoneme
     elif fig_nbr == 5:
@@ -699,12 +677,16 @@ if __name__ == '__main__':
                 margin = dict(l = 200, r = 200, t = 200, b = 200),
                 width = 800, height = 800)
             fig1.vs_show()
+            fig1_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "f_tip" + ".pdf"
+            fig1.write_image(fig1_filename)
             time.sleep(1)
             fig2 = plot_heatmap(df, 'log_w0', 'log_tau_b_m1', 'phi_tip')
             fig2.update_layout(
                 margin = dict(l = 200, r = 200, t = 200, b = 200),
                 width = 800, height = 800)
             fig2.vs_show()
+            fig2_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "phi_tip" + ".pdf"
+            fig2.write_image(fig2_filename)
 
     fig.write_image(fig_filename)
     fig.vs_show()
