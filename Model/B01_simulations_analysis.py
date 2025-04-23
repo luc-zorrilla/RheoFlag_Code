@@ -13,7 +13,7 @@ import os
 
 from A01_Coarse_grained_axoneme_functions import * 
 from audioop import mul
-import multiprocessing
+import multiprocessing as mp
 
 import math
 import numpy as np
@@ -98,7 +98,32 @@ def dimensionalize(Sp4, tau_b, beta, tau_s, eta, N, L):
 
     return E_b, nu_b, K_s, nu_s
 
-def observable_1D_dataframe(directory, ids_list, columns, observable, obs_type = 'metadata'):
+def observable_singlefile(directory, base_id, columns, observable, obs_type):
+    
+    """ Applies an observable to a single file """
+
+    # Metadata
+    metadata_file = directory + 'metadata_' + base_id + '.json'
+    solver_dict = get_metadata(metadata_file)
+
+    # Get column values (except observable)
+    col_values = [solver_dict[column] for column in columns]
+
+    # Get observable
+    if obs_type in ['metadata']:
+        obs = observable(solver_dict, None)
+    else:
+        data_file = directory + 'data_' + base_id + '.csv'
+        X = get_data(data_file)            
+        if obs_type in ['data']:
+            obs = observable(None, X)
+        elif obs_type in ['both']:
+            obs = observable(solver_dict, X)
+    col_values.append(obs)
+
+    return col_values
+
+def observable_dataframe(directory, ids_list, columns, observable, obs_type = 'metadata'):
     """ Takes as input a list of ids corresponding to simulations and makes a 
     dataframe in parameter space specified by columns where the value of the dataframe 
     is an observable, which will simply be for now a number.
@@ -113,7 +138,7 @@ def observable_1D_dataframe(directory, ids_list, columns, observable, obs_type =
 
             return T_sim
 
-    - parameters specified by axes will form the axes of the matrix, in the form 
+    - parameters specified by columns will form the axes of the matrix, in the form 
     of a list of strings such as ['Sp4', 'Beta'] or ['Sp4', 'Beta', 'tau_b', 'A', 'w0']
     
     """
@@ -121,33 +146,23 @@ def observable_1D_dataframe(directory, ids_list, columns, observable, obs_type =
     # Create dataframe
     df = pd.DataFrame(columns = columns + [str(observable)])
 
+    # Start parallel computation
+    pool = mp.Pool(mp.cpu_count())
+
     for base_id in ids_list:
         
-        # Metadata
-        metadata_file = directory + 'metadata_' + base_id + '.json'
-        solver_dict = get_metadata(metadata_file)
-
-        # Get column values (except observable)
-        col_values = [solver_dict[column] for column in columns]
-
-        # Get observable
-        if obs_type in ['metadata']:
-            obs = observable(solver_dict, None)
-        else:
-            data_file = directory + 'data_' + base_id + '.csv'
-            X = get_data(data_file)            
-            if obs_type in ['data']:
-                obs = observable(None, X)
-            elif obs_type in ['both']:
-                obs = observable(solver_dict, X)
-        col_values.append(obs)
+        # Apply in parallel observable for each file
+        col_values = pool.apply_async(func = observable_singlefile, args = (directory, base_id, columns, observable, obs_type)).get()
 
         # Put into table
         df.loc[len(df)] = col_values
 
+    pool.close()
+    pool.join() # postpones the execution of next line of code until all processes in the queue 
+
     return df
 
-def observable_1D_list_dataframe(directory, ids_list, columns, observable_list, obs_type_list):
+def observable_list_dataframe(directory, ids_list, columns, observable_list, obs_type_list):
     """ Takes as input a list of ids corresponding to simulations and makes a 
     dataframe in parameter space specified by columns where the value of the dataframe 
     is an observable, which will simply be for now a number.
@@ -170,6 +185,9 @@ def observable_1D_list_dataframe(directory, ids_list, columns, observable_list, 
     # Create dataframe
     df = pd.DataFrame(columns = columns + [str(observable)])
 
+    # Start parallel computation
+    pool = mp.Pool(mp.cpu_count())
+
     for base_id in ids_list:
         
         # Metadata
@@ -180,73 +198,17 @@ def observable_1D_list_dataframe(directory, ids_list, columns, observable_list, 
         col_values = [solver_dict[column] for column in columns]
 
         for observable, obs_type in zip(observable_list, obs_type_list):
-
-            # Get observable
-            if obs_type in ['metadata']:
-                obs = observable(solver_dict, None)
-            else:
-                data_file = directory + 'data_' + base_id + '.csv'
-                X = get_data(data_file)            
-                if obs_type in ['data']:
-                    obs = observable(None, X)
-                elif obs_type in ['both']:
-                    obs = observable(solver_dict, X)
-            col_values.append(obs)
+                
+            # Apply in parallel observable for each file
+            col_values = pool.apply_async(func = observable_singlefile, args = (directory, base_id, columns, observable, obs_type)).get()
 
             # Put into table
             df.loc[len(df)] = col_values
 
+            pool.close()
+            pool.join() # postpones the execution of next line of code until all processes in the queue 
+
     return df
-
-# def observable_ND_dataframe(directory, ids_list, columns, observable, obs_type = 'metadata'):
-#     """ Takes as input a list of ids corresponding to simulations and makes a 
-#     dataframe in parameter space specified by columns where the value of the dataframe 
-#     is an observable, which will simply be for now a number.
-    
-#     - observable is a function of metadata (as a dict), of the data (as 
-#     a numpy array), or of both and can be specified in obs_type: ['metadata', 
-#     'data', 'both'].
-
-#         Example:
-#         def observable_0(solver_dict, None):
-#             output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
-
-#             return T_sim
-
-#     - parameters specified by axes will form the axes of the matrix, in the form 
-#     of a list of strings such as ['Sp4', 'Beta'] or ['Sp4', 'Beta', 'tau_b', 'A', 'w0']
-    
-#     """
-
-#     # Create dataframe
-#     df = pd.DataFrame(columns = columns + [str(observable)])
-
-#     for base_id in ids_list:
-        
-#         # Metadata
-#         metadata_file = directory + 'metadata_' + base_id + '.json'
-#         solver_dict = get_metadata(metadata_file)
-
-#         # Get column values (except observable)
-#         col_values = [solver_dict[column] for column in columns]
-
-#         # Get observable
-#         if obs_type in ['metadata']:
-#             obs = observable(solver_dict, None)
-#         else:
-#             data_file = directory + 'data_' + base_id + '.csv'
-#             X = get_data(data_file)            
-#             if obs_type in ['data']:
-#                 obs = observable(None, X)
-#             elif obs_type in ['both']:
-#                 obs = observable(solver_dict, X)
-#         col_values.append(obs)
-
-#         # Put into table
-#         df.loc[len(df)] = col_values
-
-#     return df
-
 
 def plot_2D(df, column_0, column_1):
     """ Plot two columns of a dataframe in a 2D axis. """
@@ -267,11 +229,9 @@ def plot_heatmap(df, column_0, column_1, column_2):
         x = df[column_0],
         y = df[column_1],
         z = df[column_2],
-        ))
-    
+        )) 
     fig.update_xaxes(title = column_0)
     fig.update_yaxes(title = column_1)
-    # fig.vs_show()
 
     return fig
 
@@ -858,14 +818,13 @@ if __name__ == '__main__':
     exit()
 
     # Compute observable on these files and put this new data into a dataframe
-
     columns = ['Sp4', 'taus_b']
 
     def simulation_time(solver_dict, X = None):
         output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
         return T_sim    
     
-    df = observable_1D_dataframe(sim_directory, ids_list, columns, simulation_time, obs_type = 'metadata')
+    df = observable_dataframe(sim_directory, ids_list, columns, simulation_time, obs_type = 'metadata')
     df.columns = [*df.columns[:-1], 'T_sim']
     df['tau_b'] = df.apply(lambda x: x['taus_b'][0], axis = 1)
 

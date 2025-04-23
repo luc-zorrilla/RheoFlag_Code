@@ -56,7 +56,7 @@ if __name__ == "__main__":
     ###############################
     # Bending viscosity timescale #
     # remark : it is in tau_s units
-    Tau_b_list = [1e4, 1e5, 1e6]
+    Tau_b_list = [1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6]
     taus_b_list = [[[tau_b]*(N-1) for tau_b in Tau_b_list] for N in N_list]
     ###############################
 
@@ -223,7 +223,7 @@ if __name__ == "__main__":
 
     ########################################
     # Maximum simulation time (s) per step #
-    T_sim_max = 600 # 10min
+    T_sim_max = 6000 # 10min
     ########################################
 
     print("Time set.")
