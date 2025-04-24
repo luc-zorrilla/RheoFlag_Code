@@ -198,35 +198,76 @@ def get_tip_maxdeviation_phase(solver_dict, X):
 
 if __name__ == "__main__":
 
-    folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
-    folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/" #KnownBehaviourTest/"
+    Bending_EV = False # Whether to look at bending elasticity + viscosity
+    Shear_EV = True # Whether to look at shear elasticity + viscosity
 
-    filenames = glob.glob(folder_name + '*.json')
-    id_filenames = [os.path.basename(filename).removeprefix("metadata_").removesuffix(".json") for filename in filenames]
+    if Bending_EV:
 
-    # Do the previous steps globally
-    columns = ['w0', 'taus_b']
+        folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+        folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/" #KnownBehaviourTest/"
 
-    # df = observable_dataframe(folder_name, id_filenames, columns, get_tip_frequency_and_phase, obs_type = 'both')
-    # df.columns = [*df.columns[:-1], 'f_and_phi_tip']
-    # df['f_tip'] = df.apply(lambda x: x['f_and_phi_tip'][0], axis = 1)
-    # df['phi_tip'] = df.apply(lambda x: x['f_and_phi_tip'][1], axis = 1)
-    # df['delta_phi_tip'] = df.apply(lambda x: x['f_and_phi_tip'][2], axis = 1)
-    # df['tau_b_m1'] = df.apply(lambda x: 1/x['taus_b'][0], axis = 1)
-    # for o in ['tau_b_m1', 'w0']:
-    #     df['log_'+o] = df.apply(lambda x: np.log(x[o]), axis = 1)
+        filenames = glob.glob(folder_name + '*.json')
+        id_filenames = [os.path.basename(filename).removeprefix("metadata_").removesuffix(".json") for filename in filenames]
 
-    # dataframe_filename = folder_name + "fourier" + ".csv"
-    # df.to_csv(dataframe_filename)
+        # Do the previous steps globally
+        columns = ['w0', 'taus_b']
 
-    df = observable_dataframe(folder_name, id_filenames, columns, get_tip_maxdeviation_phase, obs_type = 'both')
-    df.columns = [*df.columns[:-1], 'maxdev_and_phi_tip']
-    Lo = ['min_y_tip', 'max_y_tip', 'phi_min_y_tip', 'phi_max_y_tip', 'phi_zerom_y_tip', 'phi_zerop_y_tip', 'delta_phi_min_y_tip', 'delta_phi_max_y_tip', 'delta_phi_zerom_y_tip', 'delta_phi_zerop_y_tip']
-    for k in range(len(Lo)):
-        df[Lo[k]] = df.apply(lambda x: x['maxdev_and_phi_tip'][k], axis = 1)
-    df['tau_b_m1'] = df.apply(lambda x: 1/x['taus_b'][0], axis = 1)
-    for o in ['tau_b_m1', 'w0']:
-        df['log_'+o] = df.apply(lambda x: np.log(x[o]), axis = 1)
+        # df = observable_dataframe(folder_name, id_filenames, columns, get_tip_frequency_and_phase, obs_type = 'both')
+        # df.columns = [*df.columns[:-1], 'f_and_phi_tip']
+        # df['f_tip'] = df.apply(lambda x: x['f_and_phi_tip'][0], axis = 1)
+        # df['phi_tip'] = df.apply(lambda x: x['f_and_phi_tip'][1], axis = 1)
+        # df['delta_phi_tip'] = df.apply(lambda x: x['f_and_phi_tip'][2], axis = 1)
+        # df['tau_b_m1'] = df.apply(lambda x: 1/x['taus_b'][0], axis = 1)
+        # for o in ['tau_b_m1', 'w0']:
+        #     df['log_'+o] = df.apply(lambda x: np.log(x[o]), axis = 1)
 
-    dataframe_filename = folder_name + "maxdev" + ".csv"
-    df.to_csv(dataframe_filename)
+        # dataframe_filename = folder_name + "fourier" + ".csv"
+        # df.to_csv(dataframe_filename)
+
+        df = observable_dataframe(folder_name, id_filenames, columns, get_tip_maxdeviation_phase, obs_type = 'both')
+        df.columns = [*df.columns[:-1], 'maxdev_and_phi_tip']
+        Lo = ['min_y_tip', 'max_y_tip', 'phi_min_y_tip', 'phi_max_y_tip', 'phi_zerom_y_tip', 'phi_zerop_y_tip', 'delta_phi_min_y_tip', 'delta_phi_max_y_tip', 'delta_phi_zerom_y_tip', 'delta_phi_zerop_y_tip']
+        for k in range(len(Lo)):
+            df[Lo[k]] = df.apply(lambda x: x['maxdev_and_phi_tip'][k], axis = 1)
+        df['tau_b_m1'] = df.apply(lambda x: 1/x['taus_b'][0], axis = 1)
+        for o in ['tau_b_m1', 'w0']:
+            df['log_'+o] = df.apply(lambda x: np.log(x[o]), axis = 1)
+
+        dataframe_filename = folder_name + "maxdev" + ".csv"
+        df.to_csv(dataframe_filename)
+    
+    if Shear_EV:
+
+        folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+        folder_name += "StraightLine_PeriodicFlow/ShearElasticity_Clamped_VaryingShearViscosity/" #KnownBehaviourTest/"
+
+        filenames = glob.glob(folder_name + '*.json')
+        id_filenames = [os.path.basename(filename).removeprefix("metadata_").removesuffix(".json") for filename in filenames]
+
+        # Do the previous steps globally
+        columns = ['w0', 'tau_s']
+
+        # df = observable_dataframe(folder_name, id_filenames, columns, get_tip_frequency_and_phase, obs_type = 'both')
+        # df.columns = [*df.columns[:-1], 'f_and_phi_tip']
+        # df['f_tip'] = df.apply(lambda x: x['f_and_phi_tip'][0], axis = 1)
+        # df['phi_tip'] = df.apply(lambda x: x['f_and_phi_tip'][1], axis = 1)
+        # df['delta_phi_tip'] = df.apply(lambda x: x['f_and_phi_tip'][2], axis = 1)
+        # df['tau_b_m1'] = df.apply(lambda x: 1/x['taus_b'][0], axis = 1)
+        # for o in ['tau_b_m1', 'w0']:
+        #     df['log_'+o] = df.apply(lambda x: np.log(x[o]), axis = 1)
+
+        # dataframe_filename = folder_name + "fourier" + ".csv"
+        # df.to_csv(dataframe_filename)
+
+        df = observable_dataframe(folder_name, id_filenames, columns, get_tip_maxdeviation_phase, obs_type = 'both')
+        df.columns = [*df.columns[:-1], 'maxdev_and_phi_tip']
+        Lo = ['min_y_tip', 'max_y_tip', 'phi_min_y_tip', 'phi_max_y_tip', 'phi_zerom_y_tip', 'phi_zerop_y_tip', 'delta_phi_min_y_tip', 'delta_phi_max_y_tip', 'delta_phi_zerom_y_tip', 'delta_phi_zerop_y_tip']
+        for k in range(len(Lo)):
+            df[Lo[k]] = df.apply(lambda x: x['maxdev_and_phi_tip'][k], axis = 1)
+        df['tau_s_m1'] = df.apply(lambda x: 1/x['tau_s'], axis = 1)
+        for o in ['tau_s_m1', 'w0']:
+            df['log_'+o] = df.apply(lambda x: np.log(x[o]), axis = 1)
+
+        dataframe_filename = folder_name + "maxdev" + ".csv"
+        df.to_csv(dataframe_filename)
+    
