@@ -17,9 +17,14 @@ from B01_simulations_analysis import *
 
 import numpy as np
 from scipy.signal import find_peaks
+from scipy.optimize import curve_fit
 
 from plotting_functions import * 
 pio.templates.default = "figure_template"
+
+# Linear Fit
+def d_exp(t, tau, A):
+    return A*np.exp(-t/tau)
 ################################################################################
 
 temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
@@ -55,9 +60,8 @@ writing_dir = temp_folder
     # Panel b - tip movement for varying shear viscosity and flow frequency: new phase definition
     # Panel c - vary shear viscosity and flow amplitude
 
-fig_nbr = 6
-panel_nbr = 1
-
+fig_nbr = 4
+panel_nbr = 0
 if __name__ == '__main__':
 
     fig_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + ".pdf"
@@ -563,9 +567,10 @@ if __name__ == '__main__':
             folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
             folder_name += "SecondBend_Relaxation/BendingElasticity_Clamped_VaryingBendingViscosity/"
 
-            id_filenames = ["20250416-040627112877_N_10_tau_s_0_taus_b_0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-040627112877_N_10_tau_s_0_taus_b_0.001_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-040627112877_N_10_tau_s_0_taus_b_1.0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-040627114882_N_10_tau_s_0_taus_b_1000.0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0", "20250416-045354068702_N_10_tau_s_0_taus_b_1000000.0_Beta_0_gamma_2_A_0_w0_0_Sp4_1.0_k0_10000000000.0"]             
+            filenames = glob.glob(folder_name + '*.json')
+            id_filenames = [os.path.basename(filename).removeprefix("metadata_").removesuffix(".json") for filename in filenames]
 
-            fig = make_subplots(rows = len(id_filenames), cols = 1, shared_xaxes=True)
+            fig = make_subplots(rows = len(id_filenames), cols = 1, shared_xaxes=False)
 
             for l in range(len(id_filenames)):
 
@@ -573,8 +578,7 @@ if __name__ == '__main__':
                 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
                 data_filename = folder_name + 'data_' + id_filename + '.csv'
                 solver_dict = get_metadata(metadata_filename)
-                output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
-                # output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())                
+                output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())                
                 tau_b = taus_b[0]
                 X = get_data(data_filename) # s, t
                 X_3N_final = X3N(X[:,-1])
@@ -599,14 +603,55 @@ if __name__ == '__main__':
 
                 # Figure 2
                 X_3N = np.array([X3N(X[:,t]) for t in range(X.shape[1])]).squeeze().transpose()
-                # print("X_3N.shape", X_3N.shape)
                 x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
-                # print("x_tip.shape", x_tip.shape)
-                # exit()
-                fig.add_scatter(x = np.arange(x_tip.shape[1])*delta_t, y = x_tip[1,:]/x_tip[1,0], row = 1+l, col =1, name = "tau_b = " + str(tau_b))
-            fig.update_xaxes(zeroline = True)
-            fig.update_yaxes(zeroline = True)
-            fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = True)
+                fig.add_scatter(x = np.arange(x_tip.shape[1])*delta_t, y = x_tip[1,:]/x_tip[1,0], row = 1+l, col =1, name = r"$\huge{\tau_b = " + sci_notation(tau_b, 0,0) + "}$", marker_color = "black")
+
+                # Fit to exponentially decreasing function
+                popt, pcov = curve_fit(f = d_exp, xdata = T_eval/delta_t, ydata = x_tip[1,:]/x_tip[1,0])
+                popt[0] *= delta_t
+                pcov[0,0] *= delta_t**2
+                pcov[0,1] *= delta_t
+                pcov[1,0] *= delta_t
+                print("tau_b, popt, pcov: ", tau_b, popt, pcov)
+
+            fig.update_xaxes(zeroline = True, title = r"$\huge{t}$")
+            x_ticks = np.arange(0,6)*1e3
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, 0, 0) + "}$" for x_tick in x_ticks]       
+            for row in [1,2,3]:
+                fig.update_xaxes(
+                    range = [0,5e3],
+                    row = row,
+                    col = 1,
+                    tickmode = "array",
+                    tickvals = x_ticks,
+                    ticktext = x_ticks_text
+                )
+            x_ticks = np.arange(0,6)*1e6
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, 0, 0) + "}$" for x_tick in x_ticks] 
+            fig.update_xaxes(
+                range = [0,5e6],
+                row = 4,
+                col = 1,
+                tickmode = "array",
+                tickvals = x_ticks,
+                ticktext = x_ticks_text                
+            )
+            y_ticks = np.float_power(10, (np.arange(-2,1)))
+            y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
+            fig.update_yaxes(
+                range = [-2,0.2],
+                title = r"$\huge{y(t)/y(0)}$",
+                type = 'log',
+                tickmode = "array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text                  
+            )            
+            fig.update_layout(
+                margin = dict(l = 200, r = 200, t = 200, b = 200),
+                width = 300 + 400, 
+                height = 300 * len(id_filenames) + 400, 
+                showlegend = True,
+                )
 
     # Shear elasticity, varying shear viscosity, clamped axoneme
     elif fig_nbr == 4:
@@ -617,15 +662,11 @@ if __name__ == '__main__':
             folder_name += "SecondBend_Relaxation/ShearElasticity_Clamped_VaryingShearViscosity/"
 
             id_filenames = [
-                "20250421-122205384969_N_10_tau_s_0_taus_b_0_bool_EI_False_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000.0",
-                "20250421-122205400770_N_10_tau_s_0.001_taus_b_0_bool_EI_False_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000.0",
-                "20250421-122205408799_N_10_tau_s_0.01_taus_b_0_bool_EI_False_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000.0",
-                "20250421-122205442149_N_10_tau_s_0.1_taus_b_0_bool_EI_False_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000.0",
-                "20250421-122205481789_N_10_tau_s_1.0_taus_b_0_bool_EI_False_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000.0",
-                "20250421-122318021139_N_10_tau_s_10.0_taus_b_0_bool_EI_False_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000.0",
-                "20250421-122328349901_N_10_tau_s_100.0_taus_b_0_bool_EI_False_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000.0",
-                "20250421-122344418886_N_10_tau_s_1000.0_taus_b_0_bool_EI_False_Beta_1000.0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000.0",
-                ]             
+                "20250427-083206365151_N_10_tau_s_0_taus_b_0_bool_EI_False_Beta_1.0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000000.0",
+                "20250427-083206379138_N_10_tau_s_0.06_taus_b_0_bool_EI_False_Beta_1.0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000000.0",
+                "20250427-083206383138_N_10_tau_s_60.0_taus_b_0_bool_EI_False_Beta_1.0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000000.0",
+                "20250427-083228620175_N_10_tau_s_60000.0_taus_b_0_bool_EI_False_Beta_1.0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000000.0",
+                ]
 
             fig = make_subplots(rows = len(id_filenames), cols = 1, shared_xaxes=False)
 
@@ -635,7 +676,8 @@ if __name__ == '__main__':
                 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
                 data_filename = folder_name + 'data_' + id_filename + '.csv'
                 solver_dict = get_metadata(metadata_filename)
-                output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())                
+                tau_b = taus_b[0]
                 X = get_data(data_filename) # s, t
                 X_3N_final = X3N(X[:,-1])
 
@@ -659,14 +701,55 @@ if __name__ == '__main__':
 
                 # Figure 2
                 X_3N = np.array([X3N(X[:,t]) for t in range(X.shape[1])]).squeeze().transpose()
-                # print("X_3N.shape", X_3N.shape)
                 x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
-                # print("x_tip.shape", x_tip.shape)
-                # exit()
-                fig.add_scatter(x = np.arange(x_tip.shape[1])*delta_t, y = x_tip[1,:]/x_tip[1,0], row = 1+l, col =1, name = "tau_s = " + str(tau_s))
-            fig.update_xaxes(zeroline = True)
-            fig.update_yaxes(zeroline = True)
-            fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = True)
+                fig.add_scatter(x = np.arange(x_tip.shape[1])*delta_t, y = x_tip[1,:]/x_tip[1,0], row = 1+l, col =1, name = r"$\huge{\tau_s = " + sci_notation(tau_s, 0,0) + "}$", marker_color = "black")
+
+                # Fit to exponentially decreasing function
+                popt, pcov = curve_fit(f = d_exp, xdata = T_eval/delta_t, ydata = x_tip[1,:]/x_tip[1,0])
+                popt[0] *= delta_t
+                pcov[0,0] *= delta_t**2
+                pcov[0,1] *= delta_t
+                pcov[1,0] *= delta_t
+                print("tau_s, popt, pcov: ", tau_s, popt, pcov)
+
+            fig.update_xaxes(zeroline = True, title = r"$\huge{t}$")
+            x_ticks = np.arange(0,20,2)*1e2
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, 0, 0) + "}$" for x_tick in x_ticks]       
+            for row in [1,2,3]:
+                fig.update_xaxes(
+                    range = [0,2e2],
+                    row = row,
+                    col = 1,
+                    tickmode = "array",
+                    tickvals = x_ticks,
+                    ticktext = x_ticks_text
+                )
+            x_ticks = np.arange(0,20,2)*1e3
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, 0, 0) + "}$" for x_tick in x_ticks] 
+            fig.update_xaxes(
+                range = [0,2e5],
+                row = 4,
+                col = 1,
+                tickmode = "array",
+                tickvals = x_ticks,
+                ticktext = x_ticks_text                
+            )
+            y_ticks = np.float_power(10, (np.arange(-2,1)))
+            y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
+            fig.update_yaxes(
+                range = [-2,0.2],
+                title = r"$\huge{y(t)/y(0)}$",
+                type = 'log',
+                tickmode = "array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text                  
+            )            
+            fig.update_layout(
+                margin = dict(l = 200, r = 200, t = 200, b = 200),
+                width = 300 + 400, 
+                height = 300 * len(id_filenames) + 400, 
+                showlegend = True,
+                )
 
     # Bending elasticity, varying bending viscosity and flow frequency, clamped axoneme
     elif fig_nbr == 5:
@@ -698,10 +781,11 @@ if __name__ == '__main__':
         elif panel_nbr == 1:
 
             folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
-            folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/"
+            folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/VaryingFrequency/"
             dataframe_filename = folder_name + "maxdev" + ".csv"
 
             df = pd.read_csv(dataframe_filename)
+            df['phi_mean_y_tip'] = df.apply(lambda x: np.mean((x['phi_min_y_tip'], x['phi_max_y_tip'])), axis = 1)
 
             # # Plot f_tip and phi_tip against tau_b, w0
             fig1 = plot_heatmap(df, 'log_w0', 'log_tau_b_m1', 'phi_max_y_tip')
@@ -721,8 +805,33 @@ if __name__ == '__main__':
             fig2.write_image(fig2_filename)
     
         elif panel_nbr == 2:
-            print("empty panel")
 
+            folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+            folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/VaryingFrequencyAmplitude/"
+            dataframe_filename = folder_name + "maxdev" + ".csv"
+
+            df = pd.read_csv(dataframe_filename)
+            df['log_A'] = df.apply(lambda x: np.log(x['A']), axis = 1)
+            df['log_max_y_tip'] = df.apply(lambda x: np.log(x['max_y_tip']), axis = 1)           
+            df['phi_mean_y_tip'] = df.apply(lambda x: np.mean((x['phi_min_y_tip'], x['phi_max_y_tip'])), axis = 1)            
+
+            # # Plot f_tip and phi_tip against tau_b, w0
+            fig1 = plot_heatmap(df, 'log_w0', 'log_A', 'phi_max_y_tip')
+            fig1.update_layout(
+                margin = dict(l = 200, r = 200, t = 200, b = 200),
+                width = 800, height = 800)
+            fig1.vs_show()
+            fig1_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "phi_max_y_tip" + ".pdf"
+            fig1.write_image(fig1_filename)
+            time.sleep(1)
+            fig2 = plot_heatmap(df, 'log_w0', 'log_A', 'log_max_y_tip')
+            fig2.update_layout(
+                margin = dict(l = 200, r = 200, t = 200, b = 200),
+                width = 800, height = 800)
+            fig2.vs_show()
+            fig2_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "max_y_tip" + ".pdf"
+            fig2.write_image(fig2_filename)
+    
     # Shear elasticity, varying shear viscosity and flow frequency, clamped axoneme
     elif fig_nbr == 6:
         if panel_nbr == 0:
@@ -754,6 +863,7 @@ if __name__ == '__main__':
 
             folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
             folder_name += "StraightLine_PeriodicFlow/ShearElasticity_Clamped_VaryingShearViscosity/"
+            folder_name += "LargeAmplitude/"
             dataframe_filename = folder_name + "maxdev" + ".csv"
 
             df = pd.read_csv(dataframe_filename)
@@ -776,8 +886,7 @@ if __name__ == '__main__':
             fig2.write_image(fig2_filename)
     
         elif panel_nbr == 2:
-            print("empty panel")
-            
+            print("empty panel")            
 
     fig.write_image(fig_filename)
     fig.vs_show()

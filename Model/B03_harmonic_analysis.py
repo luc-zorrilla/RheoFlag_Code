@@ -148,53 +148,57 @@ def get_tip_maxdeviation_phase(solver_dict, X):
     else:
         T_eval_norm = T_eval
 
-    # TIP values
-    X_3N = np.array([X3N(X[:,t]) for t in range(X.shape[1])]).squeeze().transpose()
-    x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
+    try:
+        # TIP values
+        X_3N = np.array([X3N(X[:,t]) for t in range(X.shape[1])]).squeeze().transpose()
+        x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
 
-    # Look at the vertical position
-    y_tip = x_tip[1,:]
+        # Look at the vertical position
+        y_tip = x_tip[1,:]
 
-    # Look at the second half of the signal (starting at a multiple of the flow period)
-    y_tip = y_tip[T_eval_norm >= T_eval_norm[-1] // 2]
-    T_eval_norm = T_eval_norm[T_eval_norm >= T_eval_norm[-1] // 2]
+        # Look at the second half of the signal (starting at a multiple of the flow period)
+        y_tip = y_tip[T_eval_norm >= T_eval_norm[-1] // 2]
+        T_eval_norm = T_eval_norm[T_eval_norm >= T_eval_norm[-1] // 2]
 
-    # Get values at max, min and zero
-    min_y_tip = np.min(y_tip)
-    max_y_tip = np.max(y_tip)
-    zero_y_tip = np.min(np.abs(y_tip))
+        # Get values at max, min and zero
+        min_y_tip = np.min(y_tip)
+        max_y_tip = np.max(y_tip)
+        zero_y_tip = np.min(np.abs(y_tip))
 
-    # Get phases at these values and average to get a single phase
+        # Get phases at these values and average to get a single phase
 
-    # Define the right tolerance to find relevant points
-    eps = 1e-10
-    count = np.count_nonzero((np.abs((y_tip-min_y_tip)) / np.abs(min_y_tip)) < eps)
-    n_periods = np.round(T_eval_norm[-1] - T_eval_norm[0])
-    while count > n_periods + 1:
-        eps /= 10
+        # Define the right tolerance to find relevant points
+        eps = 1e-10
         count = np.count_nonzero((np.abs((y_tip-min_y_tip)) / np.abs(min_y_tip)) < eps)
-    while count <= n_periods-1:
-        eps *= 1.1
-        count = np.count_nonzero((np.abs((y_tip-min_y_tip)) / np.abs(min_y_tip)) < eps)
+        n_periods = np.round(T_eval_norm[-1] - T_eval_norm[0])
+        while count > n_periods + 1:
+            eps /= 10
+            count = np.count_nonzero((np.abs((y_tip-min_y_tip)) / np.abs(min_y_tip)) < eps)
+        while count <= n_periods-1:
+            eps *= 1.1
+            count = np.count_nonzero((np.abs((y_tip-min_y_tip)) / np.abs(min_y_tip)) < eps)
 
-    min_y_tip_index = (np.abs((y_tip-min_y_tip)) / np.abs(min_y_tip)) < eps
-    max_y_tip_index = (np.abs((y_tip-max_y_tip)) / np.abs(max_y_tip)) < eps
-    zerom_y_tip_index = (np.abs(y_tip)<eps) & (np.hstack((np.diff(y_tip),0))<0)
-    zerop_y_tip_index = (np.abs(y_tip)<eps) & (np.hstack((np.diff(y_tip),0))>0)
+        min_y_tip_index = (np.abs((y_tip-min_y_tip)) / np.abs(min_y_tip)) < eps
+        max_y_tip_index = (np.abs((y_tip-max_y_tip)) / np.abs(max_y_tip)) < eps
+        zerom_y_tip_index = (np.abs(y_tip)<eps) & (np.hstack((np.diff(y_tip),0))<0)
+        zerop_y_tip_index = (np.abs(y_tip)<eps) & (np.hstack((np.diff(y_tip),0))>0)
 
-    phi_min_y_tip = np.mean(T_eval_norm[min_y_tip_index]%1)
-    phi_max_y_tip = np.mean(T_eval_norm[max_y_tip_index]%1)
-    phi_zerom_y_tip = np.mean(T_eval_norm[zerom_y_tip_index]%1)
-    phi_zerop_y_tip = np.mean(T_eval_norm[zerop_y_tip_index]%1)
+        phi_min_y_tip = np.mean(T_eval_norm[min_y_tip_index]%1)
+        phi_max_y_tip = np.mean(T_eval_norm[max_y_tip_index]%1)
+        phi_zerom_y_tip = np.mean(T_eval_norm[zerom_y_tip_index]%1)
+        phi_zerop_y_tip = np.mean(T_eval_norm[zerop_y_tip_index]%1)
 
-    delta_phi_min_y_tip = np.std(T_eval_norm[min_y_tip_index]%1, ddof = 1) / T_eval_norm[min_y_tip_index].shape[0]
-    delta_phi_max_y_tip = np.std(T_eval_norm[max_y_tip_index]%1, ddof = 1) / T_eval_norm[max_y_tip_index].shape[0]
-    delta_phi_zerom_y_tip = np.std(T_eval_norm[zerom_y_tip_index]%1, ddof = 1) / T_eval_norm[zerom_y_tip_index].shape[0]
-    delta_phi_zerop_y_tip = np.std(T_eval_norm[zerop_y_tip_index]%1, ddof = 1) / T_eval_norm[zerop_y_tip_index].shape[0]
+        delta_phi_min_y_tip = np.std(T_eval_norm[min_y_tip_index]%1, ddof = 1) / T_eval_norm[min_y_tip_index].shape[0]
+        delta_phi_max_y_tip = np.std(T_eval_norm[max_y_tip_index]%1, ddof = 1) / T_eval_norm[max_y_tip_index].shape[0]
+        delta_phi_zerom_y_tip = np.std(T_eval_norm[zerom_y_tip_index]%1, ddof = 1) / T_eval_norm[zerom_y_tip_index].shape[0]
+        delta_phi_zerop_y_tip = np.std(T_eval_norm[zerop_y_tip_index]%1, ddof = 1) / T_eval_norm[zerop_y_tip_index].shape[0]
 
-    print("phi_min_y_tip: ", phi_min_y_tip)
+        print("phi_min_y_tip: ", phi_min_y_tip)
 
-    return [min_y_tip, max_y_tip, phi_min_y_tip, phi_max_y_tip, phi_zerom_y_tip, phi_zerop_y_tip, delta_phi_min_y_tip, delta_phi_max_y_tip, delta_phi_zerom_y_tip, delta_phi_zerop_y_tip]
+        return [min_y_tip, max_y_tip, phi_min_y_tip, phi_max_y_tip, phi_zerom_y_tip, phi_zerop_y_tip, delta_phi_min_y_tip, delta_phi_max_y_tip, delta_phi_zerom_y_tip, delta_phi_zerop_y_tip]
+    
+    except IndexError:
+        return [np.nan]*10
 
 if __name__ == "__main__":
 
@@ -205,12 +209,13 @@ if __name__ == "__main__":
 
         folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
         folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/" #KnownBehaviourTest/"
+        folder_name += "VaryingFrequencyAmplitude/"
 
         filenames = glob.glob(folder_name + '*.json')
         id_filenames = [os.path.basename(filename).removeprefix("metadata_").removesuffix(".json") for filename in filenames]
 
         # Do the previous steps globally
-        columns = ['w0', 'taus_b']
+        columns = ['w0', 'taus_b', 'A']
 
         # df = observable_dataframe(folder_name, id_filenames, columns, get_tip_frequency_and_phase, obs_type = 'both')
         # df.columns = [*df.columns[:-1], 'f_and_phi_tip']
@@ -230,7 +235,7 @@ if __name__ == "__main__":
         for k in range(len(Lo)):
             df[Lo[k]] = df.apply(lambda x: x['maxdev_and_phi_tip'][k], axis = 1)
         df['tau_b_m1'] = df.apply(lambda x: 1/x['taus_b'][0], axis = 1)
-        for o in ['tau_b_m1', 'w0']:
+        for o in ['tau_b_m1', 'w0', 'A']:
             df['log_'+o] = df.apply(lambda x: np.log(x[o]), axis = 1)
 
         dataframe_filename = folder_name + "maxdev" + ".csv"
@@ -239,13 +244,13 @@ if __name__ == "__main__":
     if Shear_EV:
 
         folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
-        folder_name += "StraightLine_PeriodicFlow/ShearElasticity_Clamped_VaryingShearViscosity/" #KnownBehaviourTest/"
-
+        folder_name += "StraightLine_PeriodicFlow/ShearElasticity_Clamped_VaryingShearViscosity/"
+        folder_name += "LargeAmplitude/"
         filenames = glob.glob(folder_name + '*.json')
         id_filenames = [os.path.basename(filename).removeprefix("metadata_").removesuffix(".json") for filename in filenames]
 
         # Do the previous steps globally
-        columns = ['w0', 'tau_s']
+        columns = ['w0', 'tau_s', 'A']
 
         # df = observable_dataframe(folder_name, id_filenames, columns, get_tip_frequency_and_phase, obs_type = 'both')
         # df.columns = [*df.columns[:-1], 'f_and_phi_tip']
@@ -265,7 +270,7 @@ if __name__ == "__main__":
         for k in range(len(Lo)):
             df[Lo[k]] = df.apply(lambda x: x['maxdev_and_phi_tip'][k], axis = 1)
         df['tau_s_m1'] = df.apply(lambda x: 1/x['tau_s'], axis = 1)
-        for o in ['tau_s_m1', 'w0']:
+        for o in ['tau_s_m1', 'w0', 'A']:
             df['log_'+o] = df.apply(lambda x: np.log(x[o]), axis = 1)
 
         dataframe_filename = folder_name + "maxdev" + ".csv"
