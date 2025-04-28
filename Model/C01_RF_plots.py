@@ -51,17 +51,15 @@ writing_dir = temp_folder
     # Panel a - relaxation for varying shear viscosities, Sp4 = 1
 
 # Figure 5: simulations for a periodic flow, for a clamped axoneme with bending elasticity + bending viscosity
-    # Panel a - tip movement for varying bending viscosity and flow frequency: frequency and old phase
-    # Panel b - tip movement for varying bending viscosity and flow frequency: new phase definition
-    # Panel c - vary bending viscosity and flow amplitude
+    # Panel a - tip movement for varying bending viscosity and flow frequency: phase
+    # Panel b - vary bending viscosity and flow amplitude
 
 # Figure 6: simulations for a periodic flow, for a clamped axoneme with shear elasticity + shear viscosity
-    # Panel a - tip movement for varying shear viscosity and flow frequency: frequency and old phase
-    # Panel b - tip movement for varying shear viscosity and flow frequency: new phase definition
-    # Panel c - vary shear viscosity and flow amplitude
+    # Panel a - tip movement for varying shear viscosity and flow frequency: phase
+    # Panel b - vary shear viscosity and flow amplitude
 
-fig_nbr = 5
-panel_nbr = 1
+fig_nbr = 4
+panel_nbr = 0
 if __name__ == '__main__':
 
     fig_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + ".pdf"
@@ -714,10 +712,10 @@ if __name__ == '__main__':
 
             fig.update_xaxes(zeroline = True, title = r"$\huge{t}$")
             x_ticks = np.arange(0,35,5)*1e1
-            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, 0, 0) + "}$" for x_tick in x_ticks]       
+            x_ticks_text = [r"$\huge{" + sci_notation(np.round(x_tick), 2, 1) + "}$" for x_tick in x_ticks]
             for row in [1,2,3]:
                 fig.update_xaxes(
-                    range = [0,3e2],
+                    range = [0,2.5e2],
                     row = row,
                     col = 1,
                     tickmode = "array",
@@ -725,7 +723,7 @@ if __name__ == '__main__':
                     ticktext = x_ticks_text
                 )
             x_ticks = np.arange(0,35,5)*1e4
-            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, 0, 0) + "}$" for x_tick in x_ticks] 
+            x_ticks_text = [r"$\huge{" + sci_notation(np.round(x_tick), 2, 1) + "}$" for x_tick in x_ticks] 
             fig.update_xaxes(
                 range = [0,3e5],
                 row = 4,
@@ -751,7 +749,7 @@ if __name__ == '__main__':
                 showlegend = True,
                 )
 
-    # Bending elasticity, varying bending viscosity and flow frequency, clamped axoneme
+    # Bending elasticity, varying bending viscosity, flow frequency and amplitude; clamped axoneme
     elif fig_nbr == 5:
         if panel_nbr == 0:
 
