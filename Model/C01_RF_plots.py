@@ -60,8 +60,8 @@ writing_dir = temp_folder
     # Panel b - tip movement for varying shear viscosity and flow frequency: new phase definition
     # Panel c - vary shear viscosity and flow amplitude
 
-fig_nbr = 4
-panel_nbr = 0
+fig_nbr = 5
+panel_nbr = 1
 if __name__ == '__main__':
 
     fig_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + ".pdf"
@@ -713,21 +713,21 @@ if __name__ == '__main__':
                 print("tau_s, popt, pcov: ", tau_s, popt, pcov)
 
             fig.update_xaxes(zeroline = True, title = r"$\huge{t}$")
-            x_ticks = np.arange(0,20,2)*1e2
+            x_ticks = np.arange(0,35,5)*1e1
             x_ticks_text = [r"$\huge{" + sci_notation(x_tick, 0, 0) + "}$" for x_tick in x_ticks]       
             for row in [1,2,3]:
                 fig.update_xaxes(
-                    range = [0,2e2],
+                    range = [0,3e2],
                     row = row,
                     col = 1,
                     tickmode = "array",
                     tickvals = x_ticks,
                     ticktext = x_ticks_text
                 )
-            x_ticks = np.arange(0,20,2)*1e3
+            x_ticks = np.arange(0,35,5)*1e4
             x_ticks_text = [r"$\huge{" + sci_notation(x_tick, 0, 0) + "}$" for x_tick in x_ticks] 
             fig.update_xaxes(
-                range = [0,2e5],
+                range = [0,3e5],
                 row = 4,
                 col = 1,
                 tickmode = "array",
@@ -756,37 +756,16 @@ if __name__ == '__main__':
         if panel_nbr == 0:
 
             folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
-            folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/"
-            dataframe_filename = folder_name + "fourier" + ".csv"
-
-            df = pd.read_csv(dataframe_filename)
-
-            # # Plot f_tip and phi_tip against tau_b, w0
-            fig1 = plot_heatmap(df, 'log_w0', 'log_tau_b_m1', 'f_tip')
-            fig1.update_layout(
-                margin = dict(l = 200, r = 200, t = 200, b = 200),
-                width = 800, height = 800)
-            fig1.vs_show()
-            fig1_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "f_tip" + ".pdf"
-            fig1.write_image(fig1_filename)
-            time.sleep(1)
-            fig2 = plot_heatmap(df, 'log_w0', 'log_tau_b_m1', 'phi_tip')
-            fig2.update_layout(
-                margin = dict(l = 200, r = 200, t = 200, b = 200),
-                width = 800, height = 800)
-            fig2.vs_show()
-            fig2_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "phi_tip" + ".pdf"
-            fig2.write_image(fig2_filename)
-
-        elif panel_nbr == 1:
-
-            folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
-            folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/VaryingFrequency/"
+            folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/VaryingFrequencyAmplitude/"
             dataframe_filename = folder_name + "maxdev" + ".csv"
 
             df = pd.read_csv(dataframe_filename)
-            df['phi_mean_y_tip'] = df.apply(lambda x: np.mean((x['phi_min_y_tip'], x['phi_max_y_tip'])), axis = 1)
 
+            # Select only for one value of the amplitude: A = 1e-2
+            eps = 1e-6
+            A = 1e-2
+            df = df.loc[np.abs(df['A']- A) < eps]
+            
             # # Plot f_tip and phi_tip against tau_b, w0
             fig1 = plot_heatmap(df, 'log_w0', 'log_tau_b_m1', 'phi_max_y_tip')
             fig1.update_layout(
@@ -804,16 +783,26 @@ if __name__ == '__main__':
             fig2_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "max_y_tip" + ".pdf"
             fig2.write_image(fig2_filename)
     
-        elif panel_nbr == 2:
+        elif panel_nbr == 1:
 
             folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
             folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/VaryingFrequencyAmplitude/"
             dataframe_filename = folder_name + "maxdev" + ".csv"
 
             df = pd.read_csv(dataframe_filename)
+
+            # Select only for one value of w0
+            # eps = 1e-6
+            # w0 = 1e-3
+            # df = df.loc[np.abs(df['w0']- w0) < eps]
+
+            # Select only for one value of tau_b
+            eps = 1e-6
+            tau_b = 1e6
+            df = df.loc[np.abs(df['tau_b_m1'] - 1/tau_b) < eps]
+            
             df['log_A'] = df.apply(lambda x: np.log(x['A']), axis = 1)
-            df['log_max_y_tip'] = df.apply(lambda x: np.log(x['max_y_tip']), axis = 1)           
-            df['phi_mean_y_tip'] = df.apply(lambda x: np.mean((x['phi_min_y_tip'], x['phi_max_y_tip'])), axis = 1)            
+            df['log_max_y_tip'] = df.apply(lambda x: np.log(x['max_y_tip']), axis = 1)       
 
             # # Plot f_tip and phi_tip against tau_b, w0
             fig1 = plot_heatmap(df, 'log_w0', 'log_A', 'phi_max_y_tip')
