@@ -711,19 +711,19 @@ if __name__ == '__main__':
                 print("tau_s, popt, pcov: ", tau_s, popt, pcov)
 
             fig.update_xaxes(zeroline = True, title = r"$\huge{t}$")
-            x_ticks = np.arange(0,35,5)*1e1
-            x_ticks_text = [r"$\huge{" + sci_notation(np.round(x_tick), 2, 1) + "}$" for x_tick in x_ticks]
+            x_ticks = np.arange(0,35,40)*1e1
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick,2,0,2) + "}$" for x_tick in x_ticks]
             for row in [1,2,3]:
                 fig.update_xaxes(
-                    range = [0,2.5e2],
+                    range = [0,3e2],
                     row = row,
                     col = 1,
                     tickmode = "array",
                     tickvals = x_ticks,
                     ticktext = x_ticks_text
                 )
-            x_ticks = np.arange(0,35,5)*1e4
-            x_ticks_text = [r"$\huge{" + sci_notation(np.round(x_tick), 2, 1) + "}$" for x_tick in x_ticks] 
+            x_ticks = np.arange(0,40,10)*1e4
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick,2,0,5) + "}$" for x_tick in x_ticks] 
             fig.update_xaxes(
                 range = [0,3e5],
                 row = 4,
@@ -744,7 +744,7 @@ if __name__ == '__main__':
             )            
             fig.update_layout(
                 margin = dict(l = 200, r = 200, t = 200, b = 200),
-                width = 300 + 400, 
+                width = 350 + 400, 
                 height = 300 * len(id_filenames) + 400, 
                 showlegend = True,
                 )
