@@ -229,6 +229,7 @@ def plot_heatmap(df, column_0, column_1, column_2):
         x = df[column_0],
         y = df[column_1],
         z = df[column_2],
+        coloraxis = 'coloraxis',
         )) 
     fig.update_xaxes(title = column_0)
     fig.update_yaxes(title = column_1)

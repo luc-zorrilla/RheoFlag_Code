@@ -58,7 +58,7 @@ writing_dir = temp_folder
     # Panel a - tip movement for varying shear viscosity and flow frequency: phase
     # Panel b - vary shear viscosity and flow amplitude
 
-fig_nbr = 4
+fig_nbr = 5
 panel_nbr = 0
 if __name__ == '__main__':
 
@@ -763,10 +763,25 @@ if __name__ == '__main__':
             eps = 1e-6
             A = 1e-2
             df = df.loc[np.abs(df['A']- A) < eps]
+            df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
+            df['log_tau_b_m1'] = df.apply(lambda x: x['log_tau_b_m1']/np.log(10), axis = 1)
             
             # # Plot f_tip and phi_tip against tau_b, w0
             fig1 = plot_heatmap(df, 'log_w0', 'log_tau_b_m1', 'phi_max_y_tip')
             fig1.update_layout(
+                xaxis_title = r"$\huge{\log{\omega_0}}$",
+                yaxis_title = r"$\huge{\log{\tau_b^{-1}}}$",
+                coloraxis_colorbar = dict(
+                    title = r"$\huge{\phi_\text{max}}$",
+                    tickmode="array",
+                    tickcolor = 'black',
+                    tickvals = [0, 0.25, 0.5, 0.75, 1],
+                    ticktext = ["0", "0.25", "0.5", "0.75", "1"],
+                    ticks = "outside",
+                    tickwidth = 3,
+                    ticklen = 12,
+                ),
+                coloraxis_colorscale = dark_purple_scale,
                 margin = dict(l = 200, r = 200, t = 200, b = 200),
                 width = 800, height = 800)
             fig1.vs_show()
