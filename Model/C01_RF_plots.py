@@ -58,7 +58,7 @@ writing_dir = temp_folder
     # Panel a - tip movement for varying shear viscosity and flow frequency: phase
     # Panel b - vary shear viscosity and flow amplitude
 
-fig_nbr = 5
+fig_nbr = 6
 panel_nbr = 0
 if __name__ == '__main__':
 
@@ -840,35 +840,17 @@ if __name__ == '__main__':
 
             folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
             folder_name += "StraightLine_PeriodicFlow/ShearElasticity_Clamped_VaryingShearViscosity/"
-            dataframe_filename = folder_name + "fourier" + ".csv"
-
-            df = pd.read_csv(dataframe_filename)
-
-            # # Plot f_tip and phi_tip against tau_b, w0
-            fig1 = plot_heatmap(df, 'log_w0', 'log_tau_s_m1', 'f_tip')
-            fig1.update_layout(
-                margin = dict(l = 200, r = 200, t = 200, b = 200),
-                width = 800, height = 800)
-            fig1.vs_show()
-            fig1_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "f_tip" + ".pdf"
-            fig1.write_image(fig1_filename)
-            time.sleep(1)
-            fig2 = plot_heatmap(df, 'log_w0', 'log_tau_s_m1', 'phi_tip')
-            fig2.update_layout(
-                margin = dict(l = 200, r = 200, t = 200, b = 200),
-                width = 800, height = 800)
-            fig2.vs_show()
-            fig2_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "phi_tip" + ".pdf"
-            fig2.write_image(fig2_filename)
-
-        elif panel_nbr == 1:
-
-            folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
-            folder_name += "StraightLine_PeriodicFlow/ShearElasticity_Clamped_VaryingShearViscosity/"
-            folder_name += "LargeAmplitude/"
+            folder_name += "VaryingFrequencyAmplitude/"
             dataframe_filename = folder_name + "maxdev" + ".csv"
 
             df = pd.read_csv(dataframe_filename)
+
+            # Select only for one value of the amplitude: A = 1e-2
+            eps = 1e-2
+            A = 1e0
+            df = df.loc[np.abs(df['A']- A) < eps]
+            df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
+            df['log_tau_s_m1'] = df.apply(lambda x: x['log_tau_s_m1']/np.log(10), axis = 1)            
 
             # # Plot f_tip and phi_tip against tau_b, w0
             fig1 = plot_heatmap(df, 'log_w0', 'log_tau_s_m1', 'phi_max_y_tip')
@@ -887,7 +869,7 @@ if __name__ == '__main__':
             fig2_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "max_y_tip" + ".pdf"
             fig2.write_image(fig2_filename)
     
-        elif panel_nbr == 2:
+        elif panel_nbr == 1:
             print("empty panel")            
 
     fig.write_image(fig_filename)
