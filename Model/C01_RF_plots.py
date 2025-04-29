@@ -18,6 +18,7 @@ from B01_simulations_analysis import *
 import numpy as np
 from scipy.signal import find_peaks
 from scipy.optimize import curve_fit
+from scipy import special
 
 from plotting_functions import * 
 pio.templates.default = "figure_template"
@@ -42,23 +43,31 @@ writing_dir = temp_folder
 
 # Figure 2: simulations for shear elasticity + bending elasticity, no viscosity, clamped axoneme
     # Panel a - stroboscopic view of the filament in 3 different regimes of shear / bending.
-    # Panel b - Counterbend for two different regimes
 
-# Figure 3: simulations for bending elasticity + bending viscosity, clamped axoneme
-    # Panel a - relaxation
+# Figure 3: simulations for shear elasticity + bending elasticity, no viscosity, clamped axoneme
+    # Panel a - Counterbend for two different regimes
 
-# Figure 4: simulations for shear elasticity + shear viscosity, clamped axoneme
-    # Panel a - relaxation for varying shear viscosities, Sp4 = 1
+# Figure 4: simulations for bending elasticity + bending viscosity, clamped axoneme
+    # Panel a - relaxation for varying bending viscosity
 
-# Figure 5: simulations for a periodic flow, for a clamped axoneme with bending elasticity + bending viscosity
+# Figure 5: simulations for shear elasticity + shear viscosity, clamped axoneme
+    # Panel a - relaxation for varying shear viscosities
+
+# Figure 6: simulations for a periodic flow, for a clamped axoneme with bending elasticity + bending viscosity
     # Panel a - tip movement for varying bending viscosity and flow frequency: phase
-    # Panel b - vary bending viscosity and flow amplitude
+    # Panel b - tip movement for varying bending viscosity and flow frequency: max amplitude
 
-# Figure 6: simulations for a periodic flow, for a clamped axoneme with shear elasticity + shear viscosity
+# Figure 7: simulations for a periodic flow, for a clamped axoneme with bending elasticity + bending viscosity
+    # Panel a - transect for tau_b (<<, >>) tau_{b,f} with phase and max amplitude
+
+# Figure 8: simulations for a periodic flow, for a clamped axoneme with shear elasticity + shear viscosity
     # Panel a - tip movement for varying shear viscosity and flow frequency: phase
-    # Panel b - vary shear viscosity and flow amplitude
+    # Panel b - tip movement for varying shear viscosity and flow frequency: max amplitude
 
-fig_nbr = 6
+# Figure 9: simulations for a periodic flow, for a clamped axoneme with shear elasticity + shear viscosity
+    # Panel a - transects for tau_s (<<, >>) tau_{s,f} with phase and max amplitude
+
+fig_nbr = 9
 panel_nbr = 0
 if __name__ == '__main__':
 
@@ -469,7 +478,7 @@ if __name__ == '__main__':
                 height = 500 + 200 + 200,
                 )
 
-    # Bending + Shear elasticity, no viscosity, clamped axoneme.
+    # Bending + Shear elasticity, no viscosity, clamped axoneme - stroboscope
     elif fig_nbr == 2:
 
         if panel_nbr == 0:
@@ -515,8 +524,10 @@ if __name__ == '__main__':
                 # fig.update_yaxes()
             fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = False)
 
-        # Counterbend
-        if panel_nbr == 1:
+    # Bending + Shear elasticity, no viscosity, clamped axoneme - counterbend
+    elif fig_nbr == 3:
+
+        if panel_nbr == 0:
 
             folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
             folder_name += "ProximalBend_NoFlow/BendingShearElasticity_Clamped_Counterbend/"
@@ -557,8 +568,8 @@ if __name__ == '__main__':
                 # fig.update_yaxes()
             fig.update_layout(width = 800, height = 300 * len(id_filenames), showlegend = False)
 
-    # Bending elasticity, varying bending viscosity, clamped axoneme
-    elif fig_nbr == 3:
+    # Bending elasticity, varying bending viscosity, clamped axoneme - relaxation
+    elif fig_nbr == 4:
         
         if panel_nbr == 0:
 
@@ -651,8 +662,8 @@ if __name__ == '__main__':
                 showlegend = True,
                 )
 
-    # Shear elasticity, varying shear viscosity, clamped axoneme
-    elif fig_nbr == 4:
+    # Shear elasticity, varying shear viscosity, clamped axoneme - relaxation
+    elif fig_nbr == 5:
 
         if panel_nbr == 0:
 
@@ -750,25 +761,27 @@ if __name__ == '__main__':
                 )
 
     # Bending elasticity, varying bending viscosity, flow frequency and amplitude; clamped axoneme
-    elif fig_nbr == 5:
-        if panel_nbr == 0:
+    elif fig_nbr == 6: # Heatmaps
 
-            folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
-            folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/VaryingFrequencyAmplitude/"
-            dataframe_filename = folder_name + "maxdev" + ".csv"
+        folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+        folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/VaryingFrequencyAmplitude/"
+        dataframe_filename = folder_name + "maxdev" + ".csv"
 
-            df = pd.read_csv(dataframe_filename)
+        df = pd.read_csv(dataframe_filename)
 
-            # Select only for one value of the amplitude: A = 1e-2
-            eps = 1e-6
-            A = 1e-2
-            df = df.loc[np.abs(df['A']- A) < eps]
-            df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
-            df['log_tau_b_m1'] = df.apply(lambda x: x['log_tau_b_m1']/np.log(10), axis = 1)
-            
+        # Select only for one value of the amplitude: A = 1e-2
+        eps = 1e-6
+        A = 1e-2
+        df = df.loc[np.abs(df['A']- A) < eps]
+        df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
+        df['log_tau_b_m1'] = df.apply(lambda x: x['log_tau_b_m1']/np.log(10), axis = 1)
+        df['log_max_y_tip'] = df.apply(lambda x: np.log10(x['max_y_tip']), axis = 1)
+    
+        if panel_nbr == 0: # Phase
+
             # # Plot f_tip and phi_tip against tau_b, w0
-            fig1 = plot_heatmap(df, 'log_w0', 'log_tau_b_m1', 'phi_max_y_tip')
-            fig1.update_layout(
+            fig = plot_heatmap(df, 'log_w0', 'log_tau_b_m1', 'phi_max_y_tip')
+            fig.update_layout(
                 xaxis_title = r"$\huge{\log{\omega_0}}$",
                 yaxis_title = r"$\huge{\log{\tau_b^{-1}}}$",
                 coloraxis_colorbar = dict(
@@ -784,19 +797,31 @@ if __name__ == '__main__':
                 coloraxis_colorscale = dark_purple_scale,
                 margin = dict(l = 200, r = 200, t = 200, b = 200),
                 width = 800, height = 800)
-            fig1.vs_show()
-            fig1_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "phi_max_y_tip" + ".pdf"
-            fig1.write_image(fig1_filename)
-            time.sleep(1)
-            fig2 = plot_heatmap(df, 'log_w0', 'log_tau_b_m1', 'max_y_tip')
-            fig2.update_layout(
+            
+        elif panel_nbr == 1: # max_y_tip
+
+            fig = plot_heatmap(df, 'log_w0', 'log_tau_b_m1', 'max_y_tip')
+            fig.update_layout(
+                xaxis_title = r"$\huge{\log{\omega_0}}$",
+                yaxis_title = r"$\huge{\log{\tau_b^{-1}}}$",
+                coloraxis_colorbar = dict(
+                    title = r"$\huge{y_\text{max}}$",
+                    # tickmode="array",
+                    # tickcolor = 'black',
+                    # tickvals = [0, 0.25, 0.5, 0.75, 1],
+                    # ticktext = ["0", "0.25", "0.5", "0.75", "1"],
+                    # ticks = "outside",
+                    # tickwidth = 3,
+                    # ticklen = 12,
+                ),                    
                 margin = dict(l = 200, r = 200, t = 200, b = 200),
                 width = 800, height = 800)
-            fig2.vs_show()
-            fig2_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "max_y_tip" + ".pdf"
-            fig2.write_image(fig2_filename)
     
-        elif panel_nbr == 1:
+    # Bending elasticity, varying bending viscosity, flow frequency and amplitude; clamped axoneme
+    elif fig_nbr == 7:
+
+        # 2 Transects at tau_b = cte
+        if panel_nbr == 0:
 
             folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
             folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/VaryingFrequencyAmplitude/"
@@ -804,38 +829,142 @@ if __name__ == '__main__':
 
             df = pd.read_csv(dataframe_filename)
 
-            # Select only for one value of w0
-            # eps = 1e-6
-            # w0 = 1e-3
-            # df = df.loc[np.abs(df['w0']- w0) < eps]
-
-            # Select only for one value of tau_b
-            eps = 1e-6
-            tau_b = 1e6
-            df = df.loc[np.abs(df['tau_b_m1'] - 1/tau_b) < eps]
+            # Select only for one value of the amplitude: A = 1e-2
+            eps = 1e-12
+            A = 1e-2
+            df = df.loc[np.abs(df['A']- A) < eps]
+            df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
+            df['log_tau_b_m1'] = df.apply(lambda x: x['log_tau_b_m1']/np.log(10), axis = 1)
+            df['log_max_y_tip'] = df.apply(lambda x: np.log10(x['max_y_tip']), axis = 1)
             
-            df['log_A'] = df.apply(lambda x: np.log(x['A']), axis = 1)
-            df['log_max_y_tip'] = df.apply(lambda x: np.log(x['max_y_tip']), axis = 1)       
+            # Make transects dataframes
+            tau_b_m1_small = 1e-6
+            df_small = df.loc[np.abs(df['tau_b_m1']- tau_b_m1_small) < eps]
+            tau_b_m1_large = 1e0
+            df_large = df.loc[np.abs(df['tau_b_m1']- tau_b_m1_large) < eps]
 
-            # # Plot f_tip and phi_tip against tau_b, w0
-            fig1 = plot_heatmap(df, 'log_w0', 'log_A', 'phi_max_y_tip')
-            fig1.update_layout(
+            fig = make_subplots(
+                rows = 2, cols = 1, 
+                subplot_titles = [r"$\huge{\tau_b = 10^{-6}}$", r"$\huge{\tau_b = 1}}$"], 
+                shared_xaxes = True,
+                specs = [[{"secondary_y": True}], [{"secondary_y": True}]],
+                )
+            for k_df in range(2):
+                df_k = [df_small, df_large][k_df]
+                fig.add_scatter(x = df_k['log_w0'], y = df_k['phi_max_y_tip'], row = 1 + k_df, col = 1, mode = "markers", marker_color = "black", name = "phi_y_max", secondary_y = False)
+                fig.add_scatter(x = df_k['log_w0'], y = np.log10(df_k['max_y_tip']/np.max(df_k['max_y_tip'])), row = 1 + k_df, col = 1, mode = "markers", marker_color = cb_orange, name = "y_max", secondary_y = True)
+            
+            x_ticks = np.arange(-9, 1, 3)
+            x_ticks_text = [r"$\huge{" + str(x_tick) + "}$" for x_tick in x_ticks]            
+            fig.update_xaxes(
+                title = r"$\huge{\log{\omega_0}}$",
+                range = [-9.1,0.1],
+                tickmode = "array",
+                tickvals = x_ticks,
+                ticktext = x_ticks_text,
+            )
+            y_ticks = np.arange(0,6,1)/10
+            y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
+            fig.update_yaxes(
+                title = r"$\huge{\phi_\text{max}}$",
+                range = [0.24, 0.51],
+                secondary_y = False,
+                tickmode = "array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,
+            )
+            y_ticks = np.arange(-6,1,2)
+            y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]            
+            fig.update_yaxes(
+                title = r"$\huge{\log{y_\text{max}}}$",
+                range = [-6.1, 0.1],
+                secondary_y = True,
+                tickmode = "array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,
+                row = 1,
+                col = 1,
+            )
+            y_ticks = np.arange(-3,1,1)
+            y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]            
+            fig.update_yaxes(
+                title = r"$\huge{\log{y_\text{max}}}$",
+                range = [-2.5, 0.1],
+                secondary_y = True,
+                tickmode = "array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,
+                row = 2,
+                col = 1,
+            )                           
+            fig.update_layout(
                 margin = dict(l = 200, r = 200, t = 200, b = 200),
-                width = 800, height = 800)
-            fig1.vs_show()
-            fig1_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "phi_max_y_tip" + ".pdf"
-            fig1.write_image(fig1_filename)
-            time.sleep(1)
-            fig2 = plot_heatmap(df, 'log_w0', 'log_A', 'log_max_y_tip')
-            fig2.update_layout(
-                margin = dict(l = 200, r = 200, t = 200, b = 200),
-                width = 800, height = 800)
-            fig2.vs_show()
-            fig2_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "max_y_tip" + ".pdf"
-            fig2.write_image(fig2_filename)
-    
+                width = 400 + 400,
+                height = 300*2 + 400,
+                showlegend = False,
+            )
+
     # Shear elasticity, varying shear viscosity and flow frequency, clamped axoneme
-    elif fig_nbr == 6:
+    elif fig_nbr == 8:
+
+        folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+        folder_name += "StraightLine_PeriodicFlow/ShearElasticity_Clamped_VaryingShearViscosity/"
+        folder_name += "VaryingFrequencyAmplitude/"
+        dataframe_filename = folder_name + "maxdev" + ".csv"
+
+        df = pd.read_csv(dataframe_filename)
+
+        # Select only for one value of the amplitude: A = 1e-2
+        eps = 1e-2
+        A = 1e0
+        df = df.loc[np.abs(df['A']- A) < eps]
+        df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
+        df['log_tau_s_m1'] = df.apply(lambda x: x['log_tau_s_m1']/np.log(10), axis = 1)
+        df['log_max_y_tip'] = df.apply(lambda x: np.log10(x['max_y_tip']), axis = 1)
+
+        if panel_nbr == 0:
+
+            fig = plot_heatmap(df, 'log_w0', 'log_tau_s_m1', 'phi_max_y_tip')
+            fig.update_layout(
+                xaxis_title = r"$\huge{\log{\omega_0}}$",
+                yaxis_title = r"$\huge{\log{\tau_s^{-1}}}$",
+                coloraxis_colorbar = dict(
+                    title = r"$\huge{\phi_\text{max}}$",
+                    tickmode="array",
+                    tickcolor = 'black',
+                    tickvals = [0, 0.25, 0.5, 0.75, 1],
+                    ticktext = ["0", "0.25", "0.5", "0.75", "1"],
+                    ticks = "outside",
+                    tickwidth = 3,
+                    ticklen = 12,
+                ),
+                coloraxis_colorscale = dark_purple_scale,
+                margin = dict(l = 200, r = 200, t = 200, b = 200),
+                width = 800, height = 800)
+
+        elif panel_nbr == 1:
+
+            fig = plot_heatmap(df, 'log_w0', 'log_tau_s_m1', 'max_y_tip')
+            fig.update_layout(
+                xaxis_title = r"$\huge{\log{\omega_0}}$",
+                yaxis_title = r"$\huge{\log{\tau_s^{-1}}}$",
+                coloraxis_colorbar = dict(
+                    title = r"$\huge{y_\text{max}}$",
+                    # tickmode="array",
+                    # tickcolor = 'black',
+                    # tickvals = [0, 0.25, 0.5, 0.75, 1],
+                    # ticktext = ["0", "0.25", "0.5", "0.75", "1"],
+                    # ticks = "outside",
+                    # tickwidth = 3,
+                    # ticklen = 12,
+                ),                
+                margin = dict(l = 200, r = 200, t = 200, b = 200),
+                width = 800, height = 800)    
+
+    # Shear elasticity, varying shear viscosity and flow frequency, clamped axoneme
+    elif fig_nbr == 9:
+
+        # 2 Transects at tau_s = cte
         if panel_nbr == 0:
 
             folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
@@ -846,31 +975,81 @@ if __name__ == '__main__':
             df = pd.read_csv(dataframe_filename)
 
             # Select only for one value of the amplitude: A = 1e-2
-            eps = 1e-2
+            eps = 1e-3
             A = 1e0
             df = df.loc[np.abs(df['A']- A) < eps]
             df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
-            df['log_tau_s_m1'] = df.apply(lambda x: x['log_tau_s_m1']/np.log(10), axis = 1)            
+            df['log_tau_s_m1'] = df.apply(lambda x: x['log_tau_s_m1']/np.log(10), axis = 1)
+            df['log_max_y_tip'] = df.apply(lambda x: np.log10(x['max_y_tip']), axis = 1)
+            
+            # Make transects dataframes
+            tau_s_m1_small = 1e-3
+            df_small = df.loc[np.abs(df['tau_s_m1']- tau_s_m1_small) < eps]
+            tau_s_m1_large = 1e3
+            df_large = df.loc[np.abs(df['tau_s_m1']- tau_s_m1_large) < eps]
 
-            # # Plot f_tip and phi_tip against tau_b, w0
-            fig1 = plot_heatmap(df, 'log_w0', 'log_tau_s_m1', 'phi_max_y_tip')
-            fig1.update_layout(
+            fig = make_subplots(
+                rows = 2, cols = 1, 
+                subplot_titles = [r"$\huge{\tau_s = 10^{-3}}$", r"$\huge{\tau_s = 10^3}}$"], 
+                shared_xaxes = True,
+                specs = [[{"secondary_y": True}], [{"secondary_y": True}]],
+                )
+            for k_df in range(2):
+                df_k = [df_small, df_large][k_df]
+                fig.add_scatter(x = df_k['log_w0'], y = df_k['phi_max_y_tip'], row = 1 + k_df, col = 1, mode = "markers", marker_color = "black", name = "phi_y_max", secondary_y = False)
+                fig.add_scatter(x = df_k['log_w0'], y = np.log10(df_k['max_y_tip']/np.max(df_k['max_y_tip'])), row = 1 + k_df, col = 1, mode = "markers", marker_color = cb_orange, name = "y_max", secondary_y = True)
+            
+            x_ticks = np.arange(-9, 1, 3)
+            x_ticks_text = [r"$\huge{" + str(x_tick) + "}$" for x_tick in x_ticks]            
+            fig.update_xaxes(
+                title = r"$\huge{\log{\omega_0}}$",
+                range = [-9.1,0.1],
+                tickmode = "array",
+                tickvals = x_ticks,
+                ticktext = x_ticks_text,
+            )
+            y_ticks = np.arange(0,6,1)/10
+            y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
+            fig.update_yaxes(
+                title = r"$\huge{\phi_\text{max}}$",
+                range = [0.24, 0.51],
+                secondary_y = False,
+                tickmode = "array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,
+            )
+            y_ticks = np.arange(-6,1,2)
+            y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]            
+            fig.update_yaxes(
+                title = r"$\huge{\log{y_\text{max}}}$",
+                range = [-6.1, 0.1],
+                secondary_y = True,
+                tickmode = "array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,
+                row = 1,
+                col = 1,
+            )
+            y_ticks = np.arange(-3,1,1)
+            y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]            
+            fig.update_yaxes(
+                title = r"$\huge{\log{y_\text{max}}}$",
+                range = [-2.5, 0.1],
+                secondary_y = True,
+                tickmode = "array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,
+                row = 2,
+                col = 1,
+            )                           
+            fig.update_layout(
                 margin = dict(l = 200, r = 200, t = 200, b = 200),
-                width = 800, height = 800)
-            fig1.vs_show()
-            fig1_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "phi_max_y_tip" + ".pdf"
-            fig1.write_image(fig1_filename)
-            time.sleep(1)
-            fig2 = plot_heatmap(df, 'log_w0', 'log_tau_s_m1', 'max_y_tip')
-            fig2.update_layout(
-                margin = dict(l = 200, r = 200, t = 200, b = 200),
-                width = 800, height = 800)
-            fig2.vs_show()
-            fig2_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + "_" + "max_y_tip" + ".pdf"
-            fig2.write_image(fig2_filename)
-    
-        elif panel_nbr == 1:
-            print("empty panel")            
+                width = 400 + 400,
+                height = 300*2 + 400,
+                showlegend = False,
+            )
+
+            
 
     fig.write_image(fig_filename)
     fig.vs_show()
