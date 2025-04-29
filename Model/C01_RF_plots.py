@@ -67,7 +67,7 @@ writing_dir = temp_folder
 # Figure 9: simulations for a periodic flow, for a clamped axoneme with shear elasticity + shear viscosity
     # Panel a - transects for tau_s (<<, >>) tau_{s,f} with phase and max amplitude
 
-fig_nbr = 9
+fig_nbr = 7
 panel_nbr = 0
 if __name__ == '__main__':
 
@@ -786,6 +786,7 @@ if __name__ == '__main__':
                 yaxis_title = r"$\huge{\log{\tau_b^{-1}}}$",
                 coloraxis_colorbar = dict(
                     title = r"$\huge{\phi_\text{max}}$",
+                    orientation = "h",
                     tickmode="array",
                     tickcolor = 'black',
                     tickvals = [0, 0.25, 0.5, 0.75, 1],
@@ -806,13 +807,14 @@ if __name__ == '__main__':
                 yaxis_title = r"$\huge{\log{\tau_b^{-1}}}$",
                 coloraxis_colorbar = dict(
                     title = r"$\huge{y_\text{max}}$",
+                    orientation = "h",
                     # tickmode="array",
-                    # tickcolor = 'black',
+                    tickcolor = 'black',
                     # tickvals = [0, 0.25, 0.5, 0.75, 1],
                     # ticktext = ["0", "0.25", "0.5", "0.75", "1"],
-                    # ticks = "outside",
-                    # tickwidth = 3,
-                    # ticklen = 12,
+                    ticks = "outside",
+                    tickwidth = 3,
+                    ticklen = 12,
                 ),                    
                 margin = dict(l = 200, r = 200, t = 200, b = 200),
                 width = 800, height = 800)
@@ -845,7 +847,7 @@ if __name__ == '__main__':
 
             fig = make_subplots(
                 rows = 2, cols = 1, 
-                subplot_titles = [r"$\huge{\tau_b = 10^{-6}}$", r"$\huge{\tau_b = 1}}$"], 
+                subplot_titles = [r"$\huge{\tau_b = 10^{-6}}$", r"$\huge{\tau_b = 1}$"], 
                 shared_xaxes = True,
                 specs = [[{"secondary_y": True}], [{"secondary_y": True}]],
                 )
@@ -863,7 +865,7 @@ if __name__ == '__main__':
                 tickvals = x_ticks,
                 ticktext = x_ticks_text,
             )
-            y_ticks = np.arange(0,6,1)/10
+            y_ticks = np.arange(250,600,125)/1000
             y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
             fig.update_yaxes(
                 title = r"$\huge{\phi_\text{max}}$",
@@ -930,6 +932,7 @@ if __name__ == '__main__':
                 yaxis_title = r"$\huge{\log{\tau_s^{-1}}}$",
                 coloraxis_colorbar = dict(
                     title = r"$\huge{\phi_\text{max}}$",
+                    orientation = 'h',
                     tickmode="array",
                     tickcolor = 'black',
                     tickvals = [0, 0.25, 0.5, 0.75, 1],
@@ -950,13 +953,14 @@ if __name__ == '__main__':
                 yaxis_title = r"$\huge{\log{\tau_s^{-1}}}$",
                 coloraxis_colorbar = dict(
                     title = r"$\huge{y_\text{max}}$",
+                    orientation = "h",
                     # tickmode="array",
-                    # tickcolor = 'black',
+                    tickcolor = 'black',
                     # tickvals = [0, 0.25, 0.5, 0.75, 1],
                     # ticktext = ["0", "0.25", "0.5", "0.75", "1"],
-                    # ticks = "outside",
-                    # tickwidth = 3,
-                    # ticklen = 12,
+                    ticks = "outside",
+                    tickwidth = 3,
+                    ticklen = 12,
                 ),                
                 margin = dict(l = 200, r = 200, t = 200, b = 200),
                 width = 800, height = 800)    
