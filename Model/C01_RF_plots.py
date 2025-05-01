@@ -67,8 +67,8 @@ writing_dir = temp_folder
 # Figure 9: simulations for a periodic flow, for a clamped axoneme with shear elasticity + shear viscosity
     # Panel a - transects for tau_s (<<, >>) tau_{s,f} with phase and max amplitude
 
-fig_nbr = 7
-panel_nbr = 0
+fig_nbr = 8
+panel_nbr = 1
 if __name__ == '__main__':
 
     fig_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + ".pdf"
@@ -784,6 +784,8 @@ if __name__ == '__main__':
             fig.update_layout(
                 xaxis_title = r"$\huge{\log{\omega_0}}$",
                 yaxis_title = r"$\huge{\log{\tau_b^{-1}}}$",
+                # coloraxis_cmin = 0.25,
+                # coloraxis_cmax = 0.5,                
                 coloraxis_colorbar = dict(
                     title = r"$\huge{\phi_\text{max}}$",
                     orientation = "h",
@@ -847,7 +849,7 @@ if __name__ == '__main__':
 
             fig = make_subplots(
                 rows = 2, cols = 1, 
-                subplot_titles = [r"$\huge{\tau_b = 10^{-6}}$", r"$\huge{\tau_b = 1}$"], 
+                subplot_titles = [r"$\huge{\tau_b = 10^6}$", r"$\huge{\tau_b = 1}$"], 
                 shared_xaxes = True,
                 specs = [[{"secondary_y": True}], [{"secondary_y": True}]],
                 )
@@ -930,6 +932,8 @@ if __name__ == '__main__':
             fig.update_layout(
                 xaxis_title = r"$\huge{\log{\omega_0}}$",
                 yaxis_title = r"$\huge{\log{\tau_s^{-1}}}$",
+                # coloraxis_cmin = 0.25,
+                # coloraxis_cmax = 0.5,
                 coloraxis_colorbar = dict(
                     title = r"$\huge{\phi_\text{max}}$",
                     orientation = 'h',
@@ -979,7 +983,7 @@ if __name__ == '__main__':
             df = pd.read_csv(dataframe_filename)
 
             # Select only for one value of the amplitude: A = 1e-2
-            eps = 1e-3
+            eps = 1e-5
             A = 1e0
             df = df.loc[np.abs(df['A']- A) < eps]
             df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
@@ -987,14 +991,14 @@ if __name__ == '__main__':
             df['log_max_y_tip'] = df.apply(lambda x: np.log10(x['max_y_tip']), axis = 1)
             
             # Make transects dataframes
-            tau_s_m1_small = 1e-3
+            tau_s_m1_small = 1e-4
             df_small = df.loc[np.abs(df['tau_s_m1']- tau_s_m1_small) < eps]
-            tau_s_m1_large = 1e3
+            tau_s_m1_large = 1e1
             df_large = df.loc[np.abs(df['tau_s_m1']- tau_s_m1_large) < eps]
 
             fig = make_subplots(
                 rows = 2, cols = 1, 
-                subplot_titles = [r"$\huge{\tau_s = 10^{-3}}$", r"$\huge{\tau_s = 10^3}}$"], 
+                subplot_titles = [r"$\huge{\tau_s = 10^{-4}}$", r"$\huge{\tau_s = 10}}$"], 
                 shared_xaxes = True,
                 specs = [[{"secondary_y": True}], [{"secondary_y": True}]],
                 )
@@ -1003,20 +1007,20 @@ if __name__ == '__main__':
                 fig.add_scatter(x = df_k['log_w0'], y = df_k['phi_max_y_tip'], row = 1 + k_df, col = 1, mode = "markers", marker_color = "black", name = "phi_y_max", secondary_y = False)
                 fig.add_scatter(x = df_k['log_w0'], y = np.log10(df_k['max_y_tip']/np.max(df_k['max_y_tip'])), row = 1 + k_df, col = 1, mode = "markers", marker_color = cb_orange, name = "y_max", secondary_y = True)
             
-            x_ticks = np.arange(-9, 1, 3)
+            x_ticks = np.arange(-7, 3, 3)
             x_ticks_text = [r"$\huge{" + str(x_tick) + "}$" for x_tick in x_ticks]            
             fig.update_xaxes(
                 title = r"$\huge{\log{\omega_0}}$",
-                range = [-9.1,0.1],
+                range = [-7.1,2.1],
                 tickmode = "array",
                 tickvals = x_ticks,
                 ticktext = x_ticks_text,
             )
-            y_ticks = np.arange(0,6,1)/10
+            y_ticks = np.arange(250,600,125)/1000
             y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
             fig.update_yaxes(
                 title = r"$\huge{\phi_\text{max}}$",
-                range = [0.24, 0.51],
+                range = [0.2, 0.55],
                 secondary_y = False,
                 tickmode = "array",
                 tickvals = y_ticks,
@@ -1026,7 +1030,7 @@ if __name__ == '__main__':
             y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]            
             fig.update_yaxes(
                 title = r"$\huge{\log{y_\text{max}}}$",
-                range = [-6.1, 0.1],
+                range = [-4.8, 0.1],
                 secondary_y = True,
                 tickmode = "array",
                 tickvals = y_ticks,
@@ -1038,7 +1042,7 @@ if __name__ == '__main__':
             y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]            
             fig.update_yaxes(
                 title = r"$\huge{\log{y_\text{max}}}$",
-                range = [-2.5, 0.1],
+                range = [-2.7, 0.1],
                 secondary_y = True,
                 tickmode = "array",
                 tickvals = y_ticks,
@@ -1052,8 +1056,6 @@ if __name__ == '__main__':
                 height = 300*2 + 400,
                 showlegend = False,
             )
-
-            
 
     fig.write_image(fig_filename)
     fig.vs_show()
