@@ -1422,7 +1422,7 @@ if __name__ == '__main__':
                     row = 2, col = 1 + l,
                 )
 
-            x_log_list = np.arange(-8,1,2)
+            x_log_list = np.arange(-8,1,4)
             x_ticks = [np.float_power(10, m) for m in x_log_list]
             x_ticks_text = [r"$\huge{" + sci_notation(x_tick, decimal_digits=-1) + "}$" for x_tick in x_ticks]                 
             fig.update_xaxes(
