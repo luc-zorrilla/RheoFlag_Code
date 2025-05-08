@@ -77,10 +77,11 @@ writing_dir = temp_folder
     # Panel a - amplitude response
 
 # Figure 13 - inference error
-
+    # Panel a - 3 errors
+    # Panel b - inset for best error
 
 fig_nbr = 13
-panel_nbr = 0
+panel_nbr = 1
 if __name__ == '__main__':
 
     fig_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + ".pdf"
@@ -1485,49 +1486,97 @@ if __name__ == '__main__':
         tau_f_b = 1.3e3 # Approximate value
         gamma_over_k = np.array([0.99e6, 1.00e5, 1.12e4, 2.29e3, 1.40e3, 1.30e3, 1.29e3])
         sd_gamma_over_k = np.array([0.01e6, 0.01e5, 0.01e4, 0.02e3, 0.01e3, 0.01e3, 0.01e3])
-        eps_r_tau_b = np.abs((gamma_over_k - tau_b) / tau_b) + 1
+        eps_r_tau_b = (gamma_over_k - tau_b) / tau_b + 1
         sd_eps_r_tau_b = sd_gamma_over_k / tau_b
-        eps_r_tau_fb = np.abs((gamma_over_k - tau_f_b) / tau_f_b) + 1
+        eps_r_tau_fb =(gamma_over_k - tau_f_b) / tau_f_b + 1
         sd_eps_r_tau_fb = sd_gamma_over_k / tau_f_b      
-        eps_r_tau_bfb = np.abs((gamma_over_k - (tau_b + tau_f_b)) / (tau_b+tau_f_b)) + 1
+        eps_r_tau_bfb = (gamma_over_k - (tau_b + tau_f_b)) / (tau_b+tau_f_b) + 1
         sd_eps_r_tau_bfb = sd_gamma_over_k / (tau_b + tau_f_b)        
 
-        fig = go.Figure()
-        fig.add_scatter(x = tau_b, y = eps_r_tau_b, 
-            error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_b),
-            mode = 'markers+lines', marker_color = cb_dark_orange,
-            name = r"$\huge{\frac{\gamma}{k \tau_{b}}}$",
-            )
-        fig.add_scatter(x = tau_b, y = eps_r_tau_fb, 
-            error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_fb),
-            mode = 'markers+lines', marker_color = cb_dark_purple,
-            name = r"$\huge{\frac{\gamma}{k \tau_{f,b}}}$",
-            )            
-        fig.add_scatter(x = tau_b, y = eps_r_tau_bfb, 
-            error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_bfb),
-            mode = 'markers', marker_color = cb_red,
-            name = r"$\huge{\frac{\gamma}{k (\tau_b + \tau_{f,b})}}$",
+        if panel_nbr == 0:
+
+            fig = go.Figure()
+            fig.add_scatter(x = tau_b, y = eps_r_tau_b, 
+                error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_b),
+                mode = 'markers+lines', marker_color = cb_dark_orange,
+                name = r"$\huge{\frac{\gamma}{k \tau_{b}}}$",
+                )
+            fig.add_scatter(x = tau_b, y = eps_r_tau_fb, 
+                error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_fb),
+                mode = 'markers+lines', marker_color = cb_dark_purple,
+                name = r"$\huge{\frac{\gamma}{k \tau_{f,b}}}$",
+                )            
+            fig.add_scatter(x = tau_b, y = eps_r_tau_bfb, 
+                error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_bfb),
+                mode = 'markers', marker_color = cb_red,
+                name = r"$\huge{\frac{\gamma}{k (\tau_b + \tau_{f,b})}}$",
+                )
+
+            x_ticks = np.float_power(10, np.arange(0,10,1)) 
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, decimal_digits=-1) + "}$" for x_tick in x_ticks]   
+            for k in range(len(x_ticks_text)):
+                if k%2 == 1:
+                    x_ticks_text[k] = ""
+            fig.update_xaxes(
+                title = r"$\huge{\tau_b}$", 
+                type = 'log',
+                tickmode="array",
+                tickvals = x_ticks,
+                ticktext = x_ticks_text,               
+                )
+            y_ticks = np.float_power(10, np.arange(0,4,1))
+            y_ticks_text = [r"$\huge{" + sci_notation(y_tick, decimal_digits=-1) + "}$" for y_tick in y_ticks]
+            fig.update_yaxes(
+                type = 'log',
+                tickmode="array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,             
+                )
+            fig.update_layout(
+                margin = dict(l = 200, r = 200, t = 200, b = 200),
+                width = 500 + 400,
+                height = 500 + 400,
             )
 
-        x_ticks = np.float_power(10, np.arange(0,10,1)) 
-        x_ticks_text = [r"$\huge{" + sci_notation(x_tick, decimal_digits=-1) + "}$" for x_tick in x_ticks]   
-        for k in range(len(x_ticks_text)):
-            if k%2 == 1:
-                x_ticks_text[k] = ""
-        fig.update_xaxes(
-            title = r"$\huge{\tau_b}$", 
-            type = 'log',
-            tickmode="array",
-            tickvals = x_ticks,
-            ticktext = x_ticks_text,               
-            )
-        y_ticks = np.float_power(10, np.arange(0,4,1))
-        y_ticks_text = [r"$\huge{" + sci_notation(y_tick, decimal_digits=-1) + "}$" for y_tick in y_ticks]
-        fig.update_yaxes(
-            type = 'log',
-            tickmode="array",
-            tickvals = y_ticks,
-            ticktext = y_ticks_text,             
+        # Plots of relative error of best error functional
+        elif panel_nbr == 1:
+
+            fig = go.Figure()
+            fig.add_scatter(x = tau_b, y = 100*(eps_r_tau_bfb - 1), 
+                error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_bfb),
+                mode = 'markers', marker_color = cb_red,
+                )
+
+            x_ticks = np.float_power(10, np.arange(0,10,1)) 
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, decimal_digits=-1) + "}$" for x_tick in x_ticks]   
+            for k in range(len(x_ticks_text)):
+                if k%2 == 1:
+                    x_ticks_text[k] = ""                     
+            fig.update_xaxes(
+                title = r"$\huge{\tau_b}$",
+                tickmode="array",
+                tickvals = x_ticks,
+                ticktext = x_ticks_text,                  
+                type = 'log',
+                )
+            y_ticks = np.arange(-3,4,1)
+            y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
+            for k in range(len(y_ticks_text)):
+                if k%2 == 1:
+                    y_ticks_text[k] = ""                         
+            fig.update_yaxes(
+                range = [-1.5, 1.5],
+                title = r"$\huge{\frac{\gamma/k - (\tau_b - \tau_{f,b})}{\tau_b - \tau_{f,b}}}$",
+                tickmode="array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,                        
+                type = 'linear',
+                )
+            fig.update_layout(
+                margin = dict(l = 200, r = 200, t = 200, b = 200),
+                width = 500 + 400,
+                height = 250 + 400,
+                showlegend = False,                
             )
 
     fig.write_image(fig_filename)
