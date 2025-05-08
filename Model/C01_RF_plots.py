@@ -1559,11 +1559,8 @@ if __name__ == '__main__':
                 ticktext = x_ticks_text,                  
                 type = 'log',
                 )
-            y_ticks = np.arange(-3,4,1)
-            y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
-            for k in range(len(y_ticks_text)):
-                if k%2 == 1:
-                    y_ticks_text[k] = ""                         
+            y_ticks = np.arange(-1,2,1)
+            y_ticks_text = [r"$\huge{" + str(y_tick) + "\%" + "}$" for y_tick in y_ticks]                    
             fig.update_yaxes(
                 range = [-1.5, 1.5],
                 title = r"$\huge{\frac{\gamma/k - (\tau_b - \tau_{f,b})}{\tau_b - \tau_{f,b}}}$",
