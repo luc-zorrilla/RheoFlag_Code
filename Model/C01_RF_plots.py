@@ -67,9 +67,19 @@ writing_dir = temp_folder
 # Figure 9: simulations for a periodic flow, for a clamped axoneme with shear elasticity + shear viscosity
     # Panel a - transects for tau_s (<<, >>) tau_{s,f} with phase and max amplitude
 
-# Figure 10
+# Figure 10 - simulations for a periodic flow, clamped axoneme with bending (elasticity + viscosity)
+    # Panel a - phase diagrams
 
-fig_nbr = 12
+# Figure 11 - simulations for a periodic flow, clamped axoneme with bending (elasticity + viscosity)
+    # Panel a - phase response
+
+# Figure 12 - simulations for a periodic flow, clamped axoneme with bending (elasticity + viscosity)
+    # Panel a - amplitude response
+
+# Figure 13 - inference error
+
+
+fig_nbr = 13
 panel_nbr = 0
 if __name__ == '__main__':
 
@@ -876,7 +886,6 @@ if __name__ == '__main__':
                 margin = dict(l = 200, r = 200, t = 200, b = 200),
                 width = 800, height = 800)
         
-
     # Bending elasticity, varying bending viscosity, flow frequency and amplitude; clamped axoneme
     elif fig_nbr == 7:
 
@@ -1113,7 +1122,7 @@ if __name__ == '__main__':
                 showlegend = False,
             )
 
-    # Inference Bending (elasticity + viscosity)
+    # Inference Bending (elasticity + viscosity): phase diagrams
     elif fig_nbr == 10:
 
         folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
@@ -1186,7 +1195,7 @@ if __name__ == '__main__':
                 ),
                 )
 
-    # Inference Bending (elasticity + viscosity)
+    # Inference Bending (elasticity + viscosity): phase response
     elif fig_nbr == 11:
 
         folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
@@ -1318,7 +1327,7 @@ if __name__ == '__main__':
                 height = 500 + 400*2,
                 )
 
-    # Inference Bending (elasticity + viscosity)
+    # Inference Bending (elasticity + viscosity): amplitude response
     elif fig_nbr == 12:
 
         
@@ -1382,11 +1391,15 @@ if __name__ == '__main__':
                 # gamma = np.sqrt(alpha) * k
                 gamma = np.sqrt(popt[0])*k
                 sd_gamma = A * np.abs(-np.sqrt(np.diag(pcov))[0] * popt[1] / (2 * np.sqrt(popt[0])) - np.sqrt(np.diag(pcov))[1]*np.sqrt(popt[0])) / (popt[1]**2)
+                # sqrt(w0^2gamma^2 + k^2)
+                sqrt_ = np.sqrt((w0*gamma)**2 + k**2)
+                sd_sqrt_ = (w0**2 * gamma * sd_gamma + k * sd_k) / sqrt_
 
                 print("tau_b: ", 1/tau_b_m1)
                 print("k", k, sd_k)
                 print("gamma", gamma, sd_gamma)
                 print("gamma/k", gamma_over_k, sd_gamma_over_k)
+                print("sqrt_", sqrt_, sd_sqrt_)
 
             for l in range(len(tau_b_m1_list)):
                 tau_b_m1 = tau_b_m1_list[l]
@@ -1403,8 +1416,11 @@ if __name__ == '__main__':
                 fig.add_scatter(x = x_samples, y = y_fit, row = 2, col = 1 + l, mode = 'lines', marker_color = cb_dark_orange)
 
                 # (w0^2*gamma^2 + k^2)^(-1/2)
+                sqrt_ = 1 / popt[0]
+                sd_sqrt_ = np.sqrt(np.diag(pcov))[0] / (popt[0]**2)
+
                 print("tau_b: ", 1/tau_b_m1)
-                print("1 / np.sqrt(w0*gamma^2 + k^2) = ", popt[0], np.sqrt(np.diag(pcov))[0])
+                print("sqrt_", sqrt_, sd_sqrt_)
 
                 y_fit_max = y_fit[-1]
                 if y_fit_max <= 1:
@@ -1461,6 +1477,58 @@ if __name__ == '__main__':
                 width = 400 * len(tau_b_m1_list) + 400*2,
                 height = 500 + 400*2,
                 )
+        
+    # Inference Bending (elasticity + viscosity): fit values    
+    elif fig_nbr == 13:
+
+        tau_b = 10**np.arange(0,7,1)[::-1]
+        tau_f_b = 1.3e3 # Approximate value
+        gamma_over_k = np.array([0.99e6, 1.00e5, 1.12e4, 2.29e3, 1.40e3, 1.30e3, 1.29e3])
+        sd_gamma_over_k = np.array([0.01e6, 0.01e5, 0.01e4, 0.02e3, 0.01e3, 0.01e3, 0.01e3])
+        eps_r_tau_b = np.abs((gamma_over_k - tau_b) / tau_b) + 1
+        sd_eps_r_tau_b = sd_gamma_over_k / tau_b
+        eps_r_tau_fb = np.abs((gamma_over_k - tau_f_b) / tau_f_b) + 1
+        sd_eps_r_tau_fb = sd_gamma_over_k / tau_f_b      
+        eps_r_tau_bfb = np.abs((gamma_over_k - (tau_b + tau_f_b)) / (tau_b+tau_f_b)) + 1
+        sd_eps_r_tau_bfb = sd_gamma_over_k / (tau_b + tau_f_b)        
+
+        fig = go.Figure()
+        fig.add_scatter(x = tau_b, y = eps_r_tau_b, 
+            error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_b),
+            mode = 'markers+lines', marker_color = cb_dark_orange,
+            name = r"$\huge{\frac{\gamma}{k \tau_{b}}}$",
+            )
+        fig.add_scatter(x = tau_b, y = eps_r_tau_fb, 
+            error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_fb),
+            mode = 'markers+lines', marker_color = cb_dark_purple,
+            name = r"$\huge{\frac{\gamma}{k \tau_{f,b}}}$",
+            )            
+        fig.add_scatter(x = tau_b, y = eps_r_tau_bfb, 
+            error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_bfb),
+            mode = 'markers', marker_color = cb_red,
+            name = r"$\huge{\frac{\gamma}{k (\tau_b + \tau_{f,b})}}$",
+            )
+
+        x_ticks = np.float_power(10, np.arange(0,10,1)) 
+        x_ticks_text = [r"$\huge{" + sci_notation(x_tick, decimal_digits=-1) + "}$" for x_tick in x_ticks]   
+        for k in range(len(x_ticks_text)):
+            if k%2 == 1:
+                x_ticks_text[k] = ""
+        fig.update_xaxes(
+            title = r"$\huge{\tau_b}$", 
+            type = 'log',
+            tickmode="array",
+            tickvals = x_ticks,
+            ticktext = x_ticks_text,               
+            )
+        y_ticks = np.float_power(10, np.arange(0,4,1))
+        y_ticks_text = [r"$\huge{" + sci_notation(y_tick, decimal_digits=-1) + "}$" for y_tick in y_ticks]
+        fig.update_yaxes(
+            type = 'log',
+            tickmode="array",
+            tickvals = y_ticks,
+            ticktext = y_ticks_text,             
+            )
 
     fig.write_image(fig_filename)
     fig.vs_show()
