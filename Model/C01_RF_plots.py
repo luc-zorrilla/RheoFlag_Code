@@ -76,11 +76,24 @@ writing_dir = temp_folder
 # Figure 12 - simulations for a periodic flow, clamped axoneme with bending (elasticity + viscosity)
     # Panel a - amplitude response
 
-# Figure 13 - inference error
+# Figure 13 -  simulations for a periodic flow, clamped axoneme with bending (elasticity + viscosity)
     # Panel a - 3 errors
     # Panel b - inset for best error
 
-fig_nbr = 13
+# Figure 14 - simulations for a periodic flow, clamped axoneme with shear (elasticity + viscosity)
+    # Panel a - phase diagrams
+
+# Figure 15 - simulations for a periodic flow, clamped axoneme with shear (elasticity + viscosity)
+    # Panel a - phase response
+
+# Figure 16 - simulations for a periodic flow, clamped axoneme with shear (elasticity + viscosity)
+    # Panel a - amplitude response
+
+# Figure 17 - simulations for a periodic flow, clamped axoneme with shear (elasticity + viscosity)
+    # Panel a - 3 errors
+    # Panel b - inset for best error
+
+fig_nbr = 17
 panel_nbr = 1
 if __name__ == '__main__':
 
@@ -1331,7 +1344,6 @@ if __name__ == '__main__':
     # Inference Bending (elasticity + viscosity): amplitude response
     elif fig_nbr == 12:
 
-        
         folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
         folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/"
         folder_name += "VaryingFrequencyAmplitude/"
@@ -1365,7 +1377,7 @@ if __name__ == '__main__':
 
             # Select only for one value of the frequency
             eps = 1e-12
-            w0 = 1e-4
+            w0 = 1e-8
             df_w0 = df.loc[np.abs(df['w0'] - w0) < eps]
 
             fig = make_subplots(rows = 2, cols = len(tau_b_m1_list), subplot_titles = [r"$\huge{\tau_b =" + sci_notation(1/tau_b_m1, 1, 1) + "}$" for tau_b_m1 in tau_b_m1_list])
@@ -1572,6 +1584,455 @@ if __name__ == '__main__':
             fig.update_layout(
                 margin = dict(l = 200, r = 200, t = 200, b = 200),
                 width = 500 + 400,
+                height = 250 + 400,
+                showlegend = False,                
+            )
+
+    # Inference shear (elasticity + viscosity): phase diagrams
+    elif fig_nbr == 14:
+
+        folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+        folder_name += "StraightLine_PeriodicFlow/ShearElasticity_Clamped_VaryingShearViscosity/"
+        folder_name += "VaryingFrequencyAmplitude/"
+        dataframe_filename = folder_name + "maxdev" + ".csv"
+
+        df = pd.read_csv(dataframe_filename)
+
+        eps = 1e-6
+        df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
+        df['log_A'] = df.apply(lambda x: x['log_A']/np.log(10), axis = 1)
+        df['log_tau_s_m1'] = df.apply(lambda x: x['log_tau_s_m1']/np.log(10), axis = 1)
+        df['log_max_y_tip'] = df.apply(lambda x: np.log10(x['max_y_tip']), axis = 1)
+
+        tau_s_m1_list = list(np.unique(df['tau_s_m1']))
+        print('tau_s_m1_list', tau_s_m1_list)
+
+        # Heatmaps
+        if panel_nbr == 0:
+
+            fig = make_subplots(rows = 2, cols = len(tau_s_m1_list), subplot_titles = [r"$\huge{\tau_s =" + sci_notation(1/tau_s_m1, 1, 1) + "}$" for tau_s_m1 in tau_s_m1_list])
+
+            for l in range(len(tau_s_m1_list)):
+                tau_s_m1 = tau_s_m1_list[l]
+                df_tau_s_m1 =  df.loc[np.abs(df['tau_s_m1']- tau_s_m1) < eps]
+                fig_phi_tau_s_m1 = plot_heatmap(df_tau_s_m1, 'log_w0', 'log_A', 'phi_max_y_tip')
+                fig_phi_tau_s_m1.update_traces(coloraxis = 'coloraxis')
+                fig_B_tau_s_m1 = plot_heatmap(df_tau_s_m1, 'log_w0', 'log_A', 'max_y_tip')
+                fig_B_tau_s_m1.update_traces(coloraxis = 'coloraxis2')
+                fig.add_trace(fig_phi_tau_s_m1.data[0], row = 1, col = 1+l)
+                fig.add_trace(fig_B_tau_s_m1.data[0], row = 2, col = 1+l)
+
+            fig.update_xaxes(
+                title = r"$\huge{\log \omega_0}$",
+            )
+            fig.update_yaxes(
+                title = r"$\huge{\log A}$",
+            )            
+
+            fig.update_layout(
+                margin = dict(l = 400, r = 400, t = 400, b = 400),
+                width = 400 * len(tau_s_m1_list) + 400*2,
+                height = 500 * 2 + 400*2,
+                coloraxis=dict(
+                    colorbar = dict(
+                        x = 1, yanchor = 'top', y = 1, 
+                        len = 1/2 - 1/10, 
+                        tickmode="array",
+                        tickcolor = 'black',
+                        tickvals = [0, 0.2, 0.4, 0.6, 0.8, 1],
+                        ticktext = ["0", "0.2", "0.4", "0.6", "0.8", "1"],
+                        ticks = "outside",
+                        tickwidth = 3,
+                        ticklen = 12,
+                        ),
+                    colorscale = dark_purple_scale,
+                ),
+                coloraxis2=dict(
+                    colorbar = dict(
+                        x = 1, yanchor = 'bottom', y = 0, 
+                        len = 1/2 - 1/10,
+                        tickcolor = 'black',
+                        dtick = 1,
+                        ticks = "outside",
+                        tickwidth = 3,
+                        ticklen = 12,                        
+                        ),
+                ),
+                )
+
+    # Inference Shear (elasticity + viscosity): phase response
+    elif fig_nbr == 15:
+
+        folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+        folder_name += "StraightLine_PeriodicFlow/ShearElasticity_Clamped_VaryingShearViscosity/"
+        folder_name += "VaryingFrequencyAmplitude/"
+        dataframe_filename = folder_name + "maxdev" + ".csv"
+
+        df = pd.read_csv(dataframe_filename)
+
+        eps = 1e-6
+        df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
+        df['log_A'] = df.apply(lambda x: x['log_A']/np.log(10), axis = 1)
+        df['log_tau_s_m1'] = df.apply(lambda x: x['log_tau_s_m1']/np.log(10), axis = 1)
+        df['log_max_y_tip'] = df.apply(lambda x: np.log10(x['max_y_tip']), axis = 1)
+
+        tau_s_m1_list = list(np.unique(df['tau_s_m1']))
+        print('tau_s_m1_list', tau_s_m1_list)
+
+        # Transects phi(w0) and phi(A)
+        if panel_nbr == 0:
+            
+            def f_arctan(w_0, a, b):
+                return b + np.arctan(a*w_0)/(2*np.pi)
+
+            # Select only for one value of the amplitude
+            eps = 1e-12
+            A = 1e-3
+            df_A = df.loc[np.abs(df['A'] - A) < eps]
+
+            # Select only for one value of the frequency
+            eps = 1e-12
+            w0 = 1e-7
+            df_w0 = df.loc[np.abs(df['w0'] - w0) < eps]
+
+            fig = make_subplots(rows = 2, cols = len(tau_s_m1_list), subplot_titles = [r"$\huge{\tau_s =" + sci_notation(1/tau_s_m1, 1, 1) + "}$" for tau_s_m1 in tau_s_m1_list])
+    
+            for l in range(len(tau_s_m1_list)):
+                tau_s_m1 = tau_s_m1_list[l]
+                df_tau_s_m1 =  df_A.loc[np.abs(df_A['tau_s_m1'] - tau_s_m1) < eps]
+
+                fig.add_scatter(x = df_tau_s_m1['w0'], y = df_tau_s_m1['phi_max_y_tip'], row = 1, col = 1 + l, mode = 'markers', marker_color = "black")
+
+                if l == 0: #tau_s = 1e5
+                    w0_max = 1e-4
+                elif l == 1: # tau_s = 1e4
+                    w0_max = 1e-3
+                elif l == 2: # tau_s = 1e3
+                    w0_max = 1e-2
+                elif l == 3: # tau_s = 1e2
+                    w0_max = 6e-2
+                elif l == 4: # tau_s = 1e1
+                    w0_max = 1e-1
+                elif l == 5: # tau_s = 1e0
+                    w0_max = 1e-1
+                else: # tau_s = 1e0
+                    w0_max = 1e-1
+                df_fit = df_tau_s_m1.loc[df_tau_s_m1['w0'] - (3/2)*w0_max < 0]
+                popt, pcov = curve_fit(f = f_arctan, xdata = df_fit['w0'], ydata = df_fit['phi_max_y_tip'])
+                
+                # n_samples = 1e3
+                x_samples = np.sort(df_tau_s_m1['w0'])
+                y_fit = f_arctan(x_samples, *popt)
+                fig.add_scatter(x = x_samples, y = y_fit, row = 1, col = 1 + l, mode = 'lines', marker_color = cb_dark_orange)
+                
+                x_ticks = [0, w0_max, 2*w0_max, 3*w0_max]
+                x_ticks_text = [r"$\huge{" + sci_notation(x_tick, decimal_digits = 0) + "}$" for x_tick in x_ticks]  
+                fig.update_xaxes(
+                    range = [0, 3*w0_max], 
+                    tickmode="array",
+                    tickvals = x_ticks,
+                    ticktext = x_ticks_text,
+                    row = 1, 
+                    col = 1+l,
+                    )
+
+                # gamma/k = a
+                gamma_over_k = popt[0]
+                sd_gamma_over_k = np.sqrt(np.diag(pcov))[0]
+                print("gamma/k = ", gamma_over_k, sd_gamma_over_k)
+
+            for l in range(len(tau_s_m1_list)):
+                tau_s_m1 = tau_s_m1_list[l]
+                df_tau_s_m1 =  df_w0.loc[np.abs(df_w0['tau_s_m1'] - tau_s_m1) < eps]
+
+                fig.add_scatter(x = df_tau_s_m1['A'], y = df_tau_s_m1['phi_max_y_tip'], row = 2, col = 1 + l, mode = 'markers', marker_color = "black")
+
+            fig.update_xaxes(
+                title = r"$\huge{\omega_0}$",
+                row = 1,
+            )
+            x_ticks = [0, 5e-1, 1e0]
+            x_ticks_text = [r"$\huge{" + str(x_tick) + "}$" for x_tick in x_ticks]                  
+            fig.update_xaxes(
+                title = r"$\huge{A}$",
+                tickmode="array",
+                tickvals = x_ticks,
+                ticktext = x_ticks_text,                
+                row = 2,
+            )            
+            fig.update_yaxes(
+                title = r"$\huge{\phi_\text{max}}$",
+                col = 1,
+            )
+            y_ticks = [0.25, 0.375, 0.5]
+            y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
+            fig.update_yaxes(
+                range = [0.24, 0.61],
+                tickmode="array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,
+                row = 1,
+            )
+            y_ticks = [0, 0.25, 0.5]
+            y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]            
+            fig.update_yaxes(
+                range = [-0.01, 0.51],
+                tickmode="array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,                
+                row = 2,
+            )
+            for col_m1 in range(1,len(tau_s_m1_list)):
+                fig.update_yaxes(showticklabels = False, col = col_m1 + 1)                        
+
+            fig.update_layout(
+                margin = dict(l = 400, r = 400, t = 400, b = 400),
+                width = 400 * len(tau_s_m1_list) + 400*2,
+                height = 500 + 400*2,
+                )
+
+    # Inference Shear (elasticity + viscosity): amplitude response
+    elif fig_nbr == 16:
+
+        folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+        folder_name += "StraightLine_PeriodicFlow/ShearElasticity_Clamped_VaryingShearViscosity/"
+        folder_name += "VaryingFrequencyAmplitude/"
+        dataframe_filename = folder_name + "maxdev" + ".csv"
+
+        df = pd.read_csv(dataframe_filename)
+
+        eps = 1e-6
+        df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
+        df['log_A'] = df.apply(lambda x: x['log_A']/np.log(10), axis = 1)
+        df['log_tau_s_m1'] = df.apply(lambda x: x['log_tau_s_m1']/np.log(10), axis = 1)
+        df['log_max_y_tip'] = df.apply(lambda x: np.log10(x['max_y_tip']), axis = 1)
+
+        tau_s_m1_list = list(np.unique(df['tau_s_m1']))
+        print('tau_s_m1_list', tau_s_m1_list)
+
+        # Transects B(w0) and B(A)
+        if panel_nbr == 0:
+
+            def f_sqm1(x, alpha, beta):
+                return beta * (alpha * x**2 + 1)**(-1/2)
+
+            def f_lin(x, a, b):
+                return b + a*x
+
+            # Select only for one value of the amplitude
+            eps = 1e-12
+            A = 1e-3
+            df_A = df.loc[np.abs(df['A'] - A) < eps]
+
+            # Select only for one value of the frequency
+            eps = 1e-12
+            w0 = 1e-7
+            df_w0 = df.loc[np.abs(df['w0'] - w0) < eps]
+
+            fig = make_subplots(rows = 2, cols = len(tau_s_m1_list), subplot_titles = [r"$\huge{\tau_s =" + sci_notation(1/tau_s_m1, 1, 1) + "}$" for tau_s_m1 in tau_s_m1_list])
+    
+            for l in range(len(tau_s_m1_list)):
+                tau_s_m1 = tau_s_m1_list[l]
+                df_tau_s_m1 =  df_A.loc[np.abs(df_A['tau_s_m1'] - tau_s_m1) < eps]
+
+                fig.add_scatter(x = df_tau_s_m1['w0'], y = df_tau_s_m1['max_y_tip'], row = 1, col = 1 + l, mode = 'markers', marker_color = "black")
+
+                popt, pcov = curve_fit(f = f_sqm1, xdata = df_tau_s_m1['w0'], ydata = df_tau_s_m1['max_y_tip'])
+                
+                # n_samples = 1e3
+                x_samples = np.sort(df_tau_s_m1['w0'])
+                y_fit = f_sqm1(x_samples, *popt)
+                fig.add_scatter(x = x_samples, y = y_fit, row = 1, col = 1 + l, mode = 'lines', marker_color = cb_dark_orange)
+
+                # gamma/k = np.sqrt(alpha)
+                gamma_over_k = np.sqrt(popt[0])
+                sd_gamma_over_k = np.sqrt(np.diag(pcov))[0] / (2 *  np.sqrt(popt[0]))
+                # k = A/beta, A = 1e-2
+                k = A/popt[1]
+                sd_k = A * np.sqrt(np.diag(pcov))[1] / (popt[1]**2)
+                # gamma = np.sqrt(alpha) * k
+                gamma = np.sqrt(popt[0])*k
+                sd_gamma = A * np.abs(-np.sqrt(np.diag(pcov))[0] * popt[1] / (2 * np.sqrt(popt[0])) - np.sqrt(np.diag(pcov))[1]*np.sqrt(popt[0])) / (popt[1]**2)
+                # sqrt(w0^2gamma^2 + k^2)
+                sqrt_ = np.sqrt((w0*gamma)**2 + k**2)
+                sd_sqrt_ = (w0**2 * gamma * sd_gamma + k * sd_k) / sqrt_
+
+                print("tau_s: ", 1/tau_s_m1)
+                print("k", k, sd_k)
+                print("gamma", gamma, sd_gamma)
+                print("gamma/k", gamma_over_k, sd_gamma_over_k)
+                print("sqrt_", sqrt_, sd_sqrt_)
+
+            for l in range(len(tau_s_m1_list)):
+                tau_s_m1 = tau_s_m1_list[l]
+                df_tau_s_m1 =  df_w0.loc[np.abs(df_w0['tau_s_m1'] - tau_s_m1) < eps]
+
+                fig.add_scatter(x = df_tau_s_m1['A'], y = df_tau_s_m1['max_y_tip'], row = 2, col = 1 + l, mode = 'markers', marker_color = "black")
+
+                max_A = 1e-2
+                df_fit = df_tau_s_m1.loc[df_tau_s_m1['A'] - max_A <= 0]
+                popt, pcov = curve_fit(f = f_lin, xdata = df_fit['A'], ydata = df_fit['max_y_tip'])
+                # n_samples = 1e3
+                x_samples = np.sort(df_tau_s_m1['A'])
+                y_fit = f_lin(x_samples, *popt)
+                fig.add_scatter(x = x_samples, y = y_fit, row = 2, col = 1 + l, mode = 'lines', marker_color = cb_dark_orange)
+
+                # (w0^2*gamma^2 + k^2)^(-1/2)
+                sqrt_ = 1 / popt[0]
+                sd_sqrt_ = np.sqrt(np.diag(pcov))[0] / (popt[0]**2)
+
+                print("tau_s: ", 1/tau_s_m1)
+                print("sqrt_", sqrt_, sd_sqrt_)
+
+                y_fit_max = y_fit[-1]
+                if y_fit_max <= 1:
+                    d_r = 1
+                else:
+                    d_r = 0
+                y_ticks = [0, np.round(y_fit_max/3, d_r), 2*np.round(y_fit_max/3, d_r), np.round(3*np.round(y_fit_max/3, d_r), d_r)]
+                if y_fit_max > 1:
+                    y_ticks = [int(y_tick) for y_tick in y_ticks]
+                y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks] 
+                fig.update_yaxes(
+                    tickmode="array",
+                    tickvals = y_ticks,
+                    ticktext = y_ticks_text,        
+                    row = 2, col = 1 + l,
+                )
+
+            x_log_list = np.arange(-8,1,4)
+            x_ticks = [np.float_power(10, m) for m in x_log_list]
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, decimal_digits=-1) + "}$" for x_tick in x_ticks]                 
+            fig.update_xaxes(
+                title = r"$\huge{\omega_0}$",
+                type = 'log',
+                tickmode="array",
+                tickvals = x_ticks,
+                ticktext = x_ticks_text,   
+                row = 1,
+            )
+            x_ticks = [0, 5e-1, 1e0]
+            x_ticks_text = [r"$\huge{" + str(x_tick) + "}$" for x_tick in x_ticks]              
+            fig.update_xaxes(
+                title = r"$\huge{A}$",
+                tickmode="array",
+                tickvals = x_ticks,
+                ticktext = x_ticks_text,
+                row = 2,
+            )
+            y_log_list = np.arange(-8,-1,2)
+            y_ticks = [np.float_power(10, m) for m in y_log_list]
+            y_ticks_text = [r"$\huge{" + sci_notation(y_tick, decimal_digits=-1) + "}$" for y_tick in y_ticks]                 
+            fig.update_yaxes(
+                type = 'log',
+                tickmode="array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,                     
+                row = 1,
+            )
+            fig.update_yaxes(
+                title = r"$\huge{y_\text{max}}$",
+                col = 1,
+            )
+            fig.update_layout(
+                margin = dict(l = 400, r = 400, t = 400, b = 400),
+                width = 400 * len(tau_s_m1_list) + 400*2,
+                height = 500 + 400*2,
+                )
+        
+    # Inference Shear (elasticity + viscosity): fit values    
+    elif fig_nbr == 17:
+
+        tau_s = np.float_power(10, np.arange(-1,6,1))[::-1]
+        tau_f_s = 6.6e1 # Approximate value
+        gamma_over_k = np.array([9.95e4, 1.00e4, 1.06e3, 1.66e2, 7.61e1, 6.69e1, 6.60e1])
+        sd_gamma_over_k = np.array([0.04e4, 0.01e4, 0.01e3, 0.01e2, 0.03e1, 0.02e1, 0.02e1])
+        eps_r_tau_s = (gamma_over_k - tau_s) / tau_s + 1
+        sd_eps_r_tau_s = sd_gamma_over_k / tau_s
+        eps_r_tau_fb =(gamma_over_k - tau_f_s) / tau_f_s + 1
+        sd_eps_r_tau_fb = sd_gamma_over_k / tau_f_s      
+        eps_r_tau_sfb = (gamma_over_k - (tau_s + tau_f_s)) / (tau_s+tau_f_s) + 1
+        sd_eps_r_tau_sfb = sd_gamma_over_k / (tau_s + tau_f_s)        
+
+        if panel_nbr == 0:
+
+            fig = go.Figure()
+            fig.add_scatter(x = tau_s, y = eps_r_tau_s, 
+                error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_s),
+                mode = 'markers+lines', marker_color = cb_dark_orange,
+                name = r"$\huge{\frac{\gamma}{k \tau_{s}}}$",
+                )
+            fig.add_scatter(x = tau_s, y = eps_r_tau_fb, 
+                error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_fb),
+                mode = 'markers+lines', marker_color = cb_dark_purple,
+                name = r"$\huge{\frac{\gamma}{k \tau_{f,s}}}$",
+                )            
+            fig.add_scatter(x = tau_s, y = eps_r_tau_sfb, 
+                error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_sfb),
+                mode = 'markers', marker_color = cb_red,
+                name = r"$\huge{\frac{\gamma}{k (\tau_s + \tau_{f,s})}}$",
+                )
+
+            x_ticks = np.float_power(10, np.arange(-1,9,1))
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, decimal_digits=-1) + "}$" for x_tick in x_ticks]   
+            for k in range(len(x_ticks_text)):
+                if k%2 == 1:
+                    x_ticks_text[k] = ""
+            fig.update_xaxes(
+                title = r"$\huge{\tau_s}$", 
+                type = 'log',
+                tickmode="array",
+                tickvals = x_ticks,
+                ticktext = x_ticks_text,               
+                )
+            y_ticks = np.float_power(10, np.arange(0,4,1))
+            y_ticks_text = [r"$\huge{" + sci_notation(y_tick, decimal_digits=-1) + "}$" for y_tick in y_ticks]
+            fig.update_yaxes(
+                type = 'log',
+                tickmode="array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,             
+                )
+            fig.update_layout(
+                margin = dict(l = 200, r = 200, t = 200, b = 200),
+                width = 400 + 400,
+                height = 350 + 400,
+            )
+
+        # Plots of relative error of best error functional
+        elif panel_nbr == 1:
+
+            fig = go.Figure()
+            fig.add_scatter(x = tau_s, y = 100*(eps_r_tau_sfb - 1), 
+                error_y = dict(type = 'data', visible = True, array = sd_eps_r_tau_sfb),
+                mode = 'markers', marker_color = cb_red,
+                )
+
+            x_ticks = np.float_power(10, np.arange(-1,9,1))
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, decimal_digits=-1) + "}$" for x_tick in x_ticks]   
+            for k in range(len(x_ticks_text)):
+                if k%2 == 1:
+                    x_ticks_text[k] = ""
+            fig.update_xaxes(
+                title = r"$\huge{\tau_s}$",
+                tickmode="array",
+                tickvals = x_ticks,
+                ticktext = x_ticks_text,                  
+                type = 'log',
+                )
+            y_ticks = np.arange(-1,2,1)
+            y_ticks_text = [r"$\huge{" + str(y_tick) + "\%" + "}$" for y_tick in y_ticks]                    
+            fig.update_yaxes(
+                range = [-1.5, 1.5],
+                title = r"$\huge{\frac{\gamma/k - (\tau_s - \tau_{f,s})}{\tau_s - \tau_{f,s}}}$",
+                tickmode="array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,                        
+                type = 'linear',
+                )
+            fig.update_layout(
+                margin = dict(l = 200, r = 200, t = 200, b = 200),
+                width = 400 + 400,
                 height = 250 + 400,
                 showlegend = False,                
             )
