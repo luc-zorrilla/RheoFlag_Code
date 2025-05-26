@@ -31,6 +31,12 @@ def d_exp(t, tau, A):
 temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 writing_dir = temp_folder
 
+fig_nbr = 4
+panel_nbr = 1
+
+################################
+# Model chapter - benchmarking #
+################################ 
 # Figure 0: analytical results for pure bending, clamped axoneme, with point force at the tip
     # Panel a - stroboscopic view of the filament along with analytical solution
     # Panel b - kinetic energy vs time, showing equilibrium is reached
@@ -47,11 +53,20 @@ writing_dir = temp_folder
 # Figure 3: simulations for shear elasticity + bending elasticity, no viscosity, clamped axoneme
     # Panel a - Counterbend for two different regimes
 
+##############################
+# Model chapter - relaxation #
+##############################
+
 # Figure 4: simulations for bending elasticity + bending viscosity, clamped axoneme
     # Panel a - relaxation for varying bending viscosity
+    # Panel b - fit timescale against internal bending timescale
 
 # Figure 5: simulations for shear elasticity + shear viscosity, clamped axoneme
     # Panel a - relaxation for varying shear viscosities
+
+#####################################
+# Model chapter - harmonic response #
+#####################################
 
 # Figure 6: simulations for a periodic flow, for a clamped axoneme with bending elasticity + bending viscosity
     # Panel a - tip movement for varying bending viscosity and flow frequency: phase
@@ -66,6 +81,10 @@ writing_dir = temp_folder
 
 # Figure 9: simulations for a periodic flow, for a clamped axoneme with shear elasticity + shear viscosity
     # Panel a - transects for tau_s (<<, >>) tau_{s,f} with phase and max amplitude
+
+#########################################
+# Inference chapter - harmonic response #
+#########################################
 
 # Figure 10 - simulations for a periodic flow, clamped axoneme with bending (elasticity + viscosity)
     # Panel a - phase diagrams
@@ -93,8 +112,6 @@ writing_dir = temp_folder
     # Panel a - 3 errors
     # Panel b - inset for best error
 
-fig_nbr = 17
-panel_nbr = 1
 if __name__ == '__main__':
 
     fig_filename = writing_dir + "fig" + "_" + str(fig_nbr) + "_" + "panel" + "_" + str(panel_nbr) + ".pdf"
@@ -597,6 +614,7 @@ if __name__ == '__main__':
     # Bending elasticity, varying bending viscosity, clamped axoneme - relaxation
     elif fig_nbr == 4:
         
+        # Relaxation curves for varying bending viscosity
         if panel_nbr == 0:
 
             folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
@@ -604,8 +622,8 @@ if __name__ == '__main__':
 
             filenames = glob.glob(folder_name + '*.json')
             id_filenames = [os.path.basename(filename).removeprefix("metadata_").removesuffix(".json") for filename in filenames]
-
-            fig = make_subplots(rows = len(id_filenames), cols = 1, shared_xaxes=False)
+            
+            fig = go.Figure()
 
             for l in range(len(id_filenames)):
 
@@ -636,10 +654,31 @@ if __name__ == '__main__':
                 indices_s = StroboscopicView(T_eval_norm[min_index:max_index], n_strobes = n_strobes)
                 c = sample_colorscale(colorscale = dark_purple_scale[::-1], samplepoints = np.linspace(0, 1, num = indices_s.shape[0]))[::-1]        
 
-                # Figure 2
+                # Figure
+                if tau_b < 1e6:
+                    marker_color = 'black'
+                    xaxis_name = "x1"
+                    if tau_b == 0:
+                        line_dash = 'dash'
+                    elif tau_b == 1:
+                        line_dash = 'dot'
+                    elif tau_b == 1e3:
+                        line_dash = 'solid'
+                else:
+                    xaxis_name = "x2"        
+                    marker_color = cb_orange
+                    line_dash = 'solid'
+
                 X_3N = np.array([X3N(X[:,t]) for t in range(X.shape[1])]).squeeze().transpose()
                 x_tip = np.array([X_3N[N-1,:], X_3N[2*N-1,:]])
-                fig.add_scatter(x = np.arange(x_tip.shape[1])*delta_t, y = x_tip[1,:]/x_tip[1,0], row = 1+l, col =1, name = r"$\huge{\tau_b = " + sci_notation(tau_b, 0,0) + "}$", marker_color = "black")
+                fig.add_scatter(
+                    x = np.arange(x_tip.shape[1])*delta_t, 
+                    y = x_tip[1,:]/x_tip[1,0], 
+                    name = r"$\huge{\tau_b = " + sci_notation(tau_b, 0,0) + "}$", 
+                    marker_color = marker_color, 
+                    xaxis = xaxis_name,
+                    line_dash = line_dash,
+                    )
 
                 # Fit to exponentially decreasing function
                 popt, pcov = curve_fit(f = d_exp, xdata = T_eval/delta_t, ydata = x_tip[1,:]/x_tip[1,0])
@@ -649,28 +688,34 @@ if __name__ == '__main__':
                 pcov[1,0] *= delta_t
                 print("tau_b, popt, pcov: ", tau_b, popt, pcov)
 
-            fig.update_xaxes(zeroline = True, title = r"$\huge{t}$")
-            x_ticks = np.arange(0,6)*1e3
-            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, 0, 0) + "}$" for x_tick in x_ticks]       
-            for row in [1,2,3]:
-                fig.update_xaxes(
-                    range = [0,5e3],
-                    row = row,
-                    col = 1,
+            x_ticks_1 = np.arange(0,125,25)*1e2
+            x_ticks_text_1 = [r"$\huge{" + sci_notation(x_tick_1, 1, 1) + "}$" for x_tick_1 in x_ticks_1]
+            x_ticks_2 = np.arange(0,4,1)*1e6
+            x_ticks_text_2 = [r"$\huge{" + sci_notation(x_tick_2, 0, 0) + "}$" for x_tick_2 in x_ticks_2]   
+            fig.update_layout(
+                xaxis = dict(
+                    zeroline = True, 
+                    title = r"$\huge{t}$",
+                    side = 'bottom',
+                    overlaying = 'x',
+                    range = [0, 1e4],
                     tickmode = "array",
-                    tickvals = x_ticks,
-                    ticktext = x_ticks_text
-                )
-            x_ticks = np.arange(0,6)*1e6
-            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, 0, 0) + "}$" for x_tick in x_ticks] 
-            fig.update_xaxes(
-                range = [0,5e6],
-                row = 4,
-                col = 1,
-                tickmode = "array",
-                tickvals = x_ticks,
-                ticktext = x_ticks_text                
-            )
+                    tickvals = x_ticks_1,
+                    ticktext = x_ticks_text_1,
+                ),
+                xaxis2 = dict(
+                    zeroline = True, 
+                    title = r"$\huge{t}$",
+                    side = 'top',
+                    overlaying = 'x',                    
+                    range = [0, 3e6],
+                    tickmode = "array",
+                    tickvals = x_ticks_2,
+                    ticktext = x_ticks_text_2,
+                    linecolor = cb_orange,
+                    tickcolor = cb_orange,
+                ),
+                )             
             y_ticks = np.float_power(10, (np.arange(-2,1)))
             y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
             fig.update_yaxes(
@@ -684,9 +729,63 @@ if __name__ == '__main__':
             fig.update_layout(
                 margin = dict(l = 200, r = 200, t = 200, b = 200),
                 width = 300 + 400, 
-                height = 300 * len(id_filenames) + 400, 
+                height = 300 + 400, 
                 showlegend = True,
                 )
+
+        # Fit timescale against bending viscosity
+        elif panel_nbr == 1:
+
+            tau_b_list = [0, 1, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6]
+            tau_fit_list = [1.32370907e+03, 1.32917591e+03, 1.33100003e+03, 1.43848476e+03, 2.38949445e+03, 1.14066673e+04, 1.01144517e+05, 1.00163941e+06]
+            delta_tau_fit_list = [9.91664631e-01, 1.06888231e+00, 1.17750208e+00, 1.89812829e+00, 1.07628131e+00, 1.60957857e+02, 4.27311246e+04, 2.06367158e+03]
+
+            # Linear relation
+            npoints = 1000
+            x_tau = np.float_power(10, np.linspace(-0.2,6.2,npoints))
+
+            # Constant at origin
+            tau_f_b = tau_fit_list[0]
+            y_tau_constant = np.ones_like(x_tau)*tau_f_b
+
+            fig = go.Figure()
+            fig.add_scatter(x = x_tau, y = x_tau, mode = 'lines', marker_color = cb_purple, name = r"$\huge{\tau = \tau_b}$", line_dash = 'dash')
+            fig.add_scatter(x = x_tau, y = y_tau_constant, mode = 'lines', marker_color = cb_blue, name = r"$\huge{\tau = \tau_{f,b}}$", line_dash = 'dash')
+            fig.add_scatter(x = x_tau, y = x_tau + y_tau_constant, mode = 'lines', marker_color = cb_red, name = r"$\huge{\tau = \tau_{f,b} + \tau_b}$")
+            fig.add_scatter(
+                x = tau_b_list[1:],
+                y = tau_fit_list[1:], 
+                error_y = dict(type = 'data', visible = True, array = delta_tau_fit_list[1:]),
+                marker_color = 'black',
+                marker_size = 10,
+                mode = 'markers',
+                name = r"$\huge{\tau_\text{fit}}$",
+                )
+
+            x_ticks = np.float_power(10, np.arange(0,7,2))
+            x_ticks_text = [r"$\huge{" + sci_notation(x_tick, 0, 0) + "}$" for x_tick in x_ticks]   
+            fig.update_xaxes(
+                type = 'log',
+                range = [-0.1,6.1],
+                tickmode = "array",
+                tickvals = x_ticks,
+                ticktext = x_ticks_text,
+                title = r"$\huge{\tau_b}$",               
+                ) 
+            y_ticks = np.float_power(10, np.arange(0,7,1))
+            y_ticks_text = [r"$\huge{" + sci_notation(y_tick, 0, 0) + "}$" for y_tick in y_ticks]                   
+            fig.update_yaxes(
+                type = 'log',
+                range = [3,6.1],
+                tickmode = "array",
+                tickvals = y_ticks,
+                ticktext = y_ticks_text,    
+                )
+            fig.update_layout(
+                margin = dict(l = 400, r = 400, b = 400, t = 400),
+                width = 300 + 800,
+                height = 300 + 800,
+            )
 
     # Shear elasticity, varying shear viscosity, clamped axoneme - relaxation
     elif fig_nbr == 5:
