@@ -31,8 +31,8 @@ def d_exp(t, tau, A):
 temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 writing_dir = temp_folder
 
-fig_nbr = 5
-panel_nbr = 0
+fig_nbr = 1
+panel_nbr = 2
 
 ################################
 # Model chapter - benchmarking #
@@ -132,8 +132,8 @@ if __name__ == '__main__':
             metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
             data_filename = folder_name + 'data_' + id_filename + '.csv'
             solver_dict = get_metadata(metadata_filename) 
-            output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
-            X = get_data(data_filename) # s, t
+            output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values()) # bool_EI is missing in this metadata
+            X = get_data(data_filename) # s, t 
             X_3N_final = X3N(X[:,-1])
 
             T_eval = np.array(T_eval)
@@ -152,17 +152,16 @@ if __name__ == '__main__':
             indices_s = StroboscopicView(T_eval_norm[min_index:max_index], n_strobes=n_strobes)
             c = sample_colorscale('matter_r', np.linspace(0, 1, num = indices_s.shape[0]))[::-1]
 
-            # Analytical Equilbrium Profile
+            # Analytical Equilibrium Profile
             if panel_nbr == 0:
                 
                 n_eq = 1000
                 X_3N_eq = CheckEquilibrium(N, A, gamma, Sp4, n_L = n_L, Lambdas=Lambdas, conditions = "vertical_point_tip", n_eq = n_eq)
-                # ["vertical_point_tip", "vertical_density_tip", "vertical_density_uniform", "vertical_flow_uniform"]
 
                 fig = go.Figure()
-                for k in range(indices_s.shape[0]):
-                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0]/N, y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], line_width = 1, showlegend = (k in [0, indices_s.shape[0]-1]), name = [r"$\huge{\boldsymbol{y}_0}$", r"$\huge{\boldsymbol{y}_\text{eq}}$"][k > 0])
-                fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N, y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = cb_dark_red, line_width = 2, name = r"$\huge{\boldsymbol{y}^\star}$")
+                fig.add_scatter(x = X3N(X[:,0])[:N, 0]/N, y = X3N(X[:,0])[N:2*N, 0], marker_color = "black", name = r"$\huge{\boldsymbol{y}_0}$", line_width = 6)
+                fig.add_scatter(x = X3N(X[:,-1])[:N, 0]/N, y = X3N(X[:,-1])[N:2*N, 0], marker_color = cb_orange, name = r"$\huge{\boldsymbol{y}_\text{eq}}$", line_dash = "dash", line_width = 6)
+                fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N, y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = cb_dark_purple, name = r"$\huge{\boldsymbol{y}^\star}$", line_dash = "dot", line_width = 6)
 
                 x_ticks = np.round(np.linspace(0,1,11),2)
                 x_ticks_text = [r"$\huge{" + str(x_tick) + "}$" for x_tick in x_ticks]
@@ -177,7 +176,7 @@ if __name__ == '__main__':
                 y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
                 fig.update_yaxes(
                     title = r'$\huge{Y(s)}$',
-                    range = [0,3e-2],
+                    range = [-1e-3,3e-2],
                     tickmode = 'array',
                     tickvals = y_ticks,
                     ticktext = y_ticks_text
@@ -211,9 +210,7 @@ if __name__ == '__main__':
                 # Kinetic energy
                 K = KineticEnergy(X, N, T_eval) # t
                 fig = go.Figure()
-                fig.add_scatter(x = T_eval, y = K, line_width = 2)
-                for k in range(indices_s.shape[0]):
-                    fig.add_scatter(x = [T_eval[indices_s[k]]], y = [K[indices_s[k]]], marker_color = c[k], mode = 'markers', marker_size = 6)
+                fig.add_scatter(x = T_eval, y = K, line_width = 6)
 
                 x_ticks = 10 ** np.arange(10) + 1e-9 # needed to add 1e-3 due to approximation in sci_notation.
                 x_ticks_text = [r"$\huge{" + sci_notation(x_tick, -1, -1) + "}$" for x_tick in x_ticks] 
@@ -264,7 +261,7 @@ if __name__ == '__main__':
                 metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
                 data_filename = folder_name + 'data_' + id_filename + '.csv'
                 solver_dict = get_metadata(metadata_filename)
-                output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values()) # bool_EI is not present in this metadata
                 tau_b = taus_b[0]
                 if T_sim == np.inf:
                     print('Not solved. Error: ', X)
@@ -282,7 +279,7 @@ if __name__ == '__main__':
                 L2_error_array[l] = L2_error
 
             fig = go.Figure()
-            fig.add_scatter(x = 1 / np.arange(5, 50, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red, marker_size = 6)
+            fig.add_scatter(x = 1 / np.arange(5, 50, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red, marker_size = 12)
 
             x_range = np.log10(np.array([0.02, 0.12]))
             x_ticks = np.array([1,2,3,4,5,6,7,8,9,10,20]) * 1e-2
@@ -334,7 +331,7 @@ if __name__ == '__main__':
             metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
             data_filename = folder_name + 'data_' + id_filename + '.csv'
             solver_dict = get_metadata(metadata_filename)
-            output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+            output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values()) # bool_EI is not present in this metadata
             X = get_data(data_filename) # s, t
             X_3N_final = X3N(X[:,-1])
 
@@ -359,12 +356,11 @@ if __name__ == '__main__':
                 
                 n_eq = 1000
                 X_3N_eq = CheckEquilibrium(N, A, gamma, Sp4, n_L = n_L, Lambdas=Lambdas, conditions = "vertical_flow_uniform", n_eq = n_eq)
-                # ["vertical_point_tip", "vertical_density_tip", "vertical_density_uniform", "vertical_flow_uniform"]
 
                 fig = go.Figure()
-                for k in range(indices_s.shape[0]):
-                    fig.add_scatter(x = X3N(X[:,indices_s[k]])[:N, 0]/N, y = X3N(X[:,indices_s[k]])[N:2*N, 0], marker_color = c[k], line_width = 1, showlegend = (k in [0, indices_s.shape[0]-1]), name = [r"$\huge{\boldsymbol{y}(0)}$", r"$\huge{\boldsymbol{y}_{eq}}$"][k > 0])
-                fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N, y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = cb_dark_red, line_width = 2, name = r"$\huge{\boldsymbol{y}^\star}$")
+                fig.add_scatter(x = X3N(X[:,0])[:N, 0]/N, y = X3N(X[:,0])[N:2*N, 0], marker_color = "black", line_width = 6, name = r"$\huge{\boldsymbol{y}(0)}$")
+                fig.add_scatter(x = X3N(X[:,-1])[:N, -1]/N, y = X3N(X[:,-1])[N:2*N, -1], marker_color = cb_orange, line_width = 6, name = r"$\huge{\boldsymbol{y}(0)}$", line_dash = 'dash')                
+                fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N, y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = cb_dark_purple, line_width = 6, name = r"$\huge{\boldsymbol{y}^\star}$", line_dash = 'dot')
 
                 x_ticks = np.round(np.linspace(0,1,11),2)
                 x_ticks_text = [r"$\huge{" + str(x_tick) + "}$" for x_tick in x_ticks]
@@ -379,7 +375,7 @@ if __name__ == '__main__':
                 y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]
                 fig.update_yaxes(
                     title = r'$\huge{Y(s)}$',
-                    range = [0,3e-2],
+                    range = [-1e-3,3e-2],
                     tickmode = 'array',
                     tickvals = y_ticks,
                     ticktext = y_ticks_text
@@ -413,9 +409,7 @@ if __name__ == '__main__':
                 # Kinetic energy
                 K = KineticEnergy(X, N, T_eval) # t
                 fig = go.Figure()
-                fig.add_scatter(x = T_eval, y = K, line_width = 2)
-                for k in range(indices_s.shape[0]):
-                    fig.add_scatter(x = [T_eval[indices_s[k]]], y = [K[indices_s[k]]], marker_color = c[k], mode = 'markers', marker_size = 6)
+                fig.add_scatter(x = T_eval, y = K, line_width = 6)
 
                 x_ticks = 10 ** np.arange(10) + 1e-9 # needed to add 1e-3 due to approximation in sci_notation.
                 x_ticks_text = [r"$\huge{" + sci_notation(x_tick, -1, -1) + "}$" for x_tick in x_ticks] 
@@ -467,7 +461,7 @@ if __name__ == '__main__':
                 data_filename = folder_name + 'data_' + id_filename + '.csv'
 
                 solver_dict = get_metadata(metadata_filename)
-                output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+                output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values()) # bool_EI is not present in this metadata
                 tau_b = taus_b[0]
                 if T_sim == np.inf:
                     print('Not solved. Error: ', X)
@@ -485,7 +479,7 @@ if __name__ == '__main__':
                 L2_error_array[l] = L2_error
 
             fig = go.Figure()
-            fig.add_scatter(x = 1/np.arange(5, 60, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red, marker_size = 6)
+            fig.add_scatter(x = 1/np.arange(5, 60, 5), y = L2_error_array, mode = 'markers', marker_color = cb_dark_red, marker_size = 12)
 
             x_range = np.log10(np.array([0.017, 0.12]))
             x_ticks = np.array([1,2,3,4,5,6,7,8,9,10,20]) * 1e-2
