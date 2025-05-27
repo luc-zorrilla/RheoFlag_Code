@@ -31,8 +31,8 @@ def d_exp(t, tau, A):
 temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 writing_dir = temp_folder
 
-fig_nbr = 1
-panel_nbr = 2
+fig_nbr = 5
+panel_nbr = 1
 
 ################################
 # Model chapter - benchmarking #
@@ -673,6 +673,7 @@ if __name__ == '__main__':
                     marker_color = marker_color, 
                     xaxis = xaxis_name,
                     line_dash = line_dash,
+                    line_width = 6,
                     )
 
                 # Fit to exponentially decreasing function
@@ -744,15 +745,15 @@ if __name__ == '__main__':
             y_tau_constant = np.ones_like(x_tau)*tau_f_b
 
             fig = go.Figure()
-            fig.add_scatter(x = x_tau, y = x_tau, mode = 'lines', marker_color = cb_purple, name = r"$\huge{\tau = \tau_b}$", line_dash = 'dash')
-            fig.add_scatter(x = x_tau, y = y_tau_constant, mode = 'lines', marker_color = cb_blue, name = r"$\huge{\tau = \tau_{f,b}}$", line_dash = 'dash')
-            fig.add_scatter(x = x_tau, y = x_tau + y_tau_constant, mode = 'lines', marker_color = cb_red, name = r"$\huge{\tau = \tau_{f,b} + \tau_b}$")
+            fig.add_scatter(x = x_tau, y = x_tau, mode = 'lines', marker_color = cb_purple, name = r"$\huge{\tau = \tau_b}$", line_dash = 'dash', line_width = 6)
+            fig.add_scatter(x = x_tau, y = y_tau_constant, mode = 'lines', marker_color = cb_blue, name = r"$\huge{\tau = \tau_{f,b}}$", line_dash = 'dash', line_width = 6)
+            fig.add_scatter(x = x_tau, y = x_tau + y_tau_constant, mode = 'lines', marker_color = cb_red, name = r"$\huge{\tau = \tau_{f,b} + \tau_b}$", line_width = 6)
             fig.add_scatter(
                 x = tau_b_list[1:],
                 y = tau_fit_list[1:], 
                 error_y = dict(type = 'data', visible = True, array = delta_tau_fit_list[1:]),
                 marker_color = 'black',
-                marker_size = 10,
+                marker_size = 12,
                 mode = 'markers',
                 name = r"$\huge{\tau_\text{fit}}$",
                 )
@@ -849,6 +850,7 @@ if __name__ == '__main__':
                     marker_color = marker_color, 
                     xaxis = xaxis_name,
                     line_dash = line_dash,
+                    line_width = 6,
                     )
 
                 # Fit to exponentially decreasing function
@@ -920,15 +922,15 @@ if __name__ == '__main__':
             y_tau_constant = np.ones_like(x_tau)*tau_f_s
 
             fig = go.Figure()
-            fig.add_scatter(x = x_tau, y = x_tau, mode = 'lines', marker_color = cb_purple, name = r"$\huge{\tau = \tau_s}$", line_dash = 'dash')
-            fig.add_scatter(x = x_tau, y = y_tau_constant, mode = 'lines', marker_color = cb_blue, name = r"$\huge{\tau = \tau_{f,s}}$", line_dash = 'dash')
-            fig.add_scatter(x = x_tau, y = x_tau + y_tau_constant, mode = 'lines', marker_color = cb_red, name = r"$\huge{\tau = \tau_{f,s} + \tau_s}$")
+            fig.add_scatter(x = x_tau, y = x_tau, mode = 'lines', marker_color = cb_purple, name = r"$\huge{\tau = \tau_s}$", line_dash = 'dash', line_width = 6)
+            fig.add_scatter(x = x_tau, y = y_tau_constant, mode = 'lines', marker_color = cb_blue, name = r"$\huge{\tau = \tau_{f,s}}$", line_dash = 'dash', line_width = 6)
+            fig.add_scatter(x = x_tau, y = x_tau + y_tau_constant, mode = 'lines', marker_color = cb_red, name = r"$\huge{\tau = \tau_{f,s} + \tau_s}$", line_width = 6)
             fig.add_scatter(
                 x = tau_s_list[1:],
                 y = tau_fit_list[1:], 
                 error_y = dict(type = 'data', visible = True, array = delta_tau_fit_list[1:]),
                 marker_color = 'black',
-                marker_size = 10,
+                marker_size = 12,
                 mode = 'markers',
                 name = r"$\huge{\tau_\text{fit}}$",
                 )
