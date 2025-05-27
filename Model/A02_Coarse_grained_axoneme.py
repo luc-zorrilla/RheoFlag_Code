@@ -45,24 +45,24 @@ if __name__ == "__main__":
     #################################
     # Bending elasticity activation #
     #################################
-    bool_EI = True # Default is True
+    bool_EI = False # Default is True
     #################################
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [0]
+    Beta_list = [1]
     ####################################
 
     ###############################
     # Bending viscosity timescale #
     # remark : it is in tau_s units
-    Tau_b_list = [1e5]
+    Tau_b_list = [0]
     taus_b_list = [[[tau_b]*(N-1) for tau_b in Tau_b_list] for N in N_list]
     ###############################
 
     ##############################
     # Shear viscosity activation #
-    tau_s_list = [0]
+    tau_s_list = [6e4]
     ##############################
 
     ####################################
@@ -213,8 +213,8 @@ if __name__ == "__main__":
     # T_max_list = [2*np.pi*100/w0 for w0 in w0_list]
 
     # Same time for all simulations
-    dT_list = [5e4 for w0 in w0_list]
-    T_max_list = [5e5 for w0 in w0_list]
+    dT_list = [6e3 for w0 in w0_list]
+    T_max_list = [6e5 for w0 in w0_list]
 
     T_span_list = [[0, T_max] for T_max in T_max_list]
     T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l]))] for l in range(len(w0_list))]
