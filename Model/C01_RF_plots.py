@@ -31,8 +31,8 @@ def d_exp(t, tau, A):
 temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 writing_dir = temp_folder
 
-fig_nbr = 8
-panel_nbr = 1
+fig_nbr = 9
+panel_nbr = 0
 
 ################################
 # Model chapter - benchmarking #
@@ -1132,7 +1132,7 @@ if __name__ == '__main__':
             y_ticks = np.arange(-6,1,2)
             y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]            
             fig.update_yaxes(
-                title = r"$\huge{\log{y_\text{max}}}$",
+                title = r"$\huge{\log{y_\text{max}^\circ}}$",
                 range = [-6.1, 0.1],
                 secondary_y = True,
                 tickmode = "array",
@@ -1144,7 +1144,7 @@ if __name__ == '__main__':
             y_ticks = np.arange(-3,1,1)
             y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]            
             fig.update_yaxes(
-                title = r"$\huge{\log{y_\text{max}}}$",
+                title = r"$\huge{\log{y_\text{max}^\circ}}$",
                 range = [-2.5, 0.1],
                 secondary_y = True,
                 tickmode = "array",
@@ -1283,7 +1283,7 @@ if __name__ == '__main__':
             y_ticks = np.arange(-6,1,2)
             y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]            
             fig.update_yaxes(
-                title = r"$\huge{\log{y_\text{max}}}$",
+                title = r"$\huge{\log{y_\text{max}^\circ}}$",
                 range = [-4.8, 0.1],
                 secondary_y = True,
                 tickmode = "array",
@@ -1295,7 +1295,7 @@ if __name__ == '__main__':
             y_ticks = np.arange(-3,1,1)
             y_ticks_text = [r"$\huge{" + str(y_tick) + "}$" for y_tick in y_ticks]            
             fig.update_yaxes(
-                title = r"$\huge{\log{y_\text{max}}}$",
+                title = r"$\huge{\log{y_\text{max}^\circ}}$",
                 range = [-2.7, 0.1],
                 secondary_y = True,
                 tickmode = "array",
