@@ -31,7 +31,7 @@ def d_exp(t, tau, A):
 temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 writing_dir = temp_folder
 
-fig_nbr = 5
+fig_nbr = 8
 panel_nbr = 1
 
 ################################
@@ -72,6 +72,7 @@ panel_nbr = 1
 # Figure 6: simulations for a periodic flow, for a clamped axoneme with bending elasticity + bending viscosity
     # Panel a - tip movement for varying bending viscosity and flow frequency: phase
     # Panel b - tip movement for varying bending viscosity and flow frequency: max amplitude
+    # Panels c and d: trials with varying amplitude. Not useful here. 
 
 # Figure 7: simulations for a periodic flow, for a clamped axoneme with bending elasticity + bending viscosity
     # Panel a - transect for tau_b (<<, >>) tau_{b,f} with phase and max amplitude
@@ -966,6 +967,7 @@ if __name__ == '__main__':
         folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
         folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/VaryingFrequencyAmplitude/"
         dataframe_filename = folder_name + "maxdev" + ".csv"
+        N = 10
 
         df = pd.read_csv(dataframe_filename)
 
@@ -977,7 +979,9 @@ if __name__ == '__main__':
             df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
 
         df['log_tau_b_m1'] = df.apply(lambda x: x['log_tau_b_m1']/np.log(10), axis = 1)
+        df['max_y_tip'] = df.apply(lambda x: x['max_y_tip']/N, axis = 1)
         df['log_max_y_tip'] = df.apply(lambda x: np.log10(x['max_y_tip']), axis = 1)
+        
     
         if panel_nbr == 0: # Phase
 
@@ -985,12 +989,10 @@ if __name__ == '__main__':
             fig = plot_heatmap(df, 'log_w0', 'log_tau_b_m1', 'phi_max_y_tip')
             fig.update_layout(
                 xaxis_title = r"$\huge{\log{\omega_0}}$",
-                yaxis_title = r"$\huge{\log{\tau_b^{-1}}}$",
-                # coloraxis_cmin = 0.25,
-                # coloraxis_cmax = 0.5,                
+                yaxis_title = r"$\huge{\log{\tau_b^{-1}}}$", 
                 coloraxis_colorbar = dict(
                     title = r"$\huge{\phi_\text{max}}$",
-                    orientation = "h",
+                    orientation = "v",
                     tickmode="array",
                     tickcolor = 'black',
                     tickvals = [0, 0.25, 0.5, 0.75, 1],
@@ -1010,12 +1012,9 @@ if __name__ == '__main__':
                 xaxis_title = r"$\huge{\log{\omega_0}}$",
                 yaxis_title = r"$\huge{\log{\tau_b^{-1}}}$",
                 coloraxis_colorbar = dict(
-                    title = r"$\huge{y_\text{max}}$",
-                    orientation = "h",
-                    # tickmode="array",
+                    title = r"$\huge{\frac{\displaystyle y_\text{max}}{\displaystyle N}}$",
+                    orientation = "v",
                     tickcolor = 'black',
-                    # tickvals = [0, 0.25, 0.5, 0.75, 1],
-                    # ticktext = ["0", "0.25", "0.5", "0.75", "1"],
                     ticks = "outside",
                     tickwidth = 3,
                     ticklen = 12,
@@ -1061,7 +1060,7 @@ if __name__ == '__main__':
                 xaxis_title = r"$\huge{\log{A}}$",
                 yaxis_title = r"$\huge{\log{\tau_b^{-1}}}$",
                 coloraxis_colorbar = dict(
-                    title = r"$\huge{y_\text{max}}$",
+                    title = r"$\huge{\frac{\displaystyle y_\text{max}}{N}}$",
                     orientation = "h",
                     # tickmode="array",
                     tickcolor = 'black',
@@ -1170,6 +1169,7 @@ if __name__ == '__main__':
         dataframe_filename = folder_name + "maxdev" + ".csv"
 
         df = pd.read_csv(dataframe_filename)
+        N = 10
 
         # Select only for one value of the amplitude: A = 1e-2
         eps = 1e-2
@@ -1177,6 +1177,7 @@ if __name__ == '__main__':
         df = df.loc[np.abs(df['A']- A) < eps]
         df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
         df['log_tau_s_m1'] = df.apply(lambda x: x['log_tau_s_m1']/np.log(10), axis = 1)
+        df['max_y_tip'] = df.apply(lambda x: x['max_y_tip']/N, axis = 1)
         df['log_max_y_tip'] = df.apply(lambda x: np.log10(x['max_y_tip']), axis = 1)
 
         if panel_nbr == 0:
@@ -1189,7 +1190,7 @@ if __name__ == '__main__':
                 # coloraxis_cmax = 0.5,
                 coloraxis_colorbar = dict(
                     title = r"$\huge{\phi_\text{max}}$",
-                    orientation = 'h',
+                    orientation = 'v',
                     tickmode="array",
                     tickcolor = 'black',
                     tickvals = [0, 0.25, 0.5, 0.75, 1],
@@ -1209,8 +1210,8 @@ if __name__ == '__main__':
                 xaxis_title = r"$\huge{\log{\omega_0}}$",
                 yaxis_title = r"$\huge{\log{\tau_s^{-1}}}$",
                 coloraxis_colorbar = dict(
-                    title = r"$\huge{y_\text{max}}$",
-                    orientation = "h",
+                    title = r"$\huge{\frac{\displaystyle y_\text{max}}{\displaystyle N}}$",
+                    orientation = "v",
                     # tickmode="array",
                     tickcolor = 'black',
                     # tickvals = [0, 0.25, 0.5, 0.75, 1],
