@@ -358,8 +358,8 @@ if __name__ == '__main__':
                 X_3N_eq = CheckEquilibrium(N, A, gamma, Sp4, n_L = n_L, Lambdas=Lambdas, conditions = "vertical_flow_uniform", n_eq = n_eq)
 
                 fig = go.Figure()
-                fig.add_scatter(x = X3N(X[:,0])[:N, 0]/N, y = X3N(X[:,0])[N:2*N, 0], marker_color = "black", line_width = 6, name = r"$\huge{\boldsymbol{y}(0)}$")
-                fig.add_scatter(x = X3N(X[:,-1])[:N, -1]/N, y = X3N(X[:,-1])[N:2*N, -1], marker_color = cb_orange, line_width = 6, name = r"$\huge{\boldsymbol{y}(0)}$", line_dash = 'dash')                
+                fig.add_scatter(x = X3N(X[:,0])[:N, 0]/N, y = X3N(X[:,0])[N:2*N, 0], marker_color = "black", line_width = 6, name = r"$\huge{\boldsymbol{y}_0}$")
+                fig.add_scatter(x = X3N(X[:,-1])[:N, -1]/N, y = X3N(X[:,-1])[N:2*N, -1], marker_color = cb_orange, line_width = 6, name = r"$\huge{\boldsymbol{y}_\text{eq}}$", line_dash = 'dash')                
                 fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N, y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = cb_dark_purple, line_width = 6, name = r"$\huge{\boldsymbol{y}^\star}$", line_dash = 'dot')
 
                 x_ticks = np.round(np.linspace(0,1,11),2)
