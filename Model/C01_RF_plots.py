@@ -63,6 +63,7 @@ panel_nbr = 0
 
 # Figure 5: simulations for shear elasticity + shear viscosity, clamped axoneme
     # Panel a - relaxation for varying shear viscosities
+    # Panel b - fit timescale against internal shear timescale
 
 #####################################
 # Model chapter - harmonic response #
@@ -850,7 +851,7 @@ if __name__ == '__main__':
                 fig.add_scatter(
                     x = np.arange(x_tip.shape[1])*delta_t, 
                     y = x_tip[1,:]/x_tip[1,0], 
-                    name = r"$\huge{\tau_b = " + sci_notation(tau_s, 0,0) + "}$", 
+                    name = r"$\huge{\tau_s = " + sci_notation(tau_s, 0,0) + "}$", 
                     marker_color = marker_color, 
                     xaxis = xaxis_name,
                     line_dash = line_dash,
