@@ -31,8 +31,8 @@ def d_exp(t, tau, A):
 temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 writing_dir = temp_folder
 
-fig_nbr = 18
-panel_nbr = 1
+fig_nbr = 14
+panel_nbr = 0
 
 ################################
 # Model chapter - benchmarking #
@@ -1326,6 +1326,7 @@ if __name__ == '__main__':
         folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/"
         folder_name += "VaryingFrequencyAmplitude/"
         dataframe_filename = folder_name + "maxdev" + ".csv"
+        N = 10
 
         df = pd.read_csv(dataframe_filename)
 
@@ -1333,6 +1334,7 @@ if __name__ == '__main__':
         df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
         df['log_A'] = df.apply(lambda x: x['log_A']/np.log(10), axis = 1)
         df['log_tau_b_m1'] = df.apply(lambda x: x['log_tau_b_m1']/np.log(10), axis = 1)
+        df['max_y_tip'] = df.apply(lambda x: x['max_y_tip']/N, axis = 1)
         df['log_max_y_tip'] = df.apply(lambda x: np.log10(x['max_y_tip']), axis = 1)
 
         tau_b_m1_list = list(np.unique(df['tau_b_m1']))
@@ -1367,6 +1369,7 @@ if __name__ == '__main__':
                 height = 500 * 2 + 400*2,
                 coloraxis=dict(
                     colorbar = dict(
+                        title = r"$\huge{\phi_\text{max}}$",
                         x = 1, yanchor = 'top', y = 1, 
                         len = 1/2 - 1/10, 
                         tickmode="array",
@@ -1381,10 +1384,11 @@ if __name__ == '__main__':
                 ),
                 coloraxis2=dict(
                     colorbar = dict(
+                        title = r"$\huge{\frac{\displaystyle y_\text{max}}{N}}$",
                         x = 1, yanchor = 'bottom', y = 0, 
                         len = 1/2 - 1/10,
                         tickcolor = 'black',
-                        dtick = 1,
+                        # dtick = 1,
                         ticks = "outside",
                         tickwidth = 3,
                         ticklen = 12,                        
@@ -1778,6 +1782,7 @@ if __name__ == '__main__':
         folder_name += "StraightLine_PeriodicFlow/ShearElasticity_Clamped_VaryingShearViscosity/"
         folder_name += "VaryingFrequencyAmplitude/"
         dataframe_filename = folder_name + "maxdev" + ".csv"
+        N = 10
 
         df = pd.read_csv(dataframe_filename)
 
@@ -1785,6 +1790,7 @@ if __name__ == '__main__':
         df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
         df['log_A'] = df.apply(lambda x: x['log_A']/np.log(10), axis = 1)
         df['log_tau_s_m1'] = df.apply(lambda x: x['log_tau_s_m1']/np.log(10), axis = 1)
+        df['max_y_tip'] = df.apply(lambda x: x['max_y_tip']/N, axis = 1)
         df['log_max_y_tip'] = df.apply(lambda x: np.log10(x['max_y_tip']), axis = 1)
 
         tau_s_m1_list = list(np.unique(df['tau_s_m1']))
@@ -1818,6 +1824,7 @@ if __name__ == '__main__':
                 height = 500 * 2 + 400*2,
                 coloraxis=dict(
                     colorbar = dict(
+                        title = r"$\huge{\phi_\text{max}}$",
                         x = 1, yanchor = 'top', y = 1, 
                         len = 1/2 - 1/10, 
                         tickmode="array",
@@ -1832,10 +1839,11 @@ if __name__ == '__main__':
                 ),
                 coloraxis2=dict(
                     colorbar = dict(
+                        title = r"$\huge{\frac{\displaystyle y_\text{max}}{\displaystyle N}}$",
                         x = 1, yanchor = 'bottom', y = 0, 
                         len = 1/2 - 1/10,
                         tickcolor = 'black',
-                        dtick = 1,
+                        # dtick = 1,
                         ticks = "outside",
                         tickwidth = 3,
                         ticklen = 12,                        
