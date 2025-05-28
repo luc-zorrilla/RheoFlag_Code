@@ -31,7 +31,7 @@ def d_exp(t, tau, A):
 temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 writing_dir = temp_folder
 
-fig_nbr = 9
+fig_nbr = 18
 panel_nbr = 0
 
 ################################
@@ -113,6 +113,14 @@ panel_nbr = 0
 # Figure 17 - simulations for a periodic flow, clamped axoneme with shear (elasticity + viscosity)
     # Panel a - 3 errors
     # Panel b - inset for best error
+
+# Figure 18 - bending axoneme, varying bending viscosity
+    # Panel a - k(B, w0) heatmap with inverted analytical solution - 3 plots at varying viscosities
+    # Panel b - gamma(B, w0) heatmap with inverted analytical solution - 3 plots at varying viscosities
+
+# Figure 19 - bending axoneme, varying bending viscosity
+    # Panel a - k(B, w0) heatmap with inverted analytical solution - 3 plots at varying viscosities
+    # Panel b - gamma(B, w0) heatmap with inverted analytical solution - 3 plots at varying viscosities
 
 if __name__ == '__main__':
 
@@ -1350,7 +1358,7 @@ if __name__ == '__main__':
                 title = r"$\huge{\log \omega_0}$",
             )
             fig.update_yaxes(
-                title = r"$\huge{\log A}$",
+                title = r"$\huge{\log B}$",
             )            
 
             fig.update_layout(
@@ -1801,7 +1809,7 @@ if __name__ == '__main__':
                 title = r"$\huge{\log \omega_0}$",
             )
             fig.update_yaxes(
-                title = r"$\huge{\log A}$",
+                title = r"$\huge{\log B}$",
             )            
 
             fig.update_layout(
@@ -2211,6 +2219,114 @@ if __name__ == '__main__':
                 height = 250 + 400,
                 showlegend = False,                
             )
+
+    # Direct Inference Bending (elasticity + viscosity): k, gamma
+    elif fig_nbr == 18:
+
+        folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/"
+        folder_name += "StraightLine_PeriodicFlow/BendingElasticity_Clamped_VaryingBendingViscosity/"
+        folder_name += "VaryingFrequencyAmplitude/"
+        dataframe_filename = folder_name + "maxdev" + ".csv"
+
+        df = pd.read_csv(dataframe_filename)
+
+        eps = 1e-6
+        df['log_w0'] = df.apply(lambda x: x['log_w0']/np.log(10), axis = 1)
+        df['log_A'] = df.apply(lambda x: x['log_A']/np.log(10), axis = 1)
+        df['log_tau_b_m1'] = df.apply(lambda x: x['log_tau_b_m1']/np.log(10), axis = 1)
+        df['log_max_y_tip'] = df.apply(lambda x: np.log10(x['max_y_tip']), axis = 1)
+
+        # Add k to df
+        df['k'] = df.apply(lambda x: x['A'] / x['max_y_tip'] / np.sqrt(1 + np.tan((x['phi_max_y_tip']-1/4)*2*np.pi)**2), axis = 1)
+        # df['log_k'] = df.apply(lambda x: np.log10(x['k']), axis = 1)
+
+        # Add gamma to df
+        df['gamma'] = df.apply(lambda x: x['k'] * np.tan((x['phi_max_y_tip']-1/4)*2*np.pi) / x['w0'], axis = 1)
+        # df['log_gamma'] = df.apply(lambda x: np.log10(x['gamma']), axis = 1)
+
+        # Add k/gamma to df
+        df['gamma_over_k'] = df.apply(lambda x: np.tan((x['phi_max_y_tip']-1/4)*2*np.pi) / x['w0'], axis = 1)
+        df['log_gamma_over_k'] = df.apply(lambda x: np.log10(x['gamma_over_k']), axis = 1)
+
+        tau_b_m1_list = list(np.unique(df['tau_b_m1']))
+        # tau_b_m1_list = [tau_b_m1_list[0], tau_b_m1_list[2], tau_b_m1_list[-1]]
+        print('tau_b_m1_list', tau_b_m1_list)
+
+        if panel_nbr == 0:
+            fig = make_subplots(rows = len(tau_b_m1_list), cols = 3) # ((tau_b), (k, gamma))
+            
+            for l in range(len(tau_b_m1_list)):
+                tau_b_m1 = tau_b_m1_list[l]
+                df_tau_b_m1 =  df.loc[np.abs(df['tau_b_m1'] - tau_b_m1) < eps]
+
+                fig_k_tau_b_m1 = plot_heatmap(df_tau_b_m1, 'log_w0', 'log_A', 'k')
+                fig_k_tau_b_m1.update_traces(coloraxis = 'coloraxis')
+                fig_g_tau_b_m1 = plot_heatmap(df_tau_b_m1, 'log_w0', 'log_A', 'gamma')
+                fig_g_tau_b_m1.update_traces(coloraxis = 'coloraxis2')
+                fig_gk_tau_b_m1 = plot_heatmap(df_tau_b_m1, 'log_w0', 'log_A', 'gamma_over_k')
+                fig_gk_tau_b_m1.update_traces(coloraxis = 'coloraxis3')
+
+                fig.add_trace(fig_k_tau_b_m1.data[0], row = 1+l, col = 1)
+                fig.add_trace(fig_g_tau_b_m1.data[0], row = 1+l, col = 2)
+                fig.add_trace(fig_gk_tau_b_m1.data[0], row = 1+l, col = 3)
+
+            fig.update_xaxes(
+                title = r"$\huge{\log \omega_0}$",
+            )
+            fig.update_yaxes(
+                title = r"$\huge{\log B}$",
+            )            
+
+            fig.update_layout(
+                margin = dict(l = 400, r = 400, t = 400, b = 400),
+                width = 400 * 3 + 400*2,
+                height = 400 * len(tau_b_m1_list) + 400*2,
+                coloraxis=dict(
+                    colorbar = dict(
+                        # x = 1, yanchor = 'top', y = 1, 
+                        # len = 1/2 - 1/10, 
+                        # tickmode="array",
+                        tickcolor = 'black',
+                        # tickvals = [0, 0.2, 0.4, 0.6, 0.8, 1],
+                        # ticktext = ["0", "0.2", "0.4", "0.6", "0.8", "1"],
+                        ticks = "outside",
+                        tickwidth = 3,
+                        ticklen = 12,
+                        ),
+                    colorscale = dark_purple_scale,
+                ),
+                coloraxis2=dict(
+                    colorbar = dict(
+                        # x = 1, yanchor = 'bottom', y = 0, 
+                        # len = 1/2 - 1/10,
+                        tickcolor = 'black',
+                        # dtick = 1,
+                        ticks = "outside",
+                        tickwidth = 3,
+                        ticklen = 12,                        
+                        ),
+                ),
+                coloraxis3=dict(
+                    colorbar = dict(
+                        # x = 1, yanchor = 'bottom', y = 0, 
+                        # len = 1/2 - 1/10,
+                        tickcolor = 'black',
+                        # dtick = 1,
+                        ticks = "outside",
+                        tickwidth = 3,
+                        ticklen = 12,                        
+                        ),
+                ),                
+                )
+            
+
+
+
+    # Direct Inference Shear (elasticity + viscosity): k, gamma
+    elif fig_nbr == 19:
+
+        if panel_nbr == 0:
+            print("")
 
     fig.write_image(fig_filename)
     fig.vs_show()
