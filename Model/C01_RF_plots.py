@@ -32,7 +32,7 @@ temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
 writing_dir = temp_folder
 
 fig_nbr = 18
-panel_nbr = 0
+panel_nbr = 1
 
 ################################
 # Model chapter - benchmarking #
@@ -2241,12 +2241,12 @@ if __name__ == '__main__':
         # df['log_k'] = df.apply(lambda x: np.log10(x['k']), axis = 1)
 
         # Add gamma to df
-        df['gamma'] = df.apply(lambda x: x['k'] * np.tan((x['phi_max_y_tip']-1/4)*2*np.pi) / x['w0'], axis = 1)
+        df['gamma'] = df.apply(lambda x: x['A'] / x['max_y_tip'] * np.tan((x['phi_max_y_tip']-1/4)*2*np.pi) / x['w0'] / np.sqrt(1 + np.tan((x['phi_max_y_tip']-1/4)*2*np.pi)**2), axis = 1)
         # df['log_gamma'] = df.apply(lambda x: np.log10(x['gamma']), axis = 1)
 
         # Add k/gamma to df
         df['gamma_over_k'] = df.apply(lambda x: np.tan((x['phi_max_y_tip']-1/4)*2*np.pi) / x['w0'], axis = 1)
-        df['log_gamma_over_k'] = df.apply(lambda x: np.log10(x['gamma_over_k']), axis = 1)
+        # df['log_gamma_over_k'] = df.apply(lambda x: np.log10(x['gamma_over_k']), axis = 1)
 
         tau_b_m1_list = list(np.unique(df['tau_b_m1']))
         # tau_b_m1_list = [tau_b_m1_list[0], tau_b_m1_list[2], tau_b_m1_list[-1]]
@@ -2319,8 +2319,43 @@ if __name__ == '__main__':
                 ),                
                 )
             
+        elif panel_nbr == 1:
 
+            # Select only for one value of the amplitude
+            eps = 1e-12
+            A = 1e-5
+            df_A = df.loc[np.abs(df['A'] - A) < eps]
 
+            # Select only for one value of the frequency
+            eps = 1e-12
+            w0 = 1e-8
+            df_w0 = df.loc[np.abs(df['w0'] - w0) < eps]
+
+            fig = make_subplots(rows = 2, cols = len(tau_b_m1_list))
+    
+            # Vary w0, fix A
+            for l in range(len(tau_b_m1_list)):
+                tau_b_m1 = tau_b_m1_list[l]
+                df_tau_b_m1 =  df_A.loc[np.abs(df_A['tau_b_m1'] - tau_b_m1) < eps]
+
+                fig.add_scatter(x = df_tau_b_m1['w0'], y = df_tau_b_m1['k'], row = 1, col = 1 + l, mode = 'markers', marker_color = "black")
+                fig.add_scatter(x = df_tau_b_m1['w0'], y = df_tau_b_m1['gamma'], row = 1, col = 1 + l, mode = 'markers', marker_color = cb_orange)
+                fig.add_scatter(x = df_tau_b_m1['w0'], y = df_tau_b_m1['gamma_over_k'], row = 1, col = 1 + l, mode = 'markers', marker_color = cb_purple)      
+
+            # Vary A, fix w0
+            for l in range(len(tau_b_m1_list)):
+                tau_b_m1 = tau_b_m1_list[l]
+                df_tau_b_m1 =  df_w0.loc[np.abs(df_w0['tau_b_m1'] - tau_b_m1) < eps]
+
+                fig.add_scatter(x = df_tau_b_m1['A'], y = df_tau_b_m1['k'], row = 2, col = 1 + l, mode = 'markers', marker_color = "black")
+                fig.add_scatter(x = df_tau_b_m1['A'], y = df_tau_b_m1['gamma'], row = 2, col = 1 + l, mode = 'markers', marker_color = cb_orange)
+                fig.add_scatter(x = df_tau_b_m1['A'], y = df_tau_b_m1['gamma_over_k'], row = 2, col = 1 + l, mode = 'markers', marker_color = cb_purple)                                              
+
+            fig.update_layout(
+                margin = dict(l = 400, r = 400, t = 400, b = 400),
+                width = 400*len(tau_b_m1_list) + 400*2,
+                height = 400 + 400*2,
+            )
 
     # Direct Inference Shear (elasticity + viscosity): k, gamma
     elif fig_nbr == 19:
