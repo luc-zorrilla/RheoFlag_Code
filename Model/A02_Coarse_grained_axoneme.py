@@ -45,12 +45,12 @@ if __name__ == "__main__":
     #################################
     # Bending elasticity activation #
     #################################
-    bool_EI = False # Default is True
+    bool_EI = True # Default is True
     #################################
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [1]
+    Beta_list = [0]
     ####################################
 
     ###############################
@@ -62,7 +62,7 @@ if __name__ == "__main__":
 
     ##############################
     # Shear viscosity activation #
-    tau_s_list = [6e4]
+    tau_s_list = [0]
     ##############################
 
     ####################################
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     print("Preparing initial conditions...")
 
     
-    init_conf_list = [SecondBend] ## Initial conditions in [StraightLine, ProximalBend, SecondBend]
+    init_conf_list = [StraightLine] ## Initial conditions in [StraightLine, ProximalBend, SecondBend]
 
     print("Initial conditions prepared. ")
     #######################  
@@ -187,10 +187,10 @@ if __name__ == "__main__":
     # X_flow_field_list = [np.array([0, 10**(-6)])]
     
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
-    n_A = 0
-    A_list = [0] # [2.5e-3]
-    n_w0 = 100
-    w0_list = [0]
+    n_A = 1
+    A_list = [1e-5] # [2.5e-3]
+    n_w0 = 1
+    w0_list = [1e-6]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -209,12 +209,12 @@ if __name__ == "__main__":
     print("Setting time...")
 
     # time determined by the flow timescale
-    # dT_list = [2*np.pi/(10*w0) for w0 in w0_list]
-    # T_max_list = [2*np.pi*100/w0 for w0 in w0_list]
+    dT_list = [2*np.pi/(10*w0) for w0 in w0_list]
+    T_max_list = [2*np.pi*10/w0 for w0 in w0_list]
 
     # Same time for all simulations
-    dT_list = [6e3 for w0 in w0_list]
-    T_max_list = [6e5 for w0 in w0_list]
+    # dT_list = [6e3 for w0 in w0_list]
+    # T_max_list = [6e5 for w0 in w0_list]
 
     T_span_list = [[0, T_max] for T_max in T_max_list]
     T_eval_list = [[dT_list[l]*i for i in range(int(T_max_list[l]/dT_list[l]))] for l in range(len(w0_list))]

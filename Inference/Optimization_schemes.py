@@ -232,13 +232,13 @@ if __name__ == "__main__":
     x0 = np.array([0.1]) #, -0.1])
     def g(x):
         return -f(x)
-    res = so.minimize(g, x0, method='BFGS') #, jac=rosen_der, options={'gtol': 1e-6, 'disp': True})
-    print(res.x)
-    print(res.success)
-    print(res.status)
-    print(res.message)
-    print(res.fun, res.jac, res.hess_inv)
-    print(res.nfev, res.njev, res.nit)
+    res = so.minimize(g, x0, method='BFGS')
+    print("res.x", res.x)
+    print("res.success", res.success)
+    print("res.status", res.status)
+    print("res.message", res.message)
+    print("res.fun, res.jac, res.hess_inv", res.fun, res.jac, res.hess_inv)
+    print("res.nfev, res.njev, res.nit", res.nfev, res.njev, res.nit)
     
 
         

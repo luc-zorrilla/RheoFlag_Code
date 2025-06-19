@@ -730,7 +730,6 @@ def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L
     
     return X_dot
 
-
 ## --- Differential system AQX_dot = B --- ##
 #############################################
 
@@ -753,11 +752,6 @@ class StopOnTime:
     # Set event properties
     terminate_integration.terminal = True
     terminate_integration.direction = 0
-
-## --- Test --- ##
-# def g(x, a, b, c):
-#     print(x,a,b,c)
-#     return 
 
 def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = 'LSODA'):
     
@@ -786,11 +780,11 @@ def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamm
     - T_eval: time points to evaluate the dynamical system
     - T_sim_max: maximum simulation time before abort (in seconds).
     - X_flow_field: prescribed flow field
-    - X_0: initial position of the filament (now including theta_0_dot)
+    - X_0: initial position of the filament
     - method: solving method for solve_ivp. Can be any of ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
-        Explicit Runge-Kutta methods (‘RK23’, ‘RK45’, ‘DOP853’) should be used for non-stiff problems and implicit methods (‘Radau’, ‘BDF’) for stiff problems [9]. Among Runge-Kutta methods, ‘DOP853’ is recommended for solving with high precision (low values of rtol and atol).
-
-        If not sure, first try to run ‘RK45’. If it makes unusually many iterations, diverges, or fails, your problem is likely to be stiff and you should use ‘Radau’ or ‘BDF’. ‘LSODA’ can also be a good universal choice, but it might be somewhat less convenient to work with as it wraps old Fortran code.
+        - Explicit Runge-Kutta methods (‘RK23’, ‘RK45’, ‘DOP853’) should be used for non-stiff problems. ‘DOP853’ is recommended for solving with high precision (low values of rtol and atol).
+        - implicit methods (‘Radau’, ‘BDF’) for stiff problems [9].
+        --> If not sure, first try to run ‘RK45’. If it makes unusually many iterations, diverges, or fails, your problem is likely to be stiff and you should use ‘Radau’ or ‘BDF’. ‘LSODA’ can also be a good universal choice, but it might be somewhat less convenient to work with as it wraps old Fortran code.
     """
 
     # print('Solving...')
@@ -867,6 +861,128 @@ def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamm
 
 def SolveAndSave_callback(result):
     """ Callback function to use pool.apply_async to SolveAndSave. """    
+    # global results
+    # results += 1
+    return
+
+def Solve(N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, X_flow_field, X_0, method = 'LSODA'):
+    
+    """ Solves the linear system for a set of parameters
+    Returns the solution if the algorithm converges, None otherwise.
+    
+    INPUTS
+    - N: number of segments
+    - taus_b: bending viscosity caracteristic time
+    - tau_s:  shear viscosity caracteristic time
+    - init_conf: initial spatial configuration of the filament (string)
+    - Beta: ratio of the shear elasticity over the bending elasticity. 0 means only bending elasticity is present
+    - gamma: RFT parameter
+    - n_L: point force at s = L
+    - m_L: point torque at s = L
+    - A: flow amplitude
+    - w0: flow frequency
+    - bool_EI: whether to activate bending or not (default is True)
+    - Sp4: Sperm number^4, i.e., ratio of fluid viscosity over bending elasticity
+    - k0: elasticity at the base (s = 0)
+    - Lambdas: ad hoc force on filament segments
+    - Zetas: ad hoc torque on filament segments
+    - X_flow_field_string: flow field metadata
+    - T_span: simulation time
+    - T_eval: time points to evaluate the dynamical system
+    - T_sim_max: maximum simulation time before abort (in seconds).
+    - X_flow_field: prescribed flow field
+    - X_0: initial position of the filament
+    - method: solving method for solve_ivp. Can be any of ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
+        - Explicit Runge-Kutta methods (‘RK23’, ‘RK45’, ‘DOP853’) should be used for non-stiff problems. ‘DOP853’ is recommended for solving with high precision (low values of rtol and atol).
+        - implicit methods (‘Radau’, ‘BDF’) for stiff problems [9].
+        --> If not sure, first try to run ‘RK45’. If it makes unusually many iterations, diverges, or fails, your problem is likely to be stiff and you should use ‘Radau’ or ‘BDF’. ‘LSODA’ can also be a good universal choice, but it might be somewhat less convenient to work with as it wraps old Fortran code.
+    """
+
+    # print('Solving...')
+
+    ############################################################################
+    #### Flow field
+
+    # print("Interpolating flow field...")
+
+    # Creates an interpolation function of the flow field to inject it in the solver
+    if X_flow_field_string != "NO FLOW":
+
+        InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate") # Beware of that extrapolation option - might be due to the period being much higher than actual time step
+        
+        Args = (Sp4, k0, bool_EI, Beta, taus_b, tau_s, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
+
+    else:
+        Args = (Sp4, k0, bool_EI, Beta, taus_b, tau_s, gamma, n_L, m_L, Lambdas, Zetas)
+
+    # print("Flow field interpolated. ")
+    ############################################################################
+
+    ############################################################################
+    #### Solving and writing solution and metadata
+
+    try:
+        time_limiter = StopOnTime(max_simulation_time=T_sim_max)
+        sol = solve_ivp(fun = g, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method, events=time_limiter.terminate_integration)
+        T_sim = time.time() - time_limiter.start_time
+
+        if sol.t_events[0].size > 0:
+            T_sim = np.inf
+            mistake = np.array(["Solving aborted: too long."])
+            print(mistake)
+            res = None
+        else:
+            print("Solving took %s seconds." % T_sim)
+            res = sol
+
+    except BaseException as ex:
+        T_sim = np.inf
+        mistake = np.array([str(ex)])
+        print(mistake)
+        res = None
+    
+    return res
+
+def Solve_callback(result):
+    """ Callback function to use pool.apply_async to Solve. """    
+    # global results
+    # results += 1
+    return
+
+
+def Solve_InterpFlow(gamma, N, Sp4, k0, bool_EI, Beta, taus_b, tau_s, X_0, n_L, m_L, Lambdas, Zetas, InterpFlow, method, T_span, T_eval, T_sim_max):
+    
+    """ Solves the linear system for a set of parameters.
+    Returns the solution if the algorithm converges, None otherwise.
+    """
+
+    # Arguments for solve_ivp
+    Args = (Sp4, k0, bool_EI, Beta, taus_b, tau_s, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
+
+    try:
+        time_limiter = StopOnTime(max_simulation_time=T_sim_max)
+        sol = solve_ivp(fun = g, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method, events=time_limiter.terminate_integration)
+        T_sim = time.time() - time_limiter.start_time
+
+        if sol.t_events[0].size > 0:
+            T_sim = np.inf
+            mistake = np.array(["Solving aborted: too long."])
+            print(mistake)
+            res = None
+        else:
+            print("Solving took %s seconds." % T_sim)
+            res = sol
+
+    except BaseException as ex:
+        T_sim = np.inf
+        mistake = np.array([str(ex)])
+        print(mistake)
+        res = None
+    
+    return res
+
+def Solve_InterpFlow_callback(result):
+    """ Callback function to use pool.apply_async to Solve_InterpFlow. """    
     # global results
     # results += 1
     return
