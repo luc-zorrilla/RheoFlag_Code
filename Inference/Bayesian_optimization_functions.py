@@ -1,7 +1,6 @@
 """ This file compiles all the functions to perform a bayesian-BFGS (change name) 
 optimization of an inverse problem on a differential equation."""
 
-
 import numpy as np
 from scipy import special
 from skfdiff import Model, Simulation
