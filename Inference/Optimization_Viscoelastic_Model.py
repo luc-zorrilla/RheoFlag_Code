@@ -66,7 +66,13 @@ if __name__ == '__main__':
     ## Choose which parameters are relevant 
 
     ### Sp4 is the only varying parameter here
-    def h(Sp4):
+    # def h(Sp4):
+    #     return Solve_InterpFlow(gamma, N, Sp4, k0, bool_EI, Beta, taus_b, tau_s, X0, n_L, m_L, Lambdas, Zetas, InterpFlow, method, T_span, T_eval, T_sim_max).y
+
+    ### Sp4, taus_b
+    def h(p):
+        Sp4, tau_b = p
+        taus_b = [tau_b]*(N-1)
         return Solve_InterpFlow(gamma, N, Sp4, k0, bool_EI, Beta, taus_b, tau_s, X0, n_L, m_L, Lambdas, Zetas, InterpFlow, method, T_span, T_eval, T_sim_max).y
     #--------------------------------
 
@@ -75,17 +81,27 @@ if __name__ == '__main__':
 
     ## Set h_exp with simulation (or take from experimental data)
     Sp4 = 1.0
-    h_exp = h(Sp4)
+    tau_b = 10
+    p = [Sp4, tau_b]
+    # h_exp = h(Sp4)
+    h_exp = h(p)
     print("h_exp found: ", h_exp.shape)
 
     ## Set a functional to be minimized
 
-    def J(Sp4):
-        """ Returns the L2-norm (squared) of the difference between the experimental output h_exp and the simulation output h_Sp4, computed as h(Sp4) and lying in the same space as h_exp.
-        """
+    # def J(Sp4):
+    #     """ Returns the L2-norm (squared) of the difference between the experimental output h_exp and the simulation output h_Sp4, computed as h(Sp4) and lying in the same space as h_exp.
+    #     """
 
-        h_Sp4 = h(Sp4)
-        return (np.linalg.norm(h_Sp4-h_exp) / np.linalg.norm(h_exp))**2
+    #     h_Sp4 = h(Sp4)
+    #     return (np.linalg.norm(h_Sp4-h_exp) / np.linalg.norm(h_exp))**2
+
+    def J(p):
+        """ Returns the L2-norm (squared) of the difference between the experimental output h_exp and the simulation output h_p, computed as h(p) and lying in the same space as h_exp.
+        """
+        # Sp4, taus_b = p
+        h_p = h(p)
+        return (np.linalg.norm(h_p-h_exp) / np.linalg.norm(h_exp))**2
 
     def callback_function(xk):
         print("xk: ", xk)
@@ -114,9 +130,10 @@ if __name__ == '__main__':
     # res = minimize_parallel(fun = J, x0 = x0, bounds = bounds)    
 
     ### Basin-hopping + BFGS (or any other local method) [scipy]
-    x0 = 90
+    # x0 = 90
+    x0 = [1.0, 1.0]
     epsilon = 1e-2
-    bounds = [(epsilon, 2*x0)]
+    bounds = [(epsilon, 2*p[0]), (epsilon, 2*p[1])]
     minimizer_kwargs = {"method": "L-BFGS-B", "bounds": bounds, "options":{'disp': True},  "callback":callback_function}
     ret = so.basinhopping(J, x0, minimizer_kwargs=minimizer_kwargs, niter=5)
 
