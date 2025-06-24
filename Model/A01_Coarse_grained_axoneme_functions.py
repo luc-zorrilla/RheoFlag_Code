@@ -950,7 +950,7 @@ def Solve_callback(result):
     return
 
 
-def Solve_InterpFlow(gamma, N, Sp4, k0, bool_EI, Beta, taus_b, tau_s, X_0, n_L, m_L, Lambdas, Zetas, InterpFlow, method, T_span, T_eval, T_sim_max):
+def Solve_InterpFlow(gamma, N, Sp4, k0, bool_EI, Beta, taus_b, tau_s, X0, n_L, m_L, Lambdas, Zetas, InterpFlow, method, T_span, T_eval, T_sim_max):
     
     """ Solves the linear system for a set of parameters.
     Returns the solution if the algorithm converges, None otherwise.
@@ -961,7 +961,7 @@ def Solve_InterpFlow(gamma, N, Sp4, k0, bool_EI, Beta, taus_b, tau_s, X_0, n_L, 
 
     try:
         time_limiter = StopOnTime(max_simulation_time=T_sim_max)
-        sol = solve_ivp(fun = g, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method, events=time_limiter.terminate_integration)
+        sol = solve_ivp(fun = g, t_span = T_span, y0 = X0, args=Args, t_eval=T_eval, method = method, events=time_limiter.terminate_integration)
         T_sim = time.time() - time_limiter.start_time
 
         if sol.t_events[0].size > 0:
