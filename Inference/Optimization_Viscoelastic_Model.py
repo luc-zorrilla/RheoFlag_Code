@@ -389,15 +389,119 @@ def ModelExp_Inference(exp_data, model, fixed_params, guess_variable_params, bou
 
 def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args):
     return ModelExp_Inference(exp_data, Viscoelastic_Model, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args)
-    
 
+################################################################################
+################################################################################
 
-# Main
 if __name__ == '__main__':
 
-
-    # Tests # ------------------------------------------------------------------
     bool_test = False
+
+    # Main # -------------------------------------------------------------------
+
+    ## Constructing experimental data
+
+    ### Filament properties
+    gamma = 2
+    N = 10
+    Sp4 = 1
+    k0 = 1e13
+    bool_EI = True
+    Beta = 0
+    tau_b = 0
+    taus_b = [tau_b]*(N-1)
+    tau_s = 0
+
+    ### Boundary conditions
+    init_conf = StraightLine
+    X0 = init_conf(N)
+
+    ### External forcings
+    n_L = [0,0]
+    m_L = 0
+    Lambda = [0,0]
+    Lambdas = [Lambda for k in range(N)]
+    Zeta = 0
+    Zetas = [Zeta]*N
+
+    ### Time-dependent Flow field
+    A = 1e-2
+    w0 = 1e0
+    psi = np.pi / 2
+    Flow_field_filename = "" # Whether to use a measured flow field or not
+    
+    ### Integration and time
+    method = 'BDF'
+    dT = 2*np.pi/(10*w0)
+    T_max = 2*np.pi*1/w0
+    T_span = [0, T_max]
+    T_eval = [dT*i for i in range(int(T_max/dT))]
+    T_sim_max = 600
+
+    ### Numerical Flow field and Interpolation
+    X_flow_field_string, X_flow_field = CreateFlowField(A, w0, psi, T_eval, filename = Flow_field_filename)
+    if X_flow_field_string != "NO FLOW":
+        InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
+    else:         
+        InterpFlow = 0
+
+    exp_params = Viscoelastic_Model_Parameters(gamma = gamma, N = N, k0 = k0, bool_EI = bool_EI, Sp4 = Sp4, tau_b = tau_b, Beta = Beta, tau_s = tau_s, init_conf = init_conf, n_L = n_L, m_L = m_L, Lambdas = Lambdas, Zetas = Zetas, InterpFlow = InterpFlow, method = method, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, filament_type = "custom", flow_type = "custom")
+
+    exp_data = Viscoelastic_Model(exp_params)
+
+    ## Choose discrepancy function
+    disc_func = L2_relative_error
+
+    ## Choose initial guess (and fixed vs variable parameters)
+
+    ### Initialize parameters perturbed around experimental parameters
+    initial_params = exp_params
+    initial_params["Sp4"] = 2.0
+    initial_params["tau_b"] = 1.0
+
+    ### Separate fixed and variable parameters
+    variable_keys = ["Sp4", "tau_b"]
+    guess_variable_params = {key:initial_params[key] for key in variable_keys}
+    fixed_params = initial_params # copy.deepcopy(initial_params) --> Put back if error
+    for key in variable_keys:
+        fixed_params.pop(key)
+
+    ### Bounds
+    eps = 1e-3
+    bound_Sp4 = [eps, 1e3]
+    bound_tau_b = [0, 1e3]
+    lb = [bound_Sp4[0], bound_tau_b[0]]
+    ub = [bound_Sp4[1], bound_tau_b[1]]
+    bounds = so.Bounds(lb,  ub)
+
+    ### Optimization schemes and arguments
+    opt_scheme = Basinhopping_LBFGSB_Scheme
+    niter = 1
+    opt_args = {"niter":niter, "callback_function":callback_function}
+
+    ret = Viscoelastic_Inference(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
+
+    ## Inference and plotting results
+
+    print("Messages from global optimization")
+    print("ret.x", ret.x)
+    print("ret.success", ret.success)
+    print("ret.message", ret.message)
+    print("")
+    
+    res = ret.lowest_optimization_result 
+    print("Messages from best local minimization")
+    print("res.x", res.x)
+    print("res.success", res.success)
+    print("res.status", res.status)
+    print("res.message", res.message)
+    print("res.fun, res.jac, res.hess_inv operator, res.hess_inv @ res.x", "ress.hess_inv.todense()", res.fun, res.jac, res.hess_inv, res.hess_inv @ res.x, res.hess_inv.todense())
+    print("res.nfev, res.njev, res.nit", res.nfev, res.njev, res.nit)
+
+    # ----------------------------------------------------------------- # Main # 
+
+    
+    # Tests # ------------------------------------------------------------------
     if bool_test:
             
         ## Function Unitary Tests
@@ -476,8 +580,8 @@ if __name__ == '__main__':
         all_params = params
         all_params['Sp4'] = 2 # Change one parameter to make simulation-experiment discrepancy non-zero.
         all_params['tau_b'] = 1 # Change one parameter to make simulation-experiment discrepancy non-zero.
-        f = viscoelastic_modelexp_functional(all_params = all_params)
-        print("Functional evaluated for a set of parameters all_params:", f)
+        # f = viscoelastic_modelexp_functional(all_params = all_params)
+        # print("Functional evaluated for a set of parameters all_params:", f)
         # exit()
 
         ### Optimization schemes
@@ -564,67 +668,3 @@ if __name__ == '__main__':
         # exit()
         
     # ---------------------------------------------------------------- # Tests #
-
-    # Main # -------------------------------------------------------------------
-
-    ##### Filament properties
-    gamma = 2
-    N = 10
-    Sp4 = 1
-    k0 = 1e13
-    bool_EI = True
-    Beta = 0
-    tau_b = 0
-    taus_b = [tau_b]*(N-1)
-    tau_s = 0
-
-    ##### Boundary conditions
-    init_conf = StraightLine
-    X0 = init_conf(N)
-
-    ##### External forcings
-    n_L = [0,0]
-    m_L = 0
-    Lambda = [0,0]
-    Lambdas = [Lambda for k in range(N)]
-    Zeta = 0
-    Zetas = [Zeta]*N
-
-    ##### Time-dependent Flow field
-    A = 1e-2
-    w0 = 1e0
-    psi = np.pi / 2
-    Flow_field_filename = "" # Whether to use a measured flow field or not
-    
-    ##### Integration and time
-    method = 'BDF'
-    dT = 2*np.pi/(10*w0)
-    T_max = 2*np.pi*1/w0
-    T_span = [0, T_max]
-    T_eval = [dT*i for i in range(int(T_max/dT))]
-    T_sim_max = 600
-
-    ##### Numerical Flow field and Interpolation
-    X_flow_field_string, X_flow_field = CreateFlowField(A, w0, psi, T_eval, filename = Flow_field_filename)
-    if X_flow_field_string != "NO FLOW":
-        InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
-    else:         
-        InterpFlow = 0
-
-    params = Viscoelastic_Model_Parameters(gamma = gamma, N = N, k0 = k0, bool_EI = bool_EI, Sp4 = Sp4, tau_b = tau_b, Beta = Beta, tau_s = tau_s, init_conf = init_conf, n_L = n_L, m_L = m_L, Lambdas = Lambdas, Zetas = Zetas, InterpFlow = InterpFlow, method = method, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, filament_type = "custom", flow_type = "custom")
-
-
-    print("ret.x", ret.x)
-    print("ret.success", ret.success)
-    print("ret.message", ret.message)
-    
-    res = ret.lowest_optimization_result 
-    print("res.x", res.x)
-    print("res.success", res.success)
-    print("res.status", res.status)
-    print("res.message", res.message)
-    print("res.fun, res.jac, res.hess_inv operator, res.hess_inv @ res.x", "ress.hess_inv.todense()", res.fun, res.jac, res.hess_inv, res.hess_inv @ res.x, res.hess_inv.todense())
-    print("res.nfev, res.njev, res.nit", res.nfev, res.njev, res.nit)
-
-    # ----------------------------------------------------------------- # Main # 
-    
