@@ -14,7 +14,7 @@ import pickle
 import pprint
 writing_dir = "C:\\Users\\Luc\\Documents\\PhD_Large_files\\RheoFlag\\Inference\\FromSimulationData\\"
 
-from A02_Optimization_Viscoelastic_Model import *
+from A02_Inference_Viscoelastic_Model import *
 
 bool_test = False
 if __name__ == "__main__":

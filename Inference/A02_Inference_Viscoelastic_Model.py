@@ -401,10 +401,10 @@ if __name__ == '__main__':
 
     # Main # -------------------------------------------------------------------
 
-    m1 = 1 #11
-    A_vec =  np.array([1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1))
-    m2 = 1 # 11
-    w0_vec = np.array([1e0]) # np.float_power(10, np.linspace(-5, 5, num = m2))
+    m1 = 11
+    A_vec =  np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
+    m2 = 11
+    w0_vec = np.float_power(10, np.linspace(-5, 5, num = m2)) # np.array([1e0])
     m3 = 1 # 2
     psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -541,7 +541,7 @@ if __name__ == '__main__':
                                     base_id = "_Fixed"
                                     for key in list(fixed_params.keys()):
                                         # Exclude non-scalar parameters
-                                        if key in ["gamma", "N", "k0", "Sp4", "tau_b", "Beta", "tau_s"]:
+                                        if key in ["A", "w0", "psi", "gamma", "N", "k0", "Sp4", "tau_b", "Beta", "tau_s"]:
                                             param = fixed_params[key]
                                             base_id += "_" + key + "_" + f"{param:.2E}"
                                     base_id += "_Variable"
