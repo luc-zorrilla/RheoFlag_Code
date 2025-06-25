@@ -241,7 +241,7 @@ def Make_Model_Functional(model, model_disc_func):
 ## Optimization schemes
 
 def callback_function(xk):
-    print("xk: ", xk)
+    # print("xk: ", xk)
     return
 
 def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function = callback_function, niter = 5):
@@ -399,24 +399,40 @@ if __name__ == '__main__':
 
     # Main # -------------------------------------------------------------------
 
+    m1 = 11
+    A_vec = np.float_power(10, np.linspace(-5, 5, num = m1))
+    m2 = 11
+    w0_vec = np.float_power(10, np.linspace(-5, 5, num = m2))
+    m3 = 1 # 2
+    psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
+
+    n1 = 1 # 14
+    k0_vec = np.array([1e13]) # np.float_power(10, np.linspace(0, 13, num = n1))
+    n2 = 1 # 11
+    Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
+    n3 = 1 # 11
+    tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
+    n4 = 1 # 11
+    Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
+    n5 = 1 # 11
+    tau_s_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n5))
+
+    m_tot = m1 * m2 * m3
+    n_tot = n1 * n2 * n3 * n4 * n5
+    mn_tot = m_tot * n_tot
+    print("m_tot, n_tot, mn_tot:", m_tot, n_tot, mn_tot)
+
+
     ## Constructing experimental data
 
-    ### Filament properties
-    gamma = 2
+    ### Numerical properties
     N = 10
-    Sp4 = 1
-    k0 = 1e13
-    bool_EI = True
-    Beta = 0
-    tau_b = 0
-    taus_b = [tau_b]*(N-1)
-    tau_s = 0
 
-    ### Boundary conditions
+    #### Boundary conditions
     init_conf = StraightLine
     X0 = init_conf(N)
 
-    ### External forcings
+    #### External forcings
     n_L = [0,0]
     m_L = 0
     Lambda = [0,0]
@@ -424,79 +440,102 @@ if __name__ == '__main__':
     Zeta = 0
     Zetas = [Zeta]*N
 
-    ### Time-dependent Flow field
-    A = 1e-2
-    w0 = 1e0
-    psi = np.pi / 2
+    ### Time-dependent flow field
     Flow_field_filename = "" # Whether to use a measured flow field or not
-    
-    ### Integration and time
-    method = 'BDF'
-    dT = 2*np.pi/(10*w0)
-    T_max = 2*np.pi*1/w0
-    T_span = [0, T_max]
-    T_eval = [dT*i for i in range(int(T_max/dT))]
-    T_sim_max = 600
 
-    ### Numerical Flow field and Interpolation
-    X_flow_field_string, X_flow_field = CreateFlowField(A, w0, psi, T_eval, filename = Flow_field_filename)
-    if X_flow_field_string != "NO FLOW":
-        InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
-    else:         
-        InterpFlow = 0
+    for j1 in range(m1):
+        A = A_vec[j1]
+        for j2 in range(m2):
+            w0 = w0_vec[j2]
+            for j3 in range(m3):
+                psi = psi_vec[j3]
 
-    exp_params = Viscoelastic_Model_Parameters(gamma = gamma, N = N, k0 = k0, bool_EI = bool_EI, Sp4 = Sp4, tau_b = tau_b, Beta = Beta, tau_s = tau_s, init_conf = init_conf, n_L = n_L, m_L = m_L, Lambdas = Lambdas, Zetas = Zetas, InterpFlow = InterpFlow, method = method, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, filament_type = "custom", flow_type = "custom")
+                ### Integration and time
+                method = 'BDF'
+                dT = 2*np.pi/(10*w0)
+                T_max = 2*np.pi*1/w0
+                T_span = [0, T_max]
+                T_eval = [dT*i for i in range(int(T_max/dT))]
+                T_sim_max = 600
 
-    exp_data = Viscoelastic_Model(exp_params)
+                ### Numerical Flow field and Interpolation
+                X_flow_field_string, X_flow_field = CreateFlowField(A, w0, psi, T_eval, filename = Flow_field_filename)
+                if X_flow_field_string != "NO FLOW":
+                    InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
+                else:         
+                    InterpFlow = 0
+                
+                print("Flow field created for (A,w0,psi) = ", A, w0, psi)
 
-    ## Choose discrepancy function
-    disc_func = L2_relative_error
+                ### Filament properties
+                gamma = 2
+                bool_EI = True
 
-    ## Choose initial guess (and fixed vs variable parameters)
+                for i1 in range(n1):
+                    k0 = k0_vec[i1]
+                    for i2 in range(n2):
+                        Sp4 = Sp4_vec[i2]
+                        for i3 in range(n3):
+                            tau_b = tau_b_vec[i3]
+                            for i4 in range(n4):
+                                Beta = Beta_vec[i4]
+                                for i5 in range(n5):
+                                    tau_s = tau_s_vec[i5]
 
-    ### Initialize parameters perturbed around experimental parameters
-    initial_params = exp_params
-    initial_params["Sp4"] = 2.0
-    initial_params["tau_b"] = 1.0
+                                    taus_b = [tau_b]*(N-1)
 
-    ### Separate fixed and variable parameters
-    variable_keys = ["Sp4", "tau_b"]
-    guess_variable_params = {key:initial_params[key] for key in variable_keys}
-    fixed_params = initial_params # copy.deepcopy(initial_params) --> Put back if error
-    for key in variable_keys:
-        fixed_params.pop(key)
+                                    exp_params = Viscoelastic_Model_Parameters(gamma = gamma, N = N, k0 = k0, bool_EI = bool_EI, Sp4 = Sp4, tau_b = tau_b, Beta = Beta, tau_s = tau_s, init_conf = init_conf, n_L = n_L, m_L = m_L, Lambdas = Lambdas, Zetas = Zetas, InterpFlow = InterpFlow, method = method, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, filament_type = "custom", flow_type = "custom")
 
-    ### Bounds
-    eps = 1e-3
-    bound_Sp4 = [eps, 1e3]
-    bound_tau_b = [0, 1e3]
-    lb = [bound_Sp4[0], bound_tau_b[0]]
-    ub = [bound_Sp4[1], bound_tau_b[1]]
-    bounds = so.Bounds(lb,  ub)
+                                    exp_data = Viscoelastic_Model(exp_params)
 
-    ### Optimization schemes and arguments
-    opt_scheme = Basinhopping_LBFGSB_Scheme
-    niter = 1
-    opt_args = {"niter":niter, "callback_function":callback_function}
+                                    ## Choose discrepancy function
+                                    disc_func = L2_relative_error
 
-    ret = Viscoelastic_Inference(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
+                                    ## Choose initial guess (and fixed vs variable parameters)
 
-    ## Inference and plotting results
+                                    ### Initialize parameters perturbed around experimental parameters
+                                    initial_params = exp_params
+                                    initial_params["Sp4"] = 2.0
+                                    initial_params["tau_b"] = 1.0
 
-    print("Messages from global optimization")
-    print("ret.x", ret.x)
-    print("ret.success", ret.success)
-    print("ret.message", ret.message)
-    print("")
-    
-    res = ret.lowest_optimization_result 
-    print("Messages from best local minimization")
-    print("res.x", res.x)
-    print("res.success", res.success)
-    print("res.status", res.status)
-    print("res.message", res.message)
-    print("res.fun, res.jac, res.hess_inv operator, res.hess_inv @ res.x", "ress.hess_inv.todense()", res.fun, res.jac, res.hess_inv, res.hess_inv @ res.x, res.hess_inv.todense())
-    print("res.nfev, res.njev, res.nit", res.nfev, res.njev, res.nit)
+                                    ### Separate fixed and variable parameters
+                                    variable_keys = ["Sp4", "tau_b"]
+                                    guess_variable_params = {key:initial_params[key] for key in variable_keys}
+                                    fixed_params = initial_params # copy.deepcopy(initial_params) --> Put back if error
+                                    for key in variable_keys:
+                                        fixed_params.pop(key)
+
+                                    ### Bounds
+                                    eps = 1e-3
+                                    bound_Sp4 = [eps, 1e3]
+                                    bound_tau_b = [0, 1e3]
+                                    lb = [bound_Sp4[0], bound_tau_b[0]]
+                                    ub = [bound_Sp4[1], bound_tau_b[1]]
+                                    bounds = so.Bounds(lb,  ub)
+
+                                    ### Optimization schemes and arguments
+                                    opt_scheme = Basinhopping_LBFGSB_Scheme
+                                    niter = 1
+                                    opt_args = {"niter":niter, "callback_function":callback_function}
+
+                                    ret = Viscoelastic_Inference(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
+
+                                    ## Inference and plotting results
+
+                                    print("Messages from global optimization")
+                                    print("ret.x", ret.x)
+                                    print("ret.success", ret.success)
+                                    print("ret.message", ret.message)
+                                    print("")
+                                    
+                                    res = ret.lowest_optimization_result 
+                                    print("Messages from best local minimization")
+                                    print("res.x", res.x)
+                                    print("res.success", res.success)
+                                    print("res.status", res.status)
+                                    print("res.message", res.message)
+                                    print("res.fun, res.jac, res.hess_inv operator, res.hess_inv @ res.x", "ress.hess_inv.todense()", res.fun, res.jac, res.hess_inv, res.hess_inv @ res.x, res.hess_inv.todense())
+                                    print("res.nfev, res.njev, res.nit", res.nfev, res.njev, res.nit)
 
     # ----------------------------------------------------------------- # Main # 
 
