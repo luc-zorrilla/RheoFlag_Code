@@ -9,8 +9,11 @@ import plotly.graph_objects as go
 from plotly.express.colors import sample_colorscale
 import plotly.io as pio
 
+import pickle
+writing_dir = "C:\\Users\\Luc\\Documents\\PhD_Large_files\\RheoFlag\\Inference\\FromSimulationData\\"
 import copy
 import sys
+from misc_func import *
 # caution: path[0] is reserved for script path (or '' in REPL)
 sys.path.insert(1, 'c:\\Users\\Luc\\Documents\\MEGAsync\\PhD\\RheoFlag\\Code\\Model')
 from A01_Coarse_grained_axoneme_functions import *
@@ -241,7 +244,7 @@ def Make_Model_Functional(model, model_disc_func):
 ## Optimization schemes
 
 def callback_function(xk):
-    # print("xk: ", xk)
+    print("xk: ", xk)
     return
 
 def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function = callback_function, niter = 5):
@@ -393,16 +396,15 @@ def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds
 ################################################################################
 ################################################################################
 
+bool_test = False
 if __name__ == '__main__':
-
-    bool_test = False
 
     # Main # -------------------------------------------------------------------
 
-    m1 = 11
-    A_vec = np.float_power(10, np.linspace(-5, 5, num = m1))
-    m2 = 11
-    w0_vec = np.float_power(10, np.linspace(-5, 5, num = m2))
+    m1 = 1 #11
+    A_vec =  np.array([1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1))
+    m2 = 1 # 11
+    w0_vec = np.array([1e0]) # np.float_power(10, np.linspace(-5, 5, num = m2))
     m3 = 1 # 2
     psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -421,7 +423,7 @@ if __name__ == '__main__':
     n_tot = n1 * n2 * n3 * n4 * n5
     mn_tot = m_tot * n_tot
     print("m_tot, n_tot, mn_tot:", m_tot, n_tot, mn_tot)
-
+    IE_matrix = np.ones((m1,m2,m3,n1,n2,n3,n4,n5)) * np.nan
 
     ## Constructing experimental data
 
@@ -443,12 +445,12 @@ if __name__ == '__main__':
     ### Time-dependent flow field
     Flow_field_filename = "" # Whether to use a measured flow field or not
 
-    for j1 in range(m1):
-        A = A_vec[j1]
-        for j2 in range(m2):
-            w0 = w0_vec[j2]
-            for j3 in range(m3):
-                psi = psi_vec[j3]
+    for i1 in range(m1):
+        A = A_vec[i1]
+        for i2 in range(m2):
+            w0 = w0_vec[i2]
+            for i3 in range(m3):
+                psi = psi_vec[i3]
 
                 ### Integration and time
                 method = 'BDF'
@@ -471,16 +473,16 @@ if __name__ == '__main__':
                 gamma = 2
                 bool_EI = True
 
-                for i1 in range(n1):
-                    k0 = k0_vec[i1]
-                    for i2 in range(n2):
-                        Sp4 = Sp4_vec[i2]
-                        for i3 in range(n3):
-                            tau_b = tau_b_vec[i3]
-                            for i4 in range(n4):
-                                Beta = Beta_vec[i4]
-                                for i5 in range(n5):
-                                    tau_s = tau_s_vec[i5]
+                for j1 in range(n1):
+                    k0 = k0_vec[j1]
+                    for j2 in range(n2):
+                        Sp4 = Sp4_vec[j2]
+                        for j3 in range(n3):
+                            tau_b = tau_b_vec[j3]
+                            for j4 in range(n4):
+                                Beta = Beta_vec[j4]
+                                for j5 in range(n5):
+                                    tau_s = tau_s_vec[j5]
 
                                     taus_b = [tau_b]*(N-1)
 
@@ -494,12 +496,13 @@ if __name__ == '__main__':
                                     ## Choose initial guess (and fixed vs variable parameters)
 
                                     ### Initialize parameters perturbed around experimental parameters
-                                    initial_params = exp_params
+                                    initial_params = copy.deepcopy(exp_params)
                                     initial_params["Sp4"] = 2.0
                                     initial_params["tau_b"] = 1.0
 
                                     ### Separate fixed and variable parameters
                                     variable_keys = ["Sp4", "tau_b"]
+                                    exp_variable_params = {key:exp_params[key] for key in variable_keys}
                                     guess_variable_params = {key:initial_params[key] for key in variable_keys}
                                     fixed_params = initial_params # copy.deepcopy(initial_params) --> Put back if error
                                     for key in variable_keys:
@@ -518,24 +521,71 @@ if __name__ == '__main__':
                                     niter = 1
                                     opt_args = {"niter":niter, "callback_function":callback_function}
 
-                                    ret = Viscoelastic_Inference(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
+                                    VI_args = dict(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
+                                    ret = Viscoelastic_Inference(**VI_args)
 
-                                    ## Inference and plotting results
+                                    ## Inference results
 
-                                    print("Messages from global optimization")
-                                    print("ret.x", ret.x)
-                                    print("ret.success", ret.success)
-                                    print("ret.message", ret.message)
-                                    print("")
+                                    ####################### MOVE THIS IN ANALYSIS
+
+                                    ### Display results
+                                    # print("Messages from global optimization")
+                                    # print("ret.x", ret.x)
+                                    # print("ret.success", ret.success)
+                                    # print("ret.message", ret.message)
+                                    # print("")
                                     
-                                    res = ret.lowest_optimization_result 
-                                    print("Messages from best local minimization")
-                                    print("res.x", res.x)
-                                    print("res.success", res.success)
-                                    print("res.status", res.status)
-                                    print("res.message", res.message)
-                                    print("res.fun, res.jac, res.hess_inv operator, res.hess_inv @ res.x", "ress.hess_inv.todense()", res.fun, res.jac, res.hess_inv, res.hess_inv @ res.x, res.hess_inv.todense())
-                                    print("res.nfev, res.njev, res.nit", res.nfev, res.njev, res.nit)
+                                    # res = ret.lowest_optimization_result 
+                                    # print("Messages from best local minimization")
+                                    # print("res.x", res.x)
+                                    # print("res.success", res.success)
+                                    # print("res.status", res.status)
+                                    # print("res.message", res.message)
+                                    # print("res.fun, res.jac, res.hess_inv operator, res.hess_inv @ res.x", "ress.hess_inv.todense()", res.fun, res.jac, res.hess_inv, res.hess_inv @ res.x, res.hess_inv.todense())
+                                    # print("res.nfev, res.njev, res.nit", res.nfev, res.njev, res.nit)
+
+                                    # p_star = np.array(list(exp_variable_params.values()))
+                                    # p = np.array(list(ret.x.values()))
+                                    # IE = L2_relative_error(p, p_star)
+                                    # print("Relative inference error:", IE)
+                                    # IE_matrix[i1, i2, i3, j1, j2, j3, j4, j5] = IE
+                                    # MOVE THIS IN ANALYSIS ###################### 
+
+                                    ### Save results
+                                    #### Make dictionary with all relevant information
+
+                                    ###### Dictionary of the used function
+                                    VI_dict = Make_Dict_From_Applied_Function(func = Viscoelastic_Inference, func_args = VI_args, func_output = ret)
+
+                                    ###### Additional information
+                                    VI_dict["exp_variable_params"] = exp_variable_params
+                                    
+                                    # Pickle dictionary using the highest protocol available.
+                                    base_id = "_Fixed"
+                                    for key in list(fixed_params.keys()):
+                                        # Exclude non-scalar parameters
+                                        if key in ["gamma", "N", "k0", "Sp4", "tau_b", "Beta", "tau_s"]:
+                                            param = fixed_params[key]
+                                            base_id += "_" + key + "_" + f"{param:.2E}"
+                                    base_id += "_Variable"
+                                    for key in list(exp_variable_params.keys()):
+                                        param = exp_variable_params[key]
+                                        base_id += "_" + key + "_" + f"{param:.2E}"
+                                    filename = writing_dir + "VI_dict" + base_id + ".pkl"
+                                    output = open(filename, 'wb')
+                                    pickle.dump(obj = VI_dict, file = output, protocol = -1)
+                                    output.close()
+
+
+
+                                    
+    #################################################### MOVE THIS IN ANALYSIS #
+    # print("IE_matrix:", IE_matrix)
+    # writing_dir = "C:\\Users\\Luc\\Documents\\PhD_Large_files\\RheoFlag\\Inference\\"
+    # filename = writing_dir + "IE_matrix"
+    # write_array_to_csv(IE_matrix, filename)
+    # To read: read_array_from_csv
+    # MOVE THIS IN ANALYSIS ####################################################
 
     # ----------------------------------------------------------------- # Main # 
 
