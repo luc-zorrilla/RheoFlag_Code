@@ -528,29 +528,6 @@ if __name__ == '__main__':
 
                                     ####################### MOVE THIS IN ANALYSIS
 
-                                    ### Display results
-                                    # print("Messages from global optimization")
-                                    # print("ret.x", ret.x)
-                                    # print("ret.success", ret.success)
-                                    # print("ret.message", ret.message)
-                                    # print("")
-                                    
-                                    # res = ret.lowest_optimization_result 
-                                    # print("Messages from best local minimization")
-                                    # print("res.x", res.x)
-                                    # print("res.success", res.success)
-                                    # print("res.status", res.status)
-                                    # print("res.message", res.message)
-                                    # print("res.fun, res.jac, res.hess_inv operator, res.hess_inv @ res.x", "ress.hess_inv.todense()", res.fun, res.jac, res.hess_inv, res.hess_inv @ res.x, res.hess_inv.todense())
-                                    # print("res.nfev, res.njev, res.nit", res.nfev, res.njev, res.nit)
-
-                                    # p_star = np.array(list(exp_variable_params.values()))
-                                    # p = np.array(list(ret.x.values()))
-                                    # IE = L2_relative_error(p, p_star)
-                                    # print("Relative inference error:", IE)
-                                    # IE_matrix[i1, i2, i3, j1, j2, j3, j4, j5] = IE
-                                    # MOVE THIS IN ANALYSIS ###################### 
-
                                     ### Save results
                                     #### Make dictionary with all relevant information
 
@@ -575,17 +552,6 @@ if __name__ == '__main__':
                                     output = open(filename, 'wb')
                                     pickle.dump(obj = VI_dict, file = output, protocol = -1)
                                     output.close()
-
-
-
-                                    
-    #################################################### MOVE THIS IN ANALYSIS #
-    # print("IE_matrix:", IE_matrix)
-    # writing_dir = "C:\\Users\\Luc\\Documents\\PhD_Large_files\\RheoFlag\\Inference\\"
-    # filename = writing_dir + "IE_matrix"
-    # write_array_to_csv(IE_matrix, filename)
-    # To read: read_array_from_csv
-    # MOVE THIS IN ANALYSIS ####################################################
 
     # ----------------------------------------------------------------- # Main # 
 
