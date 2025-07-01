@@ -30,6 +30,8 @@ if __name__ == "__main__":
         # Hessian
         # print(VI_dict['output']['lowest_optimization_result']['hess_inv'].todense())
 
+        fixed_params = VI_dict["fixed_params"]
+        
         exp_variable_params = VI_dict["exp_variable_params"]
         p_star = np.array(list(exp_variable_params.values()))
         inferred_variable_params = VI_dict["output"].x

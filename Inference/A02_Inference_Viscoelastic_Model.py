@@ -192,7 +192,8 @@ def Viscoelastic_Model(params):
     new_params.pop("tau_b")
 
     # INSERT HERE MODEL SIMULATION
-    sol = Solve_InterpFlow(**new_params).y
+    res = Solve_InterpFlow(**new_params)
+    sol = res.y
 
     return sol
 
@@ -401,8 +402,8 @@ if __name__ == '__main__':
 
     # Main # -------------------------------------------------------------------
 
-    m1 = 11
-    A_vec =  np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
+    m1 = 1 # 11
+    A_vec =  np.array([1e-1]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
     m2 = 11
     w0_vec = np.float_power(10, np.linspace(-5, 5, num = m2)) # np.array([1e0])
     m3 = 1 # 2
@@ -457,7 +458,7 @@ if __name__ == '__main__':
                 dT = 2*np.pi/(10*w0)
                 T_max = 2*np.pi*1/w0
                 T_span = [0, T_max]
-                T_eval = [dT*i for i in range(int(T_max/dT))]
+                T_eval = [dT*i for i in range(round(T_max/dT))]
                 T_sim_max = 600
 
                 ### Numerical Flow field and Interpolation
@@ -468,6 +469,7 @@ if __name__ == '__main__':
                     InterpFlow = 0
                 
                 print("Flow field created for (A,w0,psi) = ", A, w0, psi)
+                flow_params = dict(A = A, w0 = w0, psi = psi)
 
                 ### Filament properties
                 gamma = 2
@@ -504,7 +506,7 @@ if __name__ == '__main__':
                                     variable_keys = ["Sp4", "tau_b"]
                                     exp_variable_params = {key:exp_params[key] for key in variable_keys}
                                     guess_variable_params = {key:initial_params[key] for key in variable_keys}
-                                    fixed_params = initial_params # copy.deepcopy(initial_params) --> Put back if error
+                                    fixed_params = initial_params
                                     for key in variable_keys:
                                         fixed_params.pop(key)
 
@@ -538,7 +540,13 @@ if __name__ == '__main__':
                                     VI_dict["exp_variable_params"] = exp_variable_params
                                     
                                     # Pickle dictionary using the highest protocol available.
-                                    base_id = "_Fixed"
+                                    
+                                    ## Make flow part of the filename
+                                    base_id = "_Flow"
+                                    for key in list(flow_params.keys()):
+                                        param = flow_params[key]
+                                        base_id += "_" + key + "_" + f"{param:.2E}"                                    
+                                    base_id += "_Fixed"
                                     for key in list(fixed_params.keys()):
                                         # Exclude non-scalar parameters
                                         if key in ["A", "w0", "psi", "gamma", "N", "k0", "Sp4", "tau_b", "Beta", "tau_s"]:

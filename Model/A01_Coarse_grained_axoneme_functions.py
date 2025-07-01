@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 # from regex import E
 from scipy.integrate import solve_ivp
+from sklearn.utils import Bunch
 from scipy import interpolate
 import plotly.express as px
 import plotly.graph_objects as go
@@ -785,6 +786,8 @@ def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamm
         - Explicit Runge-Kutta methods (‘RK23’, ‘RK45’, ‘DOP853’) should be used for non-stiff problems. ‘DOP853’ is recommended for solving with high precision (low values of rtol and atol).
         - implicit methods (‘Radau’, ‘BDF’) for stiff problems [9].
         --> If not sure, first try to run ‘RK45’. If it makes unusually many iterations, diverges, or fails, your problem is likely to be stiff and you should use ‘Radau’ or ‘BDF’. ‘LSODA’ can also be a good universal choice, but it might be somewhat less convenient to work with as it wraps old Fortran code.
+    
+    Outputs:
     """
 
     # print('Solving...')
@@ -968,7 +971,9 @@ def Solve_InterpFlow(gamma, N, Sp4, k0, bool_EI, Beta, taus_b, tau_s, X0, n_L, m
             T_sim = np.inf
             mistake = np.array(["Solving aborted: too long."])
             print(mistake)
-            res = None
+            res = sol
+            res.y = None
+            
         else:
             print("Solving took %s seconds." % T_sim)
             res = sol
@@ -977,8 +982,15 @@ def Solve_InterpFlow(gamma, N, Sp4, k0, bool_EI, Beta, taus_b, tau_s, X0, n_L, m
         T_sim = np.inf
         mistake = np.array([str(ex)])
         print(mistake)
-        res = None
+        res = Bunch(y = None)
+        print("Sp4, k0, Beta, tau_b", Sp4, k0, Beta, taus_b)
     
+    # Return a class with solution with np.nan if the solution is None
+    normal_shape = (X0.shape[0], len(T_eval))
+    if (res.y is None) or (np.linalg.norm(np.array(res.y.shape) - np.array(normal_shape)) > 0) :
+        res.y = np.ones((X0.shape[0], len(T_eval)))*np.nan
+    
+    print("shape: ", res.y.shape)
     return res
 
 def Solve_InterpFlow_callback(result):
