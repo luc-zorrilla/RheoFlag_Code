@@ -26,11 +26,12 @@ if __name__ == "__main__":
         VI_dict = pickle.load(pkl_file)
         pkl_file.close()
 
-        pprint.pprint(VI_dict)
+        # pprint.pprint(VI_dict)
         # Hessian
         # print(VI_dict['output']['lowest_optimization_result']['hess_inv'].todense())
 
-        fixed_params = VI_dict["fixed_params"]
+        # flow_params = VI_dict["args"]
+        fixed_params = VI_dict["args"]["fixed_params"]
         
         exp_variable_params = VI_dict["exp_variable_params"]
         p_star = np.array(list(exp_variable_params.values()))

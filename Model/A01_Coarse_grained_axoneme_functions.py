@@ -983,14 +983,12 @@ def Solve_InterpFlow(gamma, N, Sp4, k0, bool_EI, Beta, taus_b, tau_s, X0, n_L, m
         mistake = np.array([str(ex)])
         print(mistake)
         res = Bunch(y = None)
-        print("Sp4, k0, Beta, tau_b", Sp4, k0, Beta, taus_b)
     
     # Return a class with solution with np.nan if the solution is None
     normal_shape = (X0.shape[0], len(T_eval))
     if (res.y is None) or (np.linalg.norm(np.array(res.y.shape) - np.array(normal_shape)) > 0) :
         res.y = np.ones((X0.shape[0], len(T_eval)))*np.nan
     
-    print("shape: ", res.y.shape)
     return res
 
 def Solve_InterpFlow_callback(result):
