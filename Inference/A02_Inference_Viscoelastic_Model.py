@@ -456,7 +456,7 @@ if __name__ == '__main__':
                 ### Integration and time
                 method = 'BDF'
                 dT = 2*np.pi/(10*w0)
-                T_max = 2*np.pi*1/w0
+                T_max = 2*np.pi*10/w0
                 T_span = [0, T_max]
                 T_eval = [dT*i for i in range(round(T_max/dT))]
                 T_sim_max = 600
