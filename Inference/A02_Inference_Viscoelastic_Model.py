@@ -402,8 +402,8 @@ if __name__ == '__main__':
 
     # Main # -------------------------------------------------------------------
 
-    m1 = 8 # 11
-    A_vec = np.float_power(10, np.linspace(-2, 5, num = m1)) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
+    m1 = 11
+    A_vec = np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
     m2 = 11
     w0_vec = np.float_power(10, np.linspace(-5, 5, num = m2)) # np.array([1e0])
     m3 = 1 # 2
