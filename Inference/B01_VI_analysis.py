@@ -47,15 +47,15 @@ if __name__ == "__main__":
 
         p_star = np.array(list(exp_variable_params.values()))
         inferred_variable_params = VI_dict["output"].x
-        p = np.array(list(inferred_variable_params.values()))
+        p_inf = np.array(list(inferred_variable_params.values()))
 
-        IE = L2_relative_error(p, p_star)
+        IE = L2_relative_error(p_inf, p_star)
         Hm1 = VI_dict['output']['lowest_optimization_result']['hess_inv'].todense()
         # print("A, w0, L2 Relative Inference Error:", A, w0, IE)
 
         A_list.append(A)
         w0_list.append(w0)
-        p_inf_list.append(p)
+        p_inf_list.append(p_inf)
         IE_list.append(IE)
         Hm1_list.append(Hm1)
 
@@ -66,14 +66,6 @@ if __name__ == "__main__":
         # fig.add_scatter(x = list(exp_variable_params.keys()), y = list(exp_variable_params.values()), mode = "markers", marker_color = "red", marker_size = 10, name = "p_star", opacity = 0.7)
         # fig.show()
 
-    
-    # Plot transects
-    ## Inference Error
-    # fig = go.Figure()
-    # fig.add_scatter(x = w0_list, y = IE_list, mode = "markers")
-    # fig.update_xaxes(type = "log")
-    # fig.show()
-    # exit()
 
     df = pd.DataFrame()
     df["A"] = A_list
@@ -81,18 +73,7 @@ if __name__ == "__main__":
     df["p_inf"] = p_inf_list
     df["IE"] = IE_list
     df["Hm1"] = Hm1_list # Covariance matrix
-    df["Sigma"] = df.apply(lambda x: np.diag(x["Hm1"]), axis = 1)
-
-    # Plot heatmap
-    # df = df.pivot(index='A', columns='w0', values = 'IE') # .fillna(0)
-    # print(df.values.shape)
-    # print(df)
-    # exit()
-
-    # fig = go.Figure(data = go.Heatmap(x = df.columns, y = df.index, z = np.log10(df.values), colorscale = 'RdPu_r'))
-    # fig.update_xaxes(title = "w0", type = "log")
-    # fig.update_yaxes(title = "A", type = "log")
-    # fig.show()
+    df["Sigma"] = df.apply(lambda x: np.sqrt(np.diag(x["Hm1"])), axis = 1)
 
     # Combine parameter estimates (using BLC function)
     p_combined = []
@@ -101,3 +82,44 @@ if __name__ == "__main__":
         Z_combined_vector_j = BLC(Z_vector_list_j)
         p_combined.append(Z_combined_vector_j)
     print("p_combined", p_combined)
+
+    # Plot IE heatmap
+    df["p_inf_0"] = df.apply(lambda x: x['p_inf'][0], axis = 1)
+    df["p_inf_1"] = df.apply(lambda x: x['p_inf'][1], axis = 1)
+    df["sigma_p_inf_0"] = df.apply(lambda x: x['Sigma'][0], axis = 1)
+    df["sigma_p_inf_1"] = df.apply(lambda x: x['Sigma'][1], axis = 1)
+
+    # df_p_inf = df.pivot(index='A', columns='w0', values = 'p_inf')
+    # print(df_p_inf)
+    # print(df_p_inf.values[0])
+
+    # exit()
+
+    fig = make_subplots(rows = 2, cols = 2, subplot_titles=["p_inf[0]", "sigma_p_inf[0]", "p_inf[1]", "sigma_p_inf[1]"])
+
+    hm_p_inf_0 = go.Heatmap(x = df['A'], y = df['w0'], z = df['p_inf_0'], colorscale = 'RdPu_r')
+    hm_sigma_p_inf_0 = go.Heatmap(x = df['A'], y = df['w0'], z = np.log10(df['sigma_p_inf_0']), colorscale = 'RdPu_r')
+    hm_p_inf_1 = go.Heatmap(x = df['A'], y = df['w0'], z = df['p_inf_1'], colorscale = 'RdPu_r')
+    hm_sigma_p_inf_1 = go.Heatmap(x = df['A'], y = df['w0'], z = np.log10(df['sigma_p_inf_1']), colorscale = 'RdPu_r')
+
+    fig.add_trace(hm_p_inf_0, row = 1, col = 1)
+    fig.add_trace(hm_sigma_p_inf_0, row = 1, col = 2)
+    fig.add_trace(hm_p_inf_1, row = 2, col = 1)
+    fig.add_trace(hm_sigma_p_inf_1, row = 2, col = 2)
+    
+    fig.update_xaxes(title = "w0", type = "log")
+    fig.update_yaxes(title = "A", type = "log")
+    fig.show()
+
+    exit()
+
+    # Plot IE heatmap
+    df_IE = df.pivot(index='A', columns='w0', values = 'IE') # .fillna(0)
+    fig = go.Figure(data = go.Heatmap(x = df_IE.columns, y = df_IE.index, z = np.log10(df_IE.values), colorscale = 'RdPu_r'))
+    fig.update_xaxes(title = "w0", type = "log")
+    fig.update_yaxes(title = "A", type = "log")
+    fig.update_layout(title = "IE")
+    fig.show()
+
+
+
