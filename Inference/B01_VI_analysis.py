@@ -75,26 +75,13 @@ if __name__ == "__main__":
     df["Hm1"] = Hm1_list # Covariance matrix
     df["Sigma"] = df.apply(lambda x: np.sqrt(np.diag(x["Hm1"])), axis = 1)
 
-    # Combine parameter estimates (using BLC function)
-    p_combined = []
-    for j in range(len(list(exp_variable_params.keys()))):
-        Z_vector_list_j = [np.array([df["p_inf"][k][j], df["Sigma"][k][j]]) for k in range(df["p_inf"].shape[0])]
-        Z_combined_vector_j = BLC(Z_vector_list_j)
-        p_combined.append(Z_combined_vector_j)
-    print("p_combined", p_combined)
-
     # Plot IE heatmap
     df["p_inf_0"] = df.apply(lambda x: x['p_inf'][0], axis = 1)
     df["p_inf_1"] = df.apply(lambda x: x['p_inf'][1], axis = 1)
     df["sigma_p_inf_0"] = df.apply(lambda x: x['Sigma'][0], axis = 1)
     df["sigma_p_inf_1"] = df.apply(lambda x: x['Sigma'][1], axis = 1)
 
-    # df_p_inf = df.pivot(index='A', columns='w0', values = 'p_inf')
-    # print(df_p_inf)
-    # print(df_p_inf.values[0])
-
-    # exit()
-
+    # Plot inferred params for each (A,w0)-point
     fig = make_subplots(rows = 2, cols = 2, subplot_titles=["p_inf[0]", "sigma_p_inf[0]", "p_inf[1]", "sigma_p_inf[1]"])
 
     hm_p_inf_0 = go.Heatmap(x = df['A'], y = df['w0'], z = df['p_inf_0'], colorscale = 'RdPu_r')
@@ -111,15 +98,31 @@ if __name__ == "__main__":
     fig.update_yaxes(title = "A", type = "log")
     fig.show()
 
-    exit()
-
-    # Plot IE heatmap
-    df_IE = df.pivot(index='A', columns='w0', values = 'IE') # .fillna(0)
-    fig = go.Figure(data = go.Heatmap(x = df_IE.columns, y = df_IE.index, z = np.log10(df_IE.values), colorscale = 'RdPu_r'))
+    # Plot IE heatmap for each (A, w0)-point
+    # df_IE = df.pivot(index='A', columns='w0', values = 'IE') # .fillna(0)
+    fig = go.Figure(data = go.Heatmap(x = df['A'], y = df['w0'], z = np.log10(df['IE']), colorscale = 'RdPu_r'))
     fig.update_xaxes(title = "w0", type = "log")
     fig.update_yaxes(title = "A", type = "log")
     fig.update_layout(title = "IE")
     fig.show()
+
+    # Plot inferred params for all (A,w0)-point combined
+    p_combined = [] # Combine parameter estimates (using BLC function)
+    for j in range(len(list(exp_variable_params.keys()))):
+        Z_vector_list_j = [np.array([df["p_inf"][k][j], df["Sigma"][k][j]]) for k in range(df["p_inf"].shape[0])]
+        Z_combined_vector_j = BLC(Z_vector_list_j)
+        p_combined.append(Z_combined_vector_j)
+    print("p_combined", p_combined)
+
+    nbins = 20
+    # p_inf_hist = np.histogram2d(df['p_inf_0'], df['p_inf_1'], bins = nbins)
+    # print(p_inf_hist)
+    fig = go.Figure(go.Histogram2d(
+        x=df['p_inf_0'],
+        y=df['p_inf_1'], 
+        nbinsx=100, nbinsy=50))
+    fig.show()
+
 
 
 

@@ -1,6 +1,8 @@
 # Libraries
 import numpy as np
 import scipy.optimize as so
+import scipy.differentiate as sd
+# from scipy.differentiate import hessian
 from optimparallel import minimize_parallel # L-BFGS-B parallel implementation
 
 import plotly.express as px
@@ -258,6 +260,7 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function 
         - a local optimization method, the L-BFGS-B method, which is a variant 
         of the BFGS method with less memory usage and the possibility to add box 
         constraints.
+        - hessian computation at the convergence point
 
     Inputs:
         - func: a functional that takes a ndarray variable_params of shape 
@@ -267,6 +270,9 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function 
         according to the scipy.optimize syntax.
         - niter: number of global (basin-hopping) iterations
         - callback_function: callback function
+
+    Outputs: 
+        - ret is a Batch object containing all information resulting from the basinhopping algorithm
     """
 
     method = "L-BFGS-B"
@@ -274,6 +280,10 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function 
     x0 = guess_variables
     minimizer_kwargs = {"method": method, "bounds": bounds, "options":{'disp': True},  "callback":callback_function}
     ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter)
+
+    # Compute hessian
+    h = sd.hessian(func, ret.x)
+    ret.setdefault('hessian', h) #Check if that works
 
     return ret
 
@@ -355,7 +365,7 @@ def Infer(fixed_params, guess_variable_params, bounds, functional, opt_scheme, o
 
     return res
 
-### Inference for the viscoelastic model
+### Inference for model-experiment optimization
 def ModelExp_Inference(exp_data, model, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args):
 
     """ 
@@ -391,6 +401,7 @@ def ModelExp_Inference(exp_data, model, fixed_params, guess_variable_params, bou
 
     return res
 
+### Inference for the viscoelastic model
 def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args):
     return ModelExp_Inference(exp_data, Viscoelastic_Model, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args)
 
@@ -402,10 +413,10 @@ if __name__ == '__main__':
 
     # Main # -------------------------------------------------------------------
 
-    m1 = 11
-    A_vec = np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
-    m2 = 11
-    w0_vec = np.float_power(10, np.linspace(-5, 5, num = m2)) # np.array([1e0])
+    m1 = 1 # 11
+    A_vec = np.array([1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # 
+    m2 = 1 # 11
+    w0_vec = np.array([1e0]) # np.float_power(10, np.linspace(-5, 5, num = m2)) # 
     m3 = 1 # 2
     psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
