@@ -2,7 +2,6 @@
 import numpy as np
 import scipy.optimize as so
 import scipy.differentiate as sd
-# from scipy.differentiate import hessian
 from optimparallel import minimize_parallel # L-BFGS-B parallel implementation
 
 import plotly.express as px
@@ -244,6 +243,32 @@ def Make_Model_Functional(model, model_disc_func):
 
     return model_functional
 
+def Vectorize_Functional(func, m):
+    """ 
+    This function vectorizes a functional with m input parameters, 
+    by wrapping it inside another function.
+    """
+
+    def f_vec(x):
+
+        x = np.array(x, copy=False)
+        if x.ndim < 1 or x.shape[0] != m:
+            raise ValueError(f"Expected first dim {m}, got {x.shape}")
+
+        # Flatten extra dims
+        extra_shape = x.shape[1:]
+        p = int(np.prod(extra_shape, dtype=int)) if extra_shape else 1
+        x_flat = x.reshape(m, p)
+
+        # apply func to each column
+        out = np.empty(p, dtype=float)
+        for j in range(p):
+            out[j] = func(x_flat[:, j])
+        # reshape back to extra_shape
+        return out.reshape(extra_shape)
+
+    return f_vec
+
 ## Optimization schemes
 
 def callback_function(xk):
@@ -281,8 +306,9 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function 
     minimizer_kwargs = {"method": method, "bounds": bounds, "options":{'disp': True},  "callback":callback_function}
     ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter)
 
-    # Compute hessian
-    h = sd.hessian(func, ret.x)
+    m = guess_variables.shape[0]  
+    vec_func = Vectorize_Functional(func, m)
+    h = sd.hessian(f = vec_func, x = ret.x).ddf
     ret.setdefault('hessian', h) #Check if that works
 
     return ret
@@ -311,13 +337,17 @@ def Make_Red_Func(func, variable_keys, fixed_params):
         """
         The reduced functional.
         Warning! The variables np.ndarray should follow the same order as in the variable_params dictionary, otherwise it won't work.
+
+        Warning! This functional is not vectorized.
         """
+
         # Check that variables and variable_keys are compatible
         if (len(list(variable_keys)) - variables.size) != 0:
             raise ValueError("Number of variables and number of keys is different.")
 
         variable_params = {key:variable for (key,variable) in zip(variable_keys, variables)}
         all_params = fixed_params | variable_params
+        
         return func(all_params)
     
     return red_func
@@ -408,174 +438,175 @@ def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds
 ################################################################################
 ################################################################################
 
-bool_test = False
+bool_test = True
+bool_main = False
 if __name__ == '__main__':
 
+    if bool_main:
     # Main # -------------------------------------------------------------------
 
-    m1 = 1 # 11
-    A_vec = np.array([1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # 
-    m2 = 1 # 11
-    w0_vec = np.array([1e0]) # np.float_power(10, np.linspace(-5, 5, num = m2)) # 
-    m3 = 1 # 2
-    psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
+        m1 = 1 # 11
+        A_vec = np.array([1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
+        m2 = 1 # 11
+        w0_vec = np.array([1e0]) # np.float_power(10, np.linspace(-5, 5, num = m2)) # np.array([1e0])
+        m3 = 1 # 2
+        psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
-    n1 = 1 # 14
-    k0_vec = np.array([1e13]) # np.float_power(10, np.linspace(0, 13, num = n1))
-    n2 = 1 # 11
-    Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
-    n3 = 1 # 11
-    tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
-    n4 = 1 # 11
-    Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
-    n5 = 1 # 11
-    tau_s_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n5))
+        n1 = 1 # 14
+        k0_vec = np.array([1e13]) # np.float_power(10, np.linspace(0, 13, num = n1))
+        n2 = 1 # 11
+        Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
+        n3 = 1 # 11
+        tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
+        n4 = 1 # 11
+        Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
+        n5 = 1 # 11
+        tau_s_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n5))
 
-    m_tot = m1 * m2 * m3
-    n_tot = n1 * n2 * n3 * n4 * n5
-    mn_tot = m_tot * n_tot
-    print("m_tot, n_tot, mn_tot:", m_tot, n_tot, mn_tot)
-    IE_matrix = np.ones((m1,m2,m3,n1,n2,n3,n4,n5)) * np.nan
+        m_tot = m1 * m2 * m3
+        n_tot = n1 * n2 * n3 * n4 * n5
+        mn_tot = m_tot * n_tot
+        print("m_tot, n_tot, mn_tot:", m_tot, n_tot, mn_tot)
+        IE_matrix = np.ones((m1,m2,m3,n1,n2,n3,n4,n5)) * np.nan
 
-    ## Constructing experimental data
+        ## Constructing experimental data
 
-    ### Numerical properties
-    N = 10
+        ### Numerical properties
+        N = 10
 
-    #### Boundary conditions
-    init_conf = StraightLine
-    X0 = init_conf(N)
+        #### Boundary conditions
+        init_conf = StraightLine
+        X0 = init_conf(N)
 
-    #### External forcings
-    n_L = [0,0]
-    m_L = 0
-    Lambda = [0,0]
-    Lambdas = [Lambda for k in range(N)]
-    Zeta = 0
-    Zetas = [Zeta]*N
+        #### External forcings
+        n_L = [0,0]
+        m_L = 0
+        Lambda = [0,0]
+        Lambdas = [Lambda for k in range(N)]
+        Zeta = 0
+        Zetas = [Zeta]*N
 
-    ### Time-dependent flow field
-    Flow_field_filename = "" # Whether to use a measured flow field or not
+        ### Time-dependent flow field
+        Flow_field_filename = "" # Whether to use a measured flow field or not
 
-    for i1 in range(m1):
-        A = A_vec[i1]
-        for i2 in range(m2):
-            w0 = w0_vec[i2]
-            for i3 in range(m3):
-                psi = psi_vec[i3]
+        for i1 in range(m1):
+            A = A_vec[i1]
+            for i2 in range(m2):
+                w0 = w0_vec[i2]
+                for i3 in range(m3):
+                    psi = psi_vec[i3]
 
-                ### Integration and time
-                method = 'BDF'
-                dT = 2*np.pi/(10*w0)
-                T_max = 2*np.pi*10/w0
-                T_span = [0, T_max]
-                T_eval = [dT*i for i in range(round(T_max/dT))]
-                T_sim_max = 600
+                    ### Integration and time
+                    method = 'BDF'
+                    dT = 2*np.pi/(10*w0)
+                    T_max = 2*np.pi*10/w0
+                    T_span = [0, T_max]
+                    T_eval = [dT*i for i in range(round(T_max/dT))]
+                    T_sim_max = 600
 
-                ### Numerical Flow field and Interpolation
-                X_flow_field_string, X_flow_field = CreateFlowField(A, w0, psi, T_eval, filename = Flow_field_filename)
-                if X_flow_field_string != "NO FLOW":
-                    InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
-                else:         
-                    InterpFlow = 0
-                
-                print("Flow field created for (A,w0,psi) = ", A, w0, psi)
-                flow_params = dict(A = A, w0 = w0, psi = psi)
+                    ### Numerical Flow field and Interpolation
+                    X_flow_field_string, X_flow_field = CreateFlowField(A, w0, psi, T_eval, filename = Flow_field_filename)
+                    if X_flow_field_string != "NO FLOW":
+                        InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
+                    else:         
+                        InterpFlow = 0
+                    
+                    print("Flow field created for (A,w0,psi) = ", A, w0, psi)
+                    flow_params = dict(A = A, w0 = w0, psi = psi)
 
-                ### Filament properties
-                gamma = 2
-                bool_EI = True
+                    ### Filament properties
+                    gamma = 2
+                    bool_EI = True
 
-                for j1 in range(n1):
-                    k0 = k0_vec[j1]
-                    for j2 in range(n2):
-                        Sp4 = Sp4_vec[j2]
-                        for j3 in range(n3):
-                            tau_b = tau_b_vec[j3]
-                            for j4 in range(n4):
-                                Beta = Beta_vec[j4]
-                                for j5 in range(n5):
-                                    tau_s = tau_s_vec[j5]
+                    for j1 in range(n1):
+                        k0 = k0_vec[j1]
+                        for j2 in range(n2):
+                            Sp4 = Sp4_vec[j2]
+                            for j3 in range(n3):
+                                tau_b = tau_b_vec[j3]
+                                for j4 in range(n4):
+                                    Beta = Beta_vec[j4]
+                                    for j5 in range(n5):
+                                        tau_s = tau_s_vec[j5]
 
-                                    taus_b = [tau_b]*(N-1)
+                                        taus_b = [tau_b]*(N-1)
 
-                                    exp_params = Viscoelastic_Model_Parameters(gamma = gamma, N = N, k0 = k0, bool_EI = bool_EI, Sp4 = Sp4, tau_b = tau_b, Beta = Beta, tau_s = tau_s, init_conf = init_conf, n_L = n_L, m_L = m_L, Lambdas = Lambdas, Zetas = Zetas, InterpFlow = InterpFlow, method = method, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, filament_type = "custom", flow_type = "custom")
+                                        exp_params = Viscoelastic_Model_Parameters(gamma = gamma, N = N, k0 = k0, bool_EI = bool_EI, Sp4 = Sp4, tau_b = tau_b, Beta = Beta, tau_s = tau_s, init_conf = init_conf, n_L = n_L, m_L = m_L, Lambdas = Lambdas, Zetas = Zetas, InterpFlow = InterpFlow, method = method, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, filament_type = "custom", flow_type = "custom")
 
-                                    exp_data = Viscoelastic_Model(exp_params)
+                                        exp_data = Viscoelastic_Model(exp_params)
 
-                                    ## Choose discrepancy function
-                                    disc_func = L2_relative_error
+                                        ## Choose discrepancy function
+                                        disc_func = L2_relative_error
 
-                                    ## Choose initial guess (and fixed vs variable parameters)
+                                        ## Choose initial guess (and fixed vs variable parameters)
 
-                                    ### Initialize parameters perturbed around experimental parameters
-                                    initial_params = copy.deepcopy(exp_params)
-                                    initial_params["Sp4"] = 2.0
-                                    initial_params["tau_b"] = 1.0
+                                        ### Initialize parameters perturbed around experimental parameters
+                                        initial_params = copy.deepcopy(exp_params)
+                                        initial_params["Sp4"] = 2.0
+                                        initial_params["tau_b"] = 1.0
 
-                                    ### Separate fixed and variable parameters
-                                    variable_keys = ["Sp4", "tau_b"]
-                                    exp_variable_params = {key:exp_params[key] for key in variable_keys}
-                                    guess_variable_params = {key:initial_params[key] for key in variable_keys}
-                                    fixed_params = initial_params
-                                    for key in variable_keys:
-                                        fixed_params.pop(key)
+                                        ### Separate fixed and variable parameters
+                                        variable_keys = ["Sp4", "tau_b"]
+                                        exp_variable_params = {key:exp_params[key] for key in variable_keys}
+                                        guess_variable_params = {key:initial_params[key] for key in variable_keys}
+                                        fixed_params = initial_params
+                                        for key in variable_keys:
+                                            fixed_params.pop(key)
 
-                                    ### Bounds
-                                    eps = 1e-3
-                                    bound_Sp4 = [eps, 1e3]
-                                    bound_tau_b = [0, 1e3]
-                                    lb = [bound_Sp4[0], bound_tau_b[0]]
-                                    ub = [bound_Sp4[1], bound_tau_b[1]]
-                                    bounds = so.Bounds(lb,  ub)
+                                        ### Bounds
+                                        eps = 1e-3
+                                        bound_Sp4 = [eps, 1e3]
+                                        bound_tau_b = [0, 1e3]
+                                        lb = [bound_Sp4[0], bound_tau_b[0]]
+                                        ub = [bound_Sp4[1], bound_tau_b[1]]
+                                        bounds = so.Bounds(lb,  ub)
 
-                                    ### Optimization schemes and arguments
-                                    opt_scheme = Basinhopping_LBFGSB_Scheme
-                                    niter = 1
-                                    opt_args = {"niter":niter, "callback_function":callback_function}
+                                        ### Optimization schemes and arguments
+                                        opt_scheme = Basinhopping_LBFGSB_Scheme
+                                        niter = 1
+                                        opt_args = {"niter":niter, "callback_function":callback_function}
 
-                                    VI_args = dict(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
-                                    ret = Viscoelastic_Inference(**VI_args)
+                                        VI_args = dict(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
+                                        ret = Viscoelastic_Inference(**VI_args)
 
-                                    ## Inference results
+                                        ## Inference results
 
-                                    ####################### MOVE THIS IN ANALYSIS
+                                        ####################### MOVE THIS IN ANALYSIS
 
-                                    ### Save results
-                                    #### Make dictionary with all relevant information
+                                        ### Save results
+                                        #### Make dictionary with all relevant information
 
-                                    ###### Dictionary of the used function
-                                    VI_dict = Make_Dict_From_Applied_Function(func = Viscoelastic_Inference, func_args = VI_args, func_output = ret)
+                                        ###### Dictionary of the used function
+                                        VI_dict = Make_Dict_From_Applied_Function(func = Viscoelastic_Inference, func_args = VI_args, func_output = ret)
 
-                                    ###### Additional information
-                                    VI_dict["exp_variable_params"] = exp_variable_params
-                                    VI_dict["flow_params"] = flow_params
-                                    
-                                    # Pickle dictionary using the highest protocol available.
-                                    
-                                    ## Make flow part of the filename
-                                    base_id = "_Flow"
-                                    for key in list(flow_params.keys()):
-                                        param = flow_params[key]
-                                        base_id += "_" + key + "_" + f"{param:.2E}"                                    
-                                    base_id += "_Fixed"
-                                    for key in list(fixed_params.keys()):
-                                        # Exclude non-scalar parameters
-                                        if key in ["A", "w0", "psi", "gamma", "N", "k0", "Sp4", "tau_b", "Beta", "tau_s"]:
-                                            param = fixed_params[key]
+                                        ###### Additional information
+                                        VI_dict["exp_variable_params"] = exp_variable_params
+                                        VI_dict["flow_params"] = flow_params
+                                        
+                                        # Pickle dictionary using the highest protocol available.
+                                        
+                                        ## Make flow part of the filename
+                                        base_id = "_Flow"
+                                        for key in list(flow_params.keys()):
+                                            param = flow_params[key]
+                                            base_id += "_" + key + "_" + f"{param:.2E}"                                    
+                                        base_id += "_Fixed"
+                                        for key in list(fixed_params.keys()):
+                                            # Exclude non-scalar parameters
+                                            if key in ["A", "w0", "psi", "gamma", "N", "k0", "Sp4", "tau_b", "Beta", "tau_s"]:
+                                                param = fixed_params[key]
+                                                base_id += "_" + key + "_" + f"{param:.2E}"
+                                        base_id += "_Variable"
+                                        for key in list(exp_variable_params.keys()):
+                                            param = exp_variable_params[key]
                                             base_id += "_" + key + "_" + f"{param:.2E}"
-                                    base_id += "_Variable"
-                                    for key in list(exp_variable_params.keys()):
-                                        param = exp_variable_params[key]
-                                        base_id += "_" + key + "_" + f"{param:.2E}"
-                                    filename = writing_dir + "VI_dict" + base_id + ".pkl"
-                                    output = open(filename, 'wb')
-                                    pickle.dump(obj = VI_dict, file = output, protocol = -1)
-                                    output.close()
+                                        filename = writing_dir + "VI_dict" + base_id + ".pkl"
+                                        output = open(filename, 'wb')
+                                        pickle.dump(obj = VI_dict, file = output, protocol = -1)
+                                        output.close()
 
     # ----------------------------------------------------------------- # Main # 
 
-    
     # Tests # ------------------------------------------------------------------
     if bool_test:
             
@@ -671,7 +702,7 @@ if __name__ == '__main__':
         func = viscoelastic_modelexp_functional
         red_viscoelastic_modelexp_func = Make_Red_Func(func = func, variable_keys = variable_keys, fixed_params = fixed_params)
         
-        # !The variables np.ndarray should follow the same order as in the variable_params dictionary, otherwise it won't work.
+        # ! # The variables np.ndarray should follow the same order as in the variable_params dictionary, otherwise it won't work.
         variables = np.array(list(variable_params.values())) 
         f = red_viscoelastic_modelexp_func(variables)
         print("Reduced functional evaluated for a subset of parameters variables", f)
@@ -687,9 +718,15 @@ if __name__ == '__main__':
         ub = [bound_Sp4[1], bound_tau_b[1]]
         bounds = so.Bounds(lb,  ub)
         niter = 1 # Number of basin-hopping (global) iterations
-        # ret = Basinhopping_LBFGSB_Scheme(func = red_viscoelastic_modelexp_func, guess_variables = guess_variables, bounds = bounds, niter = niter)
-        # print("solution:", ret.x)
-        # exit()
+        ret = Basinhopping_LBFGSB_Scheme(func = red_viscoelastic_modelexp_func, guess_variables = guess_variables, bounds = bounds, niter = niter)
+        print("solution:", ret.x, ret.x.shape)
+
+        m = len(variable_keys)    
+        vec_red_viscoelastic_modelexp_func = Vectorize_Functional(red_viscoelastic_modelexp_func, m)
+        h = sd.hessian(f = vec_red_viscoelastic_modelexp_func, x = ret.x, maxiter = 3, order = 4).ddf
+        ret.setdefault('hessian', h) #Check if that works
+
+        exit()
 
         ### Inference meta-function
         #### Infer(): OK for (viscoelastic model, L2-relative norm, Basin-hopping, L-BFGS-B)
