@@ -34,10 +34,6 @@ if __name__ == "__main__":
         VI_dict = pickle.load(pkl_file)
         pkl_file.close()
 
-        # pprint.pprint(VI_dict)
-        # Hessian
-        # print(VI_dict['output']['lowest_optimization_result']['hess_inv'].todense())
-
         exp_variable_params = VI_dict["exp_variable_params"]
         guess_variable_params = VI_dict["args"]["guess_variable_params"]
         flow_params = VI_dict["flow_params"]
@@ -51,6 +47,8 @@ if __name__ == "__main__":
 
         IE = L2_relative_error(p_inf, p_star)
         Hm1 = VI_dict['output']['lowest_optimization_result']['hess_inv'].todense()
+        if not VI_dict['output']['success']: # If convergence failed, error is infinite
+            Hm1 = np.ones_like(Hm1) * np.inf
         # print("A, w0, L2 Relative Inference Error:", A, w0, IE)
 
         A_list.append(A)
@@ -73,6 +71,7 @@ if __name__ == "__main__":
     df["p_inf"] = p_inf_list
     df["IE"] = IE_list
     df["Hm1"] = Hm1_list # Covariance matrix
+    print("df[hm1]", df["Hm1"])
     df["Sigma"] = df.apply(lambda x: np.sqrt(np.diag(x["Hm1"])), axis = 1)
 
     # Plot IE heatmap

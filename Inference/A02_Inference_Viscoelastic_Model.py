@@ -285,7 +285,6 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function 
         - a local optimization method, the L-BFGS-B method, which is a variant 
         of the BFGS method with less memory usage and the possibility to add box 
         constraints.
-        - hessian computation at the convergence point
 
     Inputs:
         - func: a functional that takes a ndarray variable_params of shape 
@@ -306,10 +305,11 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function 
     minimizer_kwargs = {"method": method, "bounds": bounds, "options":{'disp': True},  "callback":callback_function}
     ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter)
 
-    m = guess_variables.shape[0]  
-    vec_func = Vectorize_Functional(func, m)
-    h = sd.hessian(f = vec_func, x = ret.x).ddf
-    ret.setdefault('hessian', h) #Check if that works
+    # Compute hessian at convergence point
+    # m = guess_variables.shape[0]  
+    # vec_func = Vectorize_Functional(func, m)
+    # h = sd.hessian(f = vec_func, x = ret.x).ddf
+    # ret.setdefault('hessian', h)    
 
     return ret
 
@@ -723,10 +723,10 @@ if __name__ == '__main__':
 
         m = len(variable_keys)    
         vec_red_viscoelastic_modelexp_func = Vectorize_Functional(red_viscoelastic_modelexp_func, m)
-        h = sd.hessian(f = vec_red_viscoelastic_modelexp_func, x = ret.x, maxiter = 3, order = 4).ddf
-        ret.setdefault('hessian', h) #Check if that works
+        # h = sd.hessian(f = vec_red_viscoelastic_modelexp_func, x = ret.x, maxiter = 1, order = 1).ddf
+        # ret.setdefault('hessian', h)
 
-        exit()
+        # exit()
 
         ### Inference meta-function
         #### Infer(): OK for (viscoelastic model, L2-relative norm, Basin-hopping, L-BFGS-B)
