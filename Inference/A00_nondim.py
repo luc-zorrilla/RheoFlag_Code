@@ -2,6 +2,8 @@
 This script is to write functions and tests for encoding physical parameters of the ViscoElastic Model into non-dimensional parameters, and vice-versa (when possible).
 """
 
+import numpy as np
+
 # Physical parameters
 L = 1e-5 # CR, wt
 eta = 1 # ?
@@ -32,7 +34,6 @@ tau_b = nu_b / E_b
 Beta = K_s * (Delta_s ** 2) / E_b # For sea urchin sperm, demembranated: [3,8]e-14 m^{-2}
 tau_s = nu_s / K_s
 
-unit_dict = {}
 unit_dict["N"] = "_"
 unit_dict["Delta_s"] = "m"
 unit_dict["gamma"] = "_"
@@ -51,3 +52,11 @@ unit_dict["A_dim"] = "m"
 unit_dict["A"] = "_"
 unit_dict["w0"] = "Hz"
 unit_dict["Psi"] = "rad"
+
+print("dimensional parameters")
+for dim_param in ["L", "eta", "csi", "k_0", "E_b", "nu_b", "K_s", "nu_s"]:
+    print(dim_param, eval(dim_param), unit_dict[dim_param])
+
+print("non-dimensionalized parameters")
+for nondim_param in ["N", "Delta_s", "gamma", "Sp4", "tau_b", "Beta", "tau_s"]:
+    print(nondim_param, eval(nondim_param), unit_dict[nondim_param])
