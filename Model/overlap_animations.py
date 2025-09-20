@@ -29,7 +29,6 @@ pio.templates.default = "figure_template"
 relaxation_folder = "C:\\Users\\Luc\\Documents\\PhD_Large_files\\RheoFlag\\Model\\Output\\SecondBend_Relaxation\\BendingElasticity_Clamped_VaryingBendingViscosity\\"
 relaxation_list = ["20250526-032830406021_N_10_tau_s_0_taus_b_0_bool_EI_True_Beta_0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000000.0", "20250526-032855177061_N_10_tau_s_0_taus_b_1000.0_bool_EI_True_Beta_0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000000.0"]
 harmonic_folder = "C:\\Users\\Luc\\Documents\\PhD_Large_files\\RheoFlag\\Model\\Output\\StraightLine_PeriodicFlow\\BendingElasticity_Clamped_VaryingBendingViscosity\\VaryingFrequencyAmplitude\\"
-# harmonic_list = ["20250425-065432009531_N_10_tau_s_0_taus_b_1.0_bool_EI_True_Beta_0_gamma_2_A_1e-05_w0_1e-08_Sp4_1_k0_10000000000000.0", "20250425-094213855897_N_10_tau_s_0_taus_b_1000.0_bool_EI_True_Beta_0_gamma_2_A_1e-05_w0_1e-08_Sp4_1_k0_10000000000000.0"]
 harmonic_list = ["20250425-065622977713_N_10_tau_s_0_taus_b_1.0_bool_EI_True_Beta_0_gamma_2_A_2.0433597178569438e-05_w0_0.001_Sp4_1_k0_10000000000000.0",
 "20250425-094106662156_N_10_tau_s_0_taus_b_1000.0_bool_EI_True_Beta_0_gamma_2_A_1e-05_w0_0.001_Sp4_1_k0_10000000000000.0"]
 
