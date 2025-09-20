@@ -28,13 +28,18 @@ pio.templates.default = "figure_template"
 
 relaxation_folder = "C:\\Users\\Luc\\Documents\\PhD_Large_files\\RheoFlag\\Model\\Output\\SecondBend_Relaxation\\BendingElasticity_Clamped_VaryingBendingViscosity\\"
 relaxation_list = ["20250526-032830406021_N_10_tau_s_0_taus_b_0_bool_EI_True_Beta_0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000000.0", "20250526-032855177061_N_10_tau_s_0_taus_b_1000.0_bool_EI_True_Beta_0_gamma_2_A_0_w0_0_Sp4_1_k0_10000000000000.0"]
-harmonic_folder = "C:\\Users\\Luc\\Documents\\PhD_Large_files\\RheoFlag\\Model\\Output\\StraightLine_PeriodicFlow\\BendingElasticity_Clamped_VaryingBendingViscosity\\"
-harmonic_list = []
+harmonic_folder = "C:\\Users\\Luc\\Documents\\PhD_Large_files\\RheoFlag\\Model\\Output\\StraightLine_PeriodicFlow\\BendingElasticity_Clamped_VaryingBendingViscosity\\VaryingFrequencyAmplitude\\"
+# harmonic_list = ["20250425-065432009531_N_10_tau_s_0_taus_b_1.0_bool_EI_True_Beta_0_gamma_2_A_1e-05_w0_1e-08_Sp4_1_k0_10000000000000.0", "20250425-094213855897_N_10_tau_s_0_taus_b_1000.0_bool_EI_True_Beta_0_gamma_2_A_1e-05_w0_1e-08_Sp4_1_k0_10000000000000.0"]
+harmonic_list = ["20250425-065622977713_N_10_tau_s_0_taus_b_1.0_bool_EI_True_Beta_0_gamma_2_A_2.0433597178569438e-05_w0_0.001_Sp4_1_k0_10000000000000.0",
+"20250425-094106662156_N_10_tau_s_0_taus_b_1000.0_bool_EI_True_Beta_0_gamma_2_A_1e-05_w0_0.001_Sp4_1_k0_10000000000000.0"]
+
+relaxation_range = [0, 0.025]
+harmonic_range = [-0.025, 0.025]
+range = harmonic_range
+
 folder_name = harmonic_folder
 filename_list = harmonic_list
-
 X_list = []
-filename_list = 
 for id_filename in filename_list:
     metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
     data_filename = folder_name + 'data_' + id_filename + '.csv'
@@ -63,6 +68,6 @@ for id_filename in filename_list:
 
 # Animated shape
 fig = AnimatedShapes(X_list[0], X_list[1], X_flow, N, w0, Sp4, Beta, tau_b, T_eval)
-fig.update_yaxes(range = [0, 0.025])
+fig.update_yaxes(range = range)
 fig.update_layout(showlegend = False, width = 1000, height = 1000)
 fig.vs_show()
