@@ -4,7 +4,8 @@
 ### Libraries
 
 import sys
-plot_functions_folder = "C:/Users/Luc/Documents/MEGAsync/Code"
+from pathlib import Path
+plot_functions_folder = Path.home() / 'Work' / 'Miscellaneous' / 'Code'
 sys.path.insert(0, plot_functions_folder)
 
 import multiprocessing
@@ -24,24 +25,24 @@ cyclic_color = ['Twilight', 'IceFire', 'Edge', 'Phase', 'HSV', 'mrybm', 'mygbm']
 diverging_color = [reverted_Tealrose, 'Fall', 'Geyser', 'Temps', 'Tealrose', 'Tropic'][0]
 ################################################################################
 
-temp_folder = "C:/Users/Luc/Documents/MEGAsync/PhD/RheoFlag/Results/Temp/"
+temp_folder = Path.cwd().joinpath('Model').joinpath('Results').joinpath('Temp')
 
 ################################################################################
 ### Read metadata and data
 
-folder_name = "C:/Users/Luc/Documents/PhD_Large_files/RheoFlag/Model/Output/" 
+folder_name = Path('..').joinpath('Model').joinpath('Output').resolve()
 
-# folder_name += "AnalyticalComparisons/"
-folder_name += "StraightLine_PeriodicFlow/"
+# folder_name += 'AnalyticalComparisons/'
+folder_name /= 'StraightLine_PeriodicFlow/'
 
 # Analytical Comparisons
-# folder_name += "PureBending_Clamped_Relaxation/"
-# folder_name += "PureBending_Clamped_UniformVerticalFlow/"    
-# folder_name += "PureBending_Clamped_TipVerticalPointForce/"
+# folder_name /= "PureBending_Clamped_Relaxation/"
+# folder_name /= "PureBending_Clamped_UniformVerticalFlow/"    
+# folder_name /= "PureBending_Clamped_TipVerticalPointForce/"
 
 # Periodic forcing
-folder_name += "BendingElasticity_Clamped_VaryingBendingViscosity/"
-# folder_name += "StaticTest/"
+folder_name /= "BendingElasticity_Clamped_VaryingBendingViscosity/"
+# folder_name /= "StaticTest/"
 
 ################################################################################
 id_filename = "20250421-041743766572_N_10_tau_s_0_taus_b_1000000.0_bool_EI_True_Beta_0_gamma_2_A_0.0025_w0_1e-09_Sp4_1_k0_10000000000.0"
