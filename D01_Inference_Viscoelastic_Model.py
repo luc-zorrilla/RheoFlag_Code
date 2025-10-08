@@ -1,25 +1,18 @@
 """ This file is gathering functions useful for inference at high-level coding"""
 
 ### Libraries ###
+
+import pickle
+from pathlib import Path
+writing_dir = Path('..') / 'Inference' / 'FromSimulationData'
+import copy
+
+from misc_func import *
+from A01_Coarse_grained_axoneme_functions import *
+
 import numpy as np
 import scipy.optimize as so
 import scipy.differentiate as sd
-from optimparallel import minimize_parallel # L-BFGS-B parallel implementation
-
-import plotly.express as px
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
-from plotly.express.colors import sample_colorscale
-import plotly.io as pio
-
-import pickle
-writing_dir = "C:\\Users\\Luc\\Documents\\PhD_Large_files\\RheoFlag\\Inference\\FromSimulationData\\"
-import copy
-import sys
-from misc_func import *
-# caution: path[0] is reserved for script path (or '' in REPL)
-sys.path.insert(1, 'c:\\Users\\Luc\\Documents\\MEGAsync\\PhD\\RheoFlag\\Code\\NeatCode')
-from A01_Coarse_grained_axoneme_functions import *
 
 ## Functions
 
