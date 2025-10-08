@@ -1,14 +1,16 @@
-""" This file is gathering functions useful for inference at high-level coding"""
+""" This file is 
+    - gathering functions useful for inference at a high-level
+    - """
 
 ### Libraries ###
 
-import pickle
-from pathlib import Path
-writing_dir = Path('..') / 'Inference' / 'FromSimulationData'
-import copy
-
 from misc_func import *
 from A01_Coarse_grained_axoneme_functions import *
+
+import pickle
+from pathlib import Path
+writing_dir = str((Path('..') / 'Inference' / 'FromSimulationData').resolve())
+import copy
 
 import numpy as np
 import scipy.optimize as so
@@ -264,13 +266,21 @@ def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds
 ################################################################################
 ################################################################################
 
-bool_test = True
-bool_main = False
+bool_test = False
+bool_main = True
 if __name__ == '__main__':
+    """ 
+    In the main script, one makes a scan over parameter space of the viscoelastic filament. 
+    For each point in parameter space, an inference is made in a subset of parameter space given an initial guess.
+    This method allows to perform inference on the "same" viscoelastic filament but for various external forcings. 
+    The inference follows a L-BFGS-B local optimization scheme combined with a Basin-Hopping global optimization scheme. 
+    For each inference, relevant data is saved in a pkl (pickled) file, which will then be used in VI_analysis. 
+    """
 
     if bool_main:
     ### Main
 
+        # Flow field
         m1 = 1 # 11
         A_vec = np.array([1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
         m2 = 1 # 11
@@ -278,6 +288,7 @@ if __name__ == '__main__':
         m3 = 1 # 2
         psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
+        # Viscoelastic properties
         n1 = 1 # 14
         k0_vec = np.array([1e13]) # np.float_power(10, np.linspace(0, 13, num = n1))
         n2 = 1 # 11

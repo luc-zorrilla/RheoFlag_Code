@@ -4,12 +4,6 @@
 import numpy as np
 import scipy.optimize as so
 
-import plotly.express as px
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
-from plotly.express.colors import sample_colorscale
-import plotly.io as pio
-
 ### Functions
 
 def make_tuples(depth, n_array, start_array):

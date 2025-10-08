@@ -1,22 +1,22 @@
-# Libraries
-import numpy as np
-import scipy.optimize as so
-from optimparallel import minimize_parallel # L-BFGS-B parallel implementation
-import pandas as pd
+""" This script ___ """
 
-import plotly.express as px
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
-from plotly.express.colors import sample_colorscale
-import plotly.io as pio
+## Libraries
+
+from C01_Inference_Viscoelastic_Model import *
+from misc_func import *
 
 import glob
 import pickle
-import pprint
-writing_dir = "C:\\Users\\Luc\\Documents\\PhD_Large_files\\RheoFlag\\Inference\\FromSimulationData\\"
+from pathlib import Path
+writing_dir = str((Path('..') / 'Inference' / 'FromSimulationData').resolve())
 
-from A02_Inference_Viscoelastic_Model import *
-from misc_func import *
+import numpy as np
+import pandas as pd
+
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+
+## Main
 
 bool_test = False
 if __name__ == "__main__":
@@ -27,7 +27,9 @@ if __name__ == "__main__":
     IE_list = []
     Hm1_list = []
 
-    filenames = glob.glob(writing_dir + "*.pkl")
+    filenames = glob.glob(writing_dir + "\\*.pkl")
+    print("filenames:", len(filenames))
+    exit()
     for filename in filenames:
 
         pkl_file = open(filename, 'rb')
