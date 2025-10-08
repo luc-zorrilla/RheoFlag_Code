@@ -16,7 +16,7 @@ from scipy import interpolate
 import plotly.graph_objects as go
 import webbrowser
 # Set default web browser for webbrowser as VSCode (can also be done manually)
-VS_path = "C:\\Users\\Luc\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
+VS_path = Path.home() / 'AppData' / 'Local' / 'Programs' / 'Microsoft VS Code' / 'Code.exe'
 webbrowser.register('VS', None, webbrowser.BackgroundBrowser(VS_path))
 web = webbrowser.get('VS')
 # This scripts adds a method to go.Figure class so that one can plot figures in html format inside VS code.
