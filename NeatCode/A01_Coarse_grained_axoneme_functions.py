@@ -19,6 +19,7 @@ import json
 import codecs
 import csv
 import os
+from pathlib import Path
 
 #############################
 ### ----- Functions ----- ###
@@ -31,7 +32,7 @@ webbrowser.register('VS', None, webbrowser.BackgroundBrowser(VS_path))
 web = webbrowser.get('VS')
 # This scripts adds a method to go.Figure class so that one can plot figures in html format inside VS code.
 def vs_show(self):
-    temp_dir = "C:\\Users\\Luc\\Documents\\MEGASync\\PhD\\RheoFlag\\Results\\Temp\\"
+    temp_dir = Path.cwd().joinpath('Model').joinpath('Results').joinpath('Temp')
     temp_file_number = round(datetime.now().timestamp())
     save_url = temp_dir + "temp_" + str(temp_file_number) + ".html"
 

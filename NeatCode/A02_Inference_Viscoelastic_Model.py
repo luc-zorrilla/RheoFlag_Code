@@ -609,5 +609,3 @@ if __name__ == '__main__':
         # res = Viscoelastic_Inference(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
         # print("Solution: ", res.x)
         # exit()
-        
-    # ---------------------------------------------------------------- # Tests #
