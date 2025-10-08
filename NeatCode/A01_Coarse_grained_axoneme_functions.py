@@ -33,7 +33,6 @@ go.Figure.vs_show = vs_show
 
 
 ### ----- Functions ----- ###
-
 ## --- Metadata as a dict --- ##
 
 def write_dict_to_json_file(dictionary, file_name):
@@ -582,8 +581,6 @@ def ActiveBending(X):
     B_active = np.zeros((N+2,1))
     return B_active
 
-## --- Right-hand side --- ##
-
 ## --- Differential system AQX_dot = B --- ##
     
 def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, InterpFlow = 0):
@@ -688,8 +685,6 @@ def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L
     X_dot[1] = 0
     
     return X_dot
-
-## --- Differential system AQX_dot = B --- ##
 
 # Class to track total simulation time and trigger an event when time limit is exceeded
 class StopOnTime:

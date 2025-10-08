@@ -1,5 +1,4 @@
-""" This file aims at simulating a viscoelastic filament (coarse-grained) on a subset of 
-input parameters. Each simulation is saved individually. """
+""" This file aims at simulating a viscoelastic filament (coarse-grained) on a subset of input parameters. Simulations are run in parallel looping over list of model parameters. Each simulation is saved individually. """
 
 ### libraries ###
 from A01_Coarse_grained_axoneme_functions import *
@@ -8,12 +7,42 @@ import numpy as np
 import multiprocessing as mp
 from pathlib import Path
 
-# Folder in which simulation outputs are stored
-
-output_folder = Path('..').joinpath('Model').joinpath('Output').resolve()
-
 ### Main ###
 if __name__ == "__main__":
+
+    """ 
+    INPUTS
+    - output_folder: where the metadata+data file is saved
+    - N: number of segments
+    - taus_b: bending viscosity caracteristic time
+    - tau_s:  shear viscosity caracteristic time
+    - init_conf: initial spatial configuration of the filament (string)
+    - Beta: ratio of the shear elasticity over the bending elasticity. 0 means only bending elasticity is present
+    - gamma: RFT parameter
+    - n_L: point force at s = L
+    - m_L: point torque at s = L
+    - A: flow amplitude
+    - w0: flow frequency
+    - bool_EI: whether to activate bending or not (default is True)
+    - Sp4: Sperm number^4, i.e., ratio of fluid viscosity over bending elasticity
+    - k0: elasticity at the base (s = 0)
+    - Lambdas: ad hoc force on filament segments
+    - Zetas: ad hoc torque on filament segments
+    - X_flow_field_string: flow field metadata
+    - T_span: simulation time
+    - T_eval: time points to evaluate the dynamical system
+    - T_sim_max: maximum simulation time before abort (in seconds).
+    - X_flow_field: prescribed flow field
+    - X_0: initial position of the filament
+    - method: solving method for solve_ivp. Can be any of ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
+        - Explicit Runge-Kutta methods (‘RK23’, ‘RK45’, ‘DOP853’) should be used for non-stiff problems. ‘DOP853’ is recommended for solving with high precision (low values of rtol and atol).
+        - implicit methods (‘Radau’, ‘BDF’) for stiff problems [9].
+        --> If not sure, first try to run ‘RK45’. If it makes unusually many iterations, diverges, or fails, your problem is likely to be stiff and you should use ‘Radau’ or ‘BDF’. ‘LSODA’ can also be a good universal choice, but it might be somewhat less convenient to work with as it wraps old Fortran code.
+    """
+
+    # Folder in which simulation outputs are stored
+    output_folder = Path('..').joinpath('Model').joinpath('Output').resolve()
+
     ###########################################
     ### ----- Adimensional Parameters ----- ###
 
