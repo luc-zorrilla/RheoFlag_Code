@@ -1,5 +1,5 @@
 """ This file aims at simulating a viscoelastic filament (coarse-grained) on a subset of 
-input parameters. Then each simulation is saved individually. """
+input parameters. Each simulation is saved individually. """
 
 ### libraries ###
 from A01_Coarse_grained_axoneme_functions import *

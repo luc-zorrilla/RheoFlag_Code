@@ -1,4 +1,6 @@
-# Libraries
+""" This file is gathering functions useful for inference at high-level coding"""
+
+### Libraries ###
 import numpy as np
 import scipy.optimize as so
 import scipy.differentiate as sd
