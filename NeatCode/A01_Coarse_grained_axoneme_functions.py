@@ -1,30 +1,19 @@
 """ This file contains all functions used to simulate a viscoelastic filament. """
 
 ### libraries ###
-from turtle import color
-from matplotlib import markers
+
+import time
+from datetime import datetime
+import json
+import csv
+from pathlib import Path
+
 import numpy as np
-import pandas as pd
-# from regex import E
 from scipy.integrate import solve_ivp
 from sklearn.utils import Bunch
 from scipy import interpolate
-import plotly.express as px
+
 import plotly.graph_objects as go
-import matplotlib.pyplot as plt
-import time
-from datetime import datetime
-
-import json
-import codecs
-import csv
-import os
-from pathlib import Path
-
-#############################
-### ----- Functions ----- ###
-#############################
-
 import webbrowser
 # Set default web browser for webbrowser as VSCode (can also be done manually)
 VS_path = "C:\\Users\\Luc\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
@@ -43,7 +32,8 @@ def vs_show(self):
 go.Figure.vs_show = vs_show
 
 
-################################
+### ----- Functions ----- ###
+
 ## --- Metadata as a dict --- ##
 
 def write_dict_to_json_file(dictionary, file_name):
@@ -100,9 +90,6 @@ def read_dict_from_json_file(file_name):
     except Exception as e:
         print(f"An error occurred: {e}")
 
-################################
-
-##############################
 ## --- Data as csv file --- ##
 
 def write_array_to_csv(array, filename):
@@ -167,10 +154,7 @@ def read_array_from_csv(filename):
     
     return array
 
-##############################
-
-################################################################################
-## --- Reading metadata and data
+## --- Reading metadata and data --- ##
 
 def get_metadata(metadata_filename):
 
@@ -182,9 +166,7 @@ def get_data(data_filename):
     sol = read_array_from_csv(data_filename) # contains '.csv' in the name
 
     return sol
-################################################################################
 
-################################
 ## --- Initial conditions --- ##
 
 def StraightLine(N):
@@ -208,14 +190,6 @@ def SecondBend(N):
     X_0 = Bend(N, k = 3, phi = np.pi/1024)
     return X_0
 
-
-# Add reading the last position from a file and start from there? e.g. for changing integration method.
-
-## --- Initial conditions --- ##
-################################
-
-
-#################################
 ## --- Parameter functions --- ##
 
 def Theta(X, k):
@@ -281,11 +255,6 @@ def QQ(X_3N):
     Q[2*N:3*N,2:] = Q_theta
     return Q
 
-## --- Parameter functions --- ##
-#################################
-
-
-########################
 ## --- Fluid drag --- ##
 
 def Eta(mu, r, L, h = -1):
@@ -390,8 +359,7 @@ def ADS(N):
 # print("A_DS = ", A_DS)
 # exit()
 
-# ------------------- #
-# -- External flow -- #
+## --- External flow --- ##
 
 def CreateFlowField(A = 0., w0 = 0., psi = 0., T_meas = [], filename = ""):
 
@@ -491,14 +459,6 @@ def TT_flow(X_dot_flow, k):
 #     print("T_flow_k for k = ", k, " is: ", T_flow_k)
 # exit()
 
-# -- External flow -- #
-# ------------------- #
-
-## --- Fluid drag --- ##
-########################
-
-
-#############################
 ## --- Right-hand side --- ##
 
 def BC_L(X_3N, n_L=[0,0], m_L=0):
@@ -623,10 +583,7 @@ def ActiveBending(X):
     return B_active
 
 ## --- Right-hand side --- ##
-#############################
 
-
-#############################################
 ## --- Differential system AQX_dot = B --- ##
     
 def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, InterpFlow = 0):
@@ -733,7 +690,6 @@ def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L
     return X_dot
 
 ## --- Differential system AQX_dot = B --- ##
-#############################################
 
 # Class to track total simulation time and trigger an event when time limit is exceeded
 class StopOnTime:
@@ -1136,7 +1092,6 @@ def Viscoelastic_Model_Parameters(gamma = 2, N = 10, k0 = 1e13, bool_EI = True, 
 
     return params
 
-
 def Viscoelastic_Model(params):
     """ 
     This functions computes the output of the coarse-grained viscoelastic model 
@@ -1165,7 +1120,6 @@ def Viscoelastic_Model(params):
     sol = res.y
 
     return sol
-
 
 ### Main code ###
 if __name__ == "__main__":
