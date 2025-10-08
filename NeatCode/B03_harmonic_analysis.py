@@ -211,7 +211,7 @@ if __name__ == "__main__":
         folder_name = Path('..').joinpath('Model').joinpath('Output').resolve()
         folder_name /= "StraightLine_PeriodicFlow"
         folder_name /= "BendingElasticity_Clamped_VaryingBendingViscosity" #KnownBehaviourTest/"
-        folder_name /= "VaryingFrequencyAmplitude/"
+        folder_name /= "VaryingFrequencyAmplitude"
 
         filenames = glob.glob(folder_name + '*.json')
         id_filenames = [os.path.basename(filename).removeprefix("metadata_").removesuffix(".json") for filename in filenames]
