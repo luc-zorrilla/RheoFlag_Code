@@ -283,8 +283,8 @@ if __name__ == '__main__':
         # Flow field
         m1 = 1 # 11
         A_vec = np.array([1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
-        m2 = 1 # 11
-        w0_vec = np.array([1e0]) # np.float_power(10, np.linspace(-5, 5, num = m2)) # np.array([1e0])
+        m2 = 10 # 11
+        w0_vec = np.float_power(10, np.linspace(-9, 0, num = m2)) # np.array([1e0])
         m3 = 1 # 2
         psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -294,7 +294,7 @@ if __name__ == '__main__':
         n2 = 1 # 11
         Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
         n3 = 1 # 11
-        tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
+        tau_b_vec = [1, 1e3, 1e6] # np.float_power(10, np.linspace(-5, 5, num = n3))
         n4 = 1 # 11
         Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
         n5 = 1 # 11
@@ -379,8 +379,8 @@ if __name__ == '__main__':
 
                                         ### Initialize parameters perturbed around experimental parameters
                                         initial_params = copy.deepcopy(exp_params)
-                                        initial_params["Sp4"] = 2.0
-                                        initial_params["tau_b"] = 1.0
+                                        initial_params["Sp4"] = 1e1
+                                        initial_params["tau_b"] = 1e2
 
                                         ### Separate fixed and variable parameters
                                         variable_keys = ["Sp4", "tau_b"]
@@ -393,7 +393,7 @@ if __name__ == '__main__':
                                         ### Bounds
                                         eps = 1e-3
                                         bound_Sp4 = [eps, 1e3]
-                                        bound_tau_b = [0, 1e3]
+                                        bound_tau_b = [0, 1e7]
                                         lb = [bound_Sp4[0], bound_tau_b[0]]
                                         ub = [bound_Sp4[1], bound_tau_b[1]]
                                         bounds = so.Bounds(lb,  ub)
