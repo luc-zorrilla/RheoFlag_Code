@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_dir = str((Path('..') / 'Inference' / 'FromSimulationData').resolve())
+writing_dir = str((Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped').resolve())
 
 import numpy as np
 import pandas as pd
@@ -97,6 +97,7 @@ if __name__ == "__main__":
     
     fig.update_xaxes(title = "w0", type = "log")
     fig.update_yaxes(title = "A", type = "log")
+    fig.update_layout(title = "Inferred parameters (for each external parameter)")
     fig.show()
 
     # Plot IE heatmap for each (A, w0)-point
@@ -104,7 +105,7 @@ if __name__ == "__main__":
     fig = go.Figure(data = go.Heatmap(x = df['A'], y = df['w0'], z = np.log10(df['IE']), colorscale = 'RdPu_r'))
     fig.update_xaxes(title = "w0", type = "log")
     fig.update_yaxes(title = "A", type = "log")
-    fig.update_layout(title = "IE")
+    fig.update_layout(title = "Inference Error (for each external parameter)")
     fig.show()
 
     # Plot inferred params for all (A,w0)-point combined
@@ -122,8 +123,10 @@ if __name__ == "__main__":
         x=df['p_inf_0'],
         y=df['p_inf_1'], 
         nbinsx=100, nbinsy=50))
+    fig.update_layout(title = "Histogram of inferred parameters (all external parameters combined)")
     fig.show()
 
-
+    # Inference error for all (A, w0)-point combined, for each set of internal parameters
+    # To be filled
 
 

@@ -9,7 +9,7 @@ from A01_Coarse_grained_axoneme_functions import *
 
 import pickle
 from pathlib import Path
-writing_dir = str((Path('..') / 'Inference' / 'FromSimulationData').resolve())
+writing_dir = str((Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped').resolve()) + "\\"
 import copy
 
 import numpy as np
@@ -283,8 +283,8 @@ if __name__ == '__main__':
         # Flow field
         m1 = 1 # 11
         A_vec = np.array([1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
-        m2 = 10 # 11
-        w0_vec = np.float_power(10, np.linspace(-9, 0, num = m2)) # np.array([1e0])
+        m2 = 7 # 11
+        w0_vec = np.float_power(10, np.linspace(-6, 0, num = m2)) # np.array([1e0])
         m3 = 1 # 2
         psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -294,7 +294,7 @@ if __name__ == '__main__':
         n2 = 1 # 11
         Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
         n3 = 1 # 11
-        tau_b_vec = [1, 1e3, 1e6] # np.float_power(10, np.linspace(-5, 5, num = n3))
+        tau_b_vec = [1] #, 1e3, 1e6] # np.float_power(10, np.linspace(-5, 5, num = n3))
         n4 = 1 # 11
         Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
         n5 = 1 # 11
