@@ -266,23 +266,23 @@ def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds
 
 ### Inference function in main loop
 
-def Viscoelastic_inference_inloop(flow_params, exp_params, variable_keys, bounds, disc_func, opt_scheme, opt_args, writing_dir):
+def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_dir):
     """ This functions performs inference given a certain set of arguments.
     This function is used to parallelize computation within loops. """
 
     ## Choose initial guess (and fixed vs variable parameters)
 
-    ### Initialize parameters perturbed around experimental parameters --> This could be changed to be generalized to variable_keys and variable_initial_values 
+    ### Initialize parameters perturbed around experimental parameters
 
     initial_params = copy.deepcopy(exp_params)
-    initial_params["Sp4"] = 1e1
-    initial_params["tau_b"] = exp_params["tau_b"]
+    for key in guess_variable_params.keys():
+        initial_params[key] = guess_variable_params[key]
 
+    exp_variable_params = {key:exp_params[key] for key in guess_variable_params.keys()}
+    
     ### Separate fixed and variable parameters
-    exp_variable_params = {key:exp_params[key] for key in variable_keys}
-    guess_variable_params = {key:initial_params[key] for key in variable_keys}
     fixed_params = initial_params
-    for key in variable_keys:
+    for key in guess_variable_params.keys():
         fixed_params.pop(key)
 
     ### Compute filament and inference
@@ -328,8 +328,8 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, variable_keys, bounds
 ################################################################################
 ################################################################################
 
-bool_test = False
 bool_main = True
+bool_test = False
 if __name__ == '__main__':
     """ 
     In the main script, one makes a scan over parameter space of the viscoelastic filament. 
@@ -351,7 +351,7 @@ if __name__ == '__main__':
         opt_scheme = Basinhopping_LBFGSB_Scheme
         niter = 1
         opt_args = {"niter":niter, "callback_function":callback_function}
-        variable_keys = ["Sp4", "tau_b"]
+        guess_variable_params = {"Sp4": 1e1, "tau_b": 1e2}
 
         ## Bounds
         eps = 1e-3
@@ -454,7 +454,7 @@ if __name__ == '__main__':
 
                                         exp_params = Viscoelastic_Model_Parameters(gamma = gamma, N = N, k0 = k0, bool_EI = bool_EI, Sp4 = Sp4, tau_b = tau_b, Beta = Beta, tau_s = tau_s, init_conf = init_conf, n_L = n_L, m_L = m_L, Lambdas = Lambdas, Zetas = Zetas, InterpFlow = InterpFlow, method = method, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, filament_type = "custom", flow_type = "custom")
 
-                                        inloop_args = [flow_params, exp_params, variable_keys, bounds, disc_func, opt_scheme, opt_args, writing_dir]
+                                        inloop_args = [flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_dir]                                        
                                         res = pool.apply_async(func = Viscoelastic_inference_inloop, args = inloop_args)
 
         pool.close()
