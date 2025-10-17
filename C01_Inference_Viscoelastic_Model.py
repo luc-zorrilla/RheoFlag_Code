@@ -276,7 +276,7 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, variable_keys, bounds
 
     initial_params = copy.deepcopy(exp_params)
     initial_params["Sp4"] = 1e1
-    initial_params["tau_b"] = 1e2                             
+    initial_params["tau_b"] = exp_params["tau_b"]
 
     ### Separate fixed and variable parameters
     exp_variable_params = {key:exp_params[key] for key in variable_keys}
@@ -362,20 +362,24 @@ if __name__ == '__main__':
         bounds = so.Bounds(lb,  ub)        
 
         # Flow field
-        m1 = 1 # 11
-        A_vec = np.array([1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
+        m1 = 3 # 11
+        A_vec = np.array([1e-2, 1e-1, 1e0]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
         m2 = 10 # 11
         w0_vec = np.float_power(10, np.linspace(-9, 0, num = m2)) # np.array([1e0])
         m3 = 1 # 2
         psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
+
+        ### Filament properties
+        gamma = 2
+        bool_EI = True  
 
         # Viscoelastic properties
         n1 = 1 # 14
         k0_vec = np.array([1e13]) # np.float_power(10, np.linspace(0, 13, num = n1))
         n2 = 1 # 11
         Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
-        n3 = 1 # 11
-        tau_b_vec = [1e3] # , 1e6] # np.float_power(10, np.linspace(-5, 5, num = n3))
+        n3 = 3 # 11
+        tau_b_vec = [1e0, 1e3, 1e6] # np.float_power(10, np.linspace(-5, 5, num = n3))
         n4 = 1 # 11
         Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
         n5 = 1 # 11
@@ -419,11 +423,11 @@ if __name__ == '__main__':
 
                     ### Integration and time
                     method = 'BDF'
-                    dT = 2*np.pi/(10*w0)
-                    T_max = 2*np.pi*10/w0
+                    dT = 2*np.pi/w0 * (1/5)
+                    T_max = 2*np.pi/w0 * 5
                     T_span = [0, T_max]
                     T_eval = [dT*i for i in range(round(T_max/dT))]
-                    T_sim_max = 600
+                    T_sim_max = 6000
 
                     ### Numerical Flow field and Interpolation
                     X_flow_field_string, X_flow_field = CreateFlowField(A, w0, psi, T_eval, filename = Flow_field_filename)
@@ -434,13 +438,6 @@ if __name__ == '__main__':
                     
                     print("Flow field created for (A,w0,psi) = ", A, w0, psi)
                     flow_params = dict(A = A, w0 = w0, psi = psi)
-
-                    ### Filament properties
-                    gamma = 2
-                    bool_EI = True
-
-                    # # Start parallel computation
-                    # pool = mp.Pool(mp.cpu_count())                    
 
                     for j1 in range(n1):
                         k0 = k0_vec[j1]
@@ -459,75 +456,6 @@ if __name__ == '__main__':
 
                                         inloop_args = [flow_params, exp_params, variable_keys, bounds, disc_func, opt_scheme, opt_args, writing_dir]
                                         res = pool.apply_async(func = Viscoelastic_inference_inloop, args = inloop_args)
-
-                                        # ## Choose initial guess (and fixed vs variable parameters)
-
-                                        # ### Initialize parameters perturbed around experimental parameters
-                                        # initial_params = copy.deepcopy(exp_params)
-                                        # initial_params["Sp4"] = 1e1
-                                        # initial_params["tau_b"] = 1e2                                        
-
-                                        # ### Separate fixed and variable parameters
-                                        # variable_keys = ["Sp4", "tau_b"]
-                                        # exp_variable_params = {key:exp_params[key] for key in variable_keys}
-                                        # guess_variable_params = {key:initial_params[key] for key in variable_keys}
-                                        # fixed_params = initial_params
-                                        # for key in variable_keys:
-                                        #     fixed_params.pop(key)
-
-                                        # ### Bounds
-                                        # eps = 1e-3
-                                        # bound_Sp4 = [eps, 1e3]
-                                        # bound_tau_b = [0, 1e7]
-                                        # lb = [bound_Sp4[0], bound_tau_b[0]]
-                                        # ub = [bound_Sp4[1], bound_tau_b[1]]
-                                        # bounds = so.Bounds(lb,  ub)
-
-                                        # ### Optimization schemes and arguments
-                                        # opt_scheme = Basinhopping_LBFGSB_Scheme
-                                        # niter = 1
-                                        # opt_args = {"niter":niter, "callback_function":callback_function}
-
-                                        # ### Compute filament and inference
-                                        # exp_data = Viscoelastic_Model(exp_params)
-                                        # VI_args = dict(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
-                                        # ret = Viscoelastic_Inference(**VI_args)
-
-                                        # ## Inference results
-
-                                        # ####################### MOVE THIS IN ANALYSIS
-
-                                        # ### Save results
-                                        # #### Make dictionary with all relevant information
-
-                                        # ###### Dictionary of the used function
-                                        # VI_dict = Make_Dict_From_Applied_Function(func = Viscoelastic_Inference, func_args = VI_args, func_output = ret)
-
-                                        # ###### Additional information
-                                        # VI_dict["exp_variable_params"] = exp_variable_params
-                                        # VI_dict["flow_params"] = flow_params
-                                        
-                                        # # Pickle dictionary using the highest protocol available.
-                                        
-                                        # ## Make flow part of the filename
-                                        # base_id = "_Flow"
-                                        # for key in list(flow_params.keys()):
-                                        #     param = flow_params[key]
-                                        #     base_id += "_" + key + "_" + f"{param:.2E}"                                    
-                                        # base_id += "_Fixed"
-                                        # for key in list(fixed_params.keys()):
-                                        #     # Exclude non-scalar parameters
-                                        #     if key in ["A", "w0", "psi", "gamma", "N", "k0", "Sp4", "tau_b", "Beta", "tau_s"]:
-                                        #         param = fixed_params[key]
-                                        #         base_id += "_" + key + "_" + f"{param:.2E}"
-                                        # base_id += "_Variable"
-                                        # for key in list(exp_variable_params.keys()):
-                                        #     param = exp_variable_params[key]
-                                        #     base_id += "_" + key + "_" + f"{param:.2E}"
-                                        # filename = writing_dir + "VI_dict" + base_id + ".pkl"
-                                        # output = open(filename, 'wb')
-                                        # pickle.dump(obj = VI_dict, file = output, protocol = -1)
-                                        # output.close()
 
         pool.close()
         pool.join() # postpones the execution of next line of code until all processes in the queue are done.
@@ -580,7 +508,7 @@ if __name__ == '__main__':
         ##### Integration and time
         method = 'BDF'
         dT = 2*np.pi/(10*w0)
-        T_max = 2*np.pi*1/w0
+        T_max = 2*np.pi*10/w0
         T_span = [0, T_max]
         T_eval = [dT*i for i in range(int(T_max/dT))]
         T_sim_max = 600
