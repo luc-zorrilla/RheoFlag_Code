@@ -10,7 +10,8 @@ import multiprocessing as mp
 
 import pickle
 from pathlib import Path
-writing_dir = str((Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped').resolve()) + "\\"
+writing_path = (Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped')
+
 import copy
 
 import numpy as np
@@ -319,7 +320,7 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
     for key in list(exp_variable_params.keys()):
         param = exp_variable_params[key]
         base_id += "_" + key + "_" + f"{param:.2E}"
-    filename = writing_dir + "VI_dict" + base_id + ".pkl"
+    filename = str((writing_path / ("VI_dict" + base_id + ".pkl")).resolve())
     output = open(filename, 'wb')
     pickle.dump(obj = VI_dict, file = output, protocol = -1)
     output.close()                                            

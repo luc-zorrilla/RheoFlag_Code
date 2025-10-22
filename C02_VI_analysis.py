@@ -8,8 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_dir = str((Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped').resolve())
-
+writing_path = (Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped')
 import numpy as np
 import pandas as pd
 
@@ -27,7 +26,8 @@ if __name__ == "__main__":
     IE_list = []
     Hm1_list = []
 
-    filenames = glob.glob(writing_dir + "\\*.pkl")
+    filepaths = list(writing_path.glob('**/*.pkl')) # List of path of .pkl files in the writing path
+    filenames = [str(filepath.resolve()) for filepath in filepaths] # Convert to strings in the corresponding OS
     print("filenames:", len(filenames))
     exit()
     for filename in filenames:
@@ -76,6 +76,16 @@ if __name__ == "__main__":
     print("df[hm1]", df["Hm1"])
     df["Sigma"] = df.apply(lambda x: np.sqrt(np.diag(x["Hm1"])), axis = 1)
 
+    # Plot IE heatmap for each (A, w0)-point
+    # df_IE = df.pivot(index='A', columns='w0', values = 'IE') # .fillna(0)
+    fig = go.Figure(data = go.Heatmap(x = df['A'], y = df['w0'], z = np.log10(df['IE']), colorscale = 'RdPu_r'))
+    fig.update_xaxes(title = "w0", type = "log")
+    fig.update_yaxes(title = "A", type = "log")
+    fig.update_layout(title = "Inference Error (for each external parameter)")
+    fig.show()
+
+    exit()
+
     # Plot IE heatmap
     df["p_inf_0"] = df.apply(lambda x: x['p_inf'][0], axis = 1)
     df["p_inf_1"] = df.apply(lambda x: x['p_inf'][1], axis = 1)
@@ -98,14 +108,6 @@ if __name__ == "__main__":
     fig.update_xaxes(title = "w0", type = "log")
     fig.update_yaxes(title = "A", type = "log")
     fig.update_layout(title = "Inferred parameters (for each external parameter)")
-    fig.show()
-
-    # Plot IE heatmap for each (A, w0)-point
-    # df_IE = df.pivot(index='A', columns='w0', values = 'IE') # .fillna(0)
-    fig = go.Figure(data = go.Heatmap(x = df['A'], y = df['w0'], z = np.log10(df['IE']), colorscale = 'RdPu_r'))
-    fig.update_xaxes(title = "w0", type = "log")
-    fig.update_yaxes(title = "A", type = "log")
-    fig.update_layout(title = "Inference Error (for each external parameter)")
     fig.show()
 
     # Plot inferred params for all (A,w0)-point combined
