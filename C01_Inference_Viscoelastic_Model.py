@@ -352,21 +352,21 @@ if __name__ == '__main__':
         opt_scheme = Basinhopping_LBFGSB_Scheme
         niter = 1
         opt_args = {"niter":niter, "callback_function":callback_function}
-        guess_variable_params = {"Sp4": 1e1, "tau_b": 1e2}
+        guess_variable_params = {"Sp4": 1e1}
 
         ## Bounds
         eps = 1e-3
         bound_Sp4 = [eps, 1e3]
-        bound_tau_b = [0, 1e7]
-        lb = [bound_Sp4[0], bound_tau_b[0]]
-        ub = [bound_Sp4[1], bound_tau_b[1]]
-        bounds = so.Bounds(lb,  ub)        
+        # bound_tau_b = [0, 1e7]
+        lb = [bound_Sp4[0]] #, bound_tau_b[0]]
+        ub = [bound_Sp4[1]] #, bound_tau_b[1]]
+        bounds = so.Bounds(lb,  ub)
 
         # Flow field
-        m1 = 1 # 11
-        A_vec = np.array([1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
-        m2 = 10 # 11
-        w0_vec = np.float_power(10, np.linspace(-9, 0, num = m2)) # np.array([1e0])
+        m1 = 3 # 11
+        A_vec = np.array([1e-2, 1e-1, 1e0]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
+        m2 = 7 # 11
+        w0_vec = np.float_power(10, np.linspace(-6, 0, num = m2)) # np.array([1e0])
         m3 = 1 # 2
         psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -379,8 +379,8 @@ if __name__ == '__main__':
         k0_vec = np.array([1e13]) # np.float_power(10, np.linspace(0, 13, num = n1))
         n2 = 1 # 11
         Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
-        n3 = 3 # 11
-        tau_b_vec = [1e0, 1e3, 1e6] # np.float_power(10, np.linspace(-5, 5, num = n3))
+        n3 = 1 # 11
+        tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
         n4 = 1 # 11
         Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
         n5 = 1 # 11
@@ -428,7 +428,7 @@ if __name__ == '__main__':
                     T_max = 2*np.pi/w0 * 5
                     T_span = [0, T_max]
                     T_eval = [dT*i for i in range(round(T_max/dT))]
-                    T_sim_max = 6000
+                    T_sim_max = 1*3600
 
                     ### Numerical Flow field and Interpolation
                     X_flow_field_string, X_flow_field = CreateFlowField(A, w0, psi, T_eval, filename = Flow_field_filename)
@@ -508,7 +508,7 @@ if __name__ == '__main__':
         
         ##### Integration and time
         method = 'BDF'
-        dT = 2*np.pi/(10*w0)
+        dT = 2*np.pi/(5*w0)
         T_max = 2*np.pi*10/w0
         T_span = [0, T_max]
         T_eval = [dT*i for i in range(int(T_max/dT))]
