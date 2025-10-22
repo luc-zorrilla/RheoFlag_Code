@@ -111,8 +111,8 @@ if __name__ == "__main__":
         hm_sigma_p_inf_k_vars = go.Heatmap(x = df['A'], y = df['w0'], z = np.log10(df['sigma_p_inf_' + str(k_vars)]), colorscale = 'RdPu_r')
         fig.add_trace(hm_p_inf_k_vars, row = 1 + k_vars, col = 1)
         fig.add_trace(hm_sigma_p_inf_k_vars, row = 1 + k_vars, col = 2)
-    fig.update_xaxes(title = "w0", type = "log")
-    fig.update_yaxes(title = "A", type = "log")
+    fig.update_xaxes(title = "w0", type = "linear")
+    fig.update_yaxes(title = "A", type = "linear")
     fig.update_layout(title = "Inferred parameters (for each external parameter)")
     fig.vs_show()
 
