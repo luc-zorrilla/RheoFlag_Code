@@ -267,7 +267,7 @@ def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds
 
 ### Inference function in main loop
 
-def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_dir):
+def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_path):
     """ This functions performs inference given a certain set of arguments.
     This function is used to parallelize computation within loops. """
 
@@ -363,8 +363,8 @@ if __name__ == '__main__':
         bounds = so.Bounds(lb,  ub)        
 
         # Flow field
-        m1 = 3 # 11
-        A_vec = np.array([1e-2, 1e-1, 1e0]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
+        m1 = 1 # 11
+        A_vec = np.array([1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
         m2 = 10 # 11
         w0_vec = np.float_power(10, np.linspace(-9, 0, num = m2)) # np.array([1e0])
         m3 = 1 # 2
@@ -455,7 +455,7 @@ if __name__ == '__main__':
 
                                         exp_params = Viscoelastic_Model_Parameters(gamma = gamma, N = N, k0 = k0, bool_EI = bool_EI, Sp4 = Sp4, tau_b = tau_b, Beta = Beta, tau_s = tau_s, init_conf = init_conf, n_L = n_L, m_L = m_L, Lambdas = Lambdas, Zetas = Zetas, InterpFlow = InterpFlow, method = method, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, filament_type = "custom", flow_type = "custom")
 
-                                        inloop_args = [flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_dir]                                        
+                                        inloop_args = [flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_path]                                        
                                         res = pool.apply_async(func = Viscoelastic_inference_inloop, args = inloop_args)
 
         pool.close()
