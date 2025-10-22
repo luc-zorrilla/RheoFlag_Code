@@ -78,6 +78,7 @@ if __name__ == "__main__":
     print("df[p_inf]", df["p_inf"])
     print("df[IE]", df["IE"])
     print("df[hm1]", df["Hm1"])
+    print("df[Sigma]", df["Sigma"]) 
 
     n_vars = p_inf_list[0].shape[0]
     for k_vars in range(n_vars):
@@ -103,14 +104,13 @@ if __name__ == "__main__":
     for k in range(n_vars):
         subplot_titles += variable_keys[k]
         subplot_titles += ["sigma_" + variable_keys[k]]
-    fig = make_subplots(rows = n_vars, cols = 2, subplot_titles=subplot_titles)
 
+    fig = make_subplots(rows = n_vars, cols = 2, subplot_titles=subplot_titles)
     for k_vars in range(n_vars):
         hm_p_inf_k_vars = go.Heatmap(x = df['A'], y = df['w0'], z = df['p_inf_' + str(k_vars)], colorscale = 'RdPu_r')
         hm_sigma_p_inf_k_vars = go.Heatmap(x = df['A'], y = df['w0'], z = np.log10(df['sigma_p_inf_' + str(k_vars)]), colorscale = 'RdPu_r')
         fig.add_trace(hm_p_inf_k_vars, row = 1 + k_vars, col = 1)
         fig.add_trace(hm_sigma_p_inf_k_vars, row = 1 + k_vars, col = 2)
-        
     fig.update_xaxes(title = "w0", type = "log")
     fig.update_yaxes(title = "A", type = "log")
     fig.update_layout(title = "Inferred parameters (for each external parameter)")

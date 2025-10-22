@@ -23,7 +23,7 @@ web = webbrowser.get('VS')
 # This scripts adds a method to go.Figure class so that one can plot figures in html format inside VS code.
 def vs_show(self):
     temp_dir_path = Path.cwd() / 'Temp'
-    temp_file_number = round(datetime.now().timestamp())
+    temp_file_number = round(datetime.now().timestamp() * 1e6)
     save_url = str((temp_dir_path / ("temp_" + str(temp_file_number) + ".html")).resolve())
 
     self.write_html(save_url, include_mathjax = 'cdn')
