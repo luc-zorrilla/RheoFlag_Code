@@ -17,14 +17,14 @@ from scipy import interpolate
 import plotly.graph_objects as go
 import webbrowser
 # Set default web browser for webbrowser as VSCode (can also be done manually)
-VS_path = str(Path.home() / 'AppData' / 'Local' / 'Programs' / 'Microsoft VS Code' / 'Code.exe')
+VS_path = str((Path.home() / 'AppData' / 'Local' / 'Programs' / 'Microsoft VS Code' / 'Code.exe').resolve())
 webbrowser.register('VS', None, webbrowser.BackgroundBrowser(VS_path))
 web = webbrowser.get('VS')
 # This scripts adds a method to go.Figure class so that one can plot figures in html format inside VS code.
 def vs_show(self):
-    temp_dir = Path.cwd().joinpath('Model').joinpath('Results').joinpath('Temp')
+    temp_dir_path = Path.cwd() / 'Temp'
     temp_file_number = round(datetime.now().timestamp())
-    save_url = temp_dir + "temp_" + str(temp_file_number) + ".html"
+    save_url = str((temp_dir_path / ("temp_" + str(temp_file_number) + ".html")).resolve())
 
     self.write_html(save_url, include_mathjax = 'cdn')
     web.open(save_url)

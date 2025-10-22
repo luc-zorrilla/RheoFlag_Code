@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped')
+writing_path = Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped'
 import numpy as np
 import pandas as pd
 
@@ -96,7 +96,7 @@ if __name__ == "__main__":
     fig.update_xaxes(title = "w0", type = "linear")
     fig.update_yaxes(title = "A", type = "linear")
     fig.update_layout(title = "Inference Error (for each external parameter)")
-    fig.show()
+    fig.vs_show()
 
     # Plot inferred params for each (A,w0)-point
     subplot_titles = []
@@ -114,7 +114,7 @@ if __name__ == "__main__":
     fig.update_xaxes(title = "w0", type = "log")
     fig.update_yaxes(title = "A", type = "log")
     fig.update_layout(title = "Inferred parameters (for each external parameter)")
-    fig.show()
+    fig.vs_show()
 
     # Plot inferred params for all (A,w0)-point combined (only works for 1 or 2 variables) --> to generalize to N params, one needs to plot individual histograms
     if n_vars == 1:
@@ -123,7 +123,7 @@ if __name__ == "__main__":
             x=df['p_inf_0'],
             nbinsx = nbins))
         fig.update_layout(title = "Histogram of inferred parameters (all external parameters combined)")
-        fig.show()        
+        fig.vs_show()        
     elif n_vars == 2:
         nbinsx = 100
         nbinsx = 50
@@ -132,7 +132,7 @@ if __name__ == "__main__":
             y=df['p_inf_1'], 
             nbinsx=100, nbinsy=50))
         fig.update_layout(title = "Histogram of inferred parameters (all external parameters combined)")
-        fig.show()
+        fig.vs_show()
 
     # Inference error for all (A, w0)-point combined, for each set of internal parameters
     # To be filled
