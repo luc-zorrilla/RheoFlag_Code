@@ -41,7 +41,7 @@ if __name__ == "__main__":
     """
 
     # Folder in which simulation outputs are stored
-    output_folder = Path('..').joinpath('Model').joinpath('Output').resolve()
+    output_folder = str(Path('..' / 'Model' / 'Output').resolve())
 
     ###########################################
     ### ----- Adimensional Parameters ----- ###
