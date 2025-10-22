@@ -76,6 +76,7 @@ if __name__ == "__main__":
     df["Sigma"] = df.apply(lambda x: np.sqrt(np.diag(x["Hm1"])), axis = 1)
 
     print("df[p_inf]", df["p_inf"])
+    print("df[IE]", df["IE"])
     print("df[hm1]", df["Hm1"])
 
     n_vars = p_inf_list[0].shape[0]
@@ -92,8 +93,8 @@ if __name__ == "__main__":
 
     # Plot IE heatmap for each (A, w0)-point
     fig = go.Figure(data = go.Heatmap(x = df['A'], y = df['w0'], z = np.log10(df['IE']), colorscale = 'RdPu_r'))
-    fig.update_xaxes(title = "w0", type = "log")
-    fig.update_yaxes(title = "A", type = "log")
+    fig.update_xaxes(title = "w0", type = "linear")
+    fig.update_yaxes(title = "A", type = "linear")
     fig.update_layout(title = "Inference Error (for each external parameter)")
     fig.show()
 
@@ -118,9 +119,9 @@ if __name__ == "__main__":
     # Plot inferred params for all (A,w0)-point combined (only works for 1 or 2 variables) --> to generalize to N params, one needs to plot individual histograms
     if n_vars == 1:
         nbins = 20
-        fig = go.Figure(go.Histogram2d(
+        fig = go.Figure(go.Histogram(
             x=df['p_inf_0'],
-            nbins = nbins))
+            nbinsx = nbins))
         fig.update_layout(title = "Histogram of inferred parameters (all external parameters combined)")
         fig.show()        
     elif n_vars == 2:
