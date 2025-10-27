@@ -13,7 +13,6 @@ import os
 from pathlib import Path
 
 from A01_Coarse_grained_axoneme_functions import * 
-from audioop import mul
 import multiprocessing as mp
 
 import math
@@ -705,7 +704,7 @@ def AnimatedShape(X, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
 
     return fig_shapes
 
-def AnimatedShapes(X, Y, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
+def AnimatedTwoShapes(X, Y, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
     """ Plot two overlapping shapes. To be generalized to N_s shapes. """
     fig_dict = dict(data = [], layout = {}, frames = [])
 
@@ -795,6 +794,110 @@ def AnimatedShapes(X, Y, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
 
     return fig_shapes
 
+
+def AnimatedShapes(X_list, X_flow, N, T_eval):
+    """ Plot N_s overlapping shapes stored in X_ilist.
+
+    --> To be updated so that the flow is plotted in a circle with radius one.
+    --> Only show first filament at the beginning, and display legend
+    """
+    fig_dict = dict(data = [], layout = {}, frames = [])
+
+    # data: initial frame
+    for p in range(len(X_list)):
+        X = X_list[p]
+        # Only add the first element to the layout initially.
+        data_dict = go.Scatter(x=X3N(X[:,0])[:N,0], y=X3N(X[:,0])[N:2*N,0])
+        fig_dict["data"].append(data_dict)
+
+    # flow direction
+    # data_flow_dict = go.Scatter(x = [X3N(X[:,0])[N-1,0], X3N(X[:,0])[N-1,0]], y = [X3N(X[:,0])[2*N-1,0], X3N(X[:,0])[2*N-1,0] + np.sign(X_flow[0])])
+    # fig_dict["data"].append(data_flow_dict)
+
+    # generic layout
+    fig_dict["layout"]["xaxis"] = dict(range = [0, N+1], title = "X")
+    fig_dict["layout"]["yaxis"] = dict(range = [-N, N], title = "Y")
+    fig_dict["layout"]["hovermode"] = "closest"
+    # Buttons and animation updates
+    fig_dict["layout"]["updatemenus"] = [
+        {
+            "buttons": [
+                {
+                    "args": [None, {"frame": {"duration": 50, "redraw": False},
+                                    "fromcurrent": True, "transition": {"duration": 0}}],
+                    "label": "Play",
+                    "method": "animate"
+                },
+                {
+                    "args": [[None], {"frame": {"duration": 0, "redraw": False},
+                                    "mode": "immediate",
+                                    "transition": {"duration": 0}}],
+                    "label": "Pause",
+                    "method": "animate"
+                }
+            ],
+            "direction": "left",
+            "pad": {"r": 10, "t": 50},
+            "showactive": False,
+            "type": "buttons",
+            "x": 0.1,
+            "xanchor": "right",
+            "y": 0,
+            "yanchor": "top"
+        }
+    ]
+
+    # Sliders
+    sliders_dict = {
+        "active": 0,
+        "yanchor": "top",
+        "xanchor": "left",
+        "currentvalue": {
+            "font": {"size": 20},
+            "prefix": "Time:",
+            "visible": True,
+            "xanchor": "right"
+        },
+        "transition": {"duration": 0, "easing": "cubic-in-out"},
+        "pad": {"b": 10, "t": 50},
+        "len": 0.9,
+        "x": 0.1,
+        "y": 0,
+        "steps": [] # steps should reflect each frame, so cfilled within time
+    }
+
+    # data: following frames
+    
+    for k in range(len(T_eval)-1):
+        frame_dict_list = []
+        for p in range(len(X_list)):
+            X = X_list[p]
+            frame_dict = go.Scatter(x = X3N(X[:,k])[:N, 0], y = X3N(X[:,k])[N:2*N, 0])
+            frame_dict_list.append(frame_dict)
+        
+        # frame_flow_dict = go.Scatter(x = [X3N(X[:,k])[N-1,0], X3N(X[:,k])[N-1,0]], y = [X3N(X[:,k])[2*N-1,0], X3N(X[:,k])[2*N-1,0] + np.sign(X_flow[k])])
+        # frame_dict_list.append(frame_flow_dict)
+
+        fig_dict["frames"].append(dict(data = frame_dict_list, name = str(k)))
+        
+        # frame-specific layout: slider steps
+        slider_step = dict(
+        args = [[str(k)], dict(frame = dict(duration = 50, redraw = False), mode = "immediate", transition= dict(duration = 0))],
+        label = np.round(T_eval[k], 0),
+        method = "animate")
+        sliders_dict["steps"].append(slider_step)
+
+    # Sliders
+    fig_dict["layout"]["sliders"] = [sliders_dict]
+    # Construct final animated figure
+    fig_shapes = go.Figure(fig_dict)
+    fig_shapes.update_layout(showlegend = True)
+    # fig_shapes.show()
+
+    return fig_shapes
+
+
+
 ### ----- Plotting animated shape in time ----- ###
 ######################################
 
@@ -815,9 +918,25 @@ if __name__ == '__main__':
 
     ids_list = fetch_files(sim_path, metadata_condition_0, None)
     print("# files: ", len(ids_list))
-
     print(ids_list[0])
     exit()
+
+    
+    X_list = []
+    for base_id in ids_list:
+        data_file = str(sim_path / ('data_' + base_id + '.csv'))
+        X = get_data(data_file)
+        X_list.append(X)
+
+    metadata_file = str(sim_path / ('metadata_' + base_id + '.json'))
+    solver_dict = get_metadata(metadata_file)
+    _, N, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, T_eval, _, _, X_flow_field, _, _ = list(solver_dict.values())    
+    
+
+    fig_anim = AnimatedShapes(X_list = X_list, X_flow = X_flow_field, N = N, T_eval = T_eval)
+    print("fig_anim done.")
+    fig_anim.vs_show()
+    # exit()
 
     # Visualize filaments
     # To be completed
