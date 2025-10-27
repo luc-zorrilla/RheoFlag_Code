@@ -426,7 +426,7 @@ if __name__ == '__main__':
         Flow_field_filename = "" # Whether to use a measured flow field or not
 
         # Start parallel computation
-        pool = mp.Pool(mp.cpu_count() - 2)   
+        pool = mp.Pool(mp.cpu_count() - 2)
 
         for i1 in range(m1):
             A = A_vec[i1]
@@ -436,7 +436,7 @@ if __name__ == '__main__':
                     psi = psi_vec[i3]
 
                     ### Integration and time
-                    method = 'RK45' # 'BDF'
+                    method = 'Radau' # 'BDF'
                     dT = 2*np.pi/w0 * (1/10)
                     T_max = 2*np.pi/w0 * 10
                     T_span = [0, T_max]
@@ -521,7 +521,7 @@ if __name__ == '__main__':
         
         ##### Integration and time
         method = 'BDF'
-        dT = 2*np.pi/(5*w0)
+        dT = 2*np.pi/(10*w0)
         T_max = 2*np.pi*10/w0
         T_span = [0, T_max]
         T_eval = [dT*i for i in range(int(T_max/dT))]

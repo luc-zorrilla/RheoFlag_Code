@@ -41,7 +41,7 @@ if __name__ == "__main__":
     """
 
     # Folder in which simulation outputs are stored
-    output_folder = str(Path('..' / 'Model' / 'Output').resolve())
+    output_folder = (Path('..') / 'Model' / 'Output' / 'Inference_Examples').resolve()
 
     ###########################################
     ### ----- Adimensional Parameters ----- ###
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1]
+    Sp4_list = [1, 10]
     ################
 
     ###############################
@@ -219,7 +219,7 @@ if __name__ == "__main__":
     n_A = 1
     A_list = [1e-5] # [2.5e-3]
     n_w0 = 1
-    w0_list = [1e-6]
+    w0_list = [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1e0]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -238,8 +238,8 @@ if __name__ == "__main__":
     print("Setting time...")
 
     # time determined by the flow timescale
-    dT_list = [2*np.pi/(10*w0) for w0 in w0_list]
-    T_max_list = [2*np.pi*10/w0 for w0 in w0_list]
+    dT_list = [2*np.pi/w0 * (1 / 10) for w0 in w0_list]
+    T_max_list = [2*np.pi/w0 * (10) for w0 in w0_list]
 
     # Same time for all simulations
     # dT_list = [6e3 for w0 in w0_list]
@@ -252,7 +252,7 @@ if __name__ == "__main__":
 
     ########################################
     # Maximum simulation time (s) per step #
-    T_sim_max = 60
+    T_sim_max = 1 * 3600 
     ########################################
 
     print("Time set.")

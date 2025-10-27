@@ -713,7 +713,7 @@ def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamm
     Returns True if the algorithm converges, False otherwise. 
     
     INPUTS
-    - output_folder: where the metadata+data file is saved
+    - output_folder: path of the directory where where the metadata+data file is saved
     - N: number of segments
     - taus_b: bending viscosity caracteristic time
     - tau_s:  shear viscosity caracteristic time
@@ -756,8 +756,8 @@ def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamm
         else:
             parameters_id += '_' + param + "_" + str(eval(param))
 
-    metadata_filename = output_folder + "metadata_" + str(date) + parameters_id + ".json"
-    data_filename = output_folder + "data_" + str(date) + parameters_id + ".csv"
+    metadata_filename = str(output_folder / ("metadata_" + str(date) + parameters_id + ".json"))
+    data_filename = str(output_folder / ("data_" + str(date) + parameters_id + ".csv"))
     ############################################################################
 
     ############################################################################
@@ -806,7 +806,7 @@ def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamm
     ############################################################################
     # Write metadata
     # print("Writing metadata...")
-    solver_values = [output_folder, N, taus_b, tau_s, str(init_conf), bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method]
+    solver_values = [str(output_folder), N, taus_b, tau_s, str(init_conf), bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method]
     solver_keys = ["output_folder", "N", "taus_b", "tau_s", "init_conf", "bool_EI", "Beta", "gamma", "n_L", "m_L", "A", "w0", "Sp4", "k0", "Lambdas", "Zetas", "X_flow_field_string", "T_span", "T_eval", "T_sim_max", "T_sim", "X_flow_field", "X_0", "method"]
     solver_dict = {f"{solver_keys[k]}": solver_values[k] for k in range(len(solver_values))}
     write_dict_to_json_file(solver_dict, metadata_filename)

@@ -32,7 +32,7 @@ import plotly.graph_objects as go
 from plotly.express.colors import sample_colorscale
 import plotly.io as pio
 
-def fetch_files(directory, metadata_condition, data_condition = None):
+def fetch_files(directory_path, metadata_condition, data_condition = None):
     """ Fetches all the filename ids in directory which comply with some conditions, 
     which can be either on the data or the metadata. Returns a list of ids. 
     
@@ -52,7 +52,8 @@ def fetch_files(directory, metadata_condition, data_condition = None):
     ids_list = []
 
     # Go through metadata files in directory
-    metadata_files = glob.glob(directory + "*.json")
+    metadata_filepaths = directory_path.glob("*.json")
+    metadata_files = [str(metadata_filepath) for metadata_filepath in metadata_filepaths]
     for metadata_file in metadata_files:
         base_name = os.path.basename(metadata_file)
         base_id = base_name.strip('metadata_.json')
@@ -99,12 +100,12 @@ def dimensionalize(Sp4, tau_b, beta, tau_s, eta, N, L):
 
     return E_b, nu_b, K_s, nu_s
 
-def observable_singlefile(directory, base_id, columns, observable, obs_type):
+def observable_singlefile(directory_path, base_id, columns, observable, obs_type):
     
     """ Applies an observable to a single file """
 
     # Metadata
-    metadata_file = directory + 'metadata_' + base_id + '.json'
+    metadata_file = str(directory_path / ('metadata_' + base_id + '.json'))
     solver_dict = get_metadata(metadata_file)
 
     # Get column values (except observable)
@@ -114,7 +115,7 @@ def observable_singlefile(directory, base_id, columns, observable, obs_type):
     if obs_type in ['metadata']:
         obs = observable(solver_dict, None)
     else:
-        data_file = directory + 'data_' + base_id + '.csv'
+        data_file =  str(directory_path / ('data_' + base_id + '.csv'))
         X = get_data(data_file)            
         if obs_type in ['data']:
             obs = observable(None, X)
@@ -124,7 +125,7 @@ def observable_singlefile(directory, base_id, columns, observable, obs_type):
 
     return col_values
 
-def observable_dataframe(directory, ids_list, columns, observable, obs_type = 'metadata'):
+def observable_dataframe(directory_path, ids_list, columns, observable, obs_type = 'metadata'):
     """ Takes as input a list of ids corresponding to simulations and makes a 
     dataframe in parameter space specified by columns where the value of the dataframe 
     is an observable, which will simply be for now a number.
@@ -153,7 +154,7 @@ def observable_dataframe(directory, ids_list, columns, observable, obs_type = 'm
     for base_id in ids_list:
         
         # Apply in parallel observable for each file
-        col_values = pool.apply_async(func = observable_singlefile, args = (directory, base_id, columns, observable, obs_type)).get()
+        col_values = pool.apply_async(func = observable_singlefile, args = (directory_path, base_id, columns, observable, obs_type)).get()
 
         # Put into table
         df.loc[len(df)] = col_values
@@ -163,7 +164,7 @@ def observable_dataframe(directory, ids_list, columns, observable, obs_type = 'm
 
     return df
 
-def observable_list_dataframe(directory, ids_list, columns, observable_list, obs_type_list):
+def observable_list_dataframe(directory_path, ids_list, columns, observable_list, obs_type_list):
     """ Takes as input a list of ids corresponding to simulations and makes a 
     dataframe in parameter space specified by columns where the value of the dataframe 
     is an observable, which will simply be for now a number.
@@ -192,7 +193,7 @@ def observable_list_dataframe(directory, ids_list, columns, observable_list, obs
     for base_id in ids_list:
         
         # Metadata
-        metadata_file = directory + 'metadata_' + base_id + '.json'
+        metadata_file =  str(directory_path / ('netadata_' + base_id + '.json'))
         solver_dict = get_metadata(metadata_file)
 
         # Get column values (except observable)
@@ -201,7 +202,7 @@ def observable_list_dataframe(directory, ids_list, columns, observable_list, obs
         for observable, obs_type in zip(observable_list, obs_type_list):
                 
             # Apply in parallel observable for each file
-            col_values = pool.apply_async(func = observable_singlefile, args = (directory, base_id, columns, observable, obs_type)).get()
+            col_values = pool.apply_async(func = observable_singlefile, args = (directory_path, base_id, columns, observable, obs_type)).get()
 
             # Put into table
             df.loc[len(df)] = col_values
@@ -802,32 +803,36 @@ if __name__ == '__main__':
 
     # Fetch files satisfying required conditions
 
-    sim_directory = Path('..').joinpath('Model').joinpath('Output').resolve() / 'AnalyticalComparisons' / 'PureBending_Clamped_Relaxation'
+    sim_path = (Path('..') / 'Model' / 'Output' / 'Inference_Examples').resolve()
 
     def metadata_condition_0(solver_dict, eps = 1e-6):
-        output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
-        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("ProximalBend" in init_conf) & (gamma == 2) & ((np.abs(A - 0) < eps) & (np.abs(w0 - 0) < eps)) & (np.abs(Sp4 - 1e0) < eps) & (np.abs(k0 - 1e3) < eps) & (method == 'Radau')
+        output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+
+        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("StraightLine" in init_conf) & (gamma == 2) & (np.abs(A - 1e-5) < eps) & (np.abs(Sp4 - 1e1) < eps) & (np.abs(k0 - 1e13) < eps) & (method == 'BDF')
 
         return bool_condition
 
-    ids_list = fetch_files(sim_directory, metadata_condition_0, None)
+    ids_list = fetch_files(sim_path, metadata_condition_0, None)
     print("# files: ", len(ids_list))
 
     print(ids_list[0])
     exit()
 
-    # Compute observable on these files and put this new data into a dataframe
-    columns = ['Sp4', 'taus_b']
+    # Visualize filaments
+    # To be completed
 
-    def simulation_time(solver_dict, X = None):
-        output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
-        return T_sim    
+    # # Compute observable on these files and put this new data into a dataframe
+    # columns = ['Sp4', 'taus_b']
+
+    # def simulation_time(solver_dict, X = None):
+    #     output_folder, N, taus_b, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
+    #     return T_sim    
     
-    df = observable_dataframe(sim_directory, ids_list, columns, simulation_time, obs_type = 'metadata')
-    df.columns = [*df.columns[:-1], 'T_sim']
-    df['tau_b'] = df.apply(lambda x: x['taus_b'][0], axis = 1)
+    # df = observable_dataframe(sim_directory, ids_list, columns, simulation_time, obs_type = 'metadata')
+    # df.columns = [*df.columns[:-1], 'T_sim']
+    # df['tau_b'] = df.apply(lambda x: x['taus_b'][0], axis = 1)
 
-    # Plot T_sim against Sp4
-    plot_2D(df, 'tau_b', 'T_sim').show()
-    plot_heatmap(df, 'Sp4', 'tau_b', 'T_sim').show()
+    # # Plot T_sim against Sp4
+    # plot_2D(df, 'tau_b', 'T_sim').show()
+    # plot_heatmap(df, 'Sp4', 'tau_b', 'T_sim').show()
