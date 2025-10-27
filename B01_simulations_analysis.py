@@ -809,7 +809,7 @@ if __name__ == '__main__':
 
         output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
-        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("StraightLine" in init_conf) & (gamma == 2) & (np.abs(A - 1e-5) < eps) & (np.abs(Sp4 - 1e1) < eps) & (np.abs(k0 - 1e13) < eps) & (method == 'BDF')
+        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("StraightLine" in init_conf) & (gamma == 2) & (np.abs(A - 1e-5) < eps) & (np.abs(Sp4 - 1e0) < eps) & (np.abs(k0 - 1e13) < eps) & (method == 'BDF')
 
         return bool_condition
 
