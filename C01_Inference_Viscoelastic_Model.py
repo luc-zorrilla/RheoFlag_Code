@@ -22,8 +22,13 @@ import scipy.differentiate as sd
 
 ### Discrepancy functionals
 
+def L2_absolute_error(m1, m2):
+    """ Computes the squared absolute L2-norm of the discrepancy between m1 and m2. 
+    Remark: this function is symmetric w.r.t. m1 and m2. """
+    return (np.linalg.norm(m1 - m2))**2
+
 def L2_relative_error(m1, m2):
-    """ Computes the relative L2-norm of the discrepancy between m1 and m2. 
+    """ Computes the squared relative L2-norm of the discrepancy between m1 and m2. 
     Warning: this function will depend asymmetrically on m1 and m2, 
         m2 being the reference. """
     return (np.linalg.norm(m1 - m2) / np.linalg.norm(m2))**2
@@ -105,35 +110,41 @@ def callback_function(xk):
     print("xk: ", xk)
     return
 
-def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function = callback_function, niter = 5):
+
+def LBFGSB_Scheme(func, guess_variables, bounds):
+    """ TO BE COMPLETED """
+    return
+
+def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function = callback_function, niter = 0, T = 0, stepsize = 5):
     """
-    This function aims at minimizing a functional func given 
-    an initial guess guess_params and a bound bound_params.
+    This function aims at minimizing a functional func given an initial guess guess_params and a bound bounds.
     For that, it uses 
-        - a global optimization method, the basin-hopping algorithm 
-    (scipy.optimize) with 
-        - a local optimization method, the L-BFGS-B method, which is a variant 
-        of the BFGS method with less memory usage and the possibility to add box 
-        constraints.
+        - a global optimization method, the basin-hopping algorithm (scipy.optimize).
+        The basin-hopping algorithm is iterative with each cycle composed of the following features
+            - random perturbation of the coordinates
+            - local minimization
+            - accept or reject the new coordinates based on the minimized function value
+        - a local optimization method, the L-BFGS-B method, which is a variant of the BFGS method with less memory usage and the possibility to add box  constraints.
 
     Inputs:
-        - func: a functional that takes a ndarray variable_params of shape 
-        (n_v,1) as argument
+        - func: a functional that takes a ndarray variable_params of shape (n_v,1) as argument
         - guess_variables: a (n_v,1)-shaped ndarray
-        - bound_params: a bound corresponding to the variable parameters and 
-        according to the scipy.optimize syntax.
-        - niter: number of global (basin-hopping) iterations
+        - bound_params: a bound corresponding to the variable parameters and according to the scipy.optimize syntax.
         - callback_function: callback function
+        - niter: number of global (basin-hopping) iterations. The number of runs of the local minimizer will be niter+1. 
+        If niter = 0, the basin-hopping algorithm simplifies into the local minimization scheme.
+        - T: temperature of the basin-hopping algorithm, corresponding to the temperature of the metropolis algorithm for acceptance of a step. 
+        If T = 0, then steps are only accepted if they minimize the functional.
+        - stepsize: the maximum stepsize for the algorithm to randomly vary parameters.
 
     Outputs: 
         - ret is a Batch object containing all information resulting from the basinhopping algorithm
     """
 
     method = "L-BFGS-B"
-
     x0 = guess_variables
     minimizer_kwargs = {"method": method, "bounds": bounds, "options":{'disp': True},  "callback":callback_function}
-    ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter)
+    ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T)
 
     # Compute hessian at convergence point
     # m = guess_variables.shape[0]  
@@ -350,8 +361,10 @@ if __name__ == '__main__':
 
         ## Optimization schemes and arguments
         opt_scheme = Basinhopping_LBFGSB_Scheme
-        niter = 1
-        opt_args = {"niter":niter, "callback_function":callback_function}
+        niter = 0
+        T = 0
+        stepsize = 5
+        opt_args = {"callback_function":callback_function, "niter":niter, "T":T, "stepsize":stepsize}
         guess_variable_params = {"Sp4": 1e1}
 
         ## Bounds
@@ -363,10 +376,10 @@ if __name__ == '__main__':
         bounds = so.Bounds(lb,  ub)
 
         # Flow field
-        m1 = 3 # 11
-        A_vec = np.array([1e-2, 1e-1, 1e0]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
+        m1 = 4 # 11
+        A_vec = np.array([1e-5, 1e-4, 1e-3, 1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
         m2 = 7 # 11
-        w0_vec = np.float_power(10, np.linspace(-6, 0, num = m2)) # np.array([1e0])
+        w0_vec = np.float_power(10, np.linspace(0, -6, num = m2)) # np.array([1e0])
         m3 = 1 # 2
         psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -413,7 +426,7 @@ if __name__ == '__main__':
         Flow_field_filename = "" # Whether to use a measured flow field or not
 
         # Start parallel computation
-        pool = mp.Pool(mp.cpu_count())    
+        pool = mp.Pool(mp.cpu_count() - 2)   
 
         for i1 in range(m1):
             A = A_vec[i1]
@@ -423,9 +436,9 @@ if __name__ == '__main__':
                     psi = psi_vec[i3]
 
                     ### Integration and time
-                    method = 'BDF'
-                    dT = 2*np.pi/w0 * (1/5)
-                    T_max = 2*np.pi/w0 * 5
+                    method = 'RK45' # 'BDF'
+                    dT = 2*np.pi/w0 * (1/10)
+                    T_max = 2*np.pi/w0 * 10
                     T_span = [0, T_max]
                     T_eval = [dT*i for i in range(round(T_max/dT))]
                     T_sim_max = 1*3600

@@ -93,26 +93,26 @@ if __name__ == "__main__":
     print("p_combined", p_combined)
 
     # Plot IE heatmap for each (A, w0)-point
-    fig = go.Figure(data = go.Heatmap(x = df['A'], y = df['w0'], z = np.log10(df['IE']), colorscale = 'RdPu_r'))
-    fig.update_xaxes(title = "w0", type = "linear")
-    fig.update_yaxes(title = "A", type = "linear")
+    fig = go.Figure(data = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = np.log10(df['IE']), colorscale = 'RdPu_r'))
+    fig.update_xaxes(title = "log A", type = "linear")
+    fig.update_yaxes(title = "log w0", type = "linear")
     fig.update_layout(title = "Inference Error (for each external parameter)")
     fig.vs_show()
 
     # Plot inferred params for each (A,w0)-point
     subplot_titles = []
     for k in range(n_vars):
-        subplot_titles += variable_keys[k]
+        subplot_titles += [variable_keys[k]]
         subplot_titles += ["sigma_" + variable_keys[k]]
 
     fig = make_subplots(rows = n_vars, cols = 2, subplot_titles=subplot_titles)
     for k_vars in range(n_vars):
-        hm_p_inf_k_vars = go.Heatmap(x = df['A'], y = df['w0'], z = df['p_inf_' + str(k_vars)], colorscale = 'RdPu_r')
-        hm_sigma_p_inf_k_vars = go.Heatmap(x = df['A'], y = df['w0'], z = np.log10(df['sigma_p_inf_' + str(k_vars)]), colorscale = 'RdPu_r')
+        hm_p_inf_k_vars = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = df['p_inf_' + str(k_vars)], colorscale = 'RdPu_r')
+        hm_sigma_p_inf_k_vars = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = np.log10(df['sigma_p_inf_' + str(k_vars)]), colorscale = 'RdPu_r')
         fig.add_trace(hm_p_inf_k_vars, row = 1 + k_vars, col = 1)
         fig.add_trace(hm_sigma_p_inf_k_vars, row = 1 + k_vars, col = 2)
-    fig.update_xaxes(title = "w0", type = "linear")
-    fig.update_yaxes(title = "A", type = "linear")
+    fig.update_xaxes(title = "log A", type = "linear")
+    fig.update_yaxes(title = "log w0", type = "linear")
     fig.update_layout(title = "Inferred parameters (for each external parameter)")
     fig.vs_show()
 
