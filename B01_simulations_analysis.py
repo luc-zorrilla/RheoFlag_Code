@@ -906,21 +906,22 @@ if __name__ == '__main__':
 
     # Fetch files satisfying required conditions
 
-    sim_path = (Path('..') / 'Model' / 'Output' / 'Inference_Examples').resolve()
+    sim_path = (Path('..') / 'Model' / 'Output' / 'Inference_Examples' / 'VarySp4').resolve()
 
     def metadata_condition_0(solver_dict, eps = 1e-6):
+        """ This functions computes the boolean corresponding to the condition of a clamped purely bending filament, in a harmonic vertical flow. """
 
         output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
-        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("StraightLine" in init_conf) & (gamma == 2) & (np.abs(A - 1e-5) < eps) & (np.abs(Sp4 - 1e0) < eps) & (np.abs(k0 - 1e13) < eps) & (method == 'BDF')
+        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("StraightLine" in init_conf) & (gamma == 2) & (np.abs(A - 1e-5) < eps) & (np.abs(w0 - 1e-6) < eps) & (np.abs(k0 - 1e13) < eps) & (method == 'BDF')
 
         return bool_condition
 
     ids_list = fetch_files(sim_path, metadata_condition_0, None)
+    ids_list.sort()
     print("# files: ", len(ids_list))
     print(ids_list[0])
     exit()
-
     
     X_list = []
     for base_id in ids_list:
@@ -930,15 +931,28 @@ if __name__ == '__main__':
 
     metadata_file = str(sim_path / ('metadata_' + base_id + '.json'))
     solver_dict = get_metadata(metadata_file)
-    _, N, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, T_eval, _, _, X_flow_field, _, _ = list(solver_dict.values())    
+    _, N, _, _, _, _, _, _, _, _, _, w0, _, _, _, _, _, _, T_eval, _, _, X_flow_field, _, _ = list(solver_dict.values())    
+    T_eval *= w0 / (2*np.pi)
+    # Visualize filaments
+    
+    ## 3D animation
+    # fig_anim = AnimatedShapes(X_list = X_list, X_flow = X_flow_field, N = N, T_eval = T_eval)
+    # print("fig_anim done.")
+    # fig_anim.vs_show()
+
+    ## 2D heatmap plot
+    X_list = [X_list[0]] # To be removed
+    for X in X_list:
+        data = go.Heatmap
+        fig = go.Figure(data=go.Heatmap(
+                    x = T_eval,
+                    y = np.linspace(0,1,N),
+                    z = X[2:, :],
+                    ))
+        fig.vs_show()
     
 
-    fig_anim = AnimatedShapes(X_list = X_list, X_flow = X_flow_field, N = N, T_eval = T_eval)
-    print("fig_anim done.")
-    fig_anim.vs_show()
-    # exit()
-
-    # Visualize filaments
+    
     # To be completed
 
     # # Compute observable on these files and put this new data into a dataframe

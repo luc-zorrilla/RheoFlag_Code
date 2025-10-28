@@ -63,7 +63,7 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1, 10]
+    Sp4_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     ################
 
     ###############################
@@ -219,7 +219,7 @@ if __name__ == "__main__":
     n_A = 1
     A_list = [1e-5] # [2.5e-3]
     n_w0 = 1
-    w0_list = [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1e0]
+    w0_list = [1e-6]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
