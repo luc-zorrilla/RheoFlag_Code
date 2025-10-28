@@ -10,8 +10,8 @@ import multiprocessing as mp
 
 import pickle
 from pathlib import Path
-writing_path = (Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped')
-
+writing_path = (Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'Example')
+from datetime import datetime
 import copy
 
 import numpy as np
@@ -105,17 +105,20 @@ def Vectorize_Functional(func, m):
     return f_vec
 
 ### Optimization schemes
-
-def callback_function(xk):
-    print("xk: ", xk)
-    return
-
+# nfeval = 1
+# def callback_function(*, intermediate_result): # The star makes forces intermediate_result as a keyword argument
+#     global nfeval
+#     print("k:", nfeval)
+#     print("xk: ", intermediate_result.x)
+#     print("f(xk): ", intermediate_result.fun)
+#     nfeval+=1
+#     return
 
 def LBFGSB_Scheme(func, guess_variables, bounds):
     """ TO BE COMPLETED """
     return
 
-def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function = callback_function, niter = 0, T = 0, stepsize = 5):
+def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, stepsize = 5):
     """
     This function aims at minimizing a functional func given an initial guess guess_params and a bound bounds.
     For that, it uses 
@@ -130,7 +133,6 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function 
         - func: a functional that takes a ndarray variable_params of shape (n_v,1) as argument
         - guess_variables: a (n_v,1)-shaped ndarray
         - bound_params: a bound corresponding to the variable parameters and according to the scipy.optimize syntax.
-        - callback_function: callback function
         - niter: number of global (basin-hopping) iterations. The number of runs of the local minimizer will be niter+1. 
         If niter = 0, the basin-hopping algorithm simplifies into the local minimization scheme.
         - T: temperature of the basin-hopping algorithm, corresponding to the temperature of the metropolis algorithm for acceptance of a step. 
@@ -138,13 +140,38 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function 
         - stepsize: the maximum stepsize for the algorithm to randomly vary parameters.
 
     Outputs: 
-        - ret is a Batch object containing all information resulting from the basinhopping algorithm
+        - ret is a Batch object containing all information resulting from the basinhopping algorithm -- including callbacks (still to be added).
     """
 
     method = "L-BFGS-B"
     x0 = guess_variables
+
+    ### This part should be updated to save the callback data, and add it to ret
+    X = []
+    F = []
+    dF = []
+    H = []
+    
+    def callback_function(*, intermediate_result): # The star forces intermediate_result as a keyword argument
+
+        x = copy.deepcopy(intermediate_result.x)
+        f = intermediate_result.fun
+        # Gradient approximation can be optionnally computed here
+        # Hessian approximation can be optionnally computed here too
+                
+        print("xk: ", x)
+        print("f(xk): ", f)
+
+        X.append(x)
+        print("X:", X)
+        F.append(f)
+        print("F:", F)
+
+        return
+    
     minimizer_kwargs = {"method": method, "bounds": bounds, "options":{'disp': True},  "callback":callback_function}
     ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T)
+    ### 
 
     # Compute hessian at convergence point
     # m = guess_variables.shape[0]  
@@ -152,7 +179,10 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, callback_function 
     # h = sd.hessian(f = vec_func, x = ret.x).ddf
     # ret.setdefault('hessian', h)    
 
-    return ret
+    for V in [X, F, dF, H]:
+        V = np.array(V)
+    
+    return ret, X, F, dF, H
 
 ### Inference meta-function
 
@@ -224,7 +254,7 @@ def Infer(fixed_params, guess_variable_params, bounds, functional, opt_scheme, o
     
     # Minimize functional
     guess_variables = np.array(list(guess_variable_params.values()))
-    res = opt_scheme(func = red_func, guess_variables = guess_variables, bounds = bounds, **opt_args)
+    res, X, F, dF, H = opt_scheme(func = red_func, guess_variables = guess_variables, bounds = bounds, **opt_args)
 
     # Transform back np.ndarray inferred variables into dictionary
     inferred_variables = res.x
@@ -234,7 +264,7 @@ def Infer(fixed_params, guess_variable_params, bounds, functional, opt_scheme, o
         inferred_variable_params[key] = inferred_variables[k]
     res.x = inferred_variable_params
 
-    return res
+    return res, X, F, dF, H
 
 ### Inference for model-experiment optimization
 def ModelExp_Inference(exp_data, model, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args):
@@ -268,9 +298,9 @@ def ModelExp_Inference(exp_data, model, fixed_params, guess_variable_params, bou
     modelexpdisc_func = Make_Modelexpdisc_Func(disc_func = disc_func, exp_data = exp_data)
     modeldisc_func = Make_Model_Functional(model = model, model_disc_func = modelexpdisc_func)
     
-    res = Infer(fixed_params = fixed_params, guess_variable_params = guess_variable_params, bounds = bounds, functional = modeldisc_func, opt_scheme = opt_scheme, opt_args=opt_args)
+    res, X, F, dF, H = Infer(fixed_params = fixed_params, guess_variable_params = guess_variable_params, bounds = bounds, functional = modeldisc_func, opt_scheme = opt_scheme, opt_args=opt_args)
 
-    return res
+    return res, X, F, dF, H
 
 ### Inference for the viscoelastic model
 def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args):
@@ -281,7 +311,7 @@ def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds
 def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_path):
     """ This functions performs inference given a certain set of arguments.
     This function is used to parallelize computation within loops. """
-
+    
     ## Choose initial guess (and fixed vs variable parameters)
 
     ### Initialize parameters perturbed around experimental parameters
@@ -300,7 +330,7 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
     ### Compute filament and inference
     exp_data = Viscoelastic_Model(exp_params)
     VI_args = dict(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
-    ret = Viscoelastic_Inference(**VI_args)
+    ret, X, F, dF, H = Viscoelastic_Inference(**VI_args)
 
     ## Inference results
 
@@ -308,7 +338,7 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
     #### Make dictionary with all relevant information
 
     ###### Dictionary of the used function
-    VI_dict = Make_Dict_From_Applied_Function(func = Viscoelastic_Inference, func_args = VI_args, func_output = ret)
+    VI_dict = Make_Dict_From_Applied_Function(func = Viscoelastic_Inference, func_args = VI_args, func_output = [ret, X, F, dF, H])
 
     ###### Additional information
     VI_dict["exp_variable_params"] = exp_variable_params
@@ -341,7 +371,6 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
 ################################################################################
 
 bool_main = True
-bool_test = False
 if __name__ == '__main__':
     """ 
     In the main script, one makes a scan over parameter space of the viscoelastic filament. 
@@ -364,7 +393,7 @@ if __name__ == '__main__':
         niter = 0
         T = 0
         stepsize = 5
-        opt_args = {"callback_function":callback_function, "niter":niter, "T":T, "stepsize":stepsize}
+        opt_args = {"niter":niter, "T":T, "stepsize":stepsize}
         guess_variable_params = {"Sp4": 1e1}
 
         ## Bounds
@@ -376,10 +405,10 @@ if __name__ == '__main__':
         bounds = so.Bounds(lb,  ub)
 
         # Flow field
-        m1 = 4 # 11
-        A_vec = np.array([1e-5, 1e-4, 1e-3, 1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
-        m2 = 7 # 11
-        w0_vec = np.float_power(10, np.linspace(0, -6, num = m2)) # np.array([1e0])
+        m1 = 1 # 11
+        A_vec = np.array([1e-5]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
+        m2 = 1 # 11
+        w0_vec = np.array([1e-6]) # np.float_power(10, np.linspace(0, -6, num = m2)) # np.array([1e0])
         m3 = 1 # 2
         psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -404,6 +433,12 @@ if __name__ == '__main__':
         mn_tot = m_tot * n_tot
         print("m_tot, n_tot, mn_tot:", m_tot, n_tot, mn_tot)
         IE_matrix = np.ones((m1,m2,m3,n1,n2,n3,n4,n5)) * np.nan
+
+        # Callout data
+        X = []
+        F = []
+        dF = []
+        H = []
 
         ## Constructing experimental data
 
@@ -436,9 +471,9 @@ if __name__ == '__main__':
                     psi = psi_vec[i3]
 
                     ### Integration and time
-                    method = 'Radau' # 'BDF'
-                    dT = 2*np.pi/w0 * (1/10)
-                    T_max = 2*np.pi/w0 * 10
+                    method = 'BDF' # 'BDF'
+                    dT = 2*np.pi/w0 * (1/2)
+                    T_max = 2*np.pi/w0 * 2
                     T_span = [0, T_max]
                     T_eval = [dT*i for i in range(round(T_max/dT))]
                     T_sim_max = 1*3600
@@ -473,175 +508,3 @@ if __name__ == '__main__':
 
         pool.close()
         pool.join() # postpones the execution of next line of code until all processes in the queue are done.
-
-    ### Tests
-    if bool_test:
-            
-        ## Function Unitary Tests
-
-        ### Discrepancy functionals
-        #### L2_relative_error(): OK
-        # m1 = np.zeros((10,3))
-        # m2 = np.ones((10, 3))
-        # err = L2_relative_error(m1, m2)
-        # print("err:", err)
-        # exit()
-
-        ### Models
-        #### Viscoelastic_Model_Parameters(): OK [custom flow, custom filament]
-
-        ##### Filament properties
-        gamma = 2
-        N = 10
-        Sp4 = 1
-        k0 = 1e13
-        bool_EI = True
-        Beta = 0
-        tau_b = 0
-        taus_b = [tau_b]*(N-1)
-        tau_s = 0
-
-        ##### Boundary conditions
-        init_conf = StraightLine
-        X0 = init_conf(N)
-
-        ##### External forcings
-        n_L = [0,0]
-        m_L = 0
-        Lambda = [0,0]
-        Lambdas = [Lambda for k in range(N)]
-        Zeta = 0
-        Zetas = [Zeta]*N
-
-        ##### Time-dependent Flow field
-        A = 1e-2
-        w0 = 1e0
-        psi = np.pi / 2
-        Flow_field_filename = "" # Whether to use a measured flow field or not
-        
-        ##### Integration and time
-        method = 'BDF'
-        dT = 2*np.pi/(10*w0)
-        T_max = 2*np.pi*10/w0
-        T_span = [0, T_max]
-        T_eval = [dT*i for i in range(int(T_max/dT))]
-        T_sim_max = 600
-
-        ##### Numerical Flow field and Interpolation
-        X_flow_field_string, X_flow_field = CreateFlowField(A, w0, psi, T_eval, filename = Flow_field_filename)
-        if X_flow_field_string != "NO FLOW":
-            InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
-        else:         
-            InterpFlow = 0
-
-        params = Viscoelastic_Model_Parameters(gamma = gamma, N = N, k0 = k0, bool_EI = bool_EI, Sp4 = Sp4, tau_b = tau_b, Beta = Beta, tau_s = tau_s, init_conf = init_conf, n_L = n_L, m_L = m_L, Lambdas = Lambdas, Zetas = Zetas, InterpFlow = InterpFlow, method = method, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, filament_type = "custom", flow_type = "custom")
-
-        print("params:", params)
-        
-        #### Viscoelastic_Model(): OK 
-        sol = Viscoelastic_Model(params)
-
-        ### Functional Meta-functions
-        
-        #### Make_Modelexpdisc_Func: OK
-        modelexp_disc_func = Make_Modelexpdisc_Func(disc_func = L2_relative_error, exp_data = sol)
-
-        #### Make_Model_Functional(): OK
-        model = Viscoelastic_Model
-        viscoelastic_modelexp_functional = Make_Model_Functional(model = model, model_disc_func = modelexp_disc_func)
-
-        all_params = params
-        all_params['Sp4'] = 2 # Change one parameter to make simulation-experiment discrepancy non-zero.
-        all_params['tau_b'] = 1 # Change one parameter to make simulation-experiment discrepancy non-zero.
-        # f = viscoelastic_modelexp_functional(all_params = all_params)
-        # print("Functional evaluated for a set of parameters all_params:", f)
-        # exit()
-
-        ### Optimization schemes
-
-        #### Reduce functional input space: OK
-        variable_keys = ["Sp4", "tau_b"]
-        variable_params = {key:all_params[key] for key in variable_keys}
-        fixed_params = copy.deepcopy(all_params)
-        for key in variable_keys:
-            fixed_params.pop(key)
-
-        func = viscoelastic_modelexp_functional
-        red_viscoelastic_modelexp_func = Make_Red_Func(func = func, variable_keys = variable_keys, fixed_params = fixed_params)
-        
-        # ! # The variables np.ndarray should follow the same order as in the variable_params dictionary, otherwise it won't work.
-        variables = np.array(list(variable_params.values())) 
-        f = red_viscoelastic_modelexp_func(variables)
-        print("Reduced functional evaluated for a subset of parameters variables", f)
-        # exit()
-
-        #### Basinhopping_LBFGSB_Scheme(): OK for (1D, 2D, ...), OK with (no bounds, bounds)
-        
-        guess_variables = variables
-        eps = 1e-3
-        bound_Sp4 = [eps, 1e3]
-        bound_tau_b = [0, 1e3]
-        lb = [bound_Sp4[0], bound_tau_b[0]]
-        ub = [bound_Sp4[1], bound_tau_b[1]]
-        bounds = so.Bounds(lb,  ub)
-        niter = 1 # Number of basin-hopping (global) iterations
-        ret = Basinhopping_LBFGSB_Scheme(func = red_viscoelastic_modelexp_func, guess_variables = guess_variables, bounds = bounds, niter = niter)
-        print("solution:", ret.x, ret.x.shape)
-
-        m = len(variable_keys)    
-        vec_red_viscoelastic_modelexp_func = Vectorize_Functional(red_viscoelastic_modelexp_func, m)
-        # h = sd.hessian(f = vec_red_viscoelastic_modelexp_func, x = ret.x, maxiter = 1, order = 1).ddf
-        # ret.setdefault('hessian', h)
-
-        # exit()
-
-        ### Inference meta-function
-        #### Infer(): OK for (viscoelastic model, L2-relative norm, Basin-hopping, L-BFGS-B)
-
-        # guess_variable_params = variable_params
-        # functional = viscoelastic_modelexp_functional
-        # opt_scheme = Basinhopping_LBFGSB_Scheme
-        # niter = 1
-        # opt_args = {"niter":niter} # dictionary
-        # ret = Infer(fixed_params = fixed_params, guess_variable_params = guess_variable_params, bounds = bounds, functional = functional, opt_scheme = opt_scheme, opt_args=opt_args)
-        # print("inferred variables:", ret.x)
-        # exit()
-
-        #### ModelExp_Inference: OK (Viscoelastic model, simulation output data)
-
-        # Include here sol = Viscoelastic_Model(...) if data = simulation output
-
-        exp_data = sol
-
-        # Set parameters
-        all_params = Viscoelastic_Model_Parameters(gamma = gamma, N = N, k0 = k0, bool_EI = bool_EI, Sp4 = Sp4, tau_b = tau_b, Beta = Beta, tau_s = tau_s, init_conf = init_conf, n_L = n_L, m_L = m_L, Lambdas = Lambdas, Zetas = Zetas, InterpFlow = InterpFlow, method = method, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, filament_type = "custom", flow_type = "custom")
-
-        model = Viscoelastic_Model
-        disc_func = L2_relative_error
-
-        # Separate fixed and variable parameters
-        variable_keys = ["Sp4", "tau_b"]
-        guess_variable_params = {key:all_params[key] for key in variable_keys}
-        fixed_params = copy.deepcopy(all_params)
-        for key in variable_keys:
-            fixed_params.pop(key)
-
-        eps = 1e-3
-        bound_Sp4 = [eps, 1e3]
-        bound_tau_b = [0, 1e3]
-        lb = [bound_Sp4[0], bound_tau_b[0]]
-        ub = [bound_Sp4[1], bound_tau_b[1]]
-        bounds = so.Bounds(lb,  ub)
-
-        opt_scheme = Basinhopping_LBFGSB_Scheme
-        niter = 1
-        opt_args = {"niter":niter, "callback_function":callback_function} # dictionary
-
-        # res = ModelExp_Inference(exp_data=exp_data, model = Viscoelastic_Model, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
-        # print("Solution: ", res.x)
-        # exit()
-
-        #### Viscoelastic_Inference(): OK (Viscoelastic model, simulation output data)
-        # res = Viscoelastic_Inference(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
-        # print("Solution: ", res.x)
-        # exit()

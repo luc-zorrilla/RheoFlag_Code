@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped'
+writing_path = Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'Example'
 import numpy as np
 import pandas as pd
 
@@ -44,12 +44,19 @@ if __name__ == "__main__":
         fixed_params = VI_dict["args"]["fixed_params"]
 
         p_star = np.array(list(exp_variable_params.values()))
-        inferred_variable_params = VI_dict["output"].x
+        ret = VI_dict["output"][0]
+        inferred_variable_params = ret.x
         p_inf = np.array(list(inferred_variable_params.values()))
 
+        X, F, dF, H = VI_dict["output"][1:]
+        print("X:", X)
+        print("F:", F)
+        print("dF:", dF)
+        print("H:", H)
+
         IE = L2_relative_error(p_inf, p_star)
-        Hm1 = VI_dict['output']['lowest_optimization_result']['hess_inv'].todense()
-        if not VI_dict['output']['success']: # If convergence failed, error is infinite
+        Hm1 = ret['lowest_optimization_result']['hess_inv'].todense()
+        if not ret['success']: # If convergence failed, error is infinite
             Hm1 = np.ones_like(Hm1) * np.inf
 
         A_list.append(A)

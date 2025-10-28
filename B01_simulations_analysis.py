@@ -950,10 +950,6 @@ if __name__ == '__main__':
                     z = X[2:, :],
                     ))
         fig.vs_show()
-    
-
-    
-    # To be completed
 
     # # Compute observable on these files and put this new data into a dataframe
     # columns = ['Sp4', 'taus_b']
