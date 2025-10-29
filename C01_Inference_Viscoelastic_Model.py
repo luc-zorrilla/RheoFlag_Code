@@ -10,7 +10,7 @@ import multiprocessing as mp
 
 import pickle
 from pathlib import Path
-writing_path = (Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'Example')
+writing_path = (Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'Callout' / 'VariableGuess')
 from datetime import datetime
 import copy
 
@@ -155,9 +155,7 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         print("f(xk): ", f)
 
         X.append(x)
-        print("X:", X)
         F.append(f)
-        print("F:", F)
 
         return
     
@@ -353,6 +351,10 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
     for key in list(exp_variable_params.keys()):
         param = exp_variable_params[key]
         base_id += "_" + key + "_" + f"{param:.2E}"
+    base_id += "_Guess"
+    for key in list(guess_variable_params.keys()):
+        param = guess_variable_params[key]
+        base_id += "_" + key + "_" + f"{param:.2E}"     
     filename = str((writing_path / ("VI_dict" + base_id + ".pkl")).resolve())
     print("filename:", filename)
     output = open(filename, 'wb')
@@ -364,7 +366,6 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
 ################################################################################
 
 bool_main = True
-bool_test = False
 if __name__ == '__main__':
     """ 
     In the main script, one makes a scan over parameter space of the viscoelastic filament. 
@@ -388,117 +389,119 @@ if __name__ == '__main__':
         T = 0
         stepsize = 5
         opt_args = {"niter":niter, "T":T, "stepsize":stepsize}
-        guess_variable_params = {"Sp4": 1e1}
 
-        ## Bounds
-        eps = 1e-3
-        bound_Sp4 = [eps, 1e3]
-        # bound_tau_b = [0, 1e7]
-        lb = [bound_Sp4[0]] #, bound_tau_b[0]]
-        ub = [bound_Sp4[1]] #, bound_tau_b[1]]
-        bounds = so.Bounds(lb,  ub)
+        for Sp4_guess in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]:
+            guess_variable_params = {"Sp4": Sp4_guess}
 
-        # Flow field
-        m1 = 1 # 11
-        A_vec = np.array([1e-5]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
-        m2 = 1 # 11
-        w0_vec = np.array([1e-6]) # np.float_power(10, np.linspace(0, -6, num = m2)) # np.array([1e0])
-        m3 = 1 # 2
-        psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
+            ## Bounds
+            eps = 1e-3
+            bound_Sp4 = [eps, 1e3]
+            # bound_tau_b = [0, 1e7]
+            lb = [bound_Sp4[0]] #, bound_tau_b[0]]
+            ub = [bound_Sp4[1]] #, bound_tau_b[1]]
+            bounds = so.Bounds(lb,  ub)
 
-        ### Filament properties
-        gamma = 2
-        bool_EI = True  
+            # Flow field
+            m1 = 1 # 11
+            A_vec = np.array([1e-5]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
+            m2 = 1 # 11
+            w0_vec = np.array([1e-6]) # np.float_power(10, np.linspace(0, -6, num = m2)) # np.array([1e0])
+            m3 = 1 # 2
+            psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
-        # Viscoelastic properties
-        n1 = 1 # 14
-        k0_vec = np.array([1e13]) # np.float_power(10, np.linspace(0, 13, num = n1))
-        n2 = 1 # 11
-        Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
-        n3 = 1 # 11
-        tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
-        n4 = 1 # 11
-        Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
-        n5 = 1 # 11
-        tau_s_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n5))
+            ### Filament properties
+            gamma = 2
+            bool_EI = True  
 
-        m_tot = m1 * m2 * m3
-        n_tot = n1 * n2 * n3 * n4 * n5
-        mn_tot = m_tot * n_tot
-        print("m_tot, n_tot, mn_tot:", m_tot, n_tot, mn_tot)
-        IE_matrix = np.ones((m1,m2,m3,n1,n2,n3,n4,n5)) * np.nan
+            # Viscoelastic properties
+            n1 = 1 # 14
+            k0_vec = np.array([1e13]) # np.float_power(10, np.linspace(0, 13, num = n1))
+            n2 = 1 # 11
+            Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
+            n3 = 1 # 11
+            tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
+            n4 = 1 # 11
+            Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
+            n5 = 1 # 11
+            tau_s_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n5))
 
-        # Callout data
-        X = []
-        F = []
-        dF = []
-        H = []
+            m_tot = m1 * m2 * m3
+            n_tot = n1 * n2 * n3 * n4 * n5
+            mn_tot = m_tot * n_tot
+            print("m_tot, n_tot, mn_tot:", m_tot, n_tot, mn_tot)
+            IE_matrix = np.ones((m1,m2,m3,n1,n2,n3,n4,n5)) * np.nan
 
-        ## Constructing experimental data
+            # Callout data
+            X = []
+            F = []
+            dF = []
+            H = []
 
-        ### Numerical properties
-        N = 10
+            ## Constructing experimental data
 
-        #### Boundary conditions
-        init_conf = StraightLine
-        X0 = init_conf(N)
+            ### Numerical properties
+            N = 10
 
-        #### External forcings
-        n_L = [0,0]
-        m_L = 0
-        Lambda = [0,0]
-        Lambdas = [Lambda for k in range(N)]
-        Zeta = 0
-        Zetas = [Zeta]*N
+            #### Boundary conditions
+            init_conf = StraightLine
+            X0 = init_conf(N)
 
-        ### Time-dependent flow field
-        Flow_field_filename = "" # Whether to use a measured flow field or not
+            #### External forcings
+            n_L = [0,0]
+            m_L = 0
+            Lambda = [0,0]
+            Lambdas = [Lambda for k in range(N)]
+            Zeta = 0
+            Zetas = [Zeta]*N
 
-        # Start parallel computation
-        pool = mp.Pool(mp.cpu_count() - 2)
+            ### Time-dependent flow field
+            Flow_field_filename = "" # Whether to use a measured flow field or not
 
-        for i1 in range(m1):
-            A = A_vec[i1]
-            for i2 in range(m2):
-                w0 = w0_vec[i2]
-                for i3 in range(m3):
-                    psi = psi_vec[i3]
+            # Start parallel computation
+            pool = mp.Pool(mp.cpu_count() - 2)
 
-                    ### Integration and time
-                    method = 'BDF' # 'BDF'
-                    dT = 2*np.pi/w0 * (1/2)
-                    T_max = 2*np.pi/w0 * 2
-                    T_span = [0, T_max]
-                    T_eval = [dT*i for i in range(round(T_max/dT))]
-                    T_sim_max = 1*3600
+            for i1 in range(m1):
+                A = A_vec[i1]
+                for i2 in range(m2):
+                    w0 = w0_vec[i2]
+                    for i3 in range(m3):
+                        psi = psi_vec[i3]
 
-                    ### Numerical Flow field and Interpolation
-                    X_flow_field_string, X_flow_field = CreateFlowField(A, w0, psi, T_eval, filename = Flow_field_filename)
-                    if X_flow_field_string != "NO FLOW":
-                        InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
-                    else:         
-                        InterpFlow = 0
-                    
-                    print("Flow field created for (A,w0,psi) = ", A, w0, psi)
-                    flow_params = dict(A = A, w0 = w0, psi = psi)
+                        ### Integration and time
+                        method = 'BDF' # 'BDF'
+                        dT = 2*np.pi/w0 * (1/10)
+                        T_max = 2*np.pi/w0 * 10
+                        T_span = [0, T_max]
+                        T_eval = [dT*i for i in range(round(T_max/dT))]
+                        T_sim_max = 1*3600
 
-                    for j1 in range(n1):
-                        k0 = k0_vec[j1]
-                        for j2 in range(n2):
-                            Sp4 = Sp4_vec[j2]
-                            for j3 in range(n3):
-                                tau_b = tau_b_vec[j3]
-                                for j4 in range(n4):
-                                    Beta = Beta_vec[j4]
-                                    for j5 in range(n5):
+                        ### Numerical Flow field and Interpolation
+                        X_flow_field_string, X_flow_field = CreateFlowField(A, w0, psi, T_eval, filename = Flow_field_filename)
+                        if X_flow_field_string != "NO FLOW":
+                            InterpFlow = interpolate.interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
+                        else:         
+                            InterpFlow = 0
+                        
+                        print("Flow field created for (A,w0,psi) = ", A, w0, psi)
+                        flow_params = dict(A = A, w0 = w0, psi = psi)
 
-                                        tau_s = tau_s_vec[j5]
-                                        taus_b = [tau_b]*(N-1)
+                        for j1 in range(n1):
+                            k0 = k0_vec[j1]
+                            for j2 in range(n2):
+                                Sp4 = Sp4_vec[j2]
+                                for j3 in range(n3):
+                                    tau_b = tau_b_vec[j3]
+                                    for j4 in range(n4):
+                                        Beta = Beta_vec[j4]
+                                        for j5 in range(n5):
 
-                                        exp_params = Viscoelastic_Model_Parameters(gamma = gamma, N = N, k0 = k0, bool_EI = bool_EI, Sp4 = Sp4, tau_b = tau_b, Beta = Beta, tau_s = tau_s, init_conf = init_conf, n_L = n_L, m_L = m_L, Lambdas = Lambdas, Zetas = Zetas, InterpFlow = InterpFlow, method = method, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, filament_type = "custom", flow_type = "custom")
+                                            tau_s = tau_s_vec[j5]
+                                            taus_b = [tau_b]*(N-1)
 
-                                        inloop_args = [flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_path]                                        
-                                        res = pool.apply_async(func = Viscoelastic_inference_inloop, args = inloop_args)
+                                            exp_params = Viscoelastic_Model_Parameters(gamma = gamma, N = N, k0 = k0, bool_EI = bool_EI, Sp4 = Sp4, tau_b = tau_b, Beta = Beta, tau_s = tau_s, init_conf = init_conf, n_L = n_L, m_L = m_L, Lambdas = Lambdas, Zetas = Zetas, InterpFlow = InterpFlow, method = method, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, filament_type = "custom", flow_type = "custom")
 
-        pool.close()
-        pool.join() # postpones the execution of next line of code until all processes in the queue are done.
+                                            inloop_args = [flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_path]                                        
+                                            res = pool.apply_async(func = Viscoelastic_inference_inloop, args = inloop_args)
+
+            pool.close()
+            pool.join() # postpones the execution of next line of code until all processes in the queue are done.
