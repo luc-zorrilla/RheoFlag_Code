@@ -105,14 +105,6 @@ def Vectorize_Functional(func, m):
     return f_vec
 
 ### Optimization schemes
-# nfeval = 1
-# def callback_function(*, intermediate_result): # The star makes forces intermediate_result as a keyword argument
-#     global nfeval
-#     print("k:", nfeval)
-#     print("xk: ", intermediate_result.x)
-#     print("f(xk): ", intermediate_result.fun)
-#     nfeval+=1
-#     return
 
 def LBFGSB_Scheme(func, guess_variables, bounds):
     """ TO BE COMPLETED """
@@ -299,7 +291,7 @@ def ModelExp_Inference(exp_data, model, fixed_params, guess_variable_params, bou
     modeldisc_func = Make_Model_Functional(model = model, model_disc_func = modelexpdisc_func)
     
     res, X, F, dF, H = Infer(fixed_params = fixed_params, guess_variable_params = guess_variable_params, bounds = bounds, functional = modeldisc_func, opt_scheme = opt_scheme, opt_args=opt_args)
-
+    
     return res, X, F, dF, H
 
 ### Inference for the viscoelastic model
@@ -311,7 +303,7 @@ def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds
 def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_path):
     """ This functions performs inference given a certain set of arguments.
     This function is used to parallelize computation within loops. """
-    
+
     ## Choose initial guess (and fixed vs variable parameters)
 
     ### Initialize parameters perturbed around experimental parameters
@@ -362,6 +354,7 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
         param = exp_variable_params[key]
         base_id += "_" + key + "_" + f"{param:.2E}"
     filename = str((writing_path / ("VI_dict" + base_id + ".pkl")).resolve())
+    print("filename:", filename)
     output = open(filename, 'wb')
     pickle.dump(obj = VI_dict, file = output, protocol = -1)
     output.close()                                            
@@ -371,6 +364,7 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
 ################################################################################
 
 bool_main = True
+bool_test = False
 if __name__ == '__main__':
     """ 
     In the main script, one makes a scan over parameter space of the viscoelastic filament. 

@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'Example'
+writing_path = Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'Callout' / 'Evolution'
 import numpy as np
 import pandas as pd
 
@@ -25,6 +25,10 @@ if __name__ == "__main__":
     p_inf_list = []
     IE_list = []
     Hm1_list = []
+    X_list = []
+    F_list = []
+    dF_list = []
+    H_list = []
 
     filepaths = list(writing_path.glob('**/*.pkl')) # List of path of .pkl files in the writing path
     filenames = [str(filepath.resolve()) for filepath in filepaths] # Convert to strings in the corresponding OS
@@ -49,10 +53,10 @@ if __name__ == "__main__":
         p_inf = np.array(list(inferred_variable_params.values()))
 
         X, F, dF, H = VI_dict["output"][1:]
-        print("X:", X)
-        print("F:", F)
-        print("dF:", dF)
-        print("H:", H)
+        for l in range(4):
+            V = np.array([X, F, dF, H][l]).squeeze()
+            V_list = [X_list, F_list, dF_list, H_list][l]
+            V_list.append(V)
 
         IE = L2_relative_error(p_inf, p_star)
         Hm1 = ret['lowest_optimization_result']['hess_inv'].todense()
@@ -74,23 +78,28 @@ if __name__ == "__main__":
 
     variable_keys = list(exp_variable_params.keys())
 
+    # Make dataframe
     df = pd.DataFrame()
+
     df["A"] = A_list
     df["w0"] = w0_list
     df["p_inf"] = p_inf_list
     df["IE"] = IE_list
     df["Hm1"] = Hm1_list # Covariance matrix
     df["Sigma"] = df.apply(lambda x: np.sqrt(np.diag(x["Hm1"])), axis = 1)
-
-    print("df[p_inf]", df["p_inf"])
-    print("df[IE]", df["IE"])
-    print("df[hm1]", df["Hm1"])
-    print("df[Sigma]", df["Sigma"]) 
+    df["X"] = X_list
+    df["F"] = F_list
+    df["dF"] = dF_list
+    df["H"] = H_list
 
     n_vars = p_inf_list[0].shape[0]
     for k_vars in range(n_vars):
         df["p_inf_" + str(k_vars)] = df.apply(lambda x: x['p_inf'][k_vars], axis = 1)
         df["sigma_p_inf_" + str(k_vars)] = df.apply(lambda x: x['Sigma'][k_vars], axis = 1)
+
+    print(df)
+
+    # Combine inferred parameters
 
     p_combined = [] # Combine parameter estimates (using BLC function)
     for j in range(n_vars):
@@ -99,14 +108,23 @@ if __name__ == "__main__":
         p_combined.append(Z_combined_vector_j)
     print("p_combined", p_combined)
 
-    # Plot IE heatmap for each (A, w0)-point
+    # Plots
+
+    ## Plot X, F evolution for each A, w0
+    fig = go.Figure()
+    fig.add_scatter(x = np.arange(len(df["X"][0])), y = df["X"][0], name = "X")
+    fig.add_scatter(x = np.arange(len(df["F"][0])), y = df["F"][0], name = "F")
+    fig.vs_show()
+    quit()
+
+    ## Plot IE heatmap for each (A, w0)-point
     fig = go.Figure(data = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = np.log10(df['IE']), colorscale = 'RdPu_r'))
     fig.update_xaxes(title = "log A", type = "linear")
     fig.update_yaxes(title = "log w0", type = "linear")
     fig.update_layout(title = "Inference Error (for each external parameter)")
     fig.vs_show()
 
-    # Plot inferred params for each (A,w0)-point
+    ## Plot inferred params for each (A,w0)-point
     subplot_titles = []
     for k in range(n_vars):
         subplot_titles += [variable_keys[k]]
@@ -123,7 +141,7 @@ if __name__ == "__main__":
     fig.update_layout(title = "Inferred parameters (for each external parameter)")
     fig.vs_show()
 
-    # Plot inferred params for all (A,w0)-point combined (only works for 1 or 2 variables) --> to generalize to N params, one needs to plot individual histograms
+    ## Plot inferred params for all (A,w0)-point combined (only works for 1 or 2 variables) --> to generalize to N params, one needs to plot individual histograms
     if n_vars == 1:
         nbins = 20
         fig = go.Figure(go.Histogram(
@@ -141,7 +159,7 @@ if __name__ == "__main__":
         fig.update_layout(title = "Histogram of inferred parameters (all external parameters combined)")
         fig.vs_show()
 
-    # Inference error for all (A, w0)-point combined, for each set of internal parameters
+    ## Inference error for all (A, w0)-point combined, for each set of internal parameters
     # To be filled
 
 
