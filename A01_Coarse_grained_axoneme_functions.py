@@ -217,6 +217,7 @@ def X3N(X):
 
     N = X.shape[0]-2
     X_3N = np.zeros((3*N,1), dtype=np.double)
+
     for i in range(N):
         X_2 = X2(X, i) # X_2 is adimensional
         theta_i = Theta(X, i)
@@ -225,6 +226,18 @@ def X3N(X):
         X_3N[2*N+i] = theta_i
 
     return X_3N
+
+def XNp2(X_3N):
+    """ Returns adimensional X_Np2 vector from X_3N. """
+
+    N = X_3N.shape[0]//3
+    X_Np2 = np.zeros((N+2,1), dtype=np.double)
+
+    X_Np2[0] = X_3N[0] # x_0
+    X_Np2[1] = X_3N[N] # y_0
+    X_Np2[2] = X_3N[2*N] # alpha_0 = theta_0
+    X_Np2[3:] = X_3N[2*N+1:] - X_3N[2*N:-1] # alpha_i = theta_i - theta_{i-1}
+    return X_Np2
 
 # Unit test
 # N = 5

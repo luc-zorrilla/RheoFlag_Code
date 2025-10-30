@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'Callout' / 'Evolution'
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'Callout' / 'VariableGuess' / '100points')
 import numpy as np
 import pandas as pd
 
@@ -23,12 +23,14 @@ if __name__ == "__main__":
     A_list = []
     w0_list = []
     p_inf_list = []
+    guess_list = []
     IE_list = []
     Hm1_list = []
     X_list = []
     F_list = []
     dF_list = []
     H_list = []
+    ret_list = []
 
     filepaths = list(writing_path.glob('**/*.pkl')) # List of path of .pkl files in the writing path
     filenames = [str(filepath.resolve()) for filepath in filepaths] # Convert to strings in the corresponding OS
@@ -51,6 +53,7 @@ if __name__ == "__main__":
         ret = VI_dict["output"][0]
         inferred_variable_params = ret.x
         p_inf = np.array(list(inferred_variable_params.values()))
+        guess = np.array(list(guess_variable_params.values()))
 
         X, F, dF, H = VI_dict["output"][1:]
         for l in range(4):
@@ -66,8 +69,10 @@ if __name__ == "__main__":
         A_list.append(A)
         w0_list.append(w0)
         p_inf_list.append(p_inf)
+        guess_list.append(guess)
         IE_list.append(IE)
         Hm1_list.append(Hm1)
+        ret_list.append(ret)
 
         ## Inferred parameters with uncertainty
         # fig = go.Figure()
@@ -84,6 +89,7 @@ if __name__ == "__main__":
     df["A"] = A_list
     df["w0"] = w0_list
     df["p_inf"] = p_inf_list
+    df["guess"] = guess_list
     df["IE"] = IE_list
     df["Hm1"] = Hm1_list # Covariance matrix
     df["Sigma"] = df.apply(lambda x: np.sqrt(np.diag(x["Hm1"])), axis = 1)
@@ -91,31 +97,37 @@ if __name__ == "__main__":
     df["F"] = F_list
     df["dF"] = dF_list
     df["H"] = H_list
+    df["ret"] = ret_list
 
     n_vars = p_inf_list[0].shape[0]
     for k_vars in range(n_vars):
         df["p_inf_" + str(k_vars)] = df.apply(lambda x: x['p_inf'][k_vars], axis = 1)
         df["sigma_p_inf_" + str(k_vars)] = df.apply(lambda x: x['Sigma'][k_vars], axis = 1)
 
+    # Select for a specific guess
+    Sp4_guess = 1
+    df = df[df['guess'] == Sp4_guess].reset_index()
     print(df)
+
+    # Select for specific external parameters
+    df_Aw0 = df[(df['A'] == 1e-5) & (df['w0'] == 1e-6)].reset_index()
 
     # Combine inferred parameters
 
-    p_combined = [] # Combine parameter estimates (using BLC function)
-    for j in range(n_vars):
-        Z_vector_list_j = [np.array([df["p_inf"][k][j], df["Sigma"][k][j]]) for k in range(df["p_inf"].shape[0])]
-        Z_combined_vector_j = BLC(Z_vector_list_j)
-        p_combined.append(Z_combined_vector_j)
-    print("p_combined", p_combined)
+    # p_combined = [] # Combine parameter estimates (using BLC function) --> Not working when selecting for specific guess!
+    # for j in range(n_vars):
+    #     Z_vector_list_j = [np.array([df["p_inf"][k][j], df["Sigma"][k][j]]) for k in range(df["p_inf"].shape[0])]
+    #     Z_combined_vector_j = BLC(Z_vector_list_j)
+    #     p_combined.append(Z_combined_vector_j)
+    # print("p_combined", p_combined)
 
     # Plots
 
-    ## Plot X, F evolution for each A, w0
+    # Plot X, F evolution for each A, w0
     fig = go.Figure()
-    fig.add_scatter(x = np.arange(len(df["X"][0])), y = df["X"][0], name = "X")
-    fig.add_scatter(x = np.arange(len(df["F"][0])), y = df["F"][0], name = "F")
+    fig.add_scatter(x = np.arange(len(df_Aw0["X"][0])), y = df_Aw0["X"][0], name = "X")
+    fig.add_scatter(x = np.arange(len(df_Aw0["F"][0])), y = df_Aw0["F"][0], name = "F")
     fig.vs_show()
-    quit()
 
     ## Plot IE heatmap for each (A, w0)-point
     fig = go.Figure(data = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = np.log10(df['IE']), colorscale = 'RdPu_r'))

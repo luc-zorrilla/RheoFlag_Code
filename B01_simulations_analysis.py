@@ -355,32 +355,41 @@ def CheckEquilibrium(N, A, gamma, Sp4, n_L = [0,0], Lambdas=[[0,0]], conditions 
 
     ## Analytical equilibrium solution
     X_eq = np.zeros((2*n_eq))
+    theta_eq = np.zeros((n_eq))
+
     X_eq[:n_eq] = np.linspace(start = 0, stop = N, num = n_eq) # Arclength
+    x_eq_neq = N
 
     # For a vertical point force at distal end
     if conditions == "vertical_point_tip":
         F = n_L[1]
         X_eq[n_eq:] = (3 * (X_eq[:n_eq]/(N))**2 - (X_eq[:n_eq]/(N))**3 ) * F * ((N)**3) / 6
+        y_eq_neq = (3 * (x_eq_neq/(N))**2 - (x_eq_neq/(N))**3 ) * F * ((N)**3) / 6
 
     # For a density force at distal segment
     elif conditions == "vertical_density_tip":
         F = Lambdas[-1][1]
         X_eq[n_eq:] = (3 * (X_eq[:n_eq]/N)**2 - (X_eq[:n_eq]/N)**3) * F * (N**3) / 6
+        y_eq_neq = (3 * (x_eq_neq/N)**2 - (x_eq_neq/N)**3) * F * (N**3) / 6
 
     # For a uniform vertical force
     elif conditions == "vertical_density_uniform":
         f = Lambdas[0][1]
         X_eq[n_eq:] = ( (X_eq[:n_eq]/N)**4 - 4*(X_eq[:n_eq]/N)**3 + 6*(X_eq[:n_eq]/N)**2 ) * f * (N**4) / 24
+        y_eq_neq = ( (x_eq_neq/N)**4 - 4*(x_eq_neq/N)**3 + 6*(x_eq_neq/N)**2 ) * f * (N**4) / 24
 
     # For a uniform small vertical flow
     elif conditions == "vertical_flow_uniform":
         X_eq[n_eq:] = ( (X_eq[:n_eq]/N)**4 - 4*(X_eq[:n_eq]/N)**3 + 6*(X_eq[:n_eq]/N)**2 ) * A * gamma * Sp4 *(N**4) / 24
-        # 
+        y_eq_neq = ( (x_eq_neq/N)**4 - 4*(x_eq_neq/N)**3 + 6*(x_eq_neq/N)**2 ) * A * gamma * Sp4 *(N**4) / 24
+        
     else:
         print("No condition for exact solution has been specified.")
         return NameError
     
-    X_3N_eq = np.vstack((X_eq.reshape((-1,1)), np.zeros((n_eq)).reshape(-1,1)))
+    theta_eq[:-1] = np.arctan2(X_eq[n_eq+1:], X_eq[1:n_eq])
+    theta_eq[-1] = np.arctan2(y_eq_neq, x_eq_neq)
+    X_3N_eq = np.vstack((X_eq.reshape((-1,1)), theta_eq.reshape(-1,1))) # Thetas are filled to zero here!
     return X_3N_eq
 
 def Kymograph(X):
@@ -801,6 +810,8 @@ def AnimatedShapes(X_list, X_flow, N, T_eval):
     --> To be updated so that the flow is plotted in a circle with radius one.
     --> Only show first filament at the beginning, and display legend
     """
+    n_decimals=1 # Number of decimals for the time slider
+
     fig_dict = dict(data = [], layout = {}, frames = [])
 
     # data: initial frame
@@ -867,8 +878,7 @@ def AnimatedShapes(X_list, X_flow, N, T_eval):
     }
 
     # data: following frames
-    
-    for k in range(len(T_eval)-1):
+    for k in range(len(T_eval)):
         frame_dict_list = []
         for p in range(len(X_list)):
             X = X_list[p]
@@ -883,7 +893,7 @@ def AnimatedShapes(X_list, X_flow, N, T_eval):
         # frame-specific layout: slider steps
         slider_step = dict(
         args = [[str(k)], dict(frame = dict(duration = 50, redraw = False), mode = "immediate", transition= dict(duration = 0))],
-        label = np.round(T_eval[k], 0),
+        label = np.round(T_eval[k], n_decimals),
         method = "animate")
         sliders_dict["steps"].append(slider_step)
 
@@ -906,14 +916,14 @@ if __name__ == '__main__':
 
     # Fetch files satisfying required conditions
 
-    sim_path = (Path('..') / 'Model' / 'Output' / 'Inference_Examples' / 'VarySp4').resolve()
+    sim_path = (Path(__file__).resolve().parent.parent / 'Model' / 'Output' / 'Inference_Examples' / 'VarySp4Npoints' / 'npoints_10000').resolve()
 
     def metadata_condition_0(solver_dict, eps = 1e-6):
         """ This functions computes the boolean corresponding to the condition of a clamped purely bending filament, in a harmonic vertical flow. """
 
         output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
-        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("StraightLine" in init_conf) & (gamma == 2) & (np.abs(A - 1e-5) < eps) & (np.abs(w0 - 1e-6) < eps) & (np.abs(k0 - 1e13) < eps) & (method == 'BDF')
+        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("StraightLine" in init_conf) & (gamma == 2) & (np.abs(A - 1e-7) < eps) & (np.abs(w0 - 1e-6) < eps) & (np.abs(k0 - 1e13) < eps) & (method == 'BDF')
 
         return bool_condition
 
@@ -921,7 +931,6 @@ if __name__ == '__main__':
     ids_list.sort()
     print("# files: ", len(ids_list))
     print(ids_list[0])
-    exit()
     
     X_list = []
     for base_id in ids_list:
@@ -931,25 +940,47 @@ if __name__ == '__main__':
 
     metadata_file = str(sim_path / ('metadata_' + base_id + '.json'))
     solver_dict = get_metadata(metadata_file)
-    _, N, _, _, _, _, _, _, _, _, _, w0, _, _, _, _, _, _, T_eval, _, _, X_flow_field, _, _ = list(solver_dict.values())    
+    output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())  
     T_eval *= w0 / (2*np.pi)
+
     # Visualize filaments
+    Sp4 = 1
+    X_3_Nm1_eq = CheckEquilibrium(N-1, A, gamma, Sp4, n_L = n_L, Lambdas=Lambdas, conditions = "vertical_flow_uniform", n_eq = N-1) # Go to N-1 only to take into account clamping at the base later
+    X_3N_eq = np.zeros((3*N, 1))
+    X_3N_eq[0] = 0 # Clamped x
+    X_3N_eq[1:N] = X_3_Nm1_eq[:N-1] + 1
+    X_3N_eq[N] = 0 # Clamped y
+    X_3N_eq[N+1:2*N] = X_3_Nm1_eq[N-1:2*(N-1)] + 0
+    X_3N_eq[2*N] = 0 # Clamped theta
+    X_3N_eq[2*N+1:] = X_3_Nm1_eq[2*(N-1):]
+
+    X_Np2_eq = XNp2(X_3N_eq)
+    X_3N_eq_from_Np2 = X3N(X_Np2_eq)
+
+    # Check that equilibrium is right
+    fig = go.Figure()
+    fig.add_scatter(x = X_3N_eq[:N, 0], y = X_3N_eq[N:2*N, 0], name = "Eq using x,y")
+    fig.add_scatter(x = X_3N_eq_from_Np2[:N, 0], y = X_3N_eq_from_Np2[N:2*N, 0], name = "Eq using theta")
+    fig.vs_show()
     
+    X_eq = X_Np2_eq.repeat(T_eval.shape[0], axis = 1)
+    X_list.append(X_eq)
+
     ## 3D animation
-    # fig_anim = AnimatedShapes(X_list = X_list, X_flow = X_flow_field, N = N, T_eval = T_eval)
-    # print("fig_anim done.")
-    # fig_anim.vs_show()
+    fig_anim = AnimatedShapes(X_list = X_list, X_flow = X_flow_field, N = N, T_eval = T_eval)
+    # fig_anim.add_scatter(x=X_3N_eq[:N], y=X_3N_eq[N:2*N], marker_color = "red", mode = "lines", name = "Analytical solution")
+    fig_anim.vs_show()
 
     ## 2D heatmap plot
-    X_list = [X_list[0]] # To be removed
-    for X in X_list:
-        data = go.Heatmap
-        fig = go.Figure(data=go.Heatmap(
-                    x = T_eval,
-                    y = np.linspace(0,1,N),
-                    z = X[2:, :],
-                    ))
-        fig.vs_show()
+    # X_list = [X_list[0]] # To be removed
+    # for X in X_list:
+    #     data = go.Heatmap
+    #     fig = go.Figure(data=go.Heatmap(
+    #                 x = T_eval,
+    #                 y = np.linspace(0,1,N),
+    #                 z = X[2:, :],
+    #                 ))
+    #     fig.vs_show()
 
     # # Compute observable on these files and put this new data into a dataframe
     # columns = ['Sp4', 'taus_b']

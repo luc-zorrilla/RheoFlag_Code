@@ -10,7 +10,8 @@ import multiprocessing as mp
 
 import pickle
 from pathlib import Path
-writing_path = (Path('..') / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'Callout' / 'VariableGuess')
+
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'Callout' / 'VariableGuess' / '100points')
 from datetime import datetime
 import copy
 
@@ -138,9 +139,15 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
     method = "L-BFGS-B"
     x0 = guess_variables
 
-    ### This part should be updated to save the callback data, and add it to ret
-    X = []
-    F = []
+    x = x0
+    f = func(x0)
+    # # Gradient approximation can be optionnally computed here
+    # # Hessian approximation can be optionnally computed here too
+
+    print("x0: ", x)
+    print("f(x0): ", f)
+    X = [x]
+    F = [f]
     dF = []
     H = []
     
@@ -161,7 +168,6 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
     
     minimizer_kwargs = {"method": method, "bounds": bounds, "options":{'disp': True},  "callback":callback_function}
     ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T)
-    ### 
 
     # Compute hessian at convergence point
     # m = guess_variables.shape[0]  
@@ -390,7 +396,7 @@ if __name__ == '__main__':
         stepsize = 5
         opt_args = {"niter":niter, "T":T, "stepsize":stepsize}
 
-        for Sp4_guess in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]:
+        for Sp4_guess in np.arange(2, 11):
             guess_variable_params = {"Sp4": Sp4_guess}
 
             ## Bounds
@@ -402,10 +408,10 @@ if __name__ == '__main__':
             bounds = so.Bounds(lb,  ub)
 
             # Flow field
-            m1 = 1 # 11
-            A_vec = np.array([1e-5]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
-            m2 = 1 # 11
-            w0_vec = np.array([1e-6]) # np.float_power(10, np.linspace(0, -6, num = m2)) # np.array([1e0])
+            m1 = 4 # 11
+            A_vec = np.array([1e-5, 1e-4, 1e-3, 1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
+            m2 = 7 # 11
+            w0_vec = np.array([1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1e0]) # np.float_power(10, np.linspace(0, -6, num = m2)) # np.array([1e0])
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -430,12 +436,6 @@ if __name__ == '__main__':
             mn_tot = m_tot * n_tot
             print("m_tot, n_tot, mn_tot:", m_tot, n_tot, mn_tot)
             IE_matrix = np.ones((m1,m2,m3,n1,n2,n3,n4,n5)) * np.nan
-
-            # Callout data
-            X = []
-            F = []
-            dF = []
-            H = []
 
             ## Constructing experimental data
 
