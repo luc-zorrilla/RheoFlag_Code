@@ -55,7 +55,7 @@ if __name__ == "__main__":
 
     ################################
     ## Coarse-graining parameters ##
-    N_list = [10]
+    N_list = [10, 20, 30, 40, 50]
     ################################
 
     #############################
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1,2]
+    Sp4_list = [1]
     ################
 
     ###############################
@@ -217,9 +217,9 @@ if __name__ == "__main__":
     
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
     n_A = 1
-    A_list = [1e-7] # [2.5e-3]
+    A_list = [1e-8] # [2.5e-3]
     n_w0 = 1
-    w0_list = [1e-6]
+    w0_list = [1e-10]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -238,8 +238,8 @@ if __name__ == "__main__":
     print("Setting time...")
 
     # time determined by the flow timescale
-    dT_list = [2*np.pi/w0 * (1 /1000) for w0 in w0_list]
-    T_max_list = [2*np.pi/w0 * (10) for w0 in w0_list]
+    dT_list = [2*np.pi/w0 * (1 /16) for w0 in w0_list]
+    T_max_list = [2*np.pi/w0 * (1/4) for w0 in w0_list]
 
     # Same time for all simulations
     # dT_list = [6e3 for w0 in w0_list]

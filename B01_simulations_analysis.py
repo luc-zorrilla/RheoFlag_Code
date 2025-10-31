@@ -357,7 +357,7 @@ def CheckEquilibrium(N, A, gamma, Sp4, n_L = [0,0], Lambdas=[[0,0]], conditions 
     X_eq = np.zeros((2*n_eq))
     theta_eq = np.zeros((n_eq))
 
-    X_eq[:n_eq] = np.linspace(start = 0, stop = N, num = n_eq) # Arclength
+    X_eq[:n_eq] = np.linspace(start = 0, stop = N, num = n_eq) # Arclength = horizontal position in the small amplitude regime
     x_eq_neq = N
 
     # For a vertical point force at distal end
@@ -804,11 +804,11 @@ def AnimatedTwoShapes(X, Y, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
     return fig_shapes
 
 
-def AnimatedShapes(X_list, X_flow, N, T_eval):
+def AnimatedShapes(X_list, X_flow, N, T_eval, X3N_eq = np.array(())):
     """ Plot N_s overlapping shapes stored in X_ilist.
 
     --> To be updated so that the flow is plotted in a circle with radius one.
-    --> Only show first filament at the beginning, and display legend
+    --> To be updated to show analytical result along the rest
     """
     n_decimals=1 # Number of decimals for the time slider
 
@@ -819,6 +819,11 @@ def AnimatedShapes(X_list, X_flow, N, T_eval):
         X = X_list[p]
         # Only add the first element to the layout initially.
         data_dict = go.Scatter(x=X3N(X[:,0])[:N,0], y=X3N(X[:,0])[N:2*N,0])
+        fig_dict["data"].append(data_dict)
+
+    n_eq = X3N_eq.size // 3
+    if n_eq > 0:
+        data_dict = go.Scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1], y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = "red", line_width = 2, name = "Analytical solution using (x,y)")
         fig_dict["data"].append(data_dict)
 
     # flow direction
@@ -916,14 +921,14 @@ if __name__ == '__main__':
 
     # Fetch files satisfying required conditions
 
-    sim_path = (Path(__file__).resolve().parent.parent / 'Model' / 'Output' / 'Inference_Examples' / 'VarySp4Npoints' / 'npoints_10000').resolve()
+    sim_path = (Path(__file__).resolve().parent.parent / 'Model' / 'Output' / 'Inference_Examples' / 'VarySp4Npoints' / 'npoints_4').resolve()
 
-    def metadata_condition_0(solver_dict, eps = 1e-6):
+    def metadata_condition_0(solver_dict, eps = 1e-10):
         """ This functions computes the boolean corresponding to the condition of a clamped purely bending filament, in a harmonic vertical flow. """
 
         output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
-        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("StraightLine" in init_conf) & (gamma == 2) & (np.abs(A - 1e-7) < eps) & (np.abs(w0 - 1e-6) < eps) & (np.abs(k0 - 1e13) < eps) & (method == 'BDF')
+        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("StraightLine" in init_conf) & (gamma == 2) & (np.abs(A - 1e-8) < eps) & (np.abs(w0 - 1e-10) < eps) & (np.abs(k0 - 1e13) < eps) & (method == 'BDF')
 
         return bool_condition
 
@@ -945,29 +950,19 @@ if __name__ == '__main__':
 
     # Visualize filaments
     Sp4 = 1
-    X_3_Nm1_eq = CheckEquilibrium(N-1, A, gamma, Sp4, n_L = n_L, Lambdas=Lambdas, conditions = "vertical_flow_uniform", n_eq = N-1) # Go to N-1 only to take into account clamping at the base later
-    X_3N_eq = np.zeros((3*N, 1))
-    X_3N_eq[0] = 0 # Clamped x
-    X_3N_eq[1:N] = X_3_Nm1_eq[:N-1] + 1
-    X_3N_eq[N] = 0 # Clamped y
-    X_3N_eq[N+1:2*N] = X_3_Nm1_eq[N-1:2*(N-1)] + 0
-    X_3N_eq[2*N] = 0 # Clamped theta
-    X_3N_eq[2*N+1:] = X_3_Nm1_eq[2*(N-1):]
-
-    X_Np2_eq = XNp2(X_3N_eq)
-    X_3N_eq_from_Np2 = X3N(X_Np2_eq)
+    n_eq = 100*N # N-1 # Take N-1 segments only to take into account clamping at the base later
+    X_3N_eq = CheckEquilibrium(N, A, gamma, Sp4, n_L = n_L, Lambdas=Lambdas, conditions = "vertical_flow_uniform", n_eq = n_eq) 
+    # X_Np2_eq = XNp2(X_3N_eq)
+    # X_3N_eq_from_Np2 = X3N(X_Np2_eq)
 
     # Check that equilibrium is right
     fig = go.Figure()
-    fig.add_scatter(x = X_3N_eq[:N, 0], y = X_3N_eq[N:2*N, 0], name = "Eq using x,y")
-    fig.add_scatter(x = X_3N_eq_from_Np2[:N, 0], y = X_3N_eq_from_Np2[N:2*N, 0], name = "Eq using theta")
+    fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1], y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = "red", line_width = 6, name = "Analytical solution using (x,y)")
+    # fig.add_scatter(x = X_3N_eq_from_Np2[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N, y = X_3N_eq_from_Np2[n_eq:2*n_eq,0][X_3N_eq_from_Np2[:n_eq,0]<=N-1], marker_color = "black", line_width = 6, name = "Analytical solution using theta")
     fig.vs_show()
-    
-    X_eq = X_Np2_eq.repeat(T_eval.shape[0], axis = 1)
-    X_list.append(X_eq)
 
     ## 3D animation
-    fig_anim = AnimatedShapes(X_list = X_list, X_flow = X_flow_field, N = N, T_eval = T_eval)
+    fig_anim = AnimatedShapes(X_list = X_list, X_flow = X_flow_field, N = N, T_eval = T_eval, X3N_eq = X_3N_eq)
     # fig_anim.add_scatter(x=X_3N_eq[:N], y=X_3N_eq[N:2*N], marker_color = "red", mode = "lines", name = "Analytical solution")
     fig_anim.vs_show()
 

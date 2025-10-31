@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'Callout' / 'VariableGuess' / '100points')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'QuarterPeriod')
 from datetime import datetime
 import copy
 
@@ -400,7 +400,7 @@ if __name__ == '__main__':
             guess_variable_params = {"Sp4": Sp4_guess}
 
             ## Bounds
-            eps = 1e-3
+            eps = 1e-3 # 1e-3
             bound_Sp4 = [eps, 1e3]
             # bound_tau_b = [0, 1e7]
             lb = [bound_Sp4[0]] #, bound_tau_b[0]]
@@ -408,10 +408,10 @@ if __name__ == '__main__':
             bounds = so.Bounds(lb,  ub)
 
             # Flow field
-            m1 = 4 # 11
-            A_vec = np.array([1e-5, 1e-4, 1e-3, 1e-2]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
-            m2 = 7 # 11
-            w0_vec = np.array([1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1e0]) # np.float_power(10, np.linspace(0, -6, num = m2)) # np.array([1e0])
+            m1 = 1 # 11
+            A_vec = np.array([1e-8]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
+            m2 = 1 # 11
+            w0_vec = np.array([1e-10]) # np.float_power(10, np.linspace(0, -6, num = m2)) # np.array([1e0])
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -469,8 +469,8 @@ if __name__ == '__main__':
 
                         ### Integration and time
                         method = 'BDF' # 'BDF'
-                        dT = 2*np.pi/w0 * (1/10)
-                        T_max = 2*np.pi/w0 * 10
+                        dT = 2*np.pi/w0 * (1/100)
+                        T_max = 2*np.pi/w0 * (1/4)
                         T_span = [0, T_max]
                         T_eval = [dT*i for i in range(round(T_max/dT))]
                         T_sim_max = 1*3600

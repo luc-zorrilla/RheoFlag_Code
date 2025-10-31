@@ -29,10 +29,10 @@ def d_exp(t, tau, A):
     return A*np.exp(-t/tau)
 ################################################################################
 
-temp_folder = Path.cwd().joinpath('Model').joinpath('Results').joinpath('Temp')
+temp_folder = str(Path.cwd().joinpath('Model').joinpath('Results').joinpath('Temp').resolve())
 writing_dir = temp_folder
 
-fig_nbr = 14
+fig_nbr = 1
 panel_nbr = 0
 
 ################################
@@ -140,8 +140,8 @@ if __name__ == '__main__':
         if panel_nbr in [0, 1]:
 
             id_filename = id_filenames[-1]
-            metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
-            data_filename = folder_name + 'data_' + id_filename + '.csv'
+            metadata_filename = str((folder_name / ('metadata_' + id_filename +'.json')).resolve())
+            data_filename = str((folder_name / ('data_' + id_filename + '.csv')).resolve())
             solver_dict = get_metadata(metadata_filename) 
             output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values()) # bool_EI is missing in this metadata
             X = get_data(data_filename) # s, t 
@@ -340,8 +340,8 @@ if __name__ == '__main__':
         if panel_nbr in [0, 1]:
 
             id_filename = id_filenames[-1]
-            metadata_filename = folder_name + 'metadata_' + id_filename +'.json'
-            data_filename = folder_name + 'data_' + id_filename + '.csv'
+            metadata_filename = str((folder_name / ('metadata_' + id_filename +'.json')).resolve())
+            data_filename = str((folder_name / ('data_' + id_filename + '.csv')).resolve())
             solver_dict = get_metadata(metadata_filename)
             output_folder, N, taus_b, tau_s, init_conf, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values()) # bool_EI is not present in this metadata
             X = get_data(data_filename) # s, t
