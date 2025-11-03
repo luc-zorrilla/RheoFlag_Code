@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'QuarterPeriod')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod')
 from datetime import datetime
 import copy
 
@@ -141,6 +141,7 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
 
     x = x0
     f = func(x0)
+
     # # Gradient approximation can be optionnally computed here
     # # Hessian approximation can be optionnally computed here too
 
@@ -155,30 +156,55 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
 
         x = copy.deepcopy(intermediate_result.x)
         f = intermediate_result.fun
-        # Gradient approximation can be optionnally computed here
-        # Hessian approximation can be optionnally computed here too
-                
+        
         print("xk: ", x)
         print("f(xk): ", f)
 
+        # The following quantities should not be kept, as they increase computational time and memory. They are just used for testing.
+        # jac_compute = sd.jacobian(f = vec_func, x = x, step_direction = 1, maxiter = 10) # Gradient approximation
+        # print("jac_compute:", jac_compute)
+        # hess_compute = sd.hessian(f = vec_func, x = x) # Hessian approximation
+        # print("hess_compute: ", hess_compute)     
+
         X.append(x)
         F.append(f)
+        # dF.append(g)
+        # H.append(h)
 
         return
     
     minimizer_kwargs = {"method": method, "bounds": bounds, 'jac':'3-point', "options":{'disp': True, 'finite_diff_rel_step':1e-6}, "callback":callback_function}
     # Remark: an alternative is to set jac to None and to put an absolute step size eps in the options, like eps = 1e-6 for example.
     ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T)
+    x_final = ret.x
 
-    # Compute hessian at convergence point
-    # m = guess_variables.shape[0]  
-    # vec_func = Vectorize_Functional(func, m)
-    # h = sd.hessian(f = vec_func, x = ret.x).ddf
-    # ret.setdefault('hessian', h)    
+    # Compute gradient and hessian at convergence point
+    ## Check if on boundary and choose direction of gradient approximation accordingly (Directed Backward Difference [+-1] or Central Difference [0])
+    sl, sb = bounds.residual(x_final) # Lower and upper residual between x_final and the bounds
+    if np.all(sl > 0) & np.all(sb > 0): # Within bounds
+        step_direction = 0
+    elif np.all(sl==0):
+        step_direction = 1 # Lower boundary is reached
+    elif np.all(sb==0):
+        step_direction = -1 # Upper boundary is reached
+    else:
+        raise ValueError("x_final is outside of the domain. sl, sb = ", sl, sb)
+    
+    m = guess_variables.shape[0]
+    vec_func = Vectorize_Functional(func, m)
+    g = sd.jacobian(f = vec_func, x = x_final, step_direction = step_direction).df
+    print("g = ", g)
+    ret.setdefault('jacobian', g)
+    h = sd.hessian(f = vec_func, x = x_final).ddf
+    print("h = ", h)
+    ret.setdefault('hessian', h)
+
+    # Add a check to see, when the x_final has converged to a boundary, the gradient is actually going inside the space OR towards the boundary. In the latter case, restart the minimization scheme with x_final as the initial guess. But can an optimization be performed with a guess near the boundary? Or simply add an iteration to the basin-hopping algorithn. Or a check when nit <= 2 and when on a boundary, to perform another minimization.
 
     for V in [X, F, dF, H]:
         V = np.array(V)
-    
+
+    print("return basinhopping")
     return ret, X, F, dF, H
 
 ### Inference meta-function
@@ -336,6 +362,7 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
 
     ###### Dictionary of the used function
     VI_dict = Make_Dict_From_Applied_Function(func = Viscoelastic_Inference, func_args = VI_args, func_output = [ret, X, F, dF, H])
+    print("VI_dict:", VI_dict)
 
     ###### Additional information
     VI_dict["exp_variable_params"] = exp_variable_params
@@ -397,22 +424,24 @@ if __name__ == '__main__':
         stepsize = 5
         opt_args = {"niter":niter, "T":T, "stepsize":stepsize}
 
-        for Sp4_guess in [10]:
+        for Sp4_guess in [1e1]:
             guess_variable_params = {"Sp4": Sp4_guess}
 
             ## Bounds
-            eps = 1e-3 # 1e-3
-            bound_Sp4 = [eps, 1e3]
+            Sp4_min = np.double(1e-6) # 1e-3
+            Sp4_max = np.double(1e6) # 1e3
+
+            bound_Sp4 = [Sp4_min, Sp4_max]
             # bound_tau_b = [0, 1e7]
             lb = [bound_Sp4[0]] #, bound_tau_b[0]]
             ub = [bound_Sp4[1]] #, bound_tau_b[1]]
             bounds = so.Bounds(lb,  ub)
 
             # Flow field
-            m1 = 7 # 11
-            A_vec = np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
-            m2 = 11 # 11
-            w0_vec = np.float_power(10, np.linspace(-10, 0, num = m2)) # np.array([1e-10])
+            m1 = 1 # 7
+            A_vec = np.array([1e-6]) # np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
+            m2 = 1 # 11
+            w0_vec = np.array([1e-10]) # np.float_power(10, np.linspace(-10, 0, num = m2)) # np.array([1e-10])
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -459,7 +488,7 @@ if __name__ == '__main__':
             Flow_field_filename = "" # Whether to use a measured flow field or not
 
             # Start parallel computation
-            pool = mp.Pool(mp.cpu_count() - 2)
+            pool = mp.Pool(mp.cpu_count() - 1) # - 2)
 
             for i1 in range(m1):
                 A = A_vec[i1]

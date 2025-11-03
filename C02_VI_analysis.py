@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'QuarterPeriod' / 'jac_3point')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod')
 import numpy as np
 import pandas as pd
 
@@ -30,6 +30,7 @@ if __name__ == "__main__":
     F_list = []
     dF_list = []
     H_list = []
+    H_inv_list = []
     ret_list = []
 
     filepaths = list(writing_path.glob('**/*.pkl')) # List of path of .pkl files in the writing path
@@ -58,7 +59,7 @@ if __name__ == "__main__":
         X, F, dF, H = VI_dict["output"][1:]
         for l in range(4):
             V = np.array([X, F, dF, H][l]).squeeze()
-            V_list = [X_list, F_list, dF_list, H_list][l]
+            V_list = [X_list, F_list, dF_list, H_list, H_inv_list][l]
             V_list.append(V)
 
         IE = L2_relative_error(p_inf, p_star)
@@ -97,6 +98,7 @@ if __name__ == "__main__":
     df["F"] = F_list
     df["dF"] = dF_list
     df["H"] = H_list
+    df["H_inv"] = H_inv_list
     df["ret"] = ret_list
 
     n_vars = p_inf_list[0].shape[0]
@@ -110,24 +112,24 @@ if __name__ == "__main__":
     print(df)
 
     # Select for specific external parameters
-    df_Aw0 = df[(df['A'] == 1e-5) & (df['w0'] == 1e-6)].reset_index()
+    df_Aw0 = df[(df['A'] == 1e-6) & (df['w0'] == 1e-10)].reset_index()
 
     # Combine inferred parameters
 
-    # p_combined = [] # Combine parameter estimates (using BLC function) --> Not working when selecting for specific guess!
-    # for j in range(n_vars):
-    #     Z_vector_list_j = [np.array([df["p_inf"][k][j], df["Sigma"][k][j]]) for k in range(df["p_inf"].shape[0])]
-    #     Z_combined_vector_j = BLC(Z_vector_list_j)
-    #     p_combined.append(Z_combined_vector_j)
-    # print("p_combined", p_combined)
+    p_combined = [] # Combine parameter estimates (using BLC function) --> Not working when selecting for specific guess!
+    for j in range(n_vars):
+        Z_vector_list_j = [np.array([df["p_inf"][k][j], df["Sigma"][k][j]]) for k in range(df["p_inf"].shape[0])]
+        Z_combined_vector_j = BLC(Z_vector_list_j)
+        p_combined.append(Z_combined_vector_j)
+    print("p_combined", p_combined)
 
     # Plots
 
     # Plot X, F evolution for each A, w0
-    # fig = go.Figure()
-    # fig.add_scatter(x = np.arange(len(df_Aw0["X"][0])), y = df_Aw0["X"][0], name = "X")
-    # fig.add_scatter(x = np.arange(len(df_Aw0["F"][0])), y = df_Aw0["F"][0], name = "F")
-    # fig.vs_show()
+    fig = go.Figure()
+    fig.add_scatter(x = np.arange(len(df_Aw0["X"][0])), y = df_Aw0["X"][0], name = "X")
+    fig.add_scatter(x = np.arange(len(df_Aw0["F"][0])), y = df_Aw0["F"][0], name = "F")
+    fig.vs_show()
 
     ## Plot IE heatmap for each (A, w0)-point
     fig = go.Figure(data = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = np.log10(df['IE']), colorscale = 'RdPu_r'))
