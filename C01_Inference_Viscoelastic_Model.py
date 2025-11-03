@@ -166,7 +166,8 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
 
         return
     
-    minimizer_kwargs = {"method": method, "bounds": bounds, "options":{'disp': True},  "callback":callback_function}
+    minimizer_kwargs = {"method": method, "bounds": bounds, 'jac':'3-point', "options":{'disp': True, 'finite_diff_rel_step':1e-6}, "callback":callback_function}
+    # Remark: an alternative is to set jac to None and to put an absolute step size eps in the options, like eps = 1e-6 for example.
     ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T)
 
     # Compute hessian at convergence point
@@ -396,7 +397,7 @@ if __name__ == '__main__':
         stepsize = 5
         opt_args = {"niter":niter, "T":T, "stepsize":stepsize}
 
-        for Sp4_guess in np.arange(2, 11):
+        for Sp4_guess in [10]:
             guess_variable_params = {"Sp4": Sp4_guess}
 
             ## Bounds
@@ -408,10 +409,10 @@ if __name__ == '__main__':
             bounds = so.Bounds(lb,  ub)
 
             # Flow field
-            m1 = 1 # 11
-            A_vec = np.array([1e-8]) # np.float_power(10, np.linspace(-5, 5, num = m1)) # np.array([1e-2])
-            m2 = 1 # 11
-            w0_vec = np.array([1e-10]) # np.float_power(10, np.linspace(0, -6, num = m2)) # np.array([1e0])
+            m1 = 7 # 11
+            A_vec = np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
+            m2 = 11 # 11
+            w0_vec = np.float_power(10, np.linspace(-10, 0, num = m2)) # np.array([1e-10])
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 

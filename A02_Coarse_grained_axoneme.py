@@ -41,7 +41,7 @@ if __name__ == "__main__":
     """
 
     # Folder in which simulation outputs are stored
-    output_folder = (Path(__file__).resolve().parent.parent / 'Model' / 'Output' / 'Inference_Examples' / 'VarySp4Npoints').resolve()
+    output_folder = (Path(__file__).resolve().parent.parent / 'Model' / 'Output' / 'Inference_Examples' / 'QuarterPeriod').resolve()
 
     ###########################################
     ### ----- Adimensional Parameters ----- ###
@@ -55,7 +55,7 @@ if __name__ == "__main__":
 
     ################################
     ## Coarse-graining parameters ##
-    N_list = [10, 20, 30, 40, 50]
+    N_list = [10]
     ################################
 
     #############################
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1]
+    Sp4_list = [1, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
     ################
 
     ###############################
@@ -238,7 +238,7 @@ if __name__ == "__main__":
     print("Setting time...")
 
     # time determined by the flow timescale
-    dT_list = [2*np.pi/w0 * (1 /16) for w0 in w0_list]
+    dT_list = [2*np.pi/w0 * (1 / 100) for w0 in w0_list]
     T_max_list = [2*np.pi/w0 * (1/4) for w0 in w0_list]
 
     # Same time for all simulations

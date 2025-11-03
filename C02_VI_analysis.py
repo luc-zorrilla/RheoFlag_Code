@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'QuarterPeriod' / 'Sp4min_1e-3')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_BendingViscosity_Clamped' / 'QuarterPeriod' / 'jac_3point')
 import numpy as np
 import pandas as pd
 
@@ -105,7 +105,7 @@ if __name__ == "__main__":
         df["sigma_p_inf_" + str(k_vars)] = df.apply(lambda x: x['Sigma'][k_vars], axis = 1)
 
     # Select for a specific guess
-    Sp4_guess = 1
+    Sp4_guess = 10
     df = df[df['guess'] == Sp4_guess].reset_index()
     print(df)
 
@@ -124,10 +124,10 @@ if __name__ == "__main__":
     # Plots
 
     # Plot X, F evolution for each A, w0
-    fig = go.Figure()
-    fig.add_scatter(x = np.arange(len(df_Aw0["X"][0])), y = df_Aw0["X"][0], name = "X")
-    fig.add_scatter(x = np.arange(len(df_Aw0["F"][0])), y = df_Aw0["F"][0], name = "F")
-    fig.vs_show()
+    # fig = go.Figure()
+    # fig.add_scatter(x = np.arange(len(df_Aw0["X"][0])), y = df_Aw0["X"][0], name = "X")
+    # fig.add_scatter(x = np.arange(len(df_Aw0["F"][0])), y = df_Aw0["F"][0], name = "F")
+    # fig.vs_show()
 
     ## Plot IE heatmap for each (A, w0)-point
     fig = go.Figure(data = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = np.log10(df['IE']), colorscale = 'RdPu_r'))

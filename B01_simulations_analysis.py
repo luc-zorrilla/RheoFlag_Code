@@ -921,7 +921,7 @@ if __name__ == '__main__':
 
     # Fetch files satisfying required conditions
 
-    sim_path = (Path(__file__).resolve().parent.parent / 'Model' / 'Output' / 'Inference_Examples' / 'VarySp4Npoints' / 'npoints_4').resolve()
+    sim_path = (Path(__file__).resolve().parent.parent / 'Model' / 'Output' / 'Inference_Examples' / 'QuarterPeriod').resolve()
 
     def metadata_condition_0(solver_dict, eps = 1e-10):
         """ This functions computes the boolean corresponding to the condition of a clamped purely bending filament, in a harmonic vertical flow. """
@@ -938,10 +938,15 @@ if __name__ == '__main__':
     print(ids_list[0])
     
     X_list = []
+    metadata_list = []
     for base_id in ids_list:
         data_file = str(sim_path / ('data_' + base_id + '.csv'))
+        metadata_file = str(sim_path / ('metadata_' + base_id + '.json'))
         X = get_data(data_file)
+        metadata = get_metadata(metadata_file)
+        
         X_list.append(X)
+        metadata_list.append(metadata)
 
     metadata_file = str(sim_path / ('metadata_' + base_id + '.json'))
     solver_dict = get_metadata(metadata_file)
@@ -956,16 +961,22 @@ if __name__ == '__main__':
     # X_3N_eq_from_Np2 = X3N(X_Np2_eq)
 
     # Check that equilibrium is right
-    fig = go.Figure()
-    fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1], y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = "red", line_width = 6, name = "Analytical solution using (x,y)")
+    # fig = go.Figure()
+    # fig.add_scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1], y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = "red", line_width = 6, name = "Analytical solution using (x,y)")
     # fig.add_scatter(x = X_3N_eq_from_Np2[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N, y = X_3N_eq_from_Np2[n_eq:2*n_eq,0][X_3N_eq_from_Np2[:n_eq,0]<=N-1], marker_color = "black", line_width = 6, name = "Analytical solution using theta")
-    fig.vs_show()
+    # fig.vs_show()
 
     ## 3D animation
     fig_anim = AnimatedShapes(X_list = X_list, X_flow = X_flow_field, N = N, T_eval = T_eval, X3N_eq = X_3N_eq)
     # fig_anim.add_scatter(x=X_3N_eq[:N], y=X_3N_eq[N:2*N], marker_color = "red", mode = "lines", name = "Analytical solution")
     fig_anim.vs_show()
 
+    m2 = X_list[0]
+    disc_vec = [(np.linalg.norm(m1 - m2) / np.linalg.norm(m2))**2 for m1 in X_list[1:]]
+
+    fig = go.Figure()
+    fig.add_scatter(x = [metadata["Sp4"] for metadata in metadata_list[1:]], y = disc_vec)
+    fig.vs_show()
     ## 2D heatmap plot
     # X_list = [X_list[0]] # To be removed
     # for X in X_list:
