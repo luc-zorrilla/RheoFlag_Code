@@ -111,7 +111,7 @@ def LBFGSB_Scheme(func, guess_variables, bounds):
     """ TO BE COMPLETED """
     return
 
-def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, stepsize = 5):
+def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, stepsize = 5, eps = 1e-8, jac = '3-point', finite_diff_rel_step = 1e-6, minimum_gradient = False, minimum_hessian = False):
     """
     This function aims at minimizing a functional func given an initial guess guess_params and a bound bounds.
     For that, it uses 
@@ -131,6 +131,10 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         - T: temperature of the basin-hopping algorithm, corresponding to the temperature of the metropolis algorithm for acceptance of a step. 
         If T = 0, then steps are only accepted if they minimize the functional.
         - stepsize: the maximum stepsize for the algorithm to randomly vary parameters.
+        - eps:scipyu
+        - jac:
+        - finite_diff_rel_step:
+        - compute_all_minimum:
 
     Outputs: 
         - ret is a Batch object containing all information resulting from the basinhopping algorithm -- including callbacks (still to be added).
@@ -149,8 +153,6 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
     print("f(x0): ", f)
     X = [x]
     F = [f]
-    dF = []
-    H = []
     
     def callback_function(*, intermediate_result): # The star forces intermediate_result as a keyword argument
 
@@ -168,12 +170,10 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
 
         X.append(x)
         F.append(f)
-        # dF.append(g)
-        # H.append(h)
 
         return
-    
-    minimizer_kwargs = {"method": method, "bounds": bounds, 'jac':'3-point', "options":{'disp': True, 'finite_diff_rel_step':1e-6}, "callback":callback_function}
+
+    minimizer_kwargs = {"method": method, "bounds": bounds, 'jac':jac, "options":{'disp': True, 'eps': eps, 'finite_diff_rel_step':finite_diff_rel_step}, "callback":callback_function}
     # Remark: an alternative is to set jac to None and to put an absolute step size eps in the options, like eps = 1e-6 for example.
     ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T)
     x_final = ret.x
@@ -190,22 +190,24 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
     else:
         raise ValueError("x_final is outside of the domain. sl, sb = ", sl, sb)
     
-    m = guess_variables.shape[0]
-    vec_func = Vectorize_Functional(func, m)
-    g = sd.jacobian(f = vec_func, x = x_final, step_direction = step_direction).df
-    print("g = ", g)
-    ret.setdefault('jacobian', g)
-    h = sd.hessian(f = vec_func, x = x_final).ddf
-    print("h = ", h)
-    ret.setdefault('hessian', h)
+    if minimum_gradient or minimum_hessian:
+        m = guess_variables.shape[0]
+        vec_func = Vectorize_Functional(func, m)
+        if minimum_gradient:
+            g = sd.jacobian(f = vec_func, x = x_final, step_direction = step_direction).df
+            print("Final gradient = ", g)
+            ret.setdefault('jacobian', g)
+        if minimum_hessian:
+            h = sd.hessian(f = vec_func, x = x_final).ddf
+            print("h = ", h)
+            ret.setdefault('hessian', h)
 
     # Add a check to see, when the x_final has converged to a boundary, the gradient is actually going inside the space OR towards the boundary. In the latter case, restart the minimization scheme with x_final as the initial guess. But can an optimization be performed with a guess near the boundary? Or simply add an iteration to the basin-hopping algorithn. Or a check when nit <= 2 and when on a boundary, to perform another minimization.
 
-    for V in [X, F, dF, H]:
+    for V in [X, F]:
         V = np.array(V)
 
-    print("return basinhopping")
-    return ret, X, F, dF, H
+    return ret, X, F
 
 ### Inference meta-function
 
@@ -277,7 +279,7 @@ def Infer(fixed_params, guess_variable_params, bounds, functional, opt_scheme, o
     
     # Minimize functional
     guess_variables = np.array(list(guess_variable_params.values()))
-    res, X, F, dF, H = opt_scheme(func = red_func, guess_variables = guess_variables, bounds = bounds, **opt_args)
+    res, X, F = opt_scheme(func = red_func, guess_variables = guess_variables, bounds = bounds, **opt_args)
 
     # Transform back np.ndarray inferred variables into dictionary
     inferred_variables = res.x
@@ -287,7 +289,7 @@ def Infer(fixed_params, guess_variable_params, bounds, functional, opt_scheme, o
         inferred_variable_params[key] = inferred_variables[k]
     res.x = inferred_variable_params
 
-    return res, X, F, dF, H
+    return res, X, F
 
 ### Inference for model-experiment optimization
 def ModelExp_Inference(exp_data, model, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args):
@@ -321,9 +323,9 @@ def ModelExp_Inference(exp_data, model, fixed_params, guess_variable_params, bou
     modelexpdisc_func = Make_Modelexpdisc_Func(disc_func = disc_func, exp_data = exp_data)
     modeldisc_func = Make_Model_Functional(model = model, model_disc_func = modelexpdisc_func)
     
-    res, X, F, dF, H = Infer(fixed_params = fixed_params, guess_variable_params = guess_variable_params, bounds = bounds, functional = modeldisc_func, opt_scheme = opt_scheme, opt_args=opt_args)
+    res, X, F = Infer(fixed_params = fixed_params, guess_variable_params = guess_variable_params, bounds = bounds, functional = modeldisc_func, opt_scheme = opt_scheme, opt_args=opt_args)
     
-    return res, X, F, dF, H
+    return res, X, F
 
 ### Inference for the viscoelastic model
 def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args):
@@ -353,7 +355,7 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
     ### Compute filament and inference
     exp_data = Viscoelastic_Model(exp_params)
     VI_args = dict(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
-    ret, X, F, dF, H = Viscoelastic_Inference(**VI_args)
+    ret, X, F = Viscoelastic_Inference(**VI_args)
 
     ## Inference results
 
@@ -361,8 +363,7 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
     #### Make dictionary with all relevant information
 
     ###### Dictionary of the used function
-    VI_dict = Make_Dict_From_Applied_Function(func = Viscoelastic_Inference, func_args = VI_args, func_output = [ret, X, F, dF, H])
-    print("VI_dict:", VI_dict)
+    VI_dict = Make_Dict_From_Applied_Function(func = Viscoelastic_Inference, func_args = VI_args, func_output = [ret, X, F])
 
     ###### Additional information
     VI_dict["exp_variable_params"] = exp_variable_params
@@ -419,10 +420,15 @@ if __name__ == '__main__':
 
         ## Optimization schemes and arguments
         opt_scheme = Basinhopping_LBFGSB_Scheme
-        niter = 0
-        T = 0
-        stepsize = 5
-        opt_args = {"niter":niter, "T":T, "stepsize":stepsize}
+        niter = 0 # number of iterations - 1 of the local minimizer in the Basin-hopping algorithm
+        T = 0 # Temperature of the Basin-hopping algorithm
+        stepsize = 5 # Step size of the Basin-hopping algorithm
+        jac = '3-point'
+        eps = 1e-8
+        finite_diff_rel_step = 1e-6
+        minimum_gradient = False # Whether to compute gradient at found minimum
+        minimum_hessian = False # Whether to compute gradient at found minimum
+        opt_args = {"niter":niter, "T":T, "stepsize":stepsize, 'jac':jac, "eps":eps, "finite_diff_rel_step":finite_diff_rel_step, "minimum_gradient":minimum_gradient, "minimum_hessian":minimum_hessian}
 
         for Sp4_guess in [1e1]:
             guess_variable_params = {"Sp4": Sp4_guess}
@@ -438,10 +444,10 @@ if __name__ == '__main__':
             bounds = so.Bounds(lb,  ub)
 
             # Flow field
-            m1 = 1 # 7
-            A_vec = np.array([1e-6]) # np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
-            m2 = 1 # 11
-            w0_vec = np.array([1e-10]) # np.float_power(10, np.linspace(-10, 0, num = m2)) # np.array([1e-10])
+            m1 = 7 # 7
+            A_vec = np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
+            m2 = 11 # 11
+            w0_vec = np.float_power(10, np.linspace(-10, 0, num = m2)) # np.array([1e-10])
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 

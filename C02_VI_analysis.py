@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod' / 'Sp4min_1e-6')
 import numpy as np
 import pandas as pd
 
@@ -56,10 +56,10 @@ if __name__ == "__main__":
         p_inf = np.array(list(inferred_variable_params.values()))
         guess = np.array(list(guess_variable_params.values()))
 
-        X, F, dF, H = VI_dict["output"][1:]
-        for l in range(4):
-            V = np.array([X, F, dF, H][l]).squeeze()
-            V_list = [X_list, F_list, dF_list, H_list, H_inv_list][l]
+        X, F = VI_dict["output"][1:]
+        for l in range(2):
+            V = np.array([X, F][l]).squeeze()
+            V_list = [X_list, F_list][l]
             V_list.append(V)
 
         IE = L2_relative_error(p_inf, p_star)
@@ -96,9 +96,6 @@ if __name__ == "__main__":
     df["Sigma"] = df.apply(lambda x: np.sqrt(np.diag(x["Hm1"])), axis = 1)
     df["X"] = X_list
     df["F"] = F_list
-    df["dF"] = dF_list
-    df["H"] = H_list
-    df["H_inv"] = H_inv_list
     df["ret"] = ret_list
 
     n_vars = p_inf_list[0].shape[0]
