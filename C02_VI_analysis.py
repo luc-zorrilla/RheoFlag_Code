@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod' / 'Sp4min_1e-6')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod')
 import numpy as np
 import pandas as pd
 
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     H_inv_list = []
     ret_list = []
 
-    filepaths = list(writing_path.glob('**/*.pkl')) # List of path of .pkl files in the writing path
+    filepaths = list(writing_path.glob('*.pkl')) # List of path of .pkl files in the writing path
     filenames = [str(filepath.resolve()) for filepath in filepaths] # Convert to strings in the corresponding OS
     print("filenames:", len(filenames))
 
@@ -109,7 +109,7 @@ if __name__ == "__main__":
     print(df)
 
     # Select for specific external parameters
-    df_Aw0 = df[(df['A'] == 1e-6) & (df['w0'] == 1e-10)].reset_index()
+    df_Aw0 = df[(df['A'] == 1e-7) & (df['w0'] == 1e-10)].reset_index()
 
     # Combine inferred parameters
 

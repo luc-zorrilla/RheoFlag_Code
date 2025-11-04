@@ -146,9 +146,6 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
     x = x0
     f = func(x0)
 
-    # # Gradient approximation can be optionnally computed here
-    # # Hessian approximation can be optionnally computed here too
-
     print("x0: ", x)
     print("f(x0): ", f)
     X = [x]
@@ -162,36 +159,33 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         print("xk: ", x)
         print("f(xk): ", f)
 
-        # The following quantities should not be kept, as they increase computational time and memory. They are just used for testing.
-        # jac_compute = sd.jacobian(f = vec_func, x = x, step_direction = 1, maxiter = 10) # Gradient approximation
-        # print("jac_compute:", jac_compute)
-        # hess_compute = sd.hessian(f = vec_func, x = x) # Hessian approximation
-        # print("hess_compute: ", hess_compute)     
-
         X.append(x)
         F.append(f)
 
         return
 
     minimizer_kwargs = {"method": method, "bounds": bounds, 'jac':jac, "options":{'disp': True, 'eps': eps, 'finite_diff_rel_step':finite_diff_rel_step}, "callback":callback_function}
-    # Remark: an alternative is to set jac to None and to put an absolute step size eps in the options, like eps = 1e-6 for example.
     ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T)
+    
     x_final = ret.x
-
-    # Compute gradient and hessian at convergence point
+    for V in [X, F]:
+        V = np.array(V)
+    
     ## Check if on boundary and choose direction of gradient approximation accordingly (Directed Backward Difference [+-1] or Central Difference [0])
     sl, sb = bounds.residual(x_final) # Lower and upper residual between x_final and the bounds
-    if np.all(sl > 0) & np.all(sb > 0): # Within bounds
-        step_direction = 0
-    elif np.all(sl==0):
+    if np.all(sl==0):
         step_direction = 1 # Lower boundary is reached
     elif np.all(sb==0):
-        step_direction = -1 # Upper boundary is reached
+        step_direction = -1 # Upper boundary is reached        
+    elif np.all(sl >= 0) & np.all(sb >= 0): # Within domain
+        step_direction = 0
     else:
+        step_direction = np.inf
         raise ValueError("x_final is outside of the domain. sl, sb = ", sl, sb)
     
+    # Compute gradient and hessian at convergence point
     if minimum_gradient or minimum_hessian:
-        m = guess_variables.shape[0]
+        m = guess_variables.shape[0] # number of variables
         vec_func = Vectorize_Functional(func, m)
         if minimum_gradient:
             g = sd.jacobian(f = vec_func, x = x_final, step_direction = step_direction).df
@@ -202,10 +196,28 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
             print("h = ", h)
             ret.setdefault('hessian', h)
 
-    # Add a check to see, when the x_final has converged to a boundary, the gradient is actually going inside the space OR towards the boundary. In the latter case, restart the minimization scheme with x_final as the initial guess. But can an optimization be performed with a guess near the boundary? Or simply add an iteration to the basin-hopping algorithn. Or a check when nit <= 2 and when on a boundary, to perform another minimization.
+    # # When the x_final has converged to a boundary with nit = 1 of the local optimization algorithm, perform another minimization
+    # not_within_domain = (np.abs(step_direction) > 0) # If boundary is reached
+    # rel_eps_bound = 1e-5
+    # if not_within_domain:
+    #     if ret['lowest_optimization_result']['nit'] == 1: # If boundary is reached in one iteration of the local algorithm
+    #         while not_within_domain:
+    #             new_guess_variables = x_final + np.multiply(np.ones((m,)), np.abs(x_final)) * (rel_eps_bound)**(-step_direction) * step_direction # Increment slightly from the boundary to within the domain
+    #             sl, sb = bounds.residual(new_guess_variables)
+    #             if np.all(sl==0):
+    #                 new_step_direction = 1 # Lower boundary is reached
+    #             elif np.all(sb==0):
+    #                 new_step_direction = -1 # Upper boundary is reached        
+    #             elif np.all(sl >= 0) & np.all(sb >= 0): # Within domain
+    #                 new_step_direction = 0
+    #             else:
+    #                 new_step_direction = np.inf               
+    #             not_within_domain = (np.abs(new_step_direction) > 0)
+    #             rel_eps_bound *= 10
 
-    for V in [X, F]:
-        V = np.array(V)
+    #         return Basinhopping_LBFGSB_Scheme(func=func, guess_variables=new_guess_variables, bounds=bounds, niter=niter, T=T, stepsize=stepsize, eps=eps, jac=jac, finite_diff_rel_step=finite_diff_rel_step, minimum_gradient=minimum_gradient, minimum_hessian=minimum_hessian)        
+        # else: # Otherwise the minimization returns a boundary of the domain
+        #     pass
 
     return ret, X, F
 
@@ -420,8 +432,8 @@ if __name__ == '__main__':
 
         ## Optimization schemes and arguments
         opt_scheme = Basinhopping_LBFGSB_Scheme
-        niter = 0 # number of iterations - 1 of the local minimizer in the Basin-hopping algorithm
-        T = 0 # Temperature of the Basin-hopping algorithm
+        niter = 10 # number of iterations - 1 of the local minimizer in the Basin-hopping algorithm
+        T = 0 # Temperature of the Basin-hopping algorithm. If T=0, only steps minimizing energy are accepted (apparently not...).
         stepsize = 5 # Step size of the Basin-hopping algorithm
         jac = '3-point'
         eps = 1e-8
@@ -444,10 +456,10 @@ if __name__ == '__main__':
             bounds = so.Bounds(lb,  ub)
 
             # Flow field
-            m1 = 7 # 7
-            A_vec = np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
-            m2 = 11 # 11
-            w0_vec = np.float_power(10, np.linspace(-10, 0, num = m2)) # np.array([1e-10])
+            m1 = 1 # 7
+            A_vec = np.array([1e-7]) # np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
+            m2 = 1 # 11
+            w0_vec = np.array([1e-10]) # np.float_power(10, np.linspace(-10, 0, num = m2)) # np.array([1e-10])
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -494,7 +506,7 @@ if __name__ == '__main__':
             Flow_field_filename = "" # Whether to use a measured flow field or not
 
             # Start parallel computation
-            pool = mp.Pool(mp.cpu_count() - 1) # - 2)
+            pool = mp.Pool(mp.cpu_count()) # - 2)
 
             for i1 in range(m1):
                 A = A_vec[i1]
