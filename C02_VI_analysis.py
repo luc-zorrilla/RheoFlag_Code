@@ -26,11 +26,11 @@ if __name__ == "__main__":
     guess_list = []
     IE_list = []
     Hm1_list = []
-    X_list = []
-    F_list = []
-    dF_list = []
-    H_list = []
-    H_inv_list = []
+    X_local_list = []
+    F_local_list = []
+    X_global_list = []
+    F_global_list = []
+    accept_global_list = []
     ret_list = []
 
     filepaths = list(writing_path.glob('*.pkl')) # List of path of .pkl files in the writing path
@@ -56,10 +56,10 @@ if __name__ == "__main__":
         p_inf = np.array(list(inferred_variable_params.values()))
         guess = np.array(list(guess_variable_params.values()))
 
-        X, F = VI_dict["output"][1:]
+        X_local, F_local, X_global, F_global, accept_global = VI_dict["output"][1:]
         for l in range(2):
-            V = np.array([X, F][l]).squeeze()
-            V_list = [X_list, F_list][l]
+            V = np.array([X_local, F_local, X_global, F_global, accept_global][l]).squeeze()
+            V_list = [X_local_list, F_local_list, X_global_list, F_global_list, accept_global_list][l]
             V_list.append(V)
 
         IE = L2_relative_error(p_inf, p_star)
@@ -94,8 +94,8 @@ if __name__ == "__main__":
     df["IE"] = IE_list
     df["Hm1"] = Hm1_list # Covariance matrix
     df["Sigma"] = df.apply(lambda x: np.sqrt(np.diag(x["Hm1"])), axis = 1)
-    df["X"] = X_list
-    df["F"] = F_list
+    for key in ["X_local", "F_local", "X_global", "F_global", "accept_global"]:
+        df[key] = eval(key + "_list")
     df["ret"] = ret_list
 
     n_vars = p_inf_list[0].shape[0]
@@ -124,8 +124,9 @@ if __name__ == "__main__":
 
     # Plot X, F evolution for each A, w0
     fig = go.Figure()
-    fig.add_scatter(x = np.arange(len(df_Aw0["X"][0])), y = df_Aw0["X"][0], name = "X")
-    fig.add_scatter(x = np.arange(len(df_Aw0["F"][0])), y = df_Aw0["F"][0], name = "F")
+    for k_global in range(len(df_Aw0["X_global"][0])):
+        fig.add_scatter(x = np.arange(len(df_Aw0["X_local"][0][k_global])), y = df_Aw0["X_local"][0][k_global], name = "X for k = " + str(k_global))
+        fig.add_scatter(x = np.arange(len(df_Aw0["F_local"][0][k_global])), y = df_Aw0["F_local"][0][k_global], name = "F for k = " + str(k_global))
     fig.vs_show()
 
     ## Plot IE heatmap for each (A, w0)-point

@@ -144,31 +144,48 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
     x0 = guess_variables
 
     x = x0
-    f = func(x0)
-
+    f0 = func(x0)
     print("x0: ", x)
-    print("f(x0): ", f)
-    X = [x]
-    F = [f]
+    print("f(x0): ", f0)
     
-    def callback_function(*, intermediate_result): # The star forces intermediate_result as a keyword argument
-
+    X_local = [[x0]]
+    F_local = [[f0]]
+    def local_callback_function(*, intermediate_result): # The star forces intermediate_result as a keyword argument
+        """ Callback function for the local minimizer, i.e., the L-BFGS-B algorithm. """
         x = copy.deepcopy(intermediate_result.x)
         f = intermediate_result.fun
-        
-        print("xk: ", x)
-        print("f(xk): ", f)
 
-        X.append(x)
-        F.append(f)
+        X_local[-1].append(x)
+        F_local[-1].append(f)
+
+        k = len(X_local[-1]) - 1
+        print("L-BFGS-B: (k, xk, f(xk)):", k, x, f)
 
         return
 
-    minimizer_kwargs = {"method": method, "bounds": bounds, 'jac':jac, "options":{'disp': True, 'eps': eps, 'finite_diff_rel_step':finite_diff_rel_step}, "callback":callback_function}
-    ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T)
+    X_global = []
+    F_global = []
+    accept_global = []
+    def global_callback_function(x,f,accept):
+        """ Callback function for the global minimizer, i.e., the basin-hopping algorithm. """
+
+        x = copy.deepcopy(x)
+        X_global.append(x)
+        F_global.append(f)
+        accept_global.append(accept)
+
+        X_local.append([])
+        F_local.append([])
+
+        k = len(X_global) - 1
+        print("Basin-hopping: (k,x_k,f_k,accept_k):", k, x, f, accept)
+        return
+
+    minimizer_kwargs = {"method": method, "bounds": bounds, 'jac':jac, "options":{'disp': True, 'eps': eps, 'finite_diff_rel_step':finite_diff_rel_step}, "callback":local_callback_function}
+    ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T, callback = global_callback_function)
     
     x_final = ret.x
-    for V in [X, F]:
+    for V in [X_local, F_local, X_global, F_global, accept_global]:
         V = np.array(V)
     
     ## Check if on boundary and choose direction of gradient approximation accordingly (Directed Backward Difference [+-1] or Central Difference [0])
@@ -219,7 +236,7 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         # else: # Otherwise the minimization returns a boundary of the domain
         #     pass
 
-    return ret, X, F
+    return ret, X_local, F_local, X_global, F_global, accept_global
 
 ### Inference meta-function
 
@@ -291,7 +308,7 @@ def Infer(fixed_params, guess_variable_params, bounds, functional, opt_scheme, o
     
     # Minimize functional
     guess_variables = np.array(list(guess_variable_params.values()))
-    res, X, F = opt_scheme(func = red_func, guess_variables = guess_variables, bounds = bounds, **opt_args)
+    res, X_local, F_local, X_global, F_global, accept_global = opt_scheme(func = red_func, guess_variables = guess_variables, bounds = bounds, **opt_args)
 
     # Transform back np.ndarray inferred variables into dictionary
     inferred_variables = res.x
@@ -301,7 +318,7 @@ def Infer(fixed_params, guess_variable_params, bounds, functional, opt_scheme, o
         inferred_variable_params[key] = inferred_variables[k]
     res.x = inferred_variable_params
 
-    return res, X, F
+    return res, X_local, F_local, X_global, F_global, accept_global
 
 ### Inference for model-experiment optimization
 def ModelExp_Inference(exp_data, model, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args):
@@ -335,9 +352,9 @@ def ModelExp_Inference(exp_data, model, fixed_params, guess_variable_params, bou
     modelexpdisc_func = Make_Modelexpdisc_Func(disc_func = disc_func, exp_data = exp_data)
     modeldisc_func = Make_Model_Functional(model = model, model_disc_func = modelexpdisc_func)
     
-    res, X, F = Infer(fixed_params = fixed_params, guess_variable_params = guess_variable_params, bounds = bounds, functional = modeldisc_func, opt_scheme = opt_scheme, opt_args=opt_args)
+    res, X_local, F_local, X_global, F_global, accept_global = Infer(fixed_params = fixed_params, guess_variable_params = guess_variable_params, bounds = bounds, functional = modeldisc_func, opt_scheme = opt_scheme, opt_args=opt_args)
     
-    return res, X, F
+    return res, X_local, F_local, X_global, F_global, accept_global
 
 ### Inference for the viscoelastic model
 def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args):
@@ -367,7 +384,7 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
     ### Compute filament and inference
     exp_data = Viscoelastic_Model(exp_params)
     VI_args = dict(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
-    ret, X, F = Viscoelastic_Inference(**VI_args)
+    ret, X_local, F_local, X_global, F_global, accept_global = Viscoelastic_Inference(**VI_args)
 
     ## Inference results
 
@@ -375,7 +392,7 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
     #### Make dictionary with all relevant information
 
     ###### Dictionary of the used function
-    VI_dict = Make_Dict_From_Applied_Function(func = Viscoelastic_Inference, func_args = VI_args, func_output = [ret, X, F])
+    VI_dict = Make_Dict_From_Applied_Function(func = Viscoelastic_Inference, func_args = VI_args, func_output = [ret, X_local, F_local, X_global, F_global, accept_global])
 
     ###### Additional information
     VI_dict["exp_variable_params"] = exp_variable_params
@@ -457,9 +474,9 @@ if __name__ == '__main__':
 
             # Flow field
             m1 = 1 # 7
-            A_vec = np.array([1e-7]) # np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
+            A_vec = np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
             m2 = 1 # 11
-            w0_vec = np.array([1e-10]) # np.float_power(10, np.linspace(-10, 0, num = m2)) # np.array([1e-10])
+            w0_vec = np.float_power(10, np.linspace(-10, 0, num = m2)) # np.array([1e-10])
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
