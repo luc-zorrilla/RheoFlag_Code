@@ -108,11 +108,6 @@ def Vectorize_Functional(func, m):
 
 ### Optimization schemes
 
-def LBFGSB_Scheme(func, guess_variables, bounds):
-    """ TO BE COMPLETED """
-    return
-
-
 class RandomDisplacementBounds(object):
     """random displacement with bounds:  see: https://stackoverflow.com/a/21967888/2320035
         Modified! (dropped acceptance-rejection sampling for a more specialized approach)
@@ -553,7 +548,7 @@ if __name__ == '__main__':
                         ### Integration and time
                         method = 'BDF' # 'BDF'
                         dT = 2*np.pi/w0 * (1/100)
-                        T_max = 2*np.pi/w0 * (1/4) # ( 10 )
+                        T_max = 2*np.pi/w0 * ( 10 )
                         T_span = [0, T_max]
                         T_eval = [dT*i for i in range(round(T_max/dT))]
                         T_sim_max = 1*3600

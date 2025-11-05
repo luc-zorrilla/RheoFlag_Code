@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod' / 'wrapped_minimize')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod')
 import numpy as np
 import pandas as pd
 
@@ -59,13 +59,13 @@ if __name__ == "__main__":
         X_local, F_local, X_global, F_global, accept_global = VI_dict["output"][1:]
         for l in range(len(VI_dict["output"][1:])):
             V = [X_local, F_local, X_global, F_global, accept_global][l] # This will need to be changed to take into account the fact that X_local is a list of arrays. The easiest would be to concatenate it and now where it should be divided, or to turn it into a list of arrays for real
-            if V in [X_global, F_global]:
+            if l in [2,3]:
                 V = np.array(V).squeeze()
             V_list = [X_local_list, F_local_list, X_global_list, F_global_list, accept_global_list][l]
             V_list.append(V)
 
         IE = L2_relative_error(p_inf, p_star)
-        Hm1 = ret['lowest_optimization_result']['hess_inv']
+        Hm1 = ret['lowest_optimization_result']['hess_inv'].todense()
         if not ret['success']: # If convergence failed, error is infinite
             Hm1 = np.ones_like(Hm1) * np.inf
 
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     print(df)
 
     # Select for specific external parameters
-    df_Aw0 = df[(df['A'] == 1e-8) & (df['w0'] == 1e-10)].reset_index()
+    df_Aw0 = df[(df['A'] == 1e-7) & (df['w0'] == 1e-10)].reset_index()
 
     # Combine inferred parameters
 
@@ -127,8 +127,9 @@ if __name__ == "__main__":
     # Plot X, F evolution for each A, w0
     ## Evolution of the global optimizer (showing successive minima)
     fig = go.Figure()
-    fig.add_scatter(x = np.arange(len(df_Aw0["X_global"][0])), y = df_Aw0["X_global"][0], name = "Global X")
-    fig.add_scatter(x = np.arange(len(df_Aw0["F_global"][0])), y = df_Aw0["F_global"][0], name = "Global F")
+    fig.add_scatter(x = df_Aw0["X_global"][0], y = df_Aw0["F_global"][0], name = "Global (X,F)", mode = "markers")
+    fig.update_xaxes(title = "X")
+    fig.update_xaxes(title = "F(X)")
     fig.vs_show()
 
     ## Evolution of local optimizers
