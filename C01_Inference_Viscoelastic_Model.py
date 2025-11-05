@@ -111,7 +111,7 @@ def LBFGSB_Scheme(func, guess_variables, bounds):
     """ TO BE COMPLETED """
     return
 
-def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, stepsize = 5, eps = 1e-8, jac = '3-point', finite_diff_rel_step = 1e-6, minimum_gradient = False, minimum_hessian = False):
+def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, stepsize = 5, tol = 1e-10, eps = 1e-8, jac = '3-point', finite_diff_rel_step = 1e-6, minimum_gradient = False, minimum_hessian = False):
     """
     This function aims at minimizing a functional func given an initial guess guess_params and a bound bounds.
     For that, it uses 
@@ -131,7 +131,8 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         - T: temperature of the basin-hopping algorithm, corresponding to the temperature of the metropolis algorithm for acceptance of a step. 
         If T = 0, then steps are only accepted if they minimize the functional.
         - stepsize: the maximum stepsize for the algorithm to randomly vary parameters.
-        - eps:scipyu
+        - tol: tolerance for the basin-hopping algorithm, using the global callback function
+        - eps:
         - jac:
         - finite_diff_rel_step:
         - compute_all_minimum:
@@ -180,21 +181,12 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         k = len(X_global) - 1
         print("Basin-hopping: (k,x_k,f_k,accept_k):", k, x, f, accept)
 
-        # Add test here with tolerance so as to stop the algorithm: return True to stop.
-        # global eps_tol
+        # Stop if functional is lower than a tolerance threshold
+        if f < tol:
+            return True
         return
 
-    def local_wrapper(method = method, func = func):
-        """ Wrapper of the local minimizer to return x0, f0 for each call of the method. """
-        
-        def wrapped_method(x0, **args):
-            x = copy.deepcopy(x0)
-            X_local[-1].append(x)
-            F_local[-1].append(func(x))
-            return method(x0, **args)
-        return wrapped_method
-
-    minimizer_kwargs = {"method": method, "bounds": bounds, 'jac':jac, "options":{'disp': True, 'eps': eps, 'finite_diff_rel_step':finite_diff_rel_step}, "callback":local_callback_function}
+    minimizer_kwargs = {"method": method, 'jac':jac, "bounds": bounds, "options":{'disp': True ,'eps': eps, 'finite_diff_rel_step':finite_diff_rel_step}, "callback":local_callback_function}
     ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T, callback = global_callback_function)
     
     x_final = ret.x
@@ -463,9 +455,9 @@ if __name__ == '__main__':
             bounds = so.Bounds(lb,  ub)
 
             # Flow field
-            m1 = 7 # 7
+            m1 = 1 # 7
             A_vec = np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
-            m2 = 11 # 11
+            m2 = 1 # 11
             w0_vec = np.float_power(10, np.linspace(-10, 0, num = m2)) # np.array([1e-10])
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
