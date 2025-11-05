@@ -714,7 +714,7 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
     # start main iteration loop
     count, i = 0, 0
     message = ["requested number of basinhopping iterations completed"
-               " successfully"]
+            " successfully"]
     for i in range(niter):
         new_global_min = bh.one_cycle()
 

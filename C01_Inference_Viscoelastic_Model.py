@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'MultiplePeriods')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod')
 from datetime import datetime
 import copy
 
@@ -130,7 +130,7 @@ class RandomDisplacementBounds(object):
 
         return xnew
 
-def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, stepsize = 5, tol = 1e-10, eps = 1e-8, jac = '3-point', finite_diff_rel_step = 1e-6, minimum_gradient = False, minimum_hessian = False):
+def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, stepsize = 5, tol = 1e-8, ftol = 1e-8, gtol = 1e-8, eps = 1e-8, jac = '3-point', finite_diff_rel_step = 1e-6, minimum_gradient = False, minimum_hessian = False):
     """
     This function aims at minimizing a functional func given an initial guess guess_params and a bound bounds.
     For that, it uses 
@@ -214,7 +214,7 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         return
     
     # Local minimizer arguments
-    minimizer_kwargs = {"method": method, 'jac':jac, "bounds": bounds, "options":{'disp': True ,'eps': eps, 'finite_diff_rel_step':finite_diff_rel_step}, "callback":local_callback_function}
+    minimizer_kwargs = {"method": method, 'jac':jac, "bounds": bounds, "options":{'disp': True ,'ftol':ftol, 'gtol':gtol, 'eps': eps, 'finite_diff_rel_step':finite_diff_rel_step}, "callback":local_callback_function}
     
     # Global minimizer arguments
     bounded_step = RandomDisplacementBounds(bounds)
@@ -467,10 +467,14 @@ if __name__ == '__main__':
         stepsize = 5 # Step size of the Basin-hopping algorithm
         jac = '3-point'
         eps = 1e-8
-        finite_diff_rel_step = 1e-6
+        tol = 1e-8 # Tolerance threshold for the basin-hopping algorithm
+
+        ftol = 1e-8 # Tolerance functional threshold for the local minimizer
+        gtol = 1e-8 # Tolerance gradient threshold for the local minimizer        
+        finite_diff_rel_step = 1e-6 # Maximum step size for finite difference calculation of the gradient
         minimum_gradient = False # Whether to compute gradient at found minimum
         minimum_hessian = False # Whether to compute gradient at found minimum
-        opt_args = {"niter":niter, "T":T, "stepsize":stepsize, 'jac':jac, "eps":eps, "finite_diff_rel_step":finite_diff_rel_step, "minimum_gradient":minimum_gradient, "minimum_hessian":minimum_hessian}
+        opt_args = {"niter":niter, "T":T, "stepsize":stepsize, 'jac':jac, "ftol":ftol, "gtol":gtol, "eps":eps, "finite_diff_rel_step":finite_diff_rel_step, "minimum_gradient":minimum_gradient, "minimum_hessian":minimum_hessian, 'tol':tol}
 
         for Sp4_guess in [1e1]:
             guess_variable_params = {"Sp4": Sp4_guess}
@@ -488,8 +492,8 @@ if __name__ == '__main__':
             # Flow field
             m1 = 7 # 7
             A_vec = np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
-            m2 = 11 # 11
-            w0_vec = np.float_power(10, np.linspace(-10, 0, num = m2)) # np.array([1e-10])
+            m2 = 18 # 11
+            w0_vec = np.float_power(10, np.linspace(-10, 6, num = m2))
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -548,7 +552,7 @@ if __name__ == '__main__':
                         ### Integration and time
                         method = 'BDF' # 'BDF'
                         dT = 2*np.pi/w0 * (1/100)
-                        T_max = 2*np.pi/w0 * (10)
+                        T_max = 2*np.pi/w0 * (1/4) # (10)
                         T_span = [0, T_max]
                         T_eval = [dT*i for i in range(round(T_max/dT))]
                         T_sim_max = 1*3600

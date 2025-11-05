@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod' / 'notworkinginference')
 import numpy as np
 import pandas as pd
 
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     print(df)
 
     # Select for specific external parameters
-    df_Aw0 = df[(df['A'] == 1e-7) & (df['w0'] == 1e-10)].reset_index()
+    df_Aw0 = df[(df['A'] == 1e-8) & (df['w0'] == 1e3)].reset_index()
 
     # Combine inferred parameters
 
@@ -129,12 +129,12 @@ if __name__ == "__main__":
     fig = go.Figure()
     fig.add_scatter(x = df_Aw0["X_global"][0], y = df_Aw0["F_global"][0], name = "Global (X,F)", mode = "markers")
     fig.update_xaxes(title = "X")
-    fig.update_xaxes(title = "F(X)")
+    fig.update_yaxes(title = "F(X)")
     fig.vs_show()
 
     ## Evolution of local optimizers
     fig = go.Figure()
-    for k_global in range(len(df_Aw0["X_global"][0])):
+    for k_global in range(len(df_Aw0["X_local"][0])):
         fig.add_scatter(x = np.arange(len(df_Aw0["X_local"][0][k_global])), y = np.array(df_Aw0["X_local"][0][k_global]).squeeze(), name = "X for k = " + str(k_global))
         fig.add_scatter(x = np.arange(len(df_Aw0["F_local"][0][k_global])), y = np.array(df_Aw0["F_local"][0][k_global]).squeeze(), name = "F for k = " + str(k_global))
     fig.vs_show()
