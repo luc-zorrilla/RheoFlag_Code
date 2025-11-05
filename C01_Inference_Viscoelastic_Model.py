@@ -112,6 +112,29 @@ def LBFGSB_Scheme(func, guess_variables, bounds):
     """ TO BE COMPLETED """
     return
 
+
+class RandomDisplacementBounds(object):
+    """random displacement with bounds:  see: https://stackoverflow.com/a/21967888/2320035
+        Modified! (dropped acceptance-rejection sampling for a more specialized approach)
+    """
+    def __init__(self, bounds, stepsize=0.5):
+        self.bounds = bounds
+        self.stepsize = stepsize
+
+    def __call__(self, x):
+        """take a random step but ensure the new position is within the bounds """
+        # min_step = np.maximum(self.xmin - x, -self.stepsize)
+        # max_step = np.minimum(self.xmax - x, self.stepsize)
+
+        sl, sb = self.bounds.residual(x) # Lower and upper residual between xand the bounds
+        min_step = np.maximum(sl, -self.stepsize)
+        max_step = np.minimum(sb, self.stepsize)
+
+        random_step = np.random.uniform(low=min_step, high=max_step, size=x.shape)
+        xnew = x + random_step
+
+        return xnew
+
 def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, stepsize = 5, tol = 1e-10, eps = 1e-8, jac = '3-point', finite_diff_rel_step = 1e-6, minimum_gradient = False, minimum_hessian = False):
     """
     This function aims at minimizing a functional func given an initial guess guess_params and a bound bounds.
@@ -136,7 +159,8 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         - eps:
         - jac:
         - finite_diff_rel_step:
-        - compute_all_minimum:
+        - compute_minimum_gradient:
+        - compute_minimum_hessian:
 
     Outputs: 
         - ret is a Batch object containing all information resulting from the basinhopping algorithm -- including callbacks (still to be added).
@@ -159,7 +183,7 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         print("x0: ", x)
         print("f(x0): ", f)
 
-        return minimize(fun, x0, args=(), method=None, jac=None, hess=None, hessp=None, bounds=None, constraints=(), tol=None, callback=None, options=None)
+        return minimize(fun, x0, args=args, method=method, jac=jac, hess=hess, hessp=hessp, bounds=bounds, constraints=constraints, tol=tol, callback=callback, options=options)
 
     def local_callback_function(*, intermediate_result): # The star forces intermediate_result as a keyword argument
         """ Callback function for the local minimizer, i.e., the L-BFGS-B algorithm. """
@@ -194,9 +218,14 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
             return True
         return
     
+    # Local minimizer arguments
     minimizer_kwargs = {"method": method, 'jac':jac, "bounds": bounds, "options":{'disp': True ,'eps': eps, 'finite_diff_rel_step':finite_diff_rel_step}, "callback":local_callback_function}
+    
+    # Global minimizer arguments
+    bounded_step = RandomDisplacementBounds(bounds)
 
-    ret = basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T, callback = global_callback_function, minimize_wrapper = wrapped_minimize)
+    # Run global minimization algorithm
+    ret = basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T, callback = global_callback_function, minimize_wrapper = wrapped_minimize, take_step=bounded_step)
 
     x_final = ret.x
     
