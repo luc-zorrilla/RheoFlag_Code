@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod' / 'BeforeBoundFix' / 'noconv')
 import numpy as np
 import pandas as pd
 

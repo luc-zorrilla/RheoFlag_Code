@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod' / 'AfterBoundFix')
 from datetime import datetime
 import copy
 
@@ -118,7 +118,7 @@ class RandomDisplacementBounds(object):
 
     def __call__(self, x):
         """take a random step but ensure the new position is within the bounds """
-        
+
         sl, sb = self.bounds.residual(x) # Lower and upper residual between x and the bounds
         min_step = np.maximum(-sl, -self.stepsize)
         max_step = np.minimum(sb, self.stepsize)
@@ -490,8 +490,8 @@ if __name__ == '__main__':
             # Flow field
             m1 = 7 # 7
             A_vec = np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
-            m2 = 6 # 11
-            w0_vec = np.float_power(10, np.linspace(1, 6, num = m2))
+            m2 = 17 # 11
+            w0_vec = np.float_power(10, np.linspace(-10, 6, num = m2))
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
