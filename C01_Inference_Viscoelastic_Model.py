@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'MultiplePeriods')
 from datetime import datetime
 import copy
 
@@ -548,7 +548,7 @@ if __name__ == '__main__':
                         ### Integration and time
                         method = 'BDF' # 'BDF'
                         dT = 2*np.pi/w0 * (1/100)
-                        T_max = 2*np.pi/w0 * ( 10 )
+                        T_max = 2*np.pi/w0 * (10)
                         T_span = [0, T_max]
                         T_eval = [dT*i for i in range(round(T_max/dT))]
                         T_sim_max = 1*3600

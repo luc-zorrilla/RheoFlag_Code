@@ -705,8 +705,12 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
     # The wrapped minimizer is called once during construction of
     # BasinHoppingRunner, so run the callback
     if callable(callback):
-        callback(bh.storage.minres.x, bh.storage.minres.fun, True)
-
+        val = callback(bh.storage.minres.x, bh.storage.minres.fun, True)
+        if val is not None:
+            if val:
+                message = ["callback function requested stop early by"
+                            "returning True"]
+                niter = 0
     # start main iteration loop
     count, i = 0, 0
     message = ["requested number of basinhopping iterations completed"
