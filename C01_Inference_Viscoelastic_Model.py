@@ -174,19 +174,32 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         F_global.append(f)
         accept_global.append(accept)
 
-        X_local.append([])
+        X_local.append([]) # It would be good to initialize those with x_0_k_global with a wrapper on the local minimizer
         F_local.append([])
 
         k = len(X_global) - 1
         print("Basin-hopping: (k,x_k,f_k,accept_k):", k, x, f, accept)
+
+        # Add test here with tolerance so as to stop the algorithm: return True to stop.
+        # global eps_tol
         return
+
+    def local_wrapper(method = method, func = func):
+        """ Wrapper of the local minimizer to return x0, f0 for each call of the method. """
+        
+        def wrapped_method(x0, **args):
+            x = copy.deepcopy(x0)
+            X_local[-1].append(x)
+            F_local[-1].append(func(x))
+            return method(x0, **args)
+        return wrapped_method
 
     minimizer_kwargs = {"method": method, "bounds": bounds, 'jac':jac, "options":{'disp': True, 'eps': eps, 'finite_diff_rel_step':finite_diff_rel_step}, "callback":local_callback_function}
     ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T, callback = global_callback_function)
     
     x_final = ret.x
-    for V in [X_local, F_local, X_global, F_global, accept_global]:
-        V = np.array(V)
+    # for V in [X_local, F_local, X_global, F_global, accept_global]:
+    #     V = np.array(V)
     
     ## Check if on boundary and choose direction of gradient approximation accordingly (Directed Backward Difference [+-1] or Central Difference [0])
     sl, sb = bounds.residual(x_final) # Lower and upper residual between x_final and the bounds
@@ -212,29 +225,6 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
             h = sd.hessian(f = vec_func, x = x_final).ddf
             print("h = ", h)
             ret.setdefault('hessian', h)
-
-    # # When the x_final has converged to a boundary with nit = 1 of the local optimization algorithm, perform another minimization
-    # not_within_domain = (np.abs(step_direction) > 0) # If boundary is reached
-    # rel_eps_bound = 1e-5
-    # if not_within_domain:
-    #     if ret['lowest_optimization_result']['nit'] == 1: # If boundary is reached in one iteration of the local algorithm
-    #         while not_within_domain:
-    #             new_guess_variables = x_final + np.multiply(np.ones((m,)), np.abs(x_final)) * (rel_eps_bound)**(-step_direction) * step_direction # Increment slightly from the boundary to within the domain
-    #             sl, sb = bounds.residual(new_guess_variables)
-    #             if np.all(sl==0):
-    #                 new_step_direction = 1 # Lower boundary is reached
-    #             elif np.all(sb==0):
-    #                 new_step_direction = -1 # Upper boundary is reached        
-    #             elif np.all(sl >= 0) & np.all(sb >= 0): # Within domain
-    #                 new_step_direction = 0
-    #             else:
-    #                 new_step_direction = np.inf               
-    #             not_within_domain = (np.abs(new_step_direction) > 0)
-    #             rel_eps_bound *= 10
-
-    #         return Basinhopping_LBFGSB_Scheme(func=func, guess_variables=new_guess_variables, bounds=bounds, niter=niter, T=T, stepsize=stepsize, eps=eps, jac=jac, finite_diff_rel_step=finite_diff_rel_step, minimum_gradient=minimum_gradient, minimum_hessian=minimum_hessian)        
-        # else: # Otherwise the minimization returns a boundary of the domain
-        #     pass
 
     return ret, X_local, F_local, X_global, F_global, accept_global
 
@@ -449,7 +439,7 @@ if __name__ == '__main__':
 
         ## Optimization schemes and arguments
         opt_scheme = Basinhopping_LBFGSB_Scheme
-        niter = 10 # number of iterations - 1 of the local minimizer in the Basin-hopping algorithm
+        niter = 9 # number of iterations - 1 of the local minimizer in the Basin-hopping algorithm
         T = 0 # Temperature of the Basin-hopping algorithm. If T=0, only steps minimizing energy are accepted (apparently not...).
         stepsize = 5 # Step size of the Basin-hopping algorithm
         jac = '3-point'
@@ -473,9 +463,9 @@ if __name__ == '__main__':
             bounds = so.Bounds(lb,  ub)
 
             # Flow field
-            m1 = 1 # 7
+            m1 = 7 # 7
             A_vec = np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
-            m2 = 1 # 11
+            m2 = 11 # 11
             w0_vec = np.float_power(10, np.linspace(-10, 0, num = m2)) # np.array([1e-10])
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
@@ -535,7 +525,7 @@ if __name__ == '__main__':
                         ### Integration and time
                         method = 'BDF' # 'BDF'
                         dT = 2*np.pi/w0 * (1/100)
-                        T_max = 2*np.pi/w0 * (1/4)
+                        T_max = 2*np.pi/w0 * (1/4) # ( 10 )
                         T_span = [0, T_max]
                         T_eval = [dT*i for i in range(round(T_max/dT))]
                         T_sim_max = 1*3600

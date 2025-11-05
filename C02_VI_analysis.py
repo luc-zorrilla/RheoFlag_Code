@@ -57,8 +57,10 @@ if __name__ == "__main__":
         guess = np.array(list(guess_variable_params.values()))
 
         X_local, F_local, X_global, F_global, accept_global = VI_dict["output"][1:]
-        for l in range(2):
-            V = np.array([X_local, F_local, X_global, F_global, accept_global][l]).squeeze()
+        for l in range(len(VI_dict["output"][1:])):
+            V = [X_local, F_local, X_global, F_global, accept_global][l] # This will need to be changed to take into account the fact that X_local is a list of arrays. The easiest would be to concatenate it and now where it should be divided, or to turn it into a list of arrays for real
+            if V in [X_global, F_global]:
+                V = np.array(V).squeeze()
             V_list = [X_local_list, F_local_list, X_global_list, F_global_list, accept_global_list][l]
             V_list.append(V)
 
@@ -123,10 +125,17 @@ if __name__ == "__main__":
     # Plots
 
     # Plot X, F evolution for each A, w0
+    ## Evolution of the global optimizer (showing successive minima)
+    fig = go.Figure()
+    fig.add_scatter(x = np.arange(len(df_Aw0["X_global"][0])), y = df_Aw0["X_global"][0], name = "Global X")
+    fig.add_scatter(x = np.arange(len(df_Aw0["F_global"][0])), y = df_Aw0["F_global"][0], name = "Global F")
+    fig.vs_show()
+
+    ## Evolution of local optimizers
     fig = go.Figure()
     for k_global in range(len(df_Aw0["X_global"][0])):
-        fig.add_scatter(x = np.arange(len(df_Aw0["X_local"][0][k_global])), y = df_Aw0["X_local"][0][k_global], name = "X for k = " + str(k_global))
-        fig.add_scatter(x = np.arange(len(df_Aw0["F_local"][0][k_global])), y = df_Aw0["F_local"][0][k_global], name = "F for k = " + str(k_global))
+        fig.add_scatter(x = np.arange(len(df_Aw0["X_local"][0][k_global])), y = np.array(df_Aw0["X_local"][0][k_global]).squeeze(), name = "X for k = " + str(k_global))
+        fig.add_scatter(x = np.arange(len(df_Aw0["F_local"][0][k_global])), y = np.array(df_Aw0["F_local"][0][k_global]).squeeze(), name = "F for k = " + str(k_global))
     fig.vs_show()
 
     ## Plot IE heatmap for each (A, w0)-point
