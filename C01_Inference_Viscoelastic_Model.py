@@ -118,11 +118,9 @@ class RandomDisplacementBounds(object):
 
     def __call__(self, x):
         """take a random step but ensure the new position is within the bounds """
-        # min_step = np.maximum(self.xmin - x, -self.stepsize)
-        # max_step = np.minimum(self.xmax - x, self.stepsize)
-
-        sl, sb = self.bounds.residual(x) # Lower and upper residual between xand the bounds
-        min_step = np.maximum(sl, -self.stepsize)
+        
+        sl, sb = self.bounds.residual(x) # Lower and upper residual between x and the bounds
+        min_step = np.maximum(-sl, -self.stepsize)
         max_step = np.minimum(sb, self.stepsize)
 
         random_step = np.random.uniform(low=min_step, high=max_step, size=x.shape)
@@ -492,8 +490,8 @@ if __name__ == '__main__':
             # Flow field
             m1 = 7 # 7
             A_vec = np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
-            m2 = 18 # 11
-            w0_vec = np.float_power(10, np.linspace(-10, 6, num = m2))
+            m2 = 6 # 11
+            w0_vec = np.float_power(10, np.linspace(1, 6, num = m2))
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
