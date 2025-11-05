@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod' / 'wrapped_minimize')
 import numpy as np
 import pandas as pd
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
             V_list.append(V)
 
         IE = L2_relative_error(p_inf, p_star)
-        Hm1 = ret['lowest_optimization_result']['hess_inv'].todense()
+        Hm1 = ret['lowest_optimization_result']['hess_inv']
         if not ret['success']: # If convergence failed, error is infinite
             Hm1 = np.ones_like(Hm1) * np.inf
 
@@ -111,7 +111,7 @@ if __name__ == "__main__":
     print(df)
 
     # Select for specific external parameters
-    df_Aw0 = df[(df['A'] == 1e-7) & (df['w0'] == 1e-10)].reset_index()
+    df_Aw0 = df[(df['A'] == 1e-8) & (df['w0'] == 1e-10)].reset_index()
 
     # Combine inferred parameters
 

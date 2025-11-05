@@ -16,7 +16,8 @@ from datetime import datetime
 import copy
 
 import numpy as np
-import scipy.optimize as so
+from scipy.optimize import minimize, Bounds
+from _basinhopping_mod import *
 import scipy.differentiate as sd
 
 ## Functions
@@ -143,16 +144,26 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
 
     method = "L-BFGS-B"
     x0 = guess_variables
-
-    x = x0
-    f0 = func(x0)
-    print("x0: ", x)
-    print("f(x0): ", f0)
     
-    X_local = [[x0]]
-    F_local = [[f0]]
+    X_local = []
+    F_local = []
+
+    def wrapped_minimize(fun, x0, args=(), method=None, jac=None, hess=None, hessp=None, bounds=None, constraints=(), tol=None, callback=None, options=None):
+        """ A wrapper of scipy.optimize.minimize used specifically for the basin-hopping algorithm, so that we obtain the starting point of each local minimization. """
+
+        x = copy.deepcopy(x0)
+        f = fun(x)
+        X_local.append([x])
+        F_local.append([f])
+
+        print("x0: ", x)
+        print("f(x0): ", f)
+
+        return minimize(fun, x0, args=(), method=None, jac=None, hess=None, hessp=None, bounds=None, constraints=(), tol=None, callback=None, options=None)
+
     def local_callback_function(*, intermediate_result): # The star forces intermediate_result as a keyword argument
         """ Callback function for the local minimizer, i.e., the L-BFGS-B algorithm. """
+
         x = copy.deepcopy(intermediate_result.x)
         f = intermediate_result.fun
 
@@ -162,7 +173,7 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         k = len(X_local[-1]) - 1
         print("L-BFGS-B: (k, xk, f(xk)):", k, x, f)
 
-        return
+        return    
 
     X_global = []
     F_global = []
@@ -175,9 +186,6 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         F_global.append(f)
         accept_global.append(accept)
 
-        X_local.append([]) # It would be good to initialize those with x_0_k_global with a wrapper on the local minimizer
-        F_local.append([])
-
         k = len(X_global) - 1
         print("Basin-hopping: (k,x_k,f_k,accept_k):", k, x, f, accept)
 
@@ -185,13 +193,12 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         if f < tol:
             return True
         return
-
-    minimizer_kwargs = {"method": method, 'jac':jac, "bounds": bounds, "options":{'disp': True ,'eps': eps, 'finite_diff_rel_step':finite_diff_rel_step}, "callback":local_callback_function}
-    ret = so.basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T, callback = global_callback_function)
     
+    minimizer_kwargs = {"method": method, 'jac':jac, "bounds": bounds, "options":{'disp': True ,'eps': eps, 'finite_diff_rel_step':finite_diff_rel_step}, "callback":local_callback_function}
+
+    ret = basinhopping(func = func, x0 = x0, minimizer_kwargs = minimizer_kwargs, niter = niter, stepsize = stepsize, T = T, callback = global_callback_function, minimize_wrapper = wrapped_minimize)
+
     x_final = ret.x
-    # for V in [X_local, F_local, X_global, F_global, accept_global]:
-    #     V = np.array(V)
     
     ## Check if on boundary and choose direction of gradient approximation accordingly (Directed Backward Difference [+-1] or Central Difference [0])
     sl, sb = bounds.residual(x_final) # Lower and upper residual between x_final and the bounds
@@ -452,12 +459,12 @@ if __name__ == '__main__':
             # bound_tau_b = [0, 1e7]
             lb = [bound_Sp4[0]] #, bound_tau_b[0]]
             ub = [bound_Sp4[1]] #, bound_tau_b[1]]
-            bounds = so.Bounds(lb,  ub)
+            bounds = Bounds(lb,  ub)
 
             # Flow field
-            m1 = 1 # 7
+            m1 = 7 # 7
             A_vec = np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
-            m2 = 1 # 11
+            m2 = 11 # 11
             w0_vec = np.float_power(10, np.linspace(-10, 0, num = m2)) # np.array([1e-10])
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
