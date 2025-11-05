@@ -708,7 +708,7 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
         val = callback(bh.storage.minres.x, bh.storage.minres.fun, True)
         if val is not None:
             if val:
-                message = ["callback function requested stop early by"
+                message = ["callback function requested stop before iteration loop by"
                             "returning True"]
                 niter = 0
     # start main iteration loop
