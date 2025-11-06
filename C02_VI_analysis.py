@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod' / 'BeforeBoundFix' / 'noconv')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity')
 import numpy as np
 import pandas as pd
 
@@ -106,12 +106,12 @@ if __name__ == "__main__":
         df["sigma_p_inf_" + str(k_vars)] = df.apply(lambda x: x['Sigma'][k_vars], axis = 1)
 
     # Select for a specific guess
-    Sp4_guess = 10
-    df = df[df['guess'] == Sp4_guess].reset_index()
+    # Sp4_guess = 10
+    # df = df[df['guess'] == Sp4_guess].reset_index()
     print(df)
 
     # Select for specific external parameters
-    df_Aw0 = df[(df['A'] == 1e-8) & (df['w0'] == 1e3)].reset_index()
+    df_Aw0 = df[(df['A'] == 1e-8) & (df['w0'] == 1e-3)].reset_index()
 
     # Combine inferred parameters
 

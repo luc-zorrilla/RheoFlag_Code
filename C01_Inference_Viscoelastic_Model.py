@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod' / 'AfterBoundFix')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity')
 from datetime import datetime
 import copy
 
@@ -118,7 +118,7 @@ class RandomDisplacementBounds(object):
 
     def __call__(self, x):
         """take a random step but ensure the new position is within the bounds """
-
+        
         sl, sb = self.bounds.residual(x) # Lower and upper residual between x and the bounds
         min_step = np.maximum(-sl, -self.stepsize)
         max_step = np.minimum(sb, self.stepsize)
@@ -474,17 +474,23 @@ if __name__ == '__main__':
         minimum_hessian = False # Whether to compute gradient at found minimum
         opt_args = {"niter":niter, "T":T, "stepsize":stepsize, 'jac':jac, "ftol":ftol, "gtol":gtol, "eps":eps, "finite_diff_rel_step":finite_diff_rel_step, "minimum_gradient":minimum_gradient, "minimum_hessian":minimum_hessian, 'tol':tol}
 
+        Beta_guess = 0
         for Sp4_guess in [1e1]:
-            guess_variable_params = {"Sp4": Sp4_guess}
+            guess_variable_params = {"Sp4": Sp4_guess, 'Beta':Beta_guess}
 
             ## Bounds
-            Sp4_min = np.double(1e-6) # 1e-3
-            Sp4_max = np.double(1e6) # 1e3
-
+            Sp4_min = np.double(1e-6)
+            Sp4_max = np.double(1e6)
             bound_Sp4 = [Sp4_min, Sp4_max]
+
+            Beta_min = 0
+            Beta_max = np.double(1e6)
+            bound_Beta = [Beta_min, Beta_max]
+
+            
             # bound_tau_b = [0, 1e7]
-            lb = [bound_Sp4[0]] #, bound_tau_b[0]]
-            ub = [bound_Sp4[1]] #, bound_tau_b[1]]
+            lb = [bound_Sp4[0], bound_Beta[0]]
+            ub = [bound_Sp4[1], bound_Beta[1]]
             bounds = Bounds(lb,  ub)
 
             # Flow field
@@ -507,7 +513,7 @@ if __name__ == '__main__':
             n3 = 1 # 11
             tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
             n4 = 1 # 11
-            Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
+            Beta_vec = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3] # np.float_power(10, np.linspace(-5, 5, num = n4))
             n5 = 1 # 11
             tau_s_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n5))
 
@@ -550,7 +556,7 @@ if __name__ == '__main__':
                         ### Integration and time
                         method = 'BDF' # 'BDF'
                         dT = 2*np.pi/w0 * (1/100)
-                        T_max = 2*np.pi/w0 * (1/4) # (10)
+                        T_max = 2*np.pi/w0 * (1/4)
                         T_span = [0, T_max]
                         T_eval = [dT*i for i in range(round(T_max/dT))]
                         T_sim_max = 1*3600
