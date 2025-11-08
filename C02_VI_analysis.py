@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'BendingElasticity_NoViscosity_Clamped')
 import numpy as np
 import pandas as pd
 
@@ -22,6 +22,7 @@ if __name__ == "__main__":
 
     A_list = []
     w0_list = []
+    p_star_list = []
     p_inf_list = []
     guess_list = []
     IE_list = []
@@ -71,6 +72,7 @@ if __name__ == "__main__":
 
         A_list.append(A)
         w0_list.append(w0)
+        p_star_list.append(p_star)
         p_inf_list.append(p_inf)
         guess_list.append(guess)
         IE_list.append(IE)
@@ -91,6 +93,7 @@ if __name__ == "__main__":
 
     df["A"] = A_list
     df["w0"] = w0_list
+    df["p_star"] = p_star_list
     df["p_inf"] = p_inf_list
     df["guess"] = guess_list
     df["IE"] = IE_list
@@ -105,22 +108,36 @@ if __name__ == "__main__":
         df["p_inf_" + str(k_vars)] = df.apply(lambda x: x['p_inf'][k_vars], axis = 1)
         df["sigma_p_inf_" + str(k_vars)] = df.apply(lambda x: x['Sigma'][k_vars], axis = 1)
 
-    # Select for a specific guess
+    # Select files
+
+    ## Select for a specific guess
     # Sp4_guess = 10
+    # Beta_guess = 0
     # df = df[df['guess'] == Sp4_guess].reset_index()
+
+    ## Select for a specific exp filament
+    Sp4_exp = 1
+    # Beta_exp = 1e3
+    target = np.array([Sp4_exp]) # np.array([Sp4_exp, Beta_exp])
+    # df = df[np.all(df['p_star'] - np.array([Sp4_exp, Beta_exp]) == 0)].reset_index()
+    df = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)
     print(df)
 
     # Select for specific external parameters
-    df_Aw0 = df[(df['A'] == 1e-8) & (df['w0'] == 1e-3)].reset_index()
+    df_Aw0 = df[(df['A'] == 1e-8) & (df['w0'] == 1e-9)].reset_index()
 
     # Combine inferred parameters
 
-    p_combined = [] # Combine parameter estimates (using BLC function) --> Not working when selecting for specific guess!
+    p_combined = [] # Combine parameter estimates (using BLC function)
+    p_mean = []
     for j in range(n_vars):
         Z_vector_list_j = [np.array([df["p_inf"][k][j], df["Sigma"][k][j]]) for k in range(df["p_inf"].shape[0])]
         Z_combined_vector_j = BLC(Z_vector_list_j)
+        Z_mean_vector_j = np.array([np.nanmean(np.array(Z_vector_list_j), where = np.array(Z_vector_list_j) < np.inf, axis = 0)[0], (np.nanstd(np.array(Z_vector_list_j), where = np.array(Z_vector_list_j) < np.inf, axis = 0, ddof = 1) / np.sqrt(len(Z_vector_list_j)))[0]])
         p_combined.append(Z_combined_vector_j)
+        p_mean.append(Z_mean_vector_j)
     print("p_combined", p_combined)
+    print("p_mean", p_mean)
 
     # Plots
 

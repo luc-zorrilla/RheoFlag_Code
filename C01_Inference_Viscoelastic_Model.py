@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'BendingElasticity_NoViscosity_Clamped' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'BendingShearElasticity_NoViscosity_Clamped')
 from datetime import datetime
 import copy
 
@@ -512,7 +512,7 @@ if __name__ == '__main__':
             Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
             n3 = 1 # 11
             tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
-            n4 = 1 # 11
+            n4 = 7 # 11
             Beta_vec = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3] # np.float_power(10, np.linspace(-5, 5, num = n4))
             n5 = 1 # 11
             tau_s_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n5))
@@ -556,7 +556,7 @@ if __name__ == '__main__':
                         ### Integration and time
                         method = 'BDF' # 'BDF'
                         dT = 2*np.pi/w0 * (1/100)
-                        T_max = 2*np.pi/w0 * (1/4)
+                        T_max = 2*np.pi/w0 * (10)
                         T_span = [0, T_max]
                         T_eval = [dT*i for i in range(round(T_max/dT))]
                         T_sim_max = 1*3600
