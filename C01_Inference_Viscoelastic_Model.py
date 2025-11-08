@@ -118,7 +118,7 @@ class RandomDisplacementBounds(object):
 
     def __call__(self, x):
         """take a random step but ensure the new position is within the bounds """
-        
+
         sl, sb = self.bounds.residual(x) # Lower and upper residual between x and the bounds
         min_step = np.maximum(-sl, -self.stepsize)
         max_step = np.minimum(sb, self.stepsize)
