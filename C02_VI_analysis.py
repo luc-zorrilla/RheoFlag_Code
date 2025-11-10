@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'BendingElasticity_NoViscosity_Clamped')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'FixedSp4')
 import numpy as np
 import pandas as pd
 
@@ -117,9 +117,9 @@ if __name__ == "__main__":
 
     ## Select for a specific exp filament
     Sp4_exp = 1
-    # Beta_exp = 1e3
-    target = np.array([Sp4_exp]) # np.array([Sp4_exp, Beta_exp])
-    # df = df[np.all(df['p_star'] - np.array([Sp4_exp, Beta_exp]) == 0)].reset_index()
+    Beta_exp = 1e3
+    # tau_b_exp = 1e6
+    target = np.array([Sp4_exp, Beta_exp]) # np.array([Sp4_exp, tau_b_exp]) # 
     df = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)
     print(df)
 

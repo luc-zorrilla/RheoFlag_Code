@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'BendingShearElasticity_NoViscosity_Clamped')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'FixedSp4')
 from datetime import datetime
 import copy
 
@@ -474,9 +474,11 @@ if __name__ == '__main__':
         minimum_hessian = False # Whether to compute gradient at found minimum
         opt_args = {"niter":niter, "T":T, "stepsize":stepsize, 'jac':jac, "ftol":ftol, "gtol":gtol, "eps":eps, "finite_diff_rel_step":finite_diff_rel_step, "minimum_gradient":minimum_gradient, "minimum_hessian":minimum_hessian, 'tol':tol}
 
+        Sp4_guess = 1
         Beta_guess = 0
+        tau_b_guess = 0
         for Sp4_guess in [1e1]:
-            guess_variable_params = {"Sp4": Sp4_guess, 'Beta':Beta_guess}
+            guess_variable_params = {'Beta':Beta_guess} # "Sp4": Sp4_guess, "tau_b":tau_b_guess}
 
             ## Bounds
             Sp4_min = np.double(1e-6)
@@ -487,23 +489,25 @@ if __name__ == '__main__':
             Beta_max = np.double(1e6)
             bound_Beta = [Beta_min, Beta_max]
 
+            tau_b_min = 0
+            tau_b_max = np.double(1e9)
+            bound_tau_b = [tau_b_min, tau_b_max]
             
-            # bound_tau_b = [0, 1e7]
-            lb = [bound_Sp4[0], bound_Beta[0]]
-            ub = [bound_Sp4[1], bound_Beta[1]]
+            lb = [eval("bound_"+param)[0] for param in guess_variable_params.keys()]
+            ub = [eval("bound_"+param)[1] for param in guess_variable_params.keys()]
             bounds = Bounds(lb,  ub)
 
             # Flow field
-            m1 = 7 # 7
-            A_vec = np.float_power(10, np.linspace(-8, -2, num = m1)) # np.array([1e-8])
-            m2 = 17 # 11
-            w0_vec = np.float_power(10, np.linspace(-10, 6, num = m2))
+            m1 = 9 # 7
+            A_vec = np.float_power(10, np.linspace(-10, -2, num = m1)) # np.array([1e-8])
+            m2 = 16 # 11
+            w0_vec = np.float_power(10, np.linspace(-9, 6, num = m2))
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
             ### Filament properties
             gamma = 2
-            bool_EI = True  
+            bool_EI = True
 
             # Viscoelastic properties
             n1 = 1 # 14
@@ -556,7 +560,7 @@ if __name__ == '__main__':
                         ### Integration and time
                         method = 'BDF' # 'BDF'
                         dT = 2*np.pi/w0 * (1/100)
-                        T_max = 2*np.pi/w0 * (10)
+                        T_max = 2*np.pi/w0 * (1/4)
                         T_span = [0, T_max]
                         T_eval = [dT*i for i in range(round(T_max/dT))]
                         T_sim_max = 1*3600
