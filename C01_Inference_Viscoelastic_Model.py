@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'FixedSp4')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'bool_EI_False')
 from datetime import datetime
 import copy
 
@@ -474,11 +474,11 @@ if __name__ == '__main__':
         minimum_hessian = False # Whether to compute gradient at found minimum
         opt_args = {"niter":niter, "T":T, "stepsize":stepsize, 'jac':jac, "ftol":ftol, "gtol":gtol, "eps":eps, "finite_diff_rel_step":finite_diff_rel_step, "minimum_gradient":minimum_gradient, "minimum_hessian":minimum_hessian, 'tol':tol}
 
-        Sp4_guess = 1
+        Sp4_guess = 1e1
         Beta_guess = 0
         tau_b_guess = 0
         for Sp4_guess in [1e1]:
-            guess_variable_params = {'Beta':Beta_guess} # "Sp4": Sp4_guess, "tau_b":tau_b_guess}
+            guess_variable_params = {'Sp4':Sp4_guess, 'Beta':Beta_guess} # "Sp4": Sp4_guess, "tau_b":tau_b_guess}
 
             ## Bounds
             Sp4_min = np.double(1e-6)
@@ -486,7 +486,7 @@ if __name__ == '__main__':
             bound_Sp4 = [Sp4_min, Sp4_max]
 
             Beta_min = 0
-            Beta_max = np.double(1e6)
+            Beta_max = np.double(1e9)
             bound_Beta = [Beta_min, Beta_max]
 
             tau_b_min = 0
@@ -507,7 +507,7 @@ if __name__ == '__main__':
 
             ### Filament properties
             gamma = 2
-            bool_EI = True
+            bool_EI = False
 
             # Viscoelastic properties
             n1 = 1 # 14
@@ -516,8 +516,8 @@ if __name__ == '__main__':
             Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
             n3 = 1 # 11
             tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
-            n4 = 7 # 11
-            Beta_vec = [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3] # np.float_power(10, np.linspace(-5, 5, num = n4))
+            n4 = 4 # 11
+            Beta_vec = [1e-3, 1e0, 1e3, 1e6] # np.float_power(10, np.linspace(-5, 5, num = n4))
             n5 = 1 # 11
             tau_s_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n5))
 

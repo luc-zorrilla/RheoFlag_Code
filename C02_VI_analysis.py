@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'FixedSp4')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'BendingElasticity_BendingViscosity_Clamped')
 import numpy as np
 import pandas as pd
 
@@ -112,19 +112,19 @@ if __name__ == "__main__":
 
     ## Select for a specific guess
     # Sp4_guess = 10
-    # Beta_guess = 0
+    # Beta_guess = 1e-3
     # df = df[df['guess'] == Sp4_guess].reset_index()
 
     ## Select for a specific exp filament
     Sp4_exp = 1
     Beta_exp = 1e3
-    # tau_b_exp = 1e6
-    target = np.array([Sp4_exp, Beta_exp]) # np.array([Sp4_exp, tau_b_exp]) # 
+    tau_b_exp = 1e6
+    target = np.array([Sp4_exp, tau_b_exp]) # np.array([Sp4_exp, tau_b_exp]) # 
     df = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)
     print(df)
 
     # Select for specific external parameters
-    df_Aw0 = df[(df['A'] == 1e-8) & (df['w0'] == 1e-9)].reset_index()
+    df_Aw0 = df[(df['A'] == 1e-6) & (df['w0'] == 1e-3)].reset_index()
 
     # Combine inferred parameters
 
@@ -150,11 +150,13 @@ if __name__ == "__main__":
     fig.vs_show()
 
     ## Evolution of local optimizers
-    fig = go.Figure()
+    fig = make_subplots(rows = len(df_Aw0["X_local"][0]), cols = n_vars + 1)
     for k_global in range(len(df_Aw0["X_local"][0])):
-        fig.add_scatter(x = np.arange(len(df_Aw0["X_local"][0][k_global])), y = np.array(df_Aw0["X_local"][0][k_global]).squeeze(), name = "X for k = " + str(k_global))
-        fig.add_scatter(x = np.arange(len(df_Aw0["F_local"][0][k_global])), y = np.array(df_Aw0["F_local"][0][k_global]).squeeze(), name = "F for k = " + str(k_global))
-    fig.vs_show()
+        for k_var in range(n_vars):
+            fig.add_scatter(x = np.arange(len(df_Aw0["X_local"][0][k_global])), y = np.array(df_Aw0["X_local"][0][k_global]).reshape(-1, n_vars)[:,k_var], name = "X for k = " + str(k_global), row = 1+k_global, col = 1+k_var)
+        fig.add_scatter(x = np.arange(len(df_Aw0["F_local"][0][k_global])), y = np.array(df_Aw0["F_local"][0][k_global]).squeeze(), name = "F for k = " + str(k_global), row = 1+k_global, col = 1+n_vars)
+    fig.update_yaxes(type = "log", col = n_vars + 1)
+    fig.vs_show()     
 
     ## Plot IE heatmap for each (A, w0)-point
     fig = go.Figure(data = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = np.log10(df['IE']), colorscale = 'RdPu_r'))
