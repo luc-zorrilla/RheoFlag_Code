@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'bool_EI_False')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'FinalHessian')
 from datetime import datetime
 import copy
 
@@ -465,20 +465,20 @@ if __name__ == '__main__':
         stepsize = 5 # Step size of the Basin-hopping algorithm
         jac = '3-point'
         eps = 1e-8
-        tol = 1e-8 # Tolerance threshold for the basin-hopping algorithm
+        tol = 1e-10 # Tolerance threshold for the basin-hopping algorithm
 
         ftol = 1e-8 # Tolerance functional threshold for the local minimizer
         gtol = 1e-8 # Tolerance gradient threshold for the local minimizer        
         finite_diff_rel_step = 1e-6 # Maximum step size for finite difference calculation of the gradient
         minimum_gradient = False # Whether to compute gradient at found minimum
-        minimum_hessian = False # Whether to compute gradient at found minimum
+        minimum_hessian = True # Whether to compute gradient at found minimum
         opt_args = {"niter":niter, "T":T, "stepsize":stepsize, 'jac':jac, "ftol":ftol, "gtol":gtol, "eps":eps, "finite_diff_rel_step":finite_diff_rel_step, "minimum_gradient":minimum_gradient, "minimum_hessian":minimum_hessian, 'tol':tol}
 
         Sp4_guess = 1e1
         Beta_guess = 0
         tau_b_guess = 0
         for Sp4_guess in [1e1]:
-            guess_variable_params = {'Sp4':Sp4_guess, 'Beta':Beta_guess} # "Sp4": Sp4_guess, "tau_b":tau_b_guess}
+            guess_variable_params = {'Sp4':Sp4_guess, 'Beta':Beta_guess} # 'Beta':Beta_guess}
 
             ## Bounds
             Sp4_min = np.double(1e-6)
@@ -507,7 +507,7 @@ if __name__ == '__main__':
 
             ### Filament properties
             gamma = 2
-            bool_EI = False
+            bool_EI = True
 
             # Viscoelastic properties
             n1 = 1 # 14
@@ -516,8 +516,8 @@ if __name__ == '__main__':
             Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
             n3 = 1 # 11
             tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
-            n4 = 4 # 11
-            Beta_vec = [1e-3, 1e0, 1e3, 1e6] # np.float_power(10, np.linspace(-5, 5, num = n4))
+            n4 = 1 # 11
+            Beta_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n4))
             n5 = 1 # 11
             tau_s_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n5))
 

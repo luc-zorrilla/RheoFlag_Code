@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'BendingElasticity_BendingViscosity_Clamped')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped')
 import numpy as np
 import pandas as pd
 
@@ -117,21 +117,21 @@ if __name__ == "__main__":
 
     ## Select for a specific exp filament
     Sp4_exp = 1
-    Beta_exp = 1e3
-    tau_b_exp = 1e6
-    target = np.array([Sp4_exp, tau_b_exp]) # np.array([Sp4_exp, tau_b_exp]) # 
-    df = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)
-    print(df)
+    Beta_exp = 1e0
+    tau_b_exp = 1e0
+    target = np.array([Sp4_exp, Beta_exp]) # np.array([Sp4_exp, tau_b_exp]) # 
+    df2 = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)
+    print(df2)
 
     # Select for specific external parameters
-    df_Aw0 = df[(df['A'] == 1e-6) & (df['w0'] == 1e-3)].reset_index()
+    df_Aw0 = df2[(df2['A'] == 1e-8) & (df2['w0'] == 1e5)].reset_index()
 
     # Combine inferred parameters
 
     p_combined = [] # Combine parameter estimates (using BLC function)
     p_mean = []
     for j in range(n_vars):
-        Z_vector_list_j = [np.array([df["p_inf"][k][j], df["Sigma"][k][j]]) for k in range(df["p_inf"].shape[0])]
+        Z_vector_list_j = [np.array([df2["p_inf"][k][j], df2["Sigma"][k][j]]) for k in range(df2["p_inf"].shape[0])]
         Z_combined_vector_j = BLC(Z_vector_list_j)
         Z_mean_vector_j = np.array([np.nanmean(np.array(Z_vector_list_j), where = np.array(Z_vector_list_j) < np.inf, axis = 0)[0], (np.nanstd(np.array(Z_vector_list_j), where = np.array(Z_vector_list_j) < np.inf, axis = 0, ddof = 1) / np.sqrt(len(Z_vector_list_j)))[0]])
         p_combined.append(Z_combined_vector_j)
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     fig.vs_show()     
 
     ## Plot IE heatmap for each (A, w0)-point
-    fig = go.Figure(data = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = np.log10(df['IE']), colorscale = 'RdPu_r'))
+    fig = go.Figure(data = go.Heatmap(x = np.log10(df2['A']), y = np.log10(df2['w0']), z = np.log10(df2['IE']), colorscale = 'RdPu_r'))
     fig.update_xaxes(title = "log A", type = "linear")
     fig.update_yaxes(title = "log w0", type = "linear")
     fig.update_layout(title = "Inference Error (for each external parameter)")
@@ -173,8 +173,8 @@ if __name__ == "__main__":
 
     fig = make_subplots(rows = n_vars, cols = 2, subplot_titles=subplot_titles)
     for k_vars in range(n_vars):
-        hm_p_inf_k_vars = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = df['p_inf_' + str(k_vars)], colorscale = 'RdPu_r')
-        hm_sigma_p_inf_k_vars = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = np.log10(df['sigma_p_inf_' + str(k_vars)]), colorscale = 'RdPu_r')
+        hm_p_inf_k_vars = go.Heatmap(x = np.log10(df2['A']), y = np.log10(df2['w0']), z = df2['p_inf_' + str(k_vars)], colorscale = 'RdPu_r')
+        hm_sigma_p_inf_k_vars = go.Heatmap(x = np.log10(df2['A']), y = np.log10(df2['w0']), z = np.log10(df2['sigma_p_inf_' + str(k_vars)]), colorscale = 'RdPu_r')
         fig.add_trace(hm_p_inf_k_vars, row = 1 + k_vars, col = 1)
         fig.add_trace(hm_sigma_p_inf_k_vars, row = 1 + k_vars, col = 2)
     fig.update_xaxes(title = "log A", type = "linear")
@@ -186,16 +186,16 @@ if __name__ == "__main__":
     if n_vars == 1:
         nbins = 20
         fig = go.Figure(go.Histogram(
-            x=df['p_inf_0'],
+            x=df2['p_inf_0'],
             nbinsx = nbins))
         fig.update_layout(title = "Histogram of inferred parameters (all external parameters combined)")
-        fig.vs_show()        
+        fig.vs_show()     
     elif n_vars == 2:
         nbinsx = 100
         nbinsx = 50
         fig = go.Figure(go.Histogram2d(
-            x=df['p_inf_0'],
-            y=df['p_inf_1'], 
+            x=df2['p_inf_0'],
+            y=df2['p_inf_1'], 
             nbinsx=100, nbinsy=50))
         fig.update_layout(title = "Histogram of inferred parameters (all external parameters combined)")
         fig.vs_show()
