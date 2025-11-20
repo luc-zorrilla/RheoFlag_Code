@@ -287,7 +287,6 @@ class RandomDisplacement:
                               np.shape(x))
         return x
 
-
 class MinimizerWrapper:
     """
     wrap a minimizer function as a minimizer class

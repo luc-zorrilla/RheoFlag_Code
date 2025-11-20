@@ -185,7 +185,7 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         f_loc = copy.deepcopy(intermediate_result.fun)
 
         X_local[-1].append(x_loc)
-        F_local[-1].append(f)
+        F_local[-1].append(f_loc)
 
         k = len(X_local[-1]) - 1
         print("L-BFGS-B: (k, xk, f(xk)):", k, x_loc, f_loc)
@@ -205,7 +205,7 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         accept_global.append(accept)
 
         k = len(X_global) - 1
-        print("Basin-hopping: (k,x_k,f_k,accept_k):", k, x, f, accept)
+        print("Basin-hopping: (k,x_k,f_k,accept_k):", k, x_glob, f_glob, accept)
 
         # Stop if functional is lower than a tolerance threshold
         if f < tol:
