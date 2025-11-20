@@ -23,7 +23,6 @@ class Storage:
         self._add(minres)
 
     def _add(self, minres):
-        # minres.success = True # User-customized: changes success type if f(x_new) < f(x_old)
         self.minres = minres
         self.minres.x = np.copy(minres.x)
 
@@ -712,7 +711,9 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
     # The wrapped minimizer is called once during construction of
     # BasinHoppingRunner, so run the callback
     if callable(callback):
-        val = callback(bh.storage.minres.x, bh.storage.minres.fun, True)
+        # val = callback(bh.storage.minres.x, bh.storage.minres.fun, True)
+        x0 = np.copy(bh.storage.minres.x) # User-customized
+        val = callback(x0, bh.storage.minres.fun, True) # User-customized
         if val is not None:
             if val:
                 message = ["callback function requested stop before iteration loop by"
@@ -728,9 +729,9 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
         if callable(callback):
 
             # should we pass a copy of x?
-            val = callback(bh.xtrial, bh.energy_trial, bh.accept)
-            # xtrial = np.copy(bh.xtrial) # User-customized
-            # val = callback(xtrial, bh.energy_trial, bh.accept) # User-customized
+            # val = callback(bh.xtrial, bh.energy_trial, bh.accept)
+            xtrial = np.copy(bh.xtrial) # User-customized
+            val = callback(xtrial, bh.energy_trial, bh.accept) # User-customized
 
             if val is not None:
                 if val:
