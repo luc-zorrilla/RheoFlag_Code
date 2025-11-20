@@ -805,7 +805,7 @@ def SolveAndSave(output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamm
             write_array_to_csv(mistake, data_filename)
             res = False
         else:
-            print("Solving took %s seconds." % T_sim)
+            # print("Solving took %s seconds." % T_sim)
             write_array_to_csv(sol.y, data_filename)
             res = True
 
@@ -901,7 +901,7 @@ def Solve(N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp
             print(mistake)
             res = None
         else:
-            print("Solving took %s seconds." % T_sim)
+            # print("Solving took %s seconds." % T_sim)
             res = sol
 
     except BaseException as ex:
@@ -941,7 +941,7 @@ def Solve_InterpFlow(gamma, N, Sp4, k0, bool_EI, Beta, taus_b, tau_s, X0, n_L, m
             res.y = None
             
         else:
-            print("Solving took %s seconds." % T_sim)
+            # print("Solving took %s seconds." % T_sim)
             res = sol
 
     except BaseException as ex:

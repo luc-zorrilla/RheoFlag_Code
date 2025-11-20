@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'FinalHessian')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'FinalHessian' / 'BasinAcceptTest')
 from datetime import datetime
 import copy
 
@@ -152,8 +152,8 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         - eps:
         - jac:
         - finite_diff_rel_step:
-        - compute_minimum_gradient:
-        - compute_minimum_hessian:
+        - compute_minimum_gradient: whether to compute jacobian at found global minimum
+        - compute_minimum_hessian: whether to compute hessian at found global minimum
 
     Outputs: 
         - ret is a Batch object containing all information resulting from the basinhopping algorithm -- including callbacks (still to be added).
@@ -198,8 +198,8 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
     def global_callback_function(x,f,accept):
         """ Callback function for the global minimizer, i.e., the basin-hopping algorithm. """
 
-        x = copy.deepcopy(x)
-        X_global.append(x)
+        x_glob = copy.deepcopy(x)
+        X_global.append(x_glob)
         F_global.append(f)
         accept_global.append(accept)
 
@@ -498,10 +498,10 @@ if __name__ == '__main__':
             bounds = Bounds(lb,  ub)
 
             # Flow field
-            m1 = 9 # 7
-            A_vec = np.float_power(10, np.linspace(-10, -2, num = m1)) # np.array([1e-8])
-            m2 = 16 # 11
-            w0_vec = np.float_power(10, np.linspace(-9, 6, num = m2))
+            m1 = 1# 9 # 7
+            A_vec = np.array([1e-7])# np.float_power(10, np.linspace(-10, -2, num = m1)) # np.array([1e-8])
+            m2 = 1 # 16 # 11
+            w0_vec = np.array([1e-9]) # np.float_power(10, np.linspace(-9, 6, num = m2))
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 

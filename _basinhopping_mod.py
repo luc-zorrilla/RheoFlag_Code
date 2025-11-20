@@ -23,14 +23,20 @@ class Storage:
         self._add(minres)
 
     def _add(self, minres):
+        # minres.success = True # User-customized: changes success type if f(x_new) < f(x_old)
         self.minres = minres
         self.minres.x = np.copy(minres.x)
 
-    def update(self, minres):
-        if minres.success and (minres.fun < self.minres.fun
-                               or not self.minres.success):
+    def update(self, minres): # Update if (the local minimization is successful, or if the previous minimization was not successful) AND if the functional has decreased. --> Changed to "Update if the functional has decreased. "
+
+        # if minres.success and (minres.fun < self.minres.fun
+        #                         or not self.minres.success):
+        #     self._add(minres)
+        #     return True
+
+        if (minres.fun < self.minres.fun): # User-customized
             self._add(minres)
-            return True
+            return True        
         else:
             return False
 
@@ -337,7 +343,9 @@ class Metropolis:
             w = math.exp(min(0, prod))
 
         rand = self.rng.uniform()
-        return w >= rand and (res_new.success or not res_old.success)
+        
+        # return w >= rand and (res_new.success or not res_old.success)
+        return w >= rand # User-customized: overlook success state
 
     def __call__(self, *, res_new, res_old):
         """
@@ -661,7 +669,7 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
     if minimizer_kwargs is None:
         minimizer_kwargs = dict()
     # wrapped_minimizer = MinimizerWrapper(scipy.optimize.minimize, func, **minimizer_kwargs)
-    wrapped_minimizer = MinimizerWrapper(minimize_wrapper, func, **minimizer_kwargs)
+    wrapped_minimizer = MinimizerWrapper(minimize_wrapper, func, **minimizer_kwargs) # User-customized
 
     # set up step-taking algorithm
     if take_step is not None:
@@ -719,8 +727,12 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
         new_global_min = bh.one_cycle()
 
         if callable(callback):
+
             # should we pass a copy of x?
             val = callback(bh.xtrial, bh.energy_trial, bh.accept)
+            # xtrial = np.copy(bh.xtrial) # User-customized
+            # val = callback(xtrial, bh.energy_trial, bh.accept) # User-customized
+
             if val is not None:
                 if val:
                     message = ["callback function requested stop early by"

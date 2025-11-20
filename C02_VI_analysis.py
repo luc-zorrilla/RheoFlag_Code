@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'FinalHessian' / 'BasinAcceptTest')
 import numpy as np
 import pandas as pd
 
@@ -124,7 +124,7 @@ if __name__ == "__main__":
     print(df2)
 
     # Select for specific external parameters
-    df_Aw0 = df2[(df2['A'] == 1e-8) & (df2['w0'] == 1e5)].reset_index()
+    df_Aw0 = df2[(df2['A'] == 1e-7) & (df2['w0'] == 1e-9)].reset_index()
 
     # Combine inferred parameters
 
@@ -143,10 +143,11 @@ if __name__ == "__main__":
 
     # Plot X, F evolution for each A, w0
     ## Evolution of the global optimizer (showing successive minima)
-    fig = go.Figure()
-    fig.add_scatter(x = df_Aw0["X_global"][0], y = df_Aw0["F_global"][0], name = "Global (X,F)", mode = "markers")
-    fig.update_xaxes(title = "X")
-    fig.update_yaxes(title = "F(X)")
+    fig = make_subplots(rows = n_vars + 1, cols = 1)
+    for k_var in range(n_vars):
+        fig.add_scatter(x = np.arange(len(df_Aw0["F_global"][0])), y = np.array(df_Aw0["X_global"][0][:,k_var]), row = 1+k_var, col = 1, name = "X_k global for k = " + str(k_var))
+    fig.add_scatter(x = np.arange(len(df_Aw0["F_local"][0])), y = np.array(df_Aw0["F_global"][0]), row = 1+n_vars, col = 1, name = "F(X) global")
+    fig.update_yaxes(type = "log", row = n_vars + 1)
     fig.vs_show()
 
     ## Evolution of local optimizers
