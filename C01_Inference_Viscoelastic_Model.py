@@ -181,14 +181,14 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
     def local_callback_function(*, intermediate_result): # The star forces intermediate_result as a keyword argument
         """ Callback function for the local minimizer, i.e., the L-BFGS-B algorithm. """
 
-        x = copy.deepcopy(intermediate_result.x)
-        f = intermediate_result.fun
+        x_loc = copy.deepcopy(intermediate_result.x)
+        f_loc = copy.deepcopy(intermediate_result.fun)
 
-        X_local[-1].append(x)
+        X_local[-1].append(x_loc)
         F_local[-1].append(f)
 
         k = len(X_local[-1]) - 1
-        print("L-BFGS-B: (k, xk, f(xk)):", k, x, f)
+        print("L-BFGS-B: (k, xk, f(xk)):", k, x_loc, f_loc)
 
         return    
 
@@ -199,8 +199,9 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         """ Callback function for the global minimizer, i.e., the basin-hopping algorithm. """
 
         x_glob = copy.deepcopy(x)
+        f_glob = copy.deepcopy(f)
         X_global.append(x_glob)
-        F_global.append(f)
+        F_global.append(f_glob)
         accept_global.append(accept)
 
         k = len(X_global) - 1
