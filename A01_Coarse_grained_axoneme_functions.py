@@ -923,6 +923,11 @@ def Solve_InterpFlow(gamma, N, Sp4, k0, bool_EI, Beta, taus_b, tau_s, X0, n_L, m
     
     """ Solves the linear system for a set of parameters.
     Returns the solution if the algorithm converges, None otherwise.
+
+    - INPUT
+
+    - OUTPUT: res, where res.y is a np.array of shape (X0.shape[0], len(T_eval))
+
     """
 
     # Arguments for solve_ivp
@@ -1129,6 +1134,15 @@ def Viscoelastic_Model(params):
     sol = res.y
 
     return sol
+
+def Viscoelastic_Model_LP(params):
+    """
+    Does exactly the same as Viscoelastic_Model, but selects the last bit of the simulation, 
+    corresponding to one period of the flow
+    """
+    sol_lp = Viscoelastic_Model(params)
+    sol_lp.y = sol_lp.y[:, -sol_lp.y.shape[1]//10:] # Keep the last 10th of T_eval
+    return sol_lp
 
 ### Main code ###
 if __name__ == "__main__":

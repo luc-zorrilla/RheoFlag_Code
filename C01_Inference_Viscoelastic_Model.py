@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'FinalHessian')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'BendingElasticity_BendingViscosity_Clamped' / 'LastPeriod')
 from datetime import datetime
 import copy
 
@@ -372,6 +372,10 @@ def ModelExp_Inference(exp_data, model, fixed_params, guess_variable_params, bou
 def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args):
     return ModelExp_Inference(exp_data, Viscoelastic_Model, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args)
 
+def Viscoelastic_Inference_LP(exp_data, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args):
+    """ Same as Viscoelastic_Inference but keeping the last 10th of the solution in time"""
+    return ModelExp_Inference(exp_data, Viscoelastic_Model_LP, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args)
+
 ### Inference function in main loop
 
 def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_path):
@@ -394,9 +398,9 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
         fixed_params.pop(key)
 
     ### Compute filament and inference
-    exp_data = Viscoelastic_Model(exp_params)
+    exp_data = Viscoelastic_Model_LP(exp_params)
     VI_args = dict(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
-    ret, X_local, F_local, X_global, F_global, accept_global = Viscoelastic_Inference(**VI_args)
+    ret, X_local, F_local, X_global, F_global, accept_global = Viscoelastic_Inference_LP(**VI_args)
 
     ## Inference results
 
@@ -479,7 +483,7 @@ if __name__ == '__main__':
         Beta_guess = 0
         tau_b_guess = 0
         for Sp4_guess in [1e1]:
-            guess_variable_params = {'Sp4':Sp4_guess, 'Beta':Beta_guess} # 'Beta':Beta_guess}
+            guess_variable_params = {'Sp4':Sp4_guess, 'Beta':tau_b_guess} # 'Beta':Beta_guess}
 
             ## Bounds
             Sp4_min = np.double(1e-6)
@@ -516,9 +520,9 @@ if __name__ == '__main__':
             n2 = 1 # 11
             Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
             n3 = 1 # 11
-            tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
+            tau_b_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n3))
             n4 = 1 # 11
-            Beta_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n4))
+            Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
             n5 = 1 # 11
             tau_s_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n5))
 
@@ -561,7 +565,7 @@ if __name__ == '__main__':
                         ### Integration and time
                         method = 'BDF' # 'BDF'
                         dT = 2*np.pi/w0 * (1/100)
-                        T_max = 2*np.pi/w0 * (1/4)
+                        T_max = 2*np.pi/w0 * (10)
                         T_span = [0, T_max]
                         T_eval = [dT*i for i in range(round(T_max/dT))]
                         T_sim_max = 1*3600
