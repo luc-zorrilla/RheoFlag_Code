@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'FinalHessian' / 'BasinAcceptTest')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingElasticity_BendingViscosity_Clamped')
 import numpy as np
 import pandas as pd
 
@@ -119,24 +119,33 @@ if __name__ == "__main__":
     Sp4_exp = 1
     Beta_exp = 1e0
     tau_b_exp = 1e0
-    target = np.array([Sp4_exp, Beta_exp]) # np.array([Sp4_exp, tau_b_exp]) # 
+    target = np.array([Sp4_exp, tau_b_exp]) # np.array([Sp4_exp, tau_b_exp]) # 
     df2 = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)
     print(df2)
 
     # Select for specific external parameters
-    df_Aw0 = df2[(df2['A'] == 1e-7) & (df2['w0'] == 1e-9)].reset_index()
+    df_Aw0 = df2[(df2['A'] == 1e-8) & (df2['w0'] == 1e-9)].reset_index()
 
     # Combine inferred parameters
 
     p_combined = [] # Combine parameter estimates (using BLC function)
+    p_median = []
     p_mean = []
     for j in range(n_vars):
-        Z_vector_list_j = [np.array([df2["p_inf"][k][j], df2["Sigma"][k][j]]) for k in range(df2["p_inf"].shape[0])]
-        Z_combined_vector_j = BLC(Z_vector_list_j)
-        Z_mean_vector_j = np.array([np.nanmean(np.array(Z_vector_list_j), where = np.array(Z_vector_list_j) < np.inf, axis = 0)[0], (np.nanstd(np.array(Z_vector_list_j), where = np.array(Z_vector_list_j) < np.inf, axis = 0, ddof = 1) / np.sqrt(len(Z_vector_list_j)))[0]])
+        Z_vector_list_j = np.array([np.array([df2["p_inf"][k][j], df2["Sigma"][k][j]]) for k in range(df2["p_inf"].shape[0])])
+        Z_vector_list_j = Z_vector_list_j[np.where(Z_vector_list_j < np.inf)].reshape((-1,2))
+
+        Z_mean_vector_j = np.array([np.nanmean(Z_vector_list_j, axis = 0)[0], (np.nanstd(np.array(Z_vector_list_j), axis = 0, ddof = 1) / np.sqrt(len(Z_vector_list_j)))[0]])
+
+        Z_median_vector_j = np.array([np.nanmedian(Z_vector_list_j, axis = 0)[0], (np.nanstd(np.array(Z_vector_list_j), axis = 0, ddof = 1) / np.sqrt(len(Z_vector_list_j)))[0]]) # s.e.m. should be updated
+
+        Z_combined_vector_j = np.array(BLC(Z_vector_list_j))
+
         p_combined.append(Z_combined_vector_j)
+        p_median.append(Z_median_vector_j)
         p_mean.append(Z_mean_vector_j)
     print("p_combined", p_combined)
+    print("p_median", p_median)
     print("p_mean", p_mean)
 
     # Plots

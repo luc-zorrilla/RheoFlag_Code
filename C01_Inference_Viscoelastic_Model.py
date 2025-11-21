@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'FinalHessian' / 'BasinAcceptTest')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'QuarterPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'FinalHessian')
 from datetime import datetime
 import copy
 
@@ -499,10 +499,10 @@ if __name__ == '__main__':
             bounds = Bounds(lb,  ub)
 
             # Flow field
-            m1 = 1# 9 # 7
-            A_vec = np.array([1e-7])# np.float_power(10, np.linspace(-10, -2, num = m1)) # np.array([1e-8])
-            m2 = 1 # 16 # 11
-            w0_vec = np.array([1e-9]) # np.float_power(10, np.linspace(-9, 6, num = m2))
+            m1 = 9 # 7
+            A_vec = np.float_power(10, np.linspace(-10, -2, num = m1)) # np.array([1e-8])
+            m2 = 16 # 11
+            w0_vec = np.float_power(10, np.linspace(-9, 6, num = m2))
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
