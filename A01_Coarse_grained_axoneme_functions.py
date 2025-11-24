@@ -1141,7 +1141,7 @@ def Viscoelastic_Model_LP(params):
     corresponding to one period of the flow
     """
     sol_lp = Viscoelastic_Model(params)
-    sol_lp.y = sol_lp.y[:, -sol_lp.y.shape[1]//10:] # Keep the last 10th of T_eval
+    sol_lp = sol_lp[:, -sol_lp.shape[1]//10:] # Keep the last 10th of T_eval
     return sol_lp
 
 ### Main code ###

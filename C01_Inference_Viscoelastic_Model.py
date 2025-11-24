@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'BendingElasticity_BendingViscosity_Clamped' / 'LastPeriod')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_BendingViscosity_Clamped')
 from datetime import datetime
 import copy
 
@@ -377,10 +377,10 @@ def Viscoelastic_Inference_LP(exp_data, fixed_params, guess_variable_params, bou
     return ModelExp_Inference(exp_data, Viscoelastic_Model_LP, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args)
 
 ### Inference function in main loop
-
 def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_path):
     """ This functions performs inference given a certain set of arguments.
     This function is used to parallelize computation within loops. """
+
 
     ## Choose initial guess (and fixed vs variable parameters)
 
@@ -483,7 +483,8 @@ if __name__ == '__main__':
         Beta_guess = 0
         tau_b_guess = 0
         for Sp4_guess in [1e1]:
-            guess_variable_params = {'Sp4':Sp4_guess, 'Beta':tau_b_guess} # 'Beta':Beta_guess}
+
+            guess_variable_params = {'Sp4':Sp4_guess, 'tau_b':tau_b_guess} # 'Beta':Beta_guess}
 
             ## Bounds
             Sp4_min = np.double(1e-6)
@@ -503,9 +504,9 @@ if __name__ == '__main__':
             bounds = Bounds(lb,  ub)
 
             # Flow field
-            m1 = 9 # 7
+            m1 = 9 # 9
             A_vec = np.float_power(10, np.linspace(-10, -2, num = m1)) # np.array([1e-8])
-            m2 = 16 # 11
+            m2 = 16 # 16
             w0_vec = np.float_power(10, np.linspace(-9, 6, num = m2))
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
