@@ -478,6 +478,7 @@ if __name__ == '__main__':
         minimum_gradient = False # Whether to compute gradient at found minimum
         minimum_hessian = True # Whether to compute gradient at found minimum
         opt_args = {"niter":niter, "T":T, "stepsize":stepsize, 'jac':jac, "ftol":ftol, "gtol":gtol, "eps":eps, "finite_diff_rel_step":finite_diff_rel_step, "minimum_gradient":minimum_gradient, "minimum_hessian":minimum_hessian, 'tol':tol}
+        
 
         Sp4_guess = 1e1
         Beta_guess = 0
