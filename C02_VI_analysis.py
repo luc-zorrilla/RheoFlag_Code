@@ -31,6 +31,7 @@ if __name__ == "__main__":
     F_local_list = []
     X_global_list = []
     F_global_list = []
+    F_inf_list = []
     accept_global_list = []
     ret_list = []
 
@@ -64,6 +65,7 @@ if __name__ == "__main__":
                 V = np.array(V).squeeze()
             V_list = [X_local_list, F_local_list, X_global_list, F_global_list, accept_global_list][l]
             V_list.append(V)
+        F_inf_list.append(F_global[-1])
 
         IE = L2_relative_error(p_inf, p_star)
         Hm1 = ret['lowest_optimization_result']['hess_inv'].todense()
@@ -101,6 +103,7 @@ if __name__ == "__main__":
     df["Sigma"] = df.apply(lambda x: np.sqrt(np.diag(x["Hm1"])), axis = 1)
     for key in ["X_local", "F_local", "X_global", "F_global", "accept_global"]:
         df[key] = eval(key + "_list")
+    df["F_inf"] = F_inf_list
     df["ret"] = ret_list
 
     n_vars = p_inf_list[0].shape[0]
@@ -133,7 +136,7 @@ if __name__ == "__main__":
     p_mean = []
     for j in range(n_vars):
         Z_vector_list_j = np.array([np.array([df2["p_inf"][k][j], df2["Sigma"][k][j]]) for k in range(df2["p_inf"].shape[0])])
-        Z_vector_list_j = Z_vector_list_j[np.where(Z_vector_list_j < np.inf)].reshape((-1,2))
+        Z_vector_list_j = Z_vector_list_j[Z_vector_list_j[:,1] < np.inf]
 
         Z_mean_vector_j = np.array([np.nanmean(Z_vector_list_j, axis = 0)[0], (np.nanstd(np.array(Z_vector_list_j), axis = 0, ddof = 1) / np.sqrt(len(Z_vector_list_j)))[0]])
 
@@ -174,6 +177,13 @@ if __name__ == "__main__":
     fig.update_yaxes(title = "log w0", type = "linear")
     fig.update_layout(title = "Inference Error (for each external parameter)")
     fig.vs_show()
+
+    ## Plot F_global (final) heatmap for each (A,w0)-point
+    fig = go.Figure(data = go.Heatmap(x = np.log10(df2['A']), y = np.log10(df2['w0']), z = np.log10(df2['F_inf']), colorscale = 'RdPu_r'))
+    fig.update_xaxes(title = "log A", type = "linear")
+    fig.update_yaxes(title = "log w0", type = "linear")
+    fig.update_layout(title = "F_inf (for each external parameter)")
+    fig.vs_show()    
 
     ## Plot inferred params for each (A,w0)-point
     subplot_titles = []
