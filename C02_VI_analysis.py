@@ -81,13 +81,6 @@ if __name__ == "__main__":
         Hm1_list.append(Hm1)
         ret_list.append(ret)
 
-        ## Inferred parameters with uncertainty
-        # fig = go.Figure()
-        # fig.add_scatter(x = list(guess_variable_params.keys()), y = list(guess_variable_params.values()), mode = "markers", marker_color = "green", marker_size = 10, name = "p_0", opacity = 0.7)
-        # fig.add_scatter(x = list(inferred_variable_params.keys()), y = list(inferred_variable_params.values()), error_y = dict(type = "data", array = np.sqrt(np.diag(Hm1))), mode = "markers", marker_color = "black", name = "p_inf", opacity = 0.7)
-        # fig.add_scatter(x = list(exp_variable_params.keys()), y = list(exp_variable_params.values()), mode = "markers", marker_color = "red", marker_size = 10, name = "p_star", opacity = 0.7)
-        # fig.show()
-
     variable_keys = list(exp_variable_params.keys())
 
     # Make dataframe
@@ -130,26 +123,34 @@ if __name__ == "__main__":
     df_Aw0 = df2[(df2['A'] == 1e-8) & (df2['w0'] == 1e-9)].reset_index()
 
     # Combine inferred parameters
-
     p_combined = [] # Combine parameter estimates (using BLC function)
     p_median = []
     p_mean = []
+
+    p2_combined = [] # Combine parameter estimates (using BLC function)
+    p2_median = []
+    p2_mean = []
     for j in range(n_vars):
         Z_vector_list_j = np.array([np.array([df2["p_inf"][k][j], df2["Sigma"][k][j]]) for k in range(df2["p_inf"].shape[0])])
-        Z_vector_list_j = Z_vector_list_j[Z_vector_list_j[:,1] < np.inf]
+        Z2_vector_list_j = np.array([np.array([df2["p_inf"][k][j], df2["F_inf"][k]]) for k in range(df2["p_inf"].shape[0])])
 
-        Z_mean_vector_j = np.array([np.nanmean(Z_vector_list_j, axis = 0)[0], (np.nanstd(np.array(Z_vector_list_j), axis = 0, ddof = 1) / np.sqrt(len(Z_vector_list_j)))[0]])
+        for l in range(2):
+            Z = [Z_vector_list_j, Z2_vector_list_j][l]
+            Z = Z[Z[:,1] < np.inf]
 
-        Z_median_vector_j = np.array([np.nanmedian(Z_vector_list_j, axis = 0)[0], (np.nanstd(np.array(Z_vector_list_j), axis = 0, ddof = 1) / np.sqrt(len(Z_vector_list_j)))[0]]) # s.e.m. should be updated
+            pl_mean = [p_mean, p2_mean][l]
+            pl_median = [p_median, p2_median][l]
+            pl_combined = [p_combined, p2_combined][l]
 
-        Z_combined_vector_j = np.array(BLC(Z_vector_list_j))
+            pl_mean.append(np.array([np.nanmean(Z, axis = 0)[0], (np.nanstd(np.array(Z), axis = 0, ddof = 1) / np.sqrt(len(Z)))[0]]))
+            pl_median.append(np.array([np.nanmedian(Z, axis = 0)[0], (np.nanstd(np.array(Z), axis = 0, ddof = 1) / np.sqrt(len(Z)))[0]])) # s.e.m. should be updated)
+            pl_combined.append(np.array(BLC(Z)))
 
-        p_combined.append(Z_combined_vector_j)
-        p_median.append(Z_median_vector_j)
-        p_mean.append(Z_mean_vector_j)
-    print("p_combined", p_combined)
-    print("p_median", p_median)
-    print("p_mean", p_mean)
+    print("p_mean", p_mean, p2_mean)
+    print("p_median", p_median, p2_median)
+    print("p_combined", p_combined, p2_combined)
+
+
 
     # Plots
 
