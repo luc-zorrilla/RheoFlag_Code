@@ -487,7 +487,7 @@ if __name__ == '__main__':
 
             guess_variable_params = {'Sp4':Sp4_guess, 'Beta':Beta_guess} # 'tau_b':tau_b_guess}
 
-            ## Bounds
+            ## Bounds 
             Sp4_min = np.double(1e-6)
             Sp4_max = np.double(1e6)
             bound_Sp4 = [Sp4_min, Sp4_max]
