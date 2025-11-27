@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingShearElasticity_NoViscosity_Clamped' / 'MorePrecisew0')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingShearElasticity_BendingViscosity_Clamped')
 from datetime import datetime
 import copy
 
@@ -485,7 +485,7 @@ if __name__ == '__main__':
         tau_b_guess = 0
         for Sp4_guess in [1e1]:
 
-            guess_variable_params = {'Sp4':Sp4_guess, 'Beta':Beta_guess} # 'tau_b':tau_b_guess}
+            guess_variable_params = {'Sp4':Sp4_guess, 'Beta':Beta_guess, 'tau_b':tau_b_guess}
 
             ## Bounds 
             Sp4_min = np.double(1e-6)
@@ -507,8 +507,8 @@ if __name__ == '__main__':
             # Flow field
             m1 = 9 # 9
             A_vec = np.float_power(10, np.linspace(-10, -2, num = m1)) # np.array([1e-8])
-            m2 = 20 # 20 # 16
-            w0_vec = np.float_power(10, np.linspace(-2, 2, num = m2))
+            m2 = 16 # 20
+            w0_vec = np.float_power(10, np.linspace(-10, 5, num = m2)) # np.float_power(10, np.linspace(-2, 2, num = m2))
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
