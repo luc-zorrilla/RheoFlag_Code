@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_BendingViscosity_Clamped' / 'MorePrecisew0')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped')
 import numpy as np
 import pandas as pd
 
@@ -112,15 +112,15 @@ if __name__ == "__main__":
     # df = df[df['guess'] == Sp4_guess].reset_index()
 
     ## Select for a specific exp filament
-    Sp4_exp = 1
+    Sp4_exp = 1e0
     Beta_exp = 1e0
     tau_b_exp = 1e0
-    target = np.array([Sp4_exp, tau_b_exp]) # np.array([Sp4_exp, tau_b_exp]) # 
+    target = np.array([Sp4_exp]) # np.array([Sp4_exp, tau_b_exp]) # 
     df2 = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)
     print(df2)
 
     # Select for specific external parameters
-    df_Aw0 = df2[(df2['A'] == 1e-8) & (df2['w0'] == 1e-9)].reset_index()
+    df_Aw0 = df2[(df2['A'] == 1e-6) & (df2['w0'] == 1e-10)].reset_index()
 
     # Combine inferred parameters
     p_combined = [] # Combine parameter estimates (using BLC function)
@@ -149,8 +149,6 @@ if __name__ == "__main__":
     print("p_mean", p_mean, p2_mean)
     print("p_median", p_median, p2_median)
     print("p_combined", p_combined, p2_combined)
-
-
 
     # Plots
 
