@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingShearElasticity_BendingViscosity_Clamped')
 import numpy as np
 import pandas as pd
 
@@ -115,7 +115,8 @@ if __name__ == "__main__":
     Sp4_exp = 1e0
     Beta_exp = 1e0
     tau_b_exp = 1e0
-    target = np.array([Sp4_exp]) # np.array([Sp4_exp, tau_b_exp]) # 
+    tau_s_exp = 1e0
+    target = np.array([eval(key + "_exp") for key in variable_keys])
     df2 = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)
     print(df2)
 
@@ -218,8 +219,5 @@ if __name__ == "__main__":
             nbinsx=100, nbinsy=50))
         fig.update_layout(title = "Histogram of inferred parameters (all external parameters combined)")
         fig.vs_show()
-
-    ## Inference error for all (A, w0)-point combined, for each set of internal parameters
-    # To be filled
 
 
