@@ -522,7 +522,7 @@ if __name__ == '__main__':
             n2 = 1 # 11
             Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
             n3 = 1 # 11
-            tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
+            tau_b_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n3))
             n4 = 1 # 11
             Beta_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n4))
             n5 = 1 # 11

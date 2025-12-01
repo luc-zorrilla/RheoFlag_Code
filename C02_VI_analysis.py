@@ -9,6 +9,7 @@ import glob
 import pickle
 from pathlib import Path
 writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingShearElasticity_BendingViscosity_Clamped')
+print("writing_path", writing_path)
 import numpy as np
 import pandas as pd
 
@@ -82,6 +83,7 @@ if __name__ == "__main__":
         ret_list.append(ret)
 
     variable_keys = list(exp_variable_params.keys())
+    print("variable_keys", variable_keys)
 
     # Make dataframe
     df = pd.DataFrame()
@@ -103,7 +105,7 @@ if __name__ == "__main__":
     for k_vars in range(n_vars):
         df["p_inf_" + str(k_vars)] = df.apply(lambda x: x['p_inf'][k_vars], axis = 1)
         df["sigma_p_inf_" + str(k_vars)] = df.apply(lambda x: x['Sigma'][k_vars], axis = 1)
-
+    print("df", df)
     # Select files
 
     ## Select for a specific guess
@@ -117,8 +119,9 @@ if __name__ == "__main__":
     tau_b_exp = 1e0
     tau_s_exp = 1e0
     target = np.array([eval(key + "_exp") for key in variable_keys])
+    print("target", target)
     df2 = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)
-    print(df2)
+    print("df2", df2)
 
     # Select for specific external parameters
     df_Aw0 = df2[(df2['A'] == 1e-6) & (df2['w0'] == 1e-10)].reset_index()
@@ -136,7 +139,7 @@ if __name__ == "__main__":
         Z2_vector_list_j = np.array([np.array([df2["p_inf"][k][j], df2["F_inf"][k]]) for k in range(df2["p_inf"].shape[0])])
 
         for l in range(2):
-            Z = [Z_vector_list_j, Z2_vector_list_j][l]
+            Z = ([Z_vector_list_j, Z2_vector_list_j][l]).reshape((-1,2))
             Z = Z[Z[:,1] < np.inf]
 
             pl_mean = [p_mean, p2_mean][l]
@@ -152,24 +155,6 @@ if __name__ == "__main__":
     print("p_combined", p_combined, p2_combined)
 
     # Plots
-
-    # Plot X, F evolution for each A, w0
-    ## Evolution of the global optimizer (showing successive minima)
-    fig = make_subplots(rows = n_vars + 1, cols = 1)
-    for k_var in range(n_vars):
-        fig.add_scatter(x = np.arange(len(df_Aw0["F_global"][0])), y = np.array(df_Aw0["X_global"][0][:,k_var]), row = 1+k_var, col = 1, name = "X_k global for k = " + str(k_var))
-    fig.add_scatter(x = np.arange(len(df_Aw0["F_local"][0])), y = np.array(df_Aw0["F_global"][0]), row = 1+n_vars, col = 1, name = "F(X) global")
-    fig.update_yaxes(type = "log", row = n_vars + 1)
-    fig.vs_show()
-
-    ## Evolution of local optimizers
-    fig = make_subplots(rows = len(df_Aw0["X_local"][0]), cols = n_vars + 1)
-    for k_global in range(len(df_Aw0["X_local"][0])):
-        for k_var in range(n_vars):
-            fig.add_scatter(x = np.arange(len(df_Aw0["X_local"][0][k_global])), y = np.array(df_Aw0["X_local"][0][k_global]).reshape(-1, n_vars)[:,k_var], name = "X for k = " + str(k_global), row = 1+k_global, col = 1+k_var)
-        fig.add_scatter(x = np.arange(len(df_Aw0["F_local"][0][k_global])), y = np.array(df_Aw0["F_local"][0][k_global]).squeeze(), name = "F for k = " + str(k_global), row = 1+k_global, col = 1+n_vars)
-    fig.update_yaxes(type = "log", col = n_vars + 1)
-    fig.vs_show()     
 
     ## Plot IE heatmap for each (A, w0)-point
     fig = go.Figure(data = go.Heatmap(x = np.log10(df2['A']), y = np.log10(df2['w0']), z = np.log10(df2['IE']), colorscale = 'RdPu_r'))
@@ -221,3 +206,20 @@ if __name__ == "__main__":
         fig.vs_show()
 
 
+    # Plot X, F evolution for each A, w0
+    ## Evolution of the global optimizer (showing successive minima)
+    fig = make_subplots(rows = n_vars + 1, cols = 1)
+    for k_var in range(n_vars):
+        fig.add_scatter(x = np.arange(len(df_Aw0["F_global"][0])), y = np.array(df_Aw0["X_global"][0][:,k_var]), row = 1+k_var, col = 1, name = "X_k global for k = " + str(k_var))
+    fig.add_scatter(x = np.arange(len(df_Aw0["F_local"][0])), y = np.array(df_Aw0["F_global"][0]), row = 1+n_vars, col = 1, name = "F(X) global")
+    fig.update_yaxes(type = "log", row = n_vars + 1)
+    fig.vs_show()
+
+    ## Evolution of local optimizers
+    fig = make_subplots(rows = len(df_Aw0["X_local"][0]), cols = n_vars + 1)
+    for k_global in range(len(df_Aw0["X_local"][0])):
+        for k_var in range(n_vars):
+            fig.add_scatter(x = np.arange(len(df_Aw0["X_local"][0][k_global])), y = np.array(df_Aw0["X_local"][0][k_global]).reshape(-1, n_vars)[:,k_var], name = "X for k = " + str(k_global), row = 1+k_global, col = 1+k_var)
+        fig.add_scatter(x = np.arange(len(df_Aw0["F_local"][0][k_global])), y = np.array(df_Aw0["F_local"][0][k_global]).squeeze(), name = "F for k = " + str(k_global), row = 1+k_global, col = 1+n_vars)
+    fig.update_yaxes(type = "log", col = n_vars + 1)
+    fig.vs_show()     
