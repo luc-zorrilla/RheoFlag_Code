@@ -41,7 +41,7 @@ if __name__ == "__main__":
     """
 
     # Folder in which simulation outputs are stored
-    output_folder = (Path(__file__).resolve().parent.parent / 'Model' / 'Output' / 'Inference_Examples' / 'QuarterPeriod').resolve()
+    output_folder = (Path(__file__).resolve().parent.parent / 'Model' / 'Output' / 'StraightLine_PeriodicFlow' / 'BendingShearElasticity_VaryingShearViscosity').resolve()
 
     ###########################################
     ### ----- Adimensional Parameters ----- ###
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     
     ################
     # Sperm number #
-    Sp4_list = [1, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
+    Sp4_list = [1]
     ################
 
     ###############################
@@ -79,7 +79,7 @@ if __name__ == "__main__":
 
     ####################################
     # Shear / bending elasticity ratio #
-    Beta_list = [0]
+    Beta_list = [1]
     ####################################
 
     ###############################
@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
     ##############################
     # Shear viscosity activation #
-    tau_s_list = [0]
+    tau_s_list = [1e-6, 1e-3, 1e0, 1e3, 1e6]
     ##############################
 
     ####################################
@@ -217,9 +217,9 @@ if __name__ == "__main__":
     
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
     n_A = 1
-    A_list = [1e-8] # [2.5e-3]
+    A_list = [1e-8, 1e-7, 1e-6] # [2.5e-3]
     n_w0 = 1
-    w0_list = [1e-10]
+    w0_list = [1e-6, 1e-3, 1e0, 1e3, 1e6]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.
     psi = np.pi/2 # Angle of the flow w.r.t. the horizontal axis
 
@@ -239,7 +239,7 @@ if __name__ == "__main__":
 
     # time determined by the flow timescale
     dT_list = [2*np.pi/w0 * (1 / 100) for w0 in w0_list]
-    T_max_list = [2*np.pi/w0 * (1/4) for w0 in w0_list]
+    T_max_list = [2*np.pi/w0 * (10) for w0 in w0_list]
 
     # Same time for all simulations
     # dT_list = [6e3 for w0 in w0_list]

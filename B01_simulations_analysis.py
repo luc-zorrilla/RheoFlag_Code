@@ -804,7 +804,7 @@ def AnimatedTwoShapes(X, Y, X_flow, N, w0, Sp4, Beta, tau_b, T_eval):
     return fig_shapes
 
 
-def AnimatedShapes(X_list, X_flow, N, T_eval, X3N_eq = np.array(())):
+def AnimatedShapes(X_list, X_flow, N, T_eval, X_3N_eq = np.array([])):
     """ Plot N_s overlapping shapes stored in X_ilist.
 
     --> To be updated so that the flow is plotted in a circle with radius one.
@@ -821,7 +821,7 @@ def AnimatedShapes(X_list, X_flow, N, T_eval, X3N_eq = np.array(())):
         data_dict = go.Scatter(x=X3N(X[:,0])[:N,0], y=X3N(X[:,0])[N:2*N,0])
         fig_dict["data"].append(data_dict)
 
-    n_eq = X3N_eq.size // 3
+    n_eq = X_3N_eq.size // 3
     if n_eq > 0:
         data_dict = go.Scatter(x = X_3N_eq[:n_eq,0][X_3N_eq[:n_eq,0]<=N-1], y = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1], marker_color = "red", line_width = 2, name = "Analytical solution using (x,y)")
         fig_dict["data"].append(data_dict)
@@ -916,19 +916,29 @@ def AnimatedShapes(X_list, X_flow, N, T_eval, X3N_eq = np.array(())):
 ### ----- Plotting animated shape in time ----- ###
 ######################################
 
-
 if __name__ == '__main__':
 
     # Fetch files satisfying required conditions
 
-    sim_path = (Path(__file__).resolve().parent.parent / 'Model' / 'Output' / 'Inference_Examples' / 'QuarterPeriod').resolve()
+    sim_path = (Path(__file__).resolve().parent.parent / 'Model' / 'Output' /'StraightLine_PeriodicFlow' / 'BendingShearElasticity_VaryingShearViscosity').resolve()
 
     def metadata_condition_0(solver_dict, eps = 1e-10):
         """ This functions computes the boolean corresponding to the condition of a clamped purely bending filament, in a harmonic vertical flow. """
 
         output_folder, N, taus_b, tau_s, init_conf, bool_EI, Beta, gamma, n_L, m_L, A, w0, Sp4, k0, Lambdas, Zetas, X_flow_field_string, T_span, T_eval, T_sim_max, T_sim, X_flow_field, X_0, method = list(solver_dict.values())
 
-        bool_condition = (N == 10) & (np.abs(taus_b[0] - 0) < eps) & (np.abs(Beta - 0) < eps) & ("StraightLine" in init_conf) & (gamma == 2) & (np.abs(A - 1e-8) < eps) & (np.abs(w0 - 1e-10) < eps) & (np.abs(k0 - 1e13) < eps) & (method == 'BDF')
+        N_sim = 10
+        tau_b_sim = 0
+        Sp4_sim = 1
+        Beta_sim = 1
+        init_conf_sim = 'StraightLine'
+        A_sim = 1e-6
+        w0_sim = 1e-6
+        gamma_sim = 2
+        k0_sim = 1e13
+        method_sim = 'BDF'
+        
+        bool_condition = (np.abs(N - N_sim) < eps) & (np.abs(Sp4 - Sp4_sim) < eps) & (np.abs(taus_b[0] - tau_b_sim) < eps) & (np.abs(Beta - Beta_sim) < eps) & (init_conf_sim in init_conf) & (np.abs(gamma - gamma_sim) < eps) & (np.abs(A - A_sim) < eps) & (np.abs(w0 - w0_sim) < eps) & (np.abs(k0 - k0_sim) < eps) & (method in method_sim)
 
         return bool_condition
 
@@ -954,11 +964,9 @@ if __name__ == '__main__':
     T_eval *= w0 / (2*np.pi)
 
     # Visualize filaments
-    Sp4 = 1
-    n_eq = 100*N # N-1 # Take N-1 segments only to take into account clamping at the base later
-    X_3N_eq = CheckEquilibrium(N, A, gamma, Sp4, n_L = n_L, Lambdas=Lambdas, conditions = "vertical_flow_uniform", n_eq = n_eq) 
-    # X_Np2_eq = XNp2(X_3N_eq)
-    # X_3N_eq_from_Np2 = X3N(X_Np2_eq)
+    # Sp4 = 1
+    # n_eq = 100*N # N-1 # Take N-1 segments only to take into account clamping at the base later
+    # X_3N_eq = CheckEquilibrium(N, A, gamma, Sp4, n_L = n_L, Lambdas=Lambdas, conditions = "vertical_flow_uniform", n_eq = n_eq) 
 
     # Check that equilibrium is right
     # fig = go.Figure()
@@ -967,16 +975,16 @@ if __name__ == '__main__':
     # fig.vs_show()
 
     ## 3D animation
-    fig_anim = AnimatedShapes(X_list = X_list, X_flow = X_flow_field, N = N, T_eval = T_eval, X3N_eq = X_3N_eq)
-    # fig_anim.add_scatter(x=X_3N_eq[:N], y=X_3N_eq[N:2*N], marker_color = "red", mode = "lines", name = "Analytical solution")
+    fig_anim = AnimatedShapes(X_list = X_list, X_flow = X_flow_field, N = N, T_eval = T_eval)
     fig_anim.vs_show()
 
-    m2 = X_list[0]
-    disc_vec = [(np.linalg.norm(m1 - m2) / np.linalg.norm(m2))**2 for m1 in X_list[1:]]
+    # m2 = X_list[0]
+    # disc_vec = [(np.linalg.norm(m1 - m2) / np.linalg.norm(m2))**2 for m1 in X_list[1:]]
 
-    fig = go.Figure()
-    fig.add_scatter(x = [metadata["Sp4"] for metadata in metadata_list[1:]], y = disc_vec)
-    fig.vs_show()
+    # fig = go.Figure()
+    # fig.add_scatter(x = [metadata["Sp4"] for metadata in metadata_list[1:]], y = disc_vec)
+    # fig.vs_show()
+
     ## 2D heatmap plot
     # X_list = [X_list[0]] # To be removed
     # for X in X_list:
