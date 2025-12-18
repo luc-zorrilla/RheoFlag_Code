@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingShearElasticity_BendingViscosity_Clamped')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingShearElasticity_BendingShearViscosity_Clamped')
 from datetime import datetime
 import copy
 
@@ -483,9 +483,10 @@ if __name__ == '__main__':
         Sp4_guess = 1e1
         Beta_guess = 0
         tau_b_guess = 0
+        tau_s_guess = 0
         for Sp4_guess in [1e1]:
 
-            guess_variable_params = {'Sp4':Sp4_guess, 'Beta':Beta_guess, 'tau_b':tau_b_guess}
+            guess_variable_params = {'Sp4':Sp4_guess, 'Beta':Beta_guess, 'tau_b':tau_b_guess, 'tau_s':tau_s_guess}
 
             ## Bounds 
             Sp4_min = np.double(1e-6)
@@ -499,6 +500,10 @@ if __name__ == '__main__':
             tau_b_min = 0
             tau_b_max = np.double(1e9)
             bound_tau_b = [tau_b_min, tau_b_max]
+
+            tau_s_min = 0
+            tau_s_max = np.double(1e9)
+            bound_tau_s = [tau_s_min, tau_s_max]            
             
             lb = [eval("bound_"+param)[0] for param in guess_variable_params.keys()]
             ub = [eval("bound_"+param)[1] for param in guess_variable_params.keys()]
