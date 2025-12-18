@@ -8,7 +8,8 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingShearElasticity_BendingViscosity_Clamped' / 'MorePrecisew0')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingShearElasticity_BendingViscosity_Clamped')
+print("writing_path", writing_path)
 import numpy as np
 import pandas as pd
 
@@ -82,6 +83,7 @@ if __name__ == "__main__":
         ret_list.append(ret)
 
     variable_keys = list(exp_variable_params.keys())
+    print("variable_keys", variable_keys)
 
     # Make dataframe
     df = pd.DataFrame()
@@ -103,7 +105,7 @@ if __name__ == "__main__":
     for k_vars in range(n_vars):
         df["p_inf_" + str(k_vars)] = df.apply(lambda x: x['p_inf'][k_vars], axis = 1)
         df["sigma_p_inf_" + str(k_vars)] = df.apply(lambda x: x['Sigma'][k_vars], axis = 1)
-
+    print("df", df)
     # Select files
 
     ## Select for a specific guess
@@ -117,8 +119,9 @@ if __name__ == "__main__":
     tau_b_exp = 1e0
     tau_s_exp = 1e0
     target = np.array([eval(key + "_exp") for key in variable_keys])
+    print("target", target)
     df2 = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)
-    print(df2)
+    print("df2", df2)
 
     # Select for specific external parameters
     df_Aw0 = df2[(df2['A'] == 1e-6) & (df2['w0'] == 1e0)].reset_index()
@@ -135,7 +138,7 @@ if __name__ == "__main__":
         Z2_vector_list_j = np.array([np.array([df2["p_inf"][k][j], df2["F_inf"][k]]) for k in range(df2["p_inf"].shape[0])]) # Error is measured from the L2 norm directly
 
         for l in range(2):
-            Z = [Z_vector_list_j, Z2_vector_list_j][l]
+            Z = ([Z_vector_list_j, Z2_vector_list_j][l]).reshape((-1,2))
             Z = Z[Z[:,1] < np.inf]
 
             pl_mean = [p_mean, p2_mean][l]
