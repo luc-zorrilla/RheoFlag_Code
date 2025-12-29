@@ -217,7 +217,7 @@ if __name__ == "__main__":
     
     # Periodic vertical flow of amplitude ( max velocity) A and frequency w0: A*sin(t)
     n_A = 1
-    A_list = [1e-8, 1e-7, 1e-6] # [2.5e-3]
+    A_list = [1e-2] # [2.5e-3]
     n_w0 = 1
     w0_list = [1e-6, 1e-3, 1e0, 1e3, 1e6]
     w0 = 0 # 0 for constant flow, otherwise sinusoidal flow of period w0 in w_s units.

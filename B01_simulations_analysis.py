@@ -932,8 +932,8 @@ if __name__ == '__main__':
         Sp4_sim = 1
         Beta_sim = 1
         init_conf_sim = 'StraightLine'
-        A_sim = 1e-6
-        w0_sim = 1e-6
+        A_sim = 1e-2
+        w0_sim = 1e0
         gamma_sim = 2
         k0_sim = 1e13
         method_sim = 'BDF'
