@@ -19,7 +19,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn import linear_model
 from sklearn.metrics import mean_squared_error, r2_score
 
-# from plotting_functions import * 
 pio.templates.default = "custom_template"
 cyclic_color = ['Twilight', 'IceFire', 'Edge', 'Phase', 'HSV', 'mrybm', 'mygbm'][3]
 # diverging_color = [reverted_Tealrose, 'Fall', 'Geyser', 'Temps', 'Tealrose', 'Tropic'][0]

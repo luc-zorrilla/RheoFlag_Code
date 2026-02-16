@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingShearElasticity_BendingViscosity_Clamped')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_160226')
 print("writing_path", writing_path)
 import numpy as np
 import pandas as pd
@@ -28,6 +28,7 @@ if __name__ == "__main__":
     guess_list = []
     IE_list = []
     Hm1_list = []
+    H_list = []
     X_local_list = []
     F_local_list = []
     X_global_list = []
@@ -72,6 +73,7 @@ if __name__ == "__main__":
         Hm1 = ret['lowest_optimization_result']['hess_inv'].todense()
         if not ret['success']: # If convergence failed, error is infinite
             Hm1 = np.ones_like(Hm1) * np.inf
+        H = ret['hessian']
 
         A_list.append(A)
         w0_list.append(w0)
@@ -80,6 +82,7 @@ if __name__ == "__main__":
         guess_list.append(guess)
         IE_list.append(IE)
         Hm1_list.append(Hm1)
+        H_list.append(H)
         ret_list.append(ret)
 
     variable_keys = list(exp_variable_params.keys())
@@ -95,6 +98,7 @@ if __name__ == "__main__":
     df["guess"] = guess_list
     df["IE"] = IE_list
     df["Hm1"] = Hm1_list # Covariance matrix
+    df["H"] = H_list # Hessian matrix
     df["Sigma"] = df.apply(lambda x: np.sqrt(np.diag(x["Hm1"])), axis = 1)
     for key in ["X_local", "F_local", "X_global", "F_global", "accept_global"]:
         df[key] = eval(key + "_list")
@@ -106,6 +110,10 @@ if __name__ == "__main__":
         df["p_inf_" + str(k_vars)] = df.apply(lambda x: x['p_inf'][k_vars], axis = 1)
         df["sigma_p_inf_" + str(k_vars)] = df.apply(lambda x: x['Sigma'][k_vars], axis = 1)
     print("df", df)
+    print("df", df[['p_inf', 'H', 'Hm1']])
+
+    exit()
+
     # Select files
 
     ## Select for a specific guess
@@ -115,9 +123,9 @@ if __name__ == "__main__":
 
     ## Select for a specific exp filament
     Sp4_exp = 1e0
-    Beta_exp = 1e0
-    tau_b_exp = 1e0
-    tau_s_exp = 1e0
+    Beta_exp = 0e0
+    tau_b_exp = 0e0
+    tau_s_exp = 0e0
     target = np.array([eval(key + "_exp") for key in variable_keys])
     print("target", target)
     df2 = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)

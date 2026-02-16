@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingShearElasticity_BendingShearViscosity_Clamped')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_160226')
 from datetime import datetime
 import copy
 
@@ -235,17 +235,32 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
         step_direction = np.inf
         raise ValueError("x_final is outside of the domain. sl, sb = ", sl, sb)
     
-    # Compute gradient and hessian at convergence point
+    # Compute gradient and hessian at convergence point (if convergence)
+    
     if minimum_gradient or minimum_hessian:
+
         m = guess_variables.shape[0] # number of variables
         vec_func = Vectorize_Functional(func, m)
         if minimum_gradient:
-            g = sd.jacobian(f = vec_func, x = x_final, step_direction = step_direction).df
-            print("Final gradient = ", g)
+            if ret['success']:
+                g = sd.jacobian(f = vec_func, x = x_final, step_direction = step_direction).df
+                print("Final gradient = ", g)
+            else: # Convergence failed
+                g = np.ones((m,))*np.inf
+                print("(No convergence) Final gradient = ", g)
             ret.setdefault('jacobian', g)
         if minimum_hessian:
-            h = sd.hessian(f = vec_func, x = x_final).ddf
-            print("h = ", h)
+            if ret['success']:
+                hess = sd.hessian(f = vec_func, x = x_final)
+                if hess['success']:
+                    h = hess.ddf
+                else:
+                    print("Hessian calculation failed. Status", hess.status)
+                    h = np.zeros((m,m))
+                print("Final hessian = ", h)
+            else: # Convergence failed
+                h = np.zeros((m,m))
+                print("(No convergence) Final hessian = ", h)
             ret.setdefault('hessian', h)
 
     return ret, X_local, F_local, X_global, F_global, accept_global
@@ -476,17 +491,16 @@ if __name__ == '__main__':
         gtol = 1e-8 # Tolerance gradient threshold for the local minimizer        
         finite_diff_rel_step = 1e-6 # Maximum step size for finite difference calculation of the gradient
         minimum_gradient = False # Whether to compute gradient at found minimum
-        minimum_hessian = True # Whether to compute gradient at found minimum
+        minimum_hessian = True # Whether to compute hessian at found minimum
         opt_args = {"niter":niter, "T":T, "stepsize":stepsize, 'jac':jac, "ftol":ftol, "gtol":gtol, "eps":eps, "finite_diff_rel_step":finite_diff_rel_step, "minimum_gradient":minimum_gradient, "minimum_hessian":minimum_hessian, 'tol':tol}
         
-
         Sp4_guess = 1e1
         Beta_guess = 0
         tau_b_guess = 0
         tau_s_guess = 0
         for Sp4_guess in [1e1]:
 
-            guess_variable_params = {'Sp4':Sp4_guess, 'Beta':Beta_guess, 'tau_b':tau_b_guess, 'tau_s':tau_s_guess}
+            guess_variable_params = {'Sp4':Sp4_guess} #, 'Beta':Beta_guess, 'tau_b':tau_b_guess, 'tau_s':tau_s_guess}
 
             ## Bounds 
             Sp4_min = np.double(1e-6)
@@ -510,10 +524,10 @@ if __name__ == '__main__':
             bounds = Bounds(lb,  ub)
 
             # Flow field
-            m1 = 9 # 9
-            A_vec = np.float_power(10, np.linspace(-10, -2, num = m1)) # np.array([1e-8])
-            m2 = 16 # 20
-            w0_vec = np.float_power(10, np.linspace(-10, 5, num = m2)) # np.float_power(10, np.linspace(-2, 2, num = m2))
+            m1 = 5 # 9
+            A_vec = np.float_power(10, np.linspace(-10, -6, num = m1)) # np.array([1e-8])
+            m2 = 13 # 20
+            w0_vec = np.float_power(10, np.linspace(-10, 2, num = m2)) # np.float_power(10, np.linspace(-2, 2, num = m2))
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -527,7 +541,7 @@ if __name__ == '__main__':
             n2 = 1 # 11
             Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
             n3 = 1 # 11
-            tau_b_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n3))
+            tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
             n4 = 1 # 11
             Beta_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n4))
             n5 = 1 # 11
@@ -571,7 +585,7 @@ if __name__ == '__main__':
 
                         ### Integration and time
                         method = 'BDF' # 'BDF'
-                        dT = 2*np.pi/w0 * (1/100)
+                        dT = 2*np.pi/w0 * (1/10)
                         T_max = 2*np.pi/w0 * (10)
                         T_span = [0, T_max]
                         T_eval = [dT*i for i in range(round(T_max/dT))]

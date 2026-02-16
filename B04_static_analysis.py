@@ -4,12 +4,22 @@
 ### Libraries
 
 import os
-import sys
-from pathlib import Path
-plot_functions_folder = Path.home() / 'Work' / 'Miscellaneous' / 'Code'
-sys.path.insert(0, plot_functions_folder)
 import glob
 import time
+
+# Path
+from pathlib import Path # To work with relative path
+working_path = (Path(__file__).resolve().parent.parent).resolve()
+universal_code_path = ((working_path.parent.parent) / 'Miscellaneous' / 'Code').resolve()
+
+import sys
+# Plotting functions
+sys.path.append(str(universal_code_path.resolve()))
+from plotting_functions import * # type: ignore
+import plotly.io as pio
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+pio.templates.default = "figure_template"
 
 # import multiprocessing as mp
 from datetime import datetime
@@ -19,8 +29,6 @@ from B01_simulations_analysis import *
 import numpy as np
 from scipy.signal import find_peaks
 
-from plotting_functions import * 
-pio.templates.default = "figure_template"
 ################################################################################
 
 if __name__ == '__main__':

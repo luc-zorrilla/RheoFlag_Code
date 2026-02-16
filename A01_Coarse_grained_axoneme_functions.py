@@ -7,31 +7,24 @@ import time
 from datetime import datetime
 import json
 import csv
-from pathlib import Path
+
+# Path
+from pathlib import Path # To work with relative path
+working_path = (Path(__file__).resolve().parent.parent).resolve()
+universal_code_path = ((working_path.parent.parent) / 'Miscellaneous' / 'Code').resolve()
+
+import sys
+# Plotting functions
+sys.path.append(str(universal_code_path.resolve()))
+from plotting_functions import * # type: ignore
+import plotly.io as pio
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
 
 import numpy as np
 from scipy.integrate import solve_ivp
 from sklearn.utils import Bunch
 from scipy import interpolate
-
-import plotly.graph_objects as go
-import webbrowser
-# Set default web browser for webbrowser as VSCode (can also be done manually)
-VS_path = str((Path.home() / 'AppData' / 'Local' / 'Programs' / 'Microsoft VS Code' / 'Code.exe').resolve())
-webbrowser.register('VS', None, webbrowser.BackgroundBrowser(VS_path))
-web = webbrowser.get('VS')
-# This scripts adds a method to go.Figure class so that one can plot figures in html format inside VS code.
-def vs_show(self):
-    temp_dir_path = Path.cwd() / 'Temp'
-    temp_file_number = round(datetime.now().timestamp() * 1e6)
-    save_url = str((temp_dir_path / ("temp_" + str(temp_file_number) + ".html")).resolve())
-
-    self.write_html(save_url, include_mathjax = 'cdn')
-    web.open(save_url)
-    
-    return save_url
-go.Figure.vs_show = vs_show
-
 
 ### ----- Functions ----- ###
 ## --- Metadata as a dict --- ##
@@ -221,9 +214,9 @@ def X3N(X):
     for i in range(N):
         X_2 = X2(X, i) # X_2 is adimensional
         theta_i = Theta(X, i)
-        X_3N[i] = X_2[0]
-        X_3N[N+i] = X_2[1]
-        X_3N[2*N+i] = theta_i
+        X_3N[i,0] = X_2[0]
+        X_3N[N+i, 0] = X_2[1]
+        X_3N[2*N+i, 0] = theta_i
 
     return X_3N
 
@@ -233,10 +226,10 @@ def XNp2(X_3N):
     N = X_3N.shape[0]//3
     X_Np2 = np.zeros((N+2,1), dtype=np.double)
 
-    X_Np2[0] = X_3N[0] # x_0
-    X_Np2[1] = X_3N[N] # y_0
-    X_Np2[2] = X_3N[2*N] # alpha_0 = theta_0
-    X_Np2[3:] = X_3N[2*N+1:] - X_3N[2*N:-1] # alpha_i = theta_i - theta_{i-1}
+    X_Np2[0] = X_3N[0,0] # x_0
+    X_Np2[1] = X_3N[N,0] # y_0
+    X_Np2[2] = X_3N[2*N,0] # alpha_0 = theta_0
+    X_Np2[3:] = X_3N[2*N+1:,0] - X_3N[2*N:-1,0] # alpha_i = theta_i - theta_{i-1}
     return X_Np2
 
 # Unit test
@@ -260,7 +253,7 @@ def QQ(X_3N):
     Q_theta = np.tri(N)
     
     for i in range(1,N):
-        theta_im1 = X_3N[2*N+i-1]
+        theta_im1 = X_3N[2*N+i-1,0]
         Q_x[i,:i] = Q_x[i-1,:i] - np.sin(theta_im1)*np.ones((1,i))
         Q_y[i,:i] = Q_y[i-1,:i] + np.cos(theta_im1)*np.ones((1,i))
     Q[:N,2:] = Q_x
@@ -315,7 +308,7 @@ def GG(theta, gamma):
 def UU(X_3N, k, gamma):
     """ Non-dimensional operator G @ [X_dot] """
     N = X_3N.shape[0]//3
-    theta_k = X_3N[2*N+k]
+    theta_k = X_3N[2*N+k, 0]
     G = GG(theta_k, gamma)
     U = np.zeros((3, 3*N))
     U[:,k] = G[:,0]
@@ -327,8 +320,8 @@ def DD(X_3N, k, i):
     """ Returns non-dimensional (x_k-x_j, y_k-y_j, 1) """
     D = np.zeros((1,3))
     N = X_3N.shape[0]//3
-    D[0,0] = X_3N[k] - X_3N[i]
-    D[0,1] = X_3N[N+k] - X_3N[N+i]
+    D[0,0] = X_3N[k,0] - X_3N[i,0]
+    D[0,1] = X_3N[N+k,0] - X_3N[N+i,0]
     D[0,2] = 1
     return D
 
@@ -482,8 +475,8 @@ def BC_L(X_3N, n_L=[0,0], m_L=0):
     B_C = np.zeros((N+2,1))
 
     ## point force and point moment at distal end.
-    x_L = X_3N[N-1] + np.cos(X_3N[-1])
-    y_L = X_3N[2*N-1] + np.sin(X_3N[-1])
+    x_L = X_3N[N-1, 0] + np.cos(X_3N[-1, 0])
+    y_L = X_3N[2*N-1, 0] + np.sin(X_3N[-1, 0])
     
     B_C[0] = - n_L[0]
     B_C[1] = - n_L[1]
@@ -515,7 +508,7 @@ def BB(X_3N): # Argument X_3N could be replaced by X
     B[2] = 0 # total torque equation does not depend on bending resistance
 
     # Bending resistance (constitutive equations)
-    B[3:] = (X_3N[2*N+1:]-X_3N[2*N:-1]) # Bending resistance
+    B[3:] = (X_3N[2*N+1:, :] - X_3N[2*N:-1, :]) # Bending resistance
     
     return B
 
@@ -530,7 +523,7 @@ def BS(X_3N):
     B[1] = 0 # No force on y axis due to shear at s = 0
     B[2] = 0 # No torque due to shear at s = 0
     for i in range(N-1):
-        B[3+i] = np.sum(X_3N[2*N+i+1:]) - (N-i-1)*X_3N[2*N] # Sliding resistance        
+        B[3+i] = np.sum(X_3N[2*N+i+1:, 0]) - (N-i-1)*X_3N[2*N, 0] # Sliding resistance        
     return B
 
 def BFlow(X_3N, X_dot_flow, gamma):
@@ -545,8 +538,8 @@ def BFlow(X_3N, X_dot_flow, gamma):
 
     for j in range(N):
         for i in range(j, N):
-            theta_i = X_3N[2*N+i]
-            B_flow[j+2,0] += DD(X_3N, i, j) @ GG(theta_i, gamma) @ TT_flow(X_dot_flow, i)
+            theta_i = X_3N[2*N+i, 0]
+            B_flow[j+2,0] += np.squeeze(DD(X_3N, i, j) @ GG(theta_i, gamma) @ TT_flow(X_dot_flow, i))
     return B_flow
 
 # # Unit test
@@ -573,7 +566,7 @@ def BF(X_3N, Lambdas):
         for j in range(N):
             for i in range(j, N):
                 Lambda_i = Lambdas[i]
-                B_F[j+2,0] = B_F[j+2,0] + Lambda_i[1] * (X_3N[i] - X_3N[j] + np.cos(X_3N[2*N+i])/2) - Lambda_i[0] * (X_3N[N+i] - X_3N[N+j] + np.sin(X_3N[2*N+i])/2)
+                B_F[j+2,0] = B_F[j+2,0] + Lambda_i[1] * (X_3N[i, 0] - X_3N[j, 0] + np.cos(X_3N[2*N+i, 0])/2) - Lambda_i[0] * (X_3N[N+i, 0] - X_3N[N+j, 0] + np.sin(X_3N[2*N+i, 0])/2)
         return B_F
 
 def BM(Zetas):
