@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_160226')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_170226')
 from datetime import datetime
 import copy
 
@@ -524,10 +524,10 @@ if __name__ == '__main__':
             bounds = Bounds(lb,  ub)
 
             # Flow field
-            m1 = 5 # 9
-            A_vec = np.float_power(10, np.linspace(-10, -6, num = m1)) # np.array([1e-8])
-            m2 = 13 # 20
-            w0_vec = np.float_power(10, np.linspace(-10, 2, num = m2)) # np.float_power(10, np.linspace(-2, 2, num = m2))
+            m1 = 1 # 5
+            A_vec = np.array([1e-8]) # np.float_power(10, np.linspace(-10, -6, num = m1)) # np.array([1e-8])
+            m2 = 1 # 13
+            w0_vec = np.array([1e-3]) # np.float_power(10, np.linspace(-10, 2, num = m2)) # np.float_power(10, np.linspace(-2, 2, num = m2))
             m3 = 1 # 2
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 

@@ -8,13 +8,21 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_160226')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_170226')
 print("writing_path", writing_path)
 import numpy as np
 import pandas as pd
 
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
+
+def inv_mat(M):
+    """ Invert matrix or set to infinity if not invertible. """
+    try:
+        Mm1 = np.linalg.inv(M)
+    except:
+        Mm1 = np.ones_like(M) * np.inf
+    return Mm1
 
 ## Main
 
@@ -97,7 +105,7 @@ if __name__ == "__main__":
     df["p_inf"] = p_inf_list
     df["guess"] = guess_list
     df["IE"] = IE_list
-    df["Hm1"] = Hm1_list # Covariance matrix
+    df["Hm1"] = [inv_mat(H) for H in H_list] # Hm1_list # Covariance matrix
     df["H"] = H_list # Hessian matrix
     df["Sigma"] = df.apply(lambda x: np.sqrt(np.diag(x["Hm1"])), axis = 1)
     for key in ["X_local", "F_local", "X_global", "F_global", "accept_global"]:
@@ -111,8 +119,6 @@ if __name__ == "__main__":
         df["sigma_p_inf_" + str(k_vars)] = df.apply(lambda x: x['Sigma'][k_vars], axis = 1)
     print("df", df)
     print("df", df[['p_inf', 'H', 'Hm1']])
-
-    exit()
 
     # Select files
 
@@ -132,12 +138,13 @@ if __name__ == "__main__":
     print("df2", df2)
 
     # Select for specific external parameters
-    df_Aw0 = df2[(df2['A'] == 1e-6) & (df2['w0'] == 1e0)].reset_index()
+    df_Aw0 = df2[(df2['A'] == 1e-8) & (df2['w0'] == 1e-3)].reset_index()
 
     # Combine inferred parameters
     p_combined = [] # Combine parameter estimates (using BLC function)
     p_median = []
     p_mean = []
+    # Use Inference Error as an error estimate
     p2_combined = [] # Combine parameter estimates (using BLC function)
     p2_median = []
     p2_mean = []
@@ -147,14 +154,14 @@ if __name__ == "__main__":
 
         for l in range(2):
             Z = ([Z_vector_list_j, Z2_vector_list_j][l]).reshape((-1,2))
-            Z = Z[Z[:,1] < np.inf]
+            Z = Z[(Z[:,0] < np.inf) & (Z[:,1] < np.inf)]
 
             pl_mean = [p_mean, p2_mean][l]
             pl_median = [p_median, p2_median][l]
             pl_combined = [p_combined, p2_combined][l]
 
-            pl_mean.append(np.array([np.nanmean(Z, axis = 0)[0], (np.nanstd(np.array(Z), axis = 0, ddof = 1) / np.sqrt(len(Z)))[0]]))
-            pl_median.append(np.array([np.nanmedian(Z, axis = 0)[0], (np.nanstd(np.array(Z), axis = 0, ddof = 1) / np.sqrt(len(Z)))[0]])) # s.e.m. should be updated)
+            pl_mean.append(np.array([np.mean(Z, axis = 0)[0], (np.std(np.array(Z), axis = 0, ddof = 1) / np.sqrt(len(Z)))[0]]))
+            pl_median.append(np.array([np.median(Z, axis = 0)[0], (np.std(np.array(Z), axis = 0, ddof = 1) / np.sqrt(len(Z)))[0]])) # s.e.m. should be updated)
             pl_combined.append(np.array(BLC(Z)))
 
     print("p_mean", p_mean, p2_mean)
@@ -204,7 +211,7 @@ if __name__ == "__main__":
         fig.vs_show()     
     elif n_vars == 2:
         nbinsx = 100
-        nbinsx = 50
+        nbinsy = 50
         fig = go.Figure(go.Histogram2d(
             x=df2['p_inf_0'],
             y=df2['p_inf_1'], 
@@ -216,7 +223,7 @@ if __name__ == "__main__":
     ## Evolution of the global optimizer (showing successive minima)
     fig = make_subplots(rows = n_vars + 1, cols = 1)
     for k_var in range(n_vars):
-        fig.add_scatter(x = np.arange(len(df_Aw0["F_global"][0])), y = np.array(df_Aw0["X_global"][0][:,k_var]), row = 1+k_var, col = 1, name = "X_k global for k = " + str(k_var))
+        fig.add_scatter(x = np.arange(len(df_Aw0["F_global"][0])), y = np.array(df_Aw0["X_global"][0]).reshape(-1, n_vars)[:,k_var], row = 1+k_var, col = 1, name = "X_k global for k = " + str(k_var))
     fig.add_scatter(x = np.arange(len(df_Aw0["F_local"][0])), y = np.array(df_Aw0["F_global"][0]), row = 1+n_vars, col = 1, name = "F(X) global")
     fig.update_yaxes(type = "log", row = n_vars + 1)
     fig.vs_show()
