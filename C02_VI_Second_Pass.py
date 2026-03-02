@@ -268,6 +268,11 @@ if __name__ == "__main__":
     # print(df2['new_pass'])
     print("df2", df2[['p_inf', 'new_p_inf', 'new_sigma', 'new_F_inf']])
 
+    # Save new data somewhere?
+    # FILL WITH SAVING CODE
+
+    # Global averages
+
     p_mean = df2.apply(lambda x: custom_average(x['p_inf'], x['Sigma'], type = "mean"), axis = 1) # type: "mean", "median", "combined"
     p_median = df2.apply(lambda x: custom_average(x['p_inf'], x['Sigma'], type = "median"), axis = 1)
     p_combined = df2.apply(lambda x: custom_average(x['p_inf'], x['Sigma'], type = "combined"), axis = 1)
