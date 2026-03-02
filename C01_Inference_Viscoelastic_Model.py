@@ -11,7 +11,7 @@ import multiprocessing as mp
 import pickle
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_170226')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_020326')
 from datetime import datetime
 import copy
 
@@ -234,7 +234,7 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
     else:
         step_direction = np.inf
         raise ValueError("x_final is outside of the domain. sl, sb = ", sl, sb)
-    
+
     # Compute gradient and hessian at convergence point (if convergence)
     
     if minimum_gradient or minimum_hessian:
@@ -262,6 +262,11 @@ def Basinhopping_LBFGSB_Scheme(func, guess_variables, bounds, niter = 0, T = 0, 
                 h = np.zeros((m,m))
                 print("(No convergence) Final hessian = ", h)
             ret.setdefault('hessian', h)
+
+            # Assign infinite error if convergence point is on the domain boundary
+            if np.abs(np.abs(step_direction) - 1) == 0:
+                h = np.zeros((m,m))
+                ret['hessian'] = h
 
     return ret, X_local, F_local, X_global, F_global, accept_global
 
@@ -393,9 +398,10 @@ def Viscoelastic_Inference_LP(exp_data, fixed_params, guess_variable_params, bou
 
 ### Inference function in main loop
 def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_path):
-    """ This functions performs inference given a certain set of arguments.
-    This function is used to parallelize computation within loops. """
-
+    """ 
+    This functions performs inference given a certain set of arguments.
+    This function is used to parallelize computation within loops. 
+    """
 
     ## Choose initial guess (and fixed vs variable parameters)
 
@@ -524,11 +530,11 @@ if __name__ == '__main__':
             bounds = Bounds(lb,  ub)
 
             # Flow field
-            m1 = 1 # 5
-            A_vec = np.array([1e-8]) # np.float_power(10, np.linspace(-10, -6, num = m1)) # np.array([1e-8])
-            m2 = 1 # 13
-            w0_vec = np.array([1e-3]) # np.float_power(10, np.linspace(-10, 2, num = m2)) # np.float_power(10, np.linspace(-2, 2, num = m2))
-            m3 = 1 # 2
+            m1 = 5
+            A_vec = np.float_power(10, np.linspace(-10, -6, num = m1))
+            m2 = 13
+            w0_vec = np.float_power(10, np.linspace(-10, 2, num = m2))
+            m3 = 1
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
             ### Filament properties
@@ -574,7 +580,7 @@ if __name__ == '__main__':
             Flow_field_filename = "" # Whether to use a measured flow field or not
 
             # Start parallel computation
-            pool = mp.Pool(mp.cpu_count()) # - 2)
+            pool = mp.Pool(mp.cpu_count()) # Use all cpu cores
 
             for i1 in range(m1):
                 A = A_vec[i1]

@@ -8,7 +8,7 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_170226')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_020326')
 print("writing_path", writing_path)
 import numpy as np
 import pandas as pd
@@ -79,9 +79,10 @@ if __name__ == "__main__":
 
         IE = L2_relative_error(p_inf, p_star)
         Hm1 = ret['lowest_optimization_result']['hess_inv'].todense()
+        H = ret['hessian']
         if not ret['success']: # If convergence failed, error is infinite
             Hm1 = np.ones_like(Hm1) * np.inf
-        H = ret['hessian']
+            H = np.zeros_like(H)
 
         A_list.append(A)
         w0_list.append(w0)
