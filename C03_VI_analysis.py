@@ -29,157 +29,41 @@ def inv_mat(M):
 bool_test = False
 if __name__ == "__main__":
 
-    A_list = []
-    w0_list = []
-    p_star_list = []
-    p_inf_list = []
-    guess_list = []
-    IE_list = []
-    Hm1_list = []
-    H_list = []
-    X_local_list = []
-    F_local_list = []
-    X_global_list = []
-    F_global_list = []
-    F_inf_list = []
-    accept_global_list = []
-    ret_list = []
-
-    filepaths = list(writing_path.glob('*.pkl')) # List of path of .pkl files in the writing path
-    filenames = [str(filepath.resolve()) for filepath in filepaths] # Convert to strings in the corresponding OS
-    print("filenames:", len(filenames))
-
-    for filename in filenames:
-
-        pkl_file = open(filename, 'rb')
-        VI_dict = pickle.load(pkl_file)
-        pkl_file.close()
-
-        exp_variable_params = VI_dict["exp_variable_params"]
-        guess_variable_params = VI_dict["args"]["guess_variable_params"]
-        flow_params = VI_dict["flow_params"]
-        A = flow_params["A"]
-        w0 = flow_params["w0"]
-        fixed_params = VI_dict["args"]["fixed_params"]
-
-        p_star = np.array(list(exp_variable_params.values()))
-        ret = VI_dict["output"][0]
-        inferred_variable_params = ret.x
-        p_inf = np.array(list(inferred_variable_params.values()))
-        guess = np.array(list(guess_variable_params.values()))
-
-        X_local, F_local, X_global, F_global, accept_global = VI_dict["output"][1:]
-        for l in range(len(VI_dict["output"][1:])):
-            V = [X_local, F_local, X_global, F_global, accept_global][l] # This will need to be changed to take into account the fact that X_local is a list of arrays. The easiest would be to concatenate it and now where it should be divided, or to turn it into a list of arrays for real
-            if l in [2,3]:
-                V = np.array(V).squeeze()
-            V_list = [X_local_list, F_local_list, X_global_list, F_global_list, accept_global_list][l]
-            V_list.append(V)
-        F_inf_list.append(F_global[-1])
-
-        IE = L2_relative_error(p_inf, p_star)
-        Hm1 = ret['lowest_optimization_result']['hess_inv'].todense()
-        H = ret['hessian']
-        if not ret['success']: # If convergence failed, error is infinite
-            Hm1 = np.ones_like(Hm1) * np.inf
-            H = np.zeros_like(H)
-
-        A_list.append(A)
-        w0_list.append(w0)
-        p_star_list.append(p_star)
-        p_inf_list.append(p_inf)
-        guess_list.append(guess)
-        IE_list.append(IE)
-        Hm1_list.append(Hm1)
-        H_list.append(H)
-        ret_list.append(ret)
-
-    variable_keys = list(exp_variable_params.keys())
-    print("variable_keys", variable_keys)
-
-    # Make dataframe
-    df = pd.DataFrame()
-
-    df["A"] = A_list
-    df["w0"] = w0_list
-    df["p_star"] = p_star_list
-    df["p_inf"] = p_inf_list
-    df["guess"] = guess_list
-    df["IE"] = IE_list
-    df["Hm1"] = [inv_mat(H) for H in H_list] # Hm1_list # Covariance matrix
-    df["H"] = H_list # Hessian matrix
-    df["Sigma"] = df.apply(lambda x: np.sqrt(np.diag(x["Hm1"])), axis = 1)
-    for key in ["X_local", "F_local", "X_global", "F_global", "accept_global"]:
-        df[key] = eval(key + "_list")
-    df["F_inf"] = F_inf_list
-    df["ret"] = ret_list
-
-    n_vars = p_inf_list[0].shape[0]
-    for k_vars in range(n_vars):
-        df["p_inf_" + str(k_vars)] = df.apply(lambda x: x['p_inf'][k_vars], axis = 1)
-        df["sigma_p_inf_" + str(k_vars)] = df.apply(lambda x: x['Sigma'][k_vars], axis = 1)
+    # Import dataframe written after second pass, i.e., "df.pkl".
+    reading_filename = str((writing_path / "df.pkl").resolve())
+    df = pd.read_pickle(reading_filename)
     print("df", df)
-    print("df", df[['p_inf', 'H', 'Hm1']])
 
-    # Select files
+    # Global averages
 
-    ## Select for a specific guess
-    # Sp4_guess = 10
-    # Beta_guess = 1e-3
-    # df = df[df['guess'] == Sp4_guess].reset_index()
+    p_mean = custom_average(df['p_inf'], df['sigma'], type = "mean") # type: "mean", "median", "combined"
+    p_median = custom_average(df['p_inf'], df['sigma'], type = "median")
+    p_combined = custom_average(df['p_inf'], df['sigma'], type = "combined")
 
-    ## Select for a specific exp filament
-    Sp4_exp = 1e0
-    Beta_exp = 0e0
-    tau_b_exp = 0e0
-    tau_s_exp = 0e0
-    target = np.array([eval(key + "_exp") for key in variable_keys])
-    print("target", target)
-    df2 = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)
-    print("df2", df2)
+    new_p_mean = custom_average(df['new_p_inf'], df['new_sigma'], type = "mean") # type: "mean", "median", "combined"
+    new_p_median = custom_average(df['new_p_inf'], df['new_sigma'], type = "median")
+    new_p_combined = custom_average(df['new_p_inf'], df['new_sigma'], type = "combined")
+
+    print("p_mean, new_p_mean", p_mean, new_p_mean)
+    print("p_median, new_p_median", p_median, new_p_median)
+    print("p_combined, new_p_combined", p_combined, new_p_combined)
+
+    exit()
 
     # Select for specific external parameters
-    df_Aw0 = df2[(df2['A'] == 1e-8) & (df2['w0'] == 1e-3)].reset_index()
-
-    # Combine inferred parameters
-    p_combined = [] # Combine parameter estimates (using BLC function)
-    p_median = []
-    p_mean = []
-    # Use Inference Error as an error estimate
-    p2_combined = [] # Combine parameter estimates (using BLC function)
-    p2_median = []
-    p2_mean = []
-    for j in range(n_vars):
-        Z_vector_list_j = np.array([np.array([df2["p_inf"][k][j], df2["Sigma"][k][j]]) for k in range(df2["p_inf"].shape[0])]) # Error is measured from the hessian
-        Z2_vector_list_j = np.array([np.array([df2["p_inf"][k][j], df2["F_inf"][k]]) for k in range(df2["p_inf"].shape[0])]) # Error is measured from the L2 norm directly
-
-        for l in range(2):
-            Z = ([Z_vector_list_j, Z2_vector_list_j][l]).reshape((-1,2))
-            Z = Z[(Z[:,0] < np.inf) & (Z[:,1] < np.inf)]
-
-            pl_mean = [p_mean, p2_mean][l]
-            pl_median = [p_median, p2_median][l]
-            pl_combined = [p_combined, p2_combined][l]
-
-            pl_mean.append(np.array([np.mean(Z, axis = 0)[0], (np.std(np.array(Z), axis = 0, ddof = 1) / np.sqrt(len(Z)))[0]]))
-            pl_median.append(np.array([np.median(Z, axis = 0)[0], (np.std(np.array(Z), axis = 0, ddof = 1) / np.sqrt(len(Z)))[0]])) # s.e.m. should be updated)
-            pl_combined.append(np.array(BLC(Z)))
-
-    print("p_mean", p_mean, p2_mean)
-    print("p_median", p_median, p2_median)
-    print("p_combined", p_combined, p2_combined)
-
+    # df_Aw0 = df[(df['A'] == 1e-8) & (df['w0'] == 1e-3)].reset_index()
+    
     # Plots
 
     ## Plot IE heatmap for each (A, w0)-point
-    fig = go.Figure(data = go.Heatmap(x = np.log10(df2['A']), y = np.log10(df2['w0']), z = np.log10(df2['IE']), colorscale = 'RdPu_r'))
+    fig = go.Figure(data = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = np.log10(df['IE']), colorscale = 'RdPu_r'))
     fig.update_xaxes(title = "log A", type = "linear")
     fig.update_yaxes(title = "log w0", type = "linear")
     fig.update_layout(title = "Inference Error (for each external parameter)")
     fig.vs_show()
 
     ## Plot F_global (final) heatmap for each (A,w0)-point
-    fig = go.Figure(data = go.Heatmap(x = np.log10(df2['A']), y = np.log10(df2['w0']), z = np.log10(df2['F_inf']), colorscale = 'RdPu_r'))
+    fig = go.Figure(data = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = np.log10(df['F_inf']), colorscale = 'RdPu_r'))
     fig.update_xaxes(title = "log A", type = "linear")
     fig.update_yaxes(title = "log w0", type = "linear")
     fig.update_layout(title = "F_inf (for each external parameter)")
@@ -193,8 +77,8 @@ if __name__ == "__main__":
 
     fig = make_subplots(rows = n_vars, cols = 2, subplot_titles=subplot_titles)
     for k_vars in range(n_vars):
-        hm_p_inf_k_vars = go.Heatmap(x = np.log10(df2['A']), y = np.log10(df2['w0']), z = df2['p_inf_' + str(k_vars)], colorscale = 'RdPu_r')
-        hm_sigma_p_inf_k_vars = go.Heatmap(x = np.log10(df2['A']), y = np.log10(df2['w0']), z = np.log10(df2['sigma_p_inf_' + str(k_vars)]), colorscale = 'RdPu_r')
+        hm_p_inf_k_vars = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = df['p_inf_' + str(k_vars)], colorscale = 'RdPu_r')
+        hm_sigma_p_inf_k_vars = go.Heatmap(x = np.log10(df['A']), y = np.log10(df['w0']), z = np.log10(df['sigma_p_inf_' + str(k_vars)]), colorscale = 'RdPu_r')
         fig.add_trace(hm_p_inf_k_vars, row = 1 + k_vars, col = 1)
         fig.add_trace(hm_sigma_p_inf_k_vars, row = 1 + k_vars, col = 2)
     fig.update_xaxes(title = "log A", type = "linear")
@@ -206,7 +90,7 @@ if __name__ == "__main__":
     if n_vars == 1:
         nbins = 20
         fig = go.Figure(go.Histogram(
-            x=df2['p_inf_0'],
+            x=df['p_inf_0'],
             nbinsx = nbins))
         fig.update_layout(title = "Histogram of inferred parameters (all external parameters combined)")
         fig.vs_show()     
@@ -214,8 +98,8 @@ if __name__ == "__main__":
         nbinsx = 100
         nbinsy = 50
         fig = go.Figure(go.Histogram2d(
-            x=df2['p_inf_0'],
-            y=df2['p_inf_1'], 
+            x=df['p_inf_0'],
+            y=df['p_inf_1'], 
             nbinsx=100, nbinsy=50))
         fig.update_layout(title = "Histogram of inferred parameters (all external parameters combined)")
         fig.vs_show()
