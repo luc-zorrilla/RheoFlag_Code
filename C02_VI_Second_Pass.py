@@ -122,6 +122,7 @@ def second_pass(p_inf, sigma, H, F_inf, average_p_but_one, red_func):
 bool_test = False
 if __name__ == "__main__":
 
+    variable_keys_list = []
     A_list = []
     w0_list = []
     p_star_list = []
@@ -139,7 +140,7 @@ if __name__ == "__main__":
     red_func_list = []
     ret_list = []
 
-    filepaths = list(writing_path.glob('VI_dict*.pkl')) # List of path of .pkl files in the writing path
+    filepaths = list(writing_path.glob('VI_dict*.pkl')) # List of path of VI_dict_*.pkl files in the writing path
     filenames = [str(filepath.resolve()) for filepath in filepaths] # Convert to strings in the corresponding OS
     print("filenames:", len(filenames))
 
@@ -150,6 +151,8 @@ if __name__ == "__main__":
         pkl_file.close()
 
         exp_variable_params = VI_dict["exp_variable_params"]
+        variable_keys = list(exp_variable_params.keys())
+        variable_keys_list.append(variable_keys)        
         guess_variable_params = VI_dict["args"]["guess_variable_params"]
         flow_params = VI_dict["flow_params"]
         A = flow_params["A"]
@@ -195,7 +198,7 @@ if __name__ == "__main__":
     # Make dataframe
     df = pd.DataFrame()
 
-    df["variable_keys"] = variable_keys
+    df["variable_keys"] = variable_keys_list
     df["A"] = A_list
     df["w0"] = w0_list
     df["p_star"] = p_star_list
@@ -271,7 +274,7 @@ if __name__ == "__main__":
     important_keys = ["A", "w0", "p_inf", "new_p_inf", "Hm1", "H", "new_H", "sigma", "new_sigma", "F_inf", "new_F_inf", "IE", "new_IE"]
     important_keys += ["variable_keys", "p_star", "guess", "ret"]
     df3 = df2[important_keys]
-    writing_filename = str((writing_path / "df3.pkl").resolve())
+    writing_filename = str((writing_path / "df.pkl").resolve())
     df3.to_pickle(writing_filename)
 
     # Global averages - this is just a test
