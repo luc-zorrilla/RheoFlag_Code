@@ -168,18 +168,7 @@ def BLC(Z_vector_list):
         else:
             w, tot_var = linear_combination_estimators(var_vector) # ¡Assumes independence of estimators in the same list!
             Z_combination = weighted_average(x = Z_vector, w = w)
-
-            if np.isfinite(tot_var):
-                M = w.shape[0]
-                # Standard way of computing standard deviation of that estimator
-                std_Z_combination = np.sqrt(tot_var)
-                # Experimental way of computing standard deviation of that estimator
-                # std_Z_combination = np.sqrt(np.sum(np.multiply(w, (Z_vector - Z_combination)**2))) / np.sqrt(M)
-                # Another way (potentially biased) is the following. Notice the differences with the previous formula
-                # std_Z_combination = np.sqrt(np.sum(np.multiply(w**2, (Z_vector - Z_combination)**2)))
-            else:
-                std_Z_combination = np.sqrt(tot_var)
-
+            std_Z_combination = np.sqrt(tot_var) # Standard way of computing standard deviation of that estimator
             Z_combination_vector = np.array([Z_combination, std_Z_combination])
     
     return Z_combination_vector

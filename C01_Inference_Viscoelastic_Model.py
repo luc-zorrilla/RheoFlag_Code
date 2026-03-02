@@ -8,7 +8,7 @@ from misc_func import *
 from A01_Coarse_grained_axoneme_functions import *
 import multiprocessing as mp
 
-import pickle
+import dill as pickle # enhanced pickle library that handles function pickling as well
 from pathlib import Path
 
 writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_020326')
@@ -529,8 +529,8 @@ if __name__ == '__main__':
             # Flow field
             m1 = 5
             A_vec = np.float_power(10, np.linspace(-10, -6, num = m1))
-            m2 = 13
-            w0_vec = np.float_power(10, np.linspace(-10, 2, num = m2))
+            m2 = 11
+            w0_vec = np.float_power(10, np.linspace(-10, 0, num = m2))
             m3 = 1
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
