@@ -148,6 +148,12 @@ if __name__ == "__main__":
     tau_s_exp = 0e0
     target = np.array([eval(key + "_exp") for key in variable_keys])
     df2 = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)
+
+    # To be deleted after testing
+    # df2['p_inf'] = np.where(df2['p_inf'].index == 0, np.array([1000]) , df2['p_inf'])
+    # df2['F_inf'] = np.where(df2['F_inf'].index == 0, np.array([1000]) , df2['F_inf'])
+    #
+
     print("df2", df2)
 
     ## Loop over inferred parameters
@@ -229,21 +235,28 @@ if __name__ == "__main__":
             return p_inf, sigma, F_inf
 
         # Check if error is infinite or confidence intervals don't intersect
-        if (not np.isfinite(sigma)) or ((p_inf - sigma) > (p_but_one + sigma_but_one)) or ((p_inf + sigma) < (p_but_one - sigma_but_one)):
+        if (not np.isfinite(sigma)) or ((p_inf - sigma) > (p_but_one + sigma_but_one) or (p_inf + sigma) < (p_but_one - sigma_but_one)):
             
             new_F = red_func(p_but_one)
             if new_F < F_inf:
 
-                print("Change")
+                print("Updating outlier parameter...")
 
                 # Parameter
                 new_p_inf = p_but_one
 
                 # Hessian and Sigma
                 m = p_inf.shape[0] # number of variables
-                vec_func = Vectorize_Functional(red_func, m)              
+                vec_func = Vectorize_Functional(red_func, m)      
+                print("Compute hessian...")        
                 new_hess = sd.hessian(f = vec_func, x = new_p_inf)
-                new_sigma = np.sqrt(inv_mat(new_hess))
+                if new_hess['success']:
+                    print("Hessian computed.")
+                    h = new_hess.ddf
+                else:
+                    print("Hessian calculation failed. Status", new_hess.status)
+                    h = np.zeros((m,m))                
+                new_sigma = np.sqrt(np.diag(inv_mat(h)))
 
                 return new_p_inf, new_sigma, new_F
             else:
@@ -254,34 +267,15 @@ if __name__ == "__main__":
     df2[['new_p_inf', 'new_sigma', 'new_F_inf']] = df2.apply(lambda x: second_pass(x['p_inf'], x['Sigma'], x['F_inf'], x['mean_p_but_one'], x['red_func']), axis = 1, result_type = "expand")
     # print(df2['new_pass'])
     print("df2", df2[['p_inf', 'new_p_inf', 'new_sigma', 'new_F_inf']])
-    exit()
 
-    # Combine inferred parameters
-    p_combined = [] # Combine parameter estimates (using BLC function)
-    p_median = []
-    p_mean = []
+    p_mean = df2.apply(lambda x: custom_average(x['p_inf'], x['Sigma'], type = "mean"), axis = 1) # type: "mean", "median", "combined"
+    p_median = df2.apply(lambda x: custom_average(x['p_inf'], x['Sigma'], type = "median"), axis = 1)
+    p_combined = df2.apply(lambda x: custom_average(x['p_inf'], x['Sigma'], type = "combined"), axis = 1)
 
-    # Use Inference Error as an error estimate
-    p2_combined = [] # Combine parameter estimates (using BLC function)
-    p2_median = []
-    p2_mean = []
+    new_p_mean = df2.apply(lambda x: custom_average(x['new_p_inf'], x['new_sigma'], type = "mean"), axis = 1) # type: "mean", "median", "combined"
+    new_p_median = df2.apply(lambda x: custom_average(x['new_p_inf'], x['new_sigma'], type = "median"), axis = 1)
+    new_p_combined = df2.apply(lambda x: custom_average(x['new_p_inf'], x['new_sigma'], type = "combined"), axis = 1)
 
-    for j in range(n_vars):
-        Z_vector_list_j = np.array([np.array([df2["p_inf"][k][j], df2["Sigma"][k][j]]) for k in range(df2["p_inf"].shape[0])]) # Error is measured from the hessian
-        Z2_vector_list_j = np.array([np.array([df2["p_inf"][k][j], df2["F_inf"][k]]) for k in range(df2["p_inf"].shape[0])]) # Error is measured from the L2 norm directly
-
-        for l in range(2):
-            Z = ([Z_vector_list_j, Z2_vector_list_j][l]).reshape((-1,2))
-            Z = Z[(Z[:,0] < np.inf) & (Z[:,1] < np.inf)]
-
-            pl_mean = [p_mean, p2_mean][l]
-            pl_median = [p_median, p2_median][l]
-            pl_combined = [p_combined, p2_combined][l]
-
-            pl_mean.append(np.array([np.mean(Z, axis = 0)[0], (np.std(np.array(Z), axis = 0, ddof = 1) / np.sqrt(len(Z)))[0]]))
-            pl_median.append(np.array([np.median(Z, axis = 0)[0], (np.std(np.array(Z), axis = 0, ddof = 1) / np.sqrt(len(Z)))[0]])) # s.e.m. should be updated)
-            pl_combined.append(np.array(BLC(Z)))
-
-    print("p_mean", p_mean, p2_mean)
-    print("p_median", p_median, p2_median)
-    print("p_combined", p_combined, p2_combined)
+    print("p_mean, new_p_mean", p_mean, new_p_mean)
+    print("p_median, new_p_median", p_median, new_p_median)
+    print("p_combined, new_p_combined", p_combined, new_p_combined)
