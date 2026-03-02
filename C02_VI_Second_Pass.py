@@ -54,6 +54,7 @@ if __name__ == "__main__":
     F_global_list = []
     F_inf_list = []
     accept_global_list = []
+    red_func_list = []
     ret_list = []
 
     filepaths = list(writing_path.glob('*.pkl')) # List of path of .pkl files in the writing path
@@ -79,7 +80,7 @@ if __name__ == "__main__":
         p_inf = np.array(list(inferred_variable_params.values()))
         guess = np.array(list(guess_variable_params.values()))
 
-        X_local, F_local, X_global, F_global, accept_global = VI_dict["output"][1:]
+        X_local, F_local, X_global, F_global, accept_global, red_func = VI_dict["output"][1:]
         for l in range(len(VI_dict["output"][1:])):
             V = [X_local, F_local, X_global, F_global, accept_global][l] # This will need to be changed to take into account the fact that X_local is a list of arrays. The easiest would be to concatenate it and now where it should be divided, or to turn it into a list of arrays for real
             if l in [2,3]:
@@ -87,6 +88,7 @@ if __name__ == "__main__":
             V_list = [X_local_list, F_local_list, X_global_list, F_global_list, accept_global_list][l]
             V_list.append(V)
         F_inf_list.append(F_global[-1])
+        red_func_list.append(red_func)
 
         IE = L2_relative_error(p_inf, p_star)
         Hm1 = ret['lowest_optimization_result']['hess_inv'].todense()
@@ -123,14 +125,14 @@ if __name__ == "__main__":
     for key in ["X_local", "F_local", "X_global", "F_global", "accept_global"]:
         df[key] = eval(key + "_list")
     df["F_inf"] = F_inf_list
+    df['red_func'] = red_func_list
     df["ret"] = ret_list
-
+    
     n_vars = p_inf_list[0].shape[0]
     for k_vars in range(n_vars):
         df["p_inf_" + str(k_vars)] = df.apply(lambda x: x['p_inf'][k_vars], axis = 1)
         df["sigma_p_inf_" + str(k_vars)] = df.apply(lambda x: x['Sigma'][k_vars], axis = 1)
     print("df", df)
-    print("df", df[['p_inf', 'H', 'Hm1']])
 
     # Select files
 
@@ -145,7 +147,6 @@ if __name__ == "__main__":
     tau_b_exp = 0e0
     tau_s_exp = 0e0
     target = np.array([eval(key + "_exp") for key in variable_keys])
-    print("target", target)
     df2 = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)
     print("df2", df2)
 
@@ -168,13 +169,11 @@ if __name__ == "__main__":
     df2['all_p_but_one'] = all_p_but_one_list
     df2['all_sigma_but_one'] = all_sigma_but_one_list
 
-    ### Perform combined average on this modified lists
-    df2['mean_p_but_one'] = df2.apply(lambda x: mean(x['all_p_but_one'], x['all_sigma_but_one']), axis = 1)
-    # df2['median_p_but_one'] = df2.apply(lambda x: median(x['all_p_but_one'], x['all_sigma_but_one']), axis = 1)
-    # df2['combined_p_but_one'] = df2.apply(lambda x: combine(x['all_p_but_one'], x['all_sigma_but_one']), axis = 1)
+    ### Perform combined average on this modified lists -- TO BE MODIFIED
+    df2['mean_p_but_one'] = df2.apply(lambda x: average(x['all_p_but_one'], x['all_sigma_but_one'], type = "mean"), axis = 1) # type: "mean", "median", "combine"
 
-    ### If p is far from average_p_but_one, compute F_p(average_p_but_one)
-    def second_pass(p_inf, sigma, average_p_but_one):
+    ### If p is far from average_p_but_one, compute F_p(average_p_but_one)    
+    def second_pass(p_inf, sigma, F_inf, average_p_but_one, red_func):
         """ 
         1. Check if (p_inf +- sigma) and (average_p_but_one +- average_sigma_but_one) intersects.
         2. If there is no intersection, compute new_F = F_p_inf(average_p_but_one)
@@ -186,18 +185,31 @@ if __name__ == "__main__":
         sigma_but_one = average_p_but_one[1]
 
         if not np.isfinite(sigma_but_one):
-            return new_p_inf, new_sigma
+            return p_inf, sigma, F_inf
 
         # Check if error is infinite or confidence intervals don't intersect
         if (not np.isfinite(sigma)) or ((p_inf - sigma) > (p_but_one + sigma_but_one)) or ((p_inf + sigma) < (p_but_one - sigma_but_one)):
             
-            print("To be completed")
-            # new_p_inf = 
-            # new_sigma = 
+            new_F = red_func(p_but_one)
+            if new_F < F_inf:    
 
-        return new_p_inf, new_sigma
+                # Parameter
+                new_p_inf = p_but_one
 
-    df2[['new_p_inf', 'new_H']] = df2.apply(lambda x: second_pass(x['p_inf'], x['Sigma'], x['mean_p_but_one']), axis = 1)
+                # Hessian and Sigma
+                m = p_inf.shape[0] # number of variables
+                vec_func = Vectorize_Functional(red_func, m)              
+                new_hess = sd.hessian(f = vec_func, x = new_p_inf)
+                new_sigma = np.sqrt(inv_mat(new_hess))
+
+                return new_p_inf, new_sigma, new_F
+            else:
+                return p_inf, sigma, F_inf
+        else: 
+            return p_inf, sigma, F_inf
+
+    # This line needs to be modified
+    df2[['new_p_inf', 'new_sigma', 'new_F_inf']] = df2.apply(lambda x: second_pass(x['p_inf'], x['Sigma'], x['F_inf'], x['mean_p_but_one'], x['red_func']), axis = 1)
 
     # Combine inferred parameters
     p_combined = [] # Combine parameter estimates (using BLC function)
@@ -208,6 +220,7 @@ if __name__ == "__main__":
     p2_combined = [] # Combine parameter estimates (using BLC function)
     p2_median = []
     p2_mean = []
+
     for j in range(n_vars):
         Z_vector_list_j = np.array([np.array([df2["p_inf"][k][j], df2["Sigma"][k][j]]) for k in range(df2["p_inf"].shape[0])]) # Error is measured from the hessian
         Z2_vector_list_j = np.array([np.array([df2["p_inf"][k][j], df2["F_inf"][k]]) for k in range(df2["p_inf"].shape[0])]) # Error is measured from the L2 norm directly

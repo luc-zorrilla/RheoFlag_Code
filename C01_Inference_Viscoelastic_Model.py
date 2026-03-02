@@ -294,7 +294,6 @@ def Make_Red_Func(func, variable_keys, fixed_params):
         """
         The reduced functional.
         Warning! The variables np.ndarray should follow the same order as in the variable_params dictionary, otherwise it won't work.
-
         Warning! This functional is not vectorized.
         """
 
@@ -324,6 +323,9 @@ def Infer(fixed_params, guess_variable_params, bounds, functional, opt_scheme, o
 
     Outputs:
         - res (res.x is the inferred vector)
+        - X_local, F_local: iterations of the local optimisation algorithm
+        - X_global, F_global, accept_global: iterations of the global optimisation algorithm
+        - red_func: The reduced functional to be minimised (not vectorized!), taking only variable parameters as input
 
     Example:
         - fixed_params: {"gamma":_, "N":_, "k0":_, "bool_EI":_, "Beta":_, "taus_b":_, "tau_s":_, "X0":_, "n_L":_, "m_L":_, "Lambdas":_, "Zetas":_, "InterpFlow":_, "method":_, "T_span":_, "T_eval":_, "T_sim_max":_}
@@ -350,7 +352,7 @@ def Infer(fixed_params, guess_variable_params, bounds, functional, opt_scheme, o
         inferred_variable_params[key] = inferred_variables[k]
     res.x = inferred_variable_params
 
-    return res, X_local, F_local, X_global, F_global, accept_global
+    return res, X_local, F_local, X_global, F_global, accept_global, red_func
 
 ### Inference for model-experiment optimization
 def ModelExp_Inference(exp_data, model, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args):
@@ -380,13 +382,9 @@ def ModelExp_Inference(exp_data, model, fixed_params, guess_variable_params, bou
         - opt_scheme: ?
         - opt_args: ?
     """
-
     modelexpdisc_func = Make_Modelexpdisc_Func(disc_func = disc_func, exp_data = exp_data)
     modeldisc_func = Make_Model_Functional(model = model, model_disc_func = modelexpdisc_func)
-    
-    res, X_local, F_local, X_global, F_global, accept_global = Infer(fixed_params = fixed_params, guess_variable_params = guess_variable_params, bounds = bounds, functional = modeldisc_func, opt_scheme = opt_scheme, opt_args=opt_args)
-    
-    return res, X_local, F_local, X_global, F_global, accept_global
+    return Infer(fixed_params = fixed_params, guess_variable_params = guess_variable_params, bounds = bounds, functional = modeldisc_func, opt_scheme = opt_scheme, opt_args=opt_args)
 
 ### Inference for the viscoelastic model
 def Viscoelastic_Inference(exp_data, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args):
@@ -421,7 +419,7 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
     ### Compute filament and inference
     exp_data = Viscoelastic_Model_LP(exp_params)
     VI_args = dict(exp_data=exp_data, fixed_params=fixed_params, guess_variable_params=guess_variable_params, bounds = bounds, disc_func = disc_func, opt_scheme = opt_scheme, opt_args=opt_args)
-    ret, X_local, F_local, X_global, F_global, accept_global = Viscoelastic_Inference_LP(**VI_args)
+    ret, X_local, F_local, X_global, F_global, accept_global, red_func = Viscoelastic_Inference_LP(**VI_args)
 
     ## Inference results
 
@@ -429,7 +427,7 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
     #### Make dictionary with all relevant information
 
     ###### Dictionary of the used function
-    VI_dict = Make_Dict_From_Applied_Function(func = Viscoelastic_Inference, func_args = VI_args, func_output = [ret, X_local, F_local, X_global, F_global, accept_global])
+    VI_dict = Make_Dict_From_Applied_Function(func = Viscoelastic_Inference, func_args = VI_args, func_output = [ret, X_local, F_local, X_global, F_global, accept_global, red_func])
 
     ###### Additional information
     VI_dict["exp_variable_params"] = exp_variable_params
@@ -461,7 +459,6 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
     output = open(filename, 'wb')
     pickle.dump(obj = VI_dict, file = output, protocol = -1)
     output.close()                                            
-
 
 ################################################################################
 ################################################################################
