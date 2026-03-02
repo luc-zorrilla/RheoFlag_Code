@@ -253,6 +253,7 @@ if __name__ == "__main__":
                 if new_hess['success']:
                     print("Hessian computed.")
                     h = new_hess.ddf
+                    print("h = ", h)
                 else:
                     print("Hessian calculation failed. Status", new_hess.status)
                     h = np.zeros((m,m))                
@@ -273,13 +274,13 @@ if __name__ == "__main__":
 
     # Global averages
 
-    p_mean = df2.apply(lambda x: custom_average(x['p_inf'], x['Sigma'], type = "mean"), axis = 1) # type: "mean", "median", "combined"
-    p_median = df2.apply(lambda x: custom_average(x['p_inf'], x['Sigma'], type = "median"), axis = 1)
-    p_combined = df2.apply(lambda x: custom_average(x['p_inf'], x['Sigma'], type = "combined"), axis = 1)
+    p_mean = custom_average(df2['p_inf'], df2['Sigma'], type = "mean") # type: "mean", "median", "combined"
+    p_median = custom_average(df2['p_inf'], df2['Sigma'], type = "median")
+    p_combined = custom_average(df2['p_inf'], df2['Sigma'], type = "combined")
 
-    new_p_mean = df2.apply(lambda x: custom_average(x['new_p_inf'], x['new_sigma'], type = "mean"), axis = 1) # type: "mean", "median", "combined"
-    new_p_median = df2.apply(lambda x: custom_average(x['new_p_inf'], x['new_sigma'], type = "median"), axis = 1)
-    new_p_combined = df2.apply(lambda x: custom_average(x['new_p_inf'], x['new_sigma'], type = "combined"), axis = 1)
+    new_p_mean = custom_average(df2['new_p_inf'], df2['new_sigma'], type = "mean") # type: "mean", "median", "combined"
+    new_p_median = custom_average(df2['new_p_inf'], df2['new_sigma'], type = "median")
+    new_p_combined = custom_average(df2['new_p_inf'], df2['new_sigma'], type = "combined")
 
     print("p_mean, new_p_mean", p_mean, new_p_mean)
     print("p_median, new_p_median", p_median, new_p_median)
