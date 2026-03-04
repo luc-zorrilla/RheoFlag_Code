@@ -19,10 +19,11 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_020326')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_BendingViscosity_Clamped' / 'FixedSp4')
 print("writing_path", writing_path)
 import numpy as np
 import pandas as pd
+import scipy.differentiate as sd
 
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
@@ -140,7 +141,7 @@ if __name__ == "__main__":
     ## Select for a specific exp filament
     Sp4_exp = 1e0
     Beta_exp = 0e0
-    tau_b_exp = 0e0
+    tau_b_exp = 1e0
     tau_s_exp = 0e0
     target = np.array([eval(key + "_exp") for key in variable_keys])
     df2 = df[df['p_star'].apply(lambda x: np.array_equal(x, target))].reset_index(drop=True)

@@ -11,7 +11,7 @@ import multiprocessing as mp
 import dill as pickle # enhanced pickle library that handles function pickling as well
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_020326')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_BendingViscosity_Clamped' / 'FixedSp4')
 from datetime import datetime
 import copy
 
@@ -79,32 +79,6 @@ def Make_Model_Functional(model, model_disc_func):
         return discrepancy
 
     return model_functional
-
-def Vectorize_Functional(func, m):
-    """ 
-    This function vectorizes a functional with m input parameters, 
-    by wrapping it inside another function.
-    """
-
-    def f_vec(x):
-
-        x = np.array(x, copy=False)
-        if x.ndim < 1 or x.shape[0] != m:
-            raise ValueError(f"Expected first dim {m}, got {x.shape}")
-
-        # Flatten extra dims
-        extra_shape = x.shape[1:]
-        p = int(np.prod(extra_shape, dtype=int)) if extra_shape else 1
-        x_flat = x.reshape(m, p)
-
-        # apply func to each column
-        out = np.empty(p, dtype=float)
-        for j in range(p):
-            out[j] = func(x_flat[:, j])
-        # reshape back to extra_shape
-        return out.reshape(extra_shape)
-
-    return f_vec
 
 ### Optimization schemes
 
@@ -503,7 +477,7 @@ if __name__ == '__main__':
         tau_s_guess = 0
         for Sp4_guess in [1e1]:
 
-            guess_variable_params = {'Sp4':Sp4_guess} #, 'Beta':Beta_guess, 'tau_b':tau_b_guess, 'tau_s':tau_s_guess}
+            guess_variable_params = {'tau_b':tau_b_guess} # 'Beta':Beta_guess, 'tau_b':tau_b_guess, 'tau_s':tau_s_guess}
 
             ## Bounds 
             Sp4_min = np.double(1e-6)
@@ -527,10 +501,10 @@ if __name__ == '__main__':
             bounds = Bounds(lb,  ub)
 
             # Flow field
-            m1 = 5
-            A_vec = np.float_power(10, np.linspace(-10, -6, num = m1))
-            m2 = 11
-            w0_vec = np.float_power(10, np.linspace(-10, 0, num = m2))
+            m1 = 8
+            A_vec = np.float_power(10, np.linspace(-10, -3, num = m1))
+            m2 = 16
+            w0_vec = np.float_power(10, np.linspace(-9, 6, num = m2))
             m3 = 1
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -544,9 +518,9 @@ if __name__ == '__main__':
             n2 = 1 # 11
             Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
             n3 = 1 # 11
-            tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
+            tau_b_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n3))
             n4 = 1 # 11
-            Beta_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n4))
+            Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
             n5 = 1 # 11
             tau_s_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n5))
 

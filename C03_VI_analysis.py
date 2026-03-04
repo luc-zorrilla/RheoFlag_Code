@@ -8,21 +8,13 @@ from misc_func import *
 import glob
 import pickle
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped' / 'Test_020326')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_BendingViscosity_Clamped' / 'FixedSp4')
 print("writing_path", writing_path)
 import numpy as np
 import pandas as pd
 
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
-
-def inv_mat(M):
-    """ Invert matrix or set to infinity if not invertible. """
-    try:
-        Mm1 = np.linalg.inv(M)
-    except:
-        Mm1 = np.ones_like(M) * np.inf
-    return Mm1
 
 ## Main
 

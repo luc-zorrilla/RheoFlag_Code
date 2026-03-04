@@ -1131,7 +1131,7 @@ def Viscoelastic_Model(params):
 def Viscoelastic_Model_LP(params):
     """
     Does exactly the same as Viscoelastic_Model, but selects the last bit of the simulation, 
-    corresponding to one period of the flow
+    corresponding to one period of the flow. 
     """
     sol_lp = Viscoelastic_Model(params)
     sol_lp = sol_lp[:, -sol_lp.shape[1]//10:] # Keep the last 10th of T_eval

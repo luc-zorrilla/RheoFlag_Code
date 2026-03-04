@@ -1,5 +1,5 @@
 import numpy as np
-
+import scipy.differentiate as sd
 
 def write_array_to_csv(array, filename):
     """
@@ -181,6 +181,34 @@ def inv_mat(M):
     except:
         Mm1 = np.ones_like(M) * np.inf
     return Mm1
+
+
+def Vectorize_Functional(func, m):
+    """ 
+    This function vectorizes a functional with m input parameters, 
+    by wrapping it inside another function.
+    """
+
+    def f_vec(x):
+
+        x = np.array(x, copy=False)
+        if x.ndim < 1 or x.shape[0] != m:
+            raise ValueError(f"Expected first dim {m}, got {x.shape}")
+
+        # Flatten extra dims
+        extra_shape = x.shape[1:]
+        p = int(np.prod(extra_shape, dtype=int)) if extra_shape else 1
+        x_flat = x.reshape(m, p)
+
+        # apply func to each column
+        out = np.empty(p, dtype=float)
+        for j in range(p):
+            out[j] = func(x_flat[:, j])
+        # reshape back to extra_shape
+        return out.reshape(extra_shape)
+
+    return f_vec
+
 
 def custom_average(x, sigma_x, type = "mean"):
         """ 
