@@ -217,17 +217,16 @@ def custom_average(x, type = "mean"):
         """ 
         Performs a custom average of x.
         Inputs: 
-            - x: ndarray of shape (2,), where each element is an array of shape (n_samples, nvars). x corresponds to (p, sigma_p)
+            - x is a list of ndarrays of shape (2,), i.e., a list of (p, sigma_p)
             - type: a string corresponding to one element of L, 
                 corresponding to the custom average type, where L = ["mean", "median", "combined"]
         Outputs:
             - avg_x: ndarray of shape (2,) where each element is an array of shape (nvars,). avg_x corresponds to (avg_p, sigma_avg_p)
         """
-        p, sigma_p = x[0], x[1]
+        p = np.array([x[k][0] for k in range(len(x))]).reshape((len(x), -1))
+        sigma_p = np.array([x[k][1] for k in range(len(x))]).reshape((len(x), -1))
 
         n_samples = len(p)
-        p = np.array(p).reshape((n_samples,-1))
-        sigma_p = np.array(sigma_p).reshape((n_samples,-1))
         n_vars = p.shape[1] # Check shape of p and sigma_p
         avg_p = np.zeros((n_vars,))
         sigma_avg_p = np.zeros((n_vars,))

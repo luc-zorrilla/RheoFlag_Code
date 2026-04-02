@@ -43,6 +43,23 @@ def get_p_inf_and_sigma_inf(VI_dict):
 
     return np.array([p_inf, sigma_inf]).reshape(2,)
 
+def get_other_params(row, df):
+        """ Get all (p_inf, sigma_inf) pairs except the current row's.
+        Returns an array of shape (2,-1) whose size on axis=1 is the n_samples-1. """
+
+        others = []
+        for _, other_row in df.iterrows():
+            if row.name != other_row.name:  # Skip the current row
+                ret = other_row['VI_dict']['output'][0] 
+                p_inf = np.array(list(ret.x.values()))
+                H_inf = ret['hessian']
+                if not ret['success']: # If convergence failed, error is infinite
+                    H_inf = np.zeros_like(H_inf)
+                sigma_inf = np.sqrt(np.diag(inv_mat(H_inf)))          
+                others.append(np.array([p_inf, sigma_inf]).reshape((2,)))
+        return others
+
+
 def second_pass(VI_dict, avg_other_params, writing_path):
         """ 
         1. Check if (p_inf +- sigma) and (average_p_but_one +- average_sigma_but_one) intersects.
@@ -137,7 +154,6 @@ def second_pass(VI_dict, avg_other_params, writing_path):
             new_VI_dict = VI_dict
             filename = write_VI_dict_to_path(new_VI_dict, new_writing_path)
 
-        print("VI_dict, new_VI_dict", VI_dict, new_VI_dict)
         return new_VI_dict
 
 ## Main
@@ -173,33 +189,28 @@ if __name__ == "__main__":
     ### Obtain excluded average parameters for each element of the dataframe (p_but_one)
 
     #### Make list of parameters without current parameter
-    def get_other_params(row, df):
-        """ Get all (p_inf, H_inf) pairs except the current row's """
-
-        others = []
-        for _, other_row in df.iterrows():
-            if row.name != other_row.name:  # Skip the current row
-                ret = other_row['VI_dict']['output'][0] 
-                p_inf = np.array(list(ret.x.values()))
-                H_inf = ret['hessian']
-                if not ret['success']: # If convergence failed, error is infinite
-                    H_inf = np.zeros_like(H_inf)
-                sigma_inf = np.sqrt(np.diag(inv_mat(H_inf)))          
-                others.append((p_inf, sigma_inf))
-        return others
-
+    
+    ## TEST
+    # df_VI["p_inf"] = df_VI['VI_dict'].apply(get_p_inf_and_sigma_inf)
+    # print("print(df_VI[p_inf])", df_VI["p_inf"])
+    # mean_p_inf = custom_average(df_VI['p_inf'], "mean")
+    # median_p_inf = custom_average(df_VI['p_inf'], "median")
+    # combined_p_inf = custom_average(df_VI['p_inf'], "combined")
+    # print("mean_p_inf, median_p_inf, combined_p_inf", mean_p_inf, median_p_inf, combined_p_inf)    
+    # exit()
+    ## TEST
+    
     df_VI['other_params'] = df_VI.apply(lambda row: get_other_params(row, df_VI), axis=1)
 
     #### Perform average on this modified lists
 
-    df_VI['mean_other_params'] = df_VI['other_params'].apply(lambda x: custom_average(x, "mean"))
+    df_VI['mean_other_params'] = df_VI['other_params'].apply(lambda x: custom_average(x, "mean")) # not working?
     df_VI['median_other_params'] = df_VI['other_params'].apply(lambda x: custom_average(x, "median"))
     df_VI['combined_other_params'] = df_VI['other_params'].apply(lambda x: custom_average(x, "combined"))
     print("df_VI[mean_other_params]", df_VI['mean_other_params'])
 
     ### Apply second pass to each element of the dataframe. This includes writing VI_dict_2 in new directory.
     df_VI['VI_dict_2'] = df_VI.apply(lambda row: second_pass(row['VI_dict'], row['mean_other_params'], row['writing_path']), axis=1)
-    print("VI_dict_2", df_VI['VI_dict_2'])
 
     ### Compare old average and new average
     df_VI["p_inf"] = df_VI['VI_dict'].apply(get_p_inf_and_sigma_inf)
@@ -211,6 +222,7 @@ if __name__ == "__main__":
     mean_new_p_inf = custom_average(df_VI['new_p_inf'], "mean")
     median_new_p_inf = custom_average(df_VI['new_p_inf'], "median")
     combined_new_p_inf = custom_average(df_VI['new_p_inf'], "combined")
+    print("print(df_VI[new_p_inf])", df_VI["new_p_inf"])
 
     print("mean_p_inf, mean_new_p_inf:", mean_p_inf, mean_new_p_inf)
     print("median_p_inf, median_new_p_inf:", median_p_inf, median_new_p_inf)
