@@ -11,7 +11,7 @@ import multiprocessing as mp
 import dill as pickle # enhanced pickle library that handles function pickling as well
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_BendingViscosity_Clamped' / 'FixedSp4')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped')
 from datetime import datetime
 import copy
 
@@ -369,6 +369,42 @@ def Viscoelastic_Inference_LP(exp_data, fixed_params, guess_variable_params, bou
     return ModelExp_Inference(exp_data, Viscoelastic_Model_LP, fixed_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args)
 
 ### Inference function in main loop
+
+#### Functions within inference function
+def write_VI_dict_to_path(VI_dict, writing_path):
+    """ Write VI_dict in the directory represented by writing_path. """
+
+    # Make filename
+    base_id = "_Flow"
+    for key in list(VI_dict['flow_params'].keys()):
+        param = VI_dict['flow_params'][key]
+        base_id += "_" + key + "_" + f"{param:.2E}"                                    
+    base_id += "_Fixed"
+    for key in list(VI_dict['args']['fixed_params'].keys()):
+        # Exclude non-scalar parameters
+        if key in ["A", "w0", "psi", "gamma", "N", "k0", "Sp4", "tau_b", "Beta", "tau_s"]:
+            param = VI_dict['args']['fixed_params'][key]
+            base_id += "_" + key + "_" + f"{param:.2E}"
+    base_id += "_Variable"
+    for key in list(VI_dict['exp_variable_params'].keys()):
+        param = VI_dict['exp_variable_params'][key]
+        base_id += "_" + key + "_" + f"{param:.2E}"
+    base_id += "_Guess"
+    for key in list(VI_dict['args']['guess_variable_params'].keys()):
+        param = VI_dict['args']['guess_variable_params'][key]
+        base_id += "_" + key + "_" + f"{param:.2E}"     
+    filename = str((writing_path / ("VI_dict" + base_id + ".pkl")).resolve())
+    
+    print("filename:", filename)
+    
+    # Pickle dictionary using the highest protocol available
+
+    output = open(filename, 'wb')
+    pickle.dump(obj = VI_dict, file = output, protocol = -1)
+    output.close()
+
+    return filename
+
 def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_path):
     """ 
     This functions performs inference given a certain set of arguments.
@@ -406,33 +442,9 @@ def Viscoelastic_inference_inloop(flow_params, exp_params, guess_variable_params
     ###### Additional information
     VI_dict["exp_variable_params"] = exp_variable_params
     VI_dict["flow_params"] = flow_params
-    
-    # Pickle dictionary using the highest protocol available.
-    
-    ## Make flow part of the filename
-    base_id = "_Flow"
-    for key in list(flow_params.keys()):
-        param = flow_params[key]
-        base_id += "_" + key + "_" + f"{param:.2E}"                                    
-    base_id += "_Fixed"
-    for key in list(fixed_params.keys()):
-        # Exclude non-scalar parameters
-        if key in ["A", "w0", "psi", "gamma", "N", "k0", "Sp4", "tau_b", "Beta", "tau_s"]:
-            param = fixed_params[key]
-            base_id += "_" + key + "_" + f"{param:.2E}"
-    base_id += "_Variable"
-    for key in list(exp_variable_params.keys()):
-        param = exp_variable_params[key]
-        base_id += "_" + key + "_" + f"{param:.2E}"
-    base_id += "_Guess"
-    for key in list(guess_variable_params.keys()):
-        param = guess_variable_params[key]
-        base_id += "_" + key + "_" + f"{param:.2E}"     
-    filename = str((writing_path / ("VI_dict" + base_id + ".pkl")).resolve())
-    print("filename:", filename)
-    output = open(filename, 'wb')
-    pickle.dump(obj = VI_dict, file = output, protocol = -1)
-    output.close()                                            
+
+    filename = write_VI_dict_to_path(VI_dict, writing_path)
+    return VI_dict
 
 ################################################################################
 ################################################################################
@@ -477,7 +489,7 @@ if __name__ == '__main__':
         tau_s_guess = 0
         for Sp4_guess in [1e1]:
 
-            guess_variable_params = {'tau_b':tau_b_guess} # 'Beta':Beta_guess, 'tau_b':tau_b_guess, 'tau_s':tau_s_guess}
+            guess_variable_params = {'Sp4':Sp4_guess} # 'Beta':Beta_guess, 'tau_b':tau_b_guess, 'tau_s':tau_s_guess}
 
             ## Bounds 
             Sp4_min = np.double(1e-6)
@@ -518,7 +530,7 @@ if __name__ == '__main__':
             n2 = 1 # 11
             Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
             n3 = 1 # 11
-            tau_b_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n3))
+            tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
             n4 = 1 # 11
             Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
             n5 = 1 # 11
@@ -593,7 +605,7 @@ if __name__ == '__main__':
 
                                             exp_params = Viscoelastic_Model_Parameters(gamma = gamma, N = N, k0 = k0, bool_EI = bool_EI, Sp4 = Sp4, tau_b = tau_b, Beta = Beta, tau_s = tau_s, init_conf = init_conf, n_L = n_L, m_L = m_L, Lambdas = Lambdas, Zetas = Zetas, InterpFlow = InterpFlow, method = method, T_span = T_span, T_eval = T_eval, T_sim_max = T_sim_max, filament_type = "custom", flow_type = "custom")
 
-                                            inloop_args = [flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_path]                                        
+                                            inloop_args = [flow_params, exp_params, guess_variable_params, bounds, disc_func, opt_scheme, opt_args, writing_path]
                                             res = pool.apply_async(func = Viscoelastic_inference_inloop, args = inloop_args)
 
             pool.close()

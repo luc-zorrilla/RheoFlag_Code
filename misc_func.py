@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.differentiate as sd
+import dill as pickle
 
 def write_array_to_csv(array, filename):
     """
@@ -56,14 +57,16 @@ def Make_Dict_From_Applied_Function(func, func_args, func_output):
         - func_args: the input arguments used for the function (dict)
         Note: If any func_args dictionary item is a function, keeps only its name (string).
         - func_output: the output of the function (unknown type)
+    
+    Update: save functions directly thanks to dill. Not used yet.
     """
     applied_func_dict = {}
-    applied_func_dict["function"] = func.__name__
+    applied_func_dict["function"] = func #.__name__
 
-    for arg_key in list(func_args.keys()):
-        arg = func_args[arg_key]
-        if callable(arg): # Check if it's a function (or behaves like one)
-            func_args[arg_key] = arg.__name__
+    # for arg_key in list(func_args.keys()):
+    #     arg = func_args[arg_key]
+    #     if callable(arg): # Check if it's a function (or behaves like one)
+    #         func_args[arg_key] = arg.__name__
     applied_func_dict["args"] = func_args
 
     applied_func_dict["output"] = func_output
@@ -178,7 +181,7 @@ def inv_mat(M):
     """ Invert matrix or set to infinity if not invertible. """
     try:
         Mm1 = np.linalg.inv(M)
-    except:
+    except np.linalg.LinAlgError:
         Mm1 = np.ones_like(M) * np.inf
     return Mm1
 
@@ -210,84 +213,43 @@ def Vectorize_Functional(func, m):
     return f_vec
 
 
-def custom_average(x, sigma_x, type = "mean"):
+def custom_average(x, type = "mean"):
         """ 
         Performs a custom average of x.
         Inputs: 
-            - x: ndarray of shape (n_samples, nvars)
-            - sigma_x: ndarray of same shape as x. If unknown, set to infinite.
+            - x: ndarray of shape (2,), where each element is an array of shape (n_samples, nvars). x corresponds to (p, sigma_p)
             - type: a string corresponding to one element of L, 
                 corresponding to the custom average type, where L = ["mean", "median", "combined"]
         Outputs:
-            - avg_x: ndarray of shape (nvars,)
-            - sigma_avg_x: ndarray of shape (nvars,) corresponding to std. of the estimator avg_x
+            - avg_x: ndarray of shape (2,) where each element is an array of shape (nvars,). avg_x corresponds to (avg_p, sigma_avg_p)
         """
-        n_samples = len(x)
-        x = np.array(x).reshape((n_samples,-1))
-        sigma_x = np.array(sigma_x).reshape((n_samples,-1))
-        n_vars = x.shape[1] # Check shape of x and sigma_x
-        avg_x = np.zeros((n_vars,))
-        sigma_avg_x = np.zeros((n_vars,))
+        p, sigma_p = x[0], x[1]
+
+        n_samples = len(p)
+        p = np.array(p).reshape((n_samples,-1))
+        sigma_p = np.array(sigma_p).reshape((n_samples,-1))
+        n_vars = p.shape[1] # Check shape of p and sigma_p
+        avg_p = np.zeros((n_vars,))
+        sigma_avg_p = np.zeros((n_vars,))
 
         for j in range(n_vars):
-            Z_vector_list_j = np.array([np.array([x[k,j], sigma_x[k,j]]) for k in range(x.shape[0])]) # Error is measured from the hessian
+            Z_vector_list_j = np.array([np.array([p[k,j], sigma_p[k,j]]) for k in range(p.shape[0])]) # Error is measured from the hessian
             Z = Z_vector_list_j.reshape((-1,2))
             Z = Z[(Z[:,0] < np.inf) & (Z[:,1] < np.inf)]
             
             if type == 'mean':
-                avg_x[j] = np.mean(Z, axis = 0)[0]
-                sigma_avg_x[j] = (np.std(np.array(Z), axis = 0, ddof = 1) / np.sqrt(len(Z)))[0]
+                avg_p[j] = np.mean(Z, axis = 0)[0]
+                sigma_avg_p[j] = (np.std(np.array(Z), axis = 0, ddof = 1) / np.sqrt(len(Z)))[0]
             elif type == 'median':
-                avg_x[j] = np.median(Z, axis = 0)[0]
-                sigma_avg_x[j] = np.nan # No std. for the median.
+                avg_p[j] = np.median(Z, axis = 0)[0]
+                sigma_avg_p[j] = np.nan # No std. for the median.
             elif type == "combined":
-                avg_x[j], sigma_avg_x[j] = np.array(BLC(Z))
+                avg_p[j], sigma_avg_p[j] = np.array(BLC(Z))
             else:
                 raise ValueError("String does not correspond to available types of averages.")
-            
-        return avg_x, sigma_avg_x
+        
+        avg_x = np.array([avg_p, sigma_avg_p]).reshape(2,)
+        return avg_x
 
-def second_pass(p_inf, sigma, H, F_inf, average_p_but_one, red_func):
-        """ 
-        1. Check if (p_inf +- sigma) and (average_p_but_one +- average_sigma_but_one) intersects.
-        2. If there is no intersection, compute new_F = F_p_inf(average_p_but_one)
-        3. If new_F < F_p_inf, new_p_inf = average_p_but_one and new_H = hessian(new_p_inf)
-        4. Return
-        """
-
-        p_but_one = average_p_but_one[0]
-        sigma_but_one = average_p_but_one[1]
-
-        if not np.isfinite(sigma_but_one):
-            return p_inf, sigma, H, F_inf
-
-        # Check if error is infinite or confidence intervals don't intersect
-        if (not np.isfinite(sigma)) or ((p_inf - sigma) > (p_but_one + sigma_but_one) or (p_inf + sigma) < (p_but_one - sigma_but_one)):
-            
-            new_F = red_func(p_but_one)
-            if new_F < F_inf:
-
-                print("Updating outlier parameter...")
-
-                # Parameter
-                new_p_inf = p_but_one
-
-                # Hessian and sigma
-                m = p_inf.shape[0] # number of variables
-                vec_func = Vectorize_Functional(red_func, m)      
-                print("Compute hessian...")        
-                new_hess = sd.hessian(f = vec_func, x = new_p_inf)
-                if new_hess['success']:
-                    print("Hessian computed.")
-                    new_H = new_hess.ddf
-                    print("new_H = ", new_H)
-                else:
-                    print("Hessian calculation failed. Status", new_hess.status)
-                    new_H = np.zeros((m,m))                
-                new_sigma = np.sqrt(np.diag(inv_mat(new_H)))
-
-                return new_p_inf, new_sigma, new_H, new_F
-            else:
-                return p_inf, sigma, H, F_inf
-        else: 
-            return p_inf, sigma, H, F_inf
+def second_pass(): # This is a residual saving to to pickling scripts... no idea what happened but I need to leave this function here.
+    return
