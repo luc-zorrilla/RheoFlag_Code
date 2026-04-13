@@ -11,7 +11,7 @@ import multiprocessing as mp
 import dill as pickle # enhanced pickle library that handles function pickling as well
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_NoViscosity_Clamped')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_BendingViscosity_Clamped')
 from datetime import datetime
 import copy
 
@@ -489,7 +489,7 @@ if __name__ == '__main__':
         tau_s_guess = 0
         for Sp4_guess in [1e1]:
 
-            guess_variable_params = {'Sp4':Sp4_guess} # 'Beta':Beta_guess, 'tau_b':tau_b_guess, 'tau_s':tau_s_guess}
+            guess_variable_params = {'tau_b':tau_b_guess} # 'Sp4':Sp4_guess, 'Beta':Beta_guess, 'tau_b':tau_b_guess, 'tau_s':tau_s_guess}
 
             ## Bounds 
             Sp4_min = np.double(1e-6)
@@ -530,7 +530,7 @@ if __name__ == '__main__':
             n2 = 1 # 11
             Sp4_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n2))
             n3 = 1 # 11
-            tau_b_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n3))
+            tau_b_vec = [1] # np.float_power(10, np.linspace(-5, 5, num = n3))
             n4 = 1 # 11
             Beta_vec = [0] # np.float_power(10, np.linspace(-5, 5, num = n4))
             n5 = 1 # 11

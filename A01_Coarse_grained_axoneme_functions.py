@@ -1109,8 +1109,8 @@ def Viscoelastic_Model(params):
                 InterpFlow, method, T_span, T_eval, T_sim_max.
 
     Remark: Some input parameters could be changed in the future to:
-        - (A, w0, psi) -> InterpFlow
-        - (dT, T_max) -> (T_span, T_eval)
+        - InterpFlow -> (A, w0, psi). InterpFlow is a 1D interpolation of X_flow_field over time.
+        - (T_span, T_eval) -> (dT, T_max)
     But it would increase memory and computational power, as it needs to
     be evaluated at every call of the function.
     """
@@ -1136,6 +1136,42 @@ def Viscoelastic_Model_LP(params):
     sol_lp = Viscoelastic_Model(params)
     sol_lp = sol_lp[:, -sol_lp.shape[1]//10:] # Keep the last 10th of T_eval
     return sol_lp
+
+def Viscoelastic_Simulation(output_path, internal_params, external_params, sim_params):
+    """ This script is made to perform a simulation over one specific model of a viscoelastic filament. 
+    
+    Input:
+        - output_path: where the metadata+data file is saved
+        - internal_params: N, taus_b, tau_s, Beta, gamma, n_L, m_L, bool_EI, Sp4, k0; (X0) OR (init_conf)
+        - external_params: Lambdas, Zetas; ((A, w0, psi) OR (X_flow_field)) OR (InterpFlow), 
+        - sim_params: method, T_sim_max; (dT, T_max) OR (T_span (?), T_eval)
+    
+    Output:
+        - res: full simulation output. To get solution y(x, t), y = res.y
+    """
+
+    # 0. Check that path is a path. If it's a path and it does not exist, create it. If it is None, do not save to a file. Otherwise, raise an error.
+    # 1a. Decide whether to create InterpFlow or not based on InterpFlow. 
+    # 1b. If yes, decide first whether to create a flow field or not based on X_flow_field. 
+    # 1c. Then create InterpFlow from flow field.
+    # 2. Simulate viscoelastic model with internal_params, new_external_params (i.e., InterpFlow), sim_params
+    # 3. Write down solution if path is given.
+    return
+
+def Viscoelastic_Parallel_Simulations(output_path, params_list):
+    """ This script is made to perform parallel simulations over one multiple models of viscoelastic filaments,
+    subject to different external forcings under various simulation parameters. Solutions can be written down if output_path is specified.
+    
+    Input:
+        - output_path: where the metadata+data file is saved
+        - params_list: a list of arrays (internal_params, external_params, sim_params)
+    
+    Output:
+        - res: list of full simulation outputs.
+    """
+
+    # 0. Check that path is a path. If it's a path and it does not exist, create it. If it is not a path, do not save to a file.
+    return
 
 ### Main code ###
 if __name__ == "__main__":

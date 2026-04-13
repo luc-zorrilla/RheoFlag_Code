@@ -7,6 +7,9 @@ import numpy as np
 import multiprocessing as mp
 from pathlib import Path
 
+def main():
+    return
+
 ### Main ###
 if __name__ == "__main__":
 
@@ -36,7 +39,7 @@ if __name__ == "__main__":
     - X_0: initial position of the filament
     - method: solving method for solve_ivp. Can be any of ["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"]
         - Explicit Runge-Kutta methods (‘RK23’, ‘RK45’, ‘DOP853’) should be used for non-stiff problems. ‘DOP853’ is recommended for solving with high precision (low values of rtol and atol).
-        - implicit methods (‘Radau’, ‘BDF’) for stiff problems [9].
+        - Implicit methods (‘Radau’, ‘BDF’) for stiff problems [9].
         --> If not sure, first try to run ‘RK45’. If it makes unusually many iterations, diverges, or fails, your problem is likely to be stiff and you should use ‘Radau’ or ‘BDF’. ‘LSODA’ can also be a good universal choice, but it might be somewhat less convenient to work with as it wraps old Fortran code.
     """
 
