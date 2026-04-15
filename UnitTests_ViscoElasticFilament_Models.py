@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 from Models import Model, merge_models, merge_multiple_models, compose_model, parallel_simulate_batch
-from ViscoElasticFilament_Model import ViscoElasticFilament, FlowParams_to_InterpFlow
+from ViscoElasticFilament_Models import ViscoElasticFilament, FlowParams_to_InterpFlow
 
 # --- Fixtures ---
 @pytest.fixture
