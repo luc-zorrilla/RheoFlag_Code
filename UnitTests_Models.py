@@ -129,7 +129,7 @@ def test_compose_model_with_ext_params():
 
 def test_compose_model_with_sim_params():
     # Define a transformation function for sim_params
-    def transform_sim_params(sim_params):
+    def transform_sim_params(int_params, sim_params, ext_params):
         return {"transformed": True} if sim_params is None else sim_params
 
     # Compose the Square model with the transformation function

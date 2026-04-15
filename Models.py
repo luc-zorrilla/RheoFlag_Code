@@ -2,7 +2,7 @@ from concurrent.futures import ProcessPoolExecutor
 from typing import Any, Callable, Iterable, List, Sequence, Type, Optional, Tuple, Dict, Literal
 import numpy as np
 import logging
-from itertools import zip_longest
+from itertools import zip_longest, product
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +24,7 @@ class Model:
     - sim_output: initialized as None; populated after simulate_single() or simulate_batch() is called
     """
 
-    def __init__(self, int_params: np.ndarray, ext_params: Any, sim_params: Any):
+    def __init__(self, int_params: Any, ext_params: Any, sim_params: Any):
         self.int_params = int_params
         self.ext_params = ext_params
         self.sim_params = sim_params
@@ -62,10 +62,20 @@ class Model:
         # TO BE COMPLETED
         return
 
+    def read_sim_output(self, filepath):
+        """Read simulation output and Model metadata."""
+        # TO BE COMPLETED
+        return
+
     def pickle_model(self, filepath):
         """Pickle Model instance."""
         # TO BE COMPLETED
         return
+    
+    def unpickle_model(self, filepath):
+        """Unpickle Model instance."""
+        # TO BE COMPLETED - Could be a function rather than a method.
+        return        
 
 # ----------------------
 # Example model: Square (x -> x**2)
@@ -101,10 +111,6 @@ class Square(Model):
             output = arr ** 2
             results.append({"value": output, "shape": output.shape})
         return results
-
-# ---------------------------------
-# Include ViscoElasticFilament here (update similarly)
-# ---------------------------------
 
 # --- Functions on models ---
 def reduce_model(
@@ -572,9 +578,7 @@ def _batch_worker(
 
 def parallel_simulate_batch(
     model_cls: Type[Model],
-    int_params_list: Iterable[Any],
-    ext_params_list: Iterable[Any],
-    sim_params_list: Iterable[Any],
+    params_list: Iterable[Tuple[Any, Any, Any]],
     batch_size: int = 32,
     max_workers: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
@@ -582,16 +586,14 @@ def parallel_simulate_batch(
     Run many simulations in parallel using ProcessPoolExecutor with chunking.
     Returns: List[{"value": np.ndarray, "shape": tuple}]
     """
-    int_list = list(int_params_list)
-    ext_list = list(ext_params_list)
-    sim_list = list(sim_params_list)
+    # Unpack the input list of tuples into separate lists
+    int_list, ext_list, sim_list = zip(*params_list)
     n = len(int_list)
-    assert n == len(ext_list) == len(sim_list), "Parameter lists must have same length"
 
     # Create chunks
     chunks: List[Tuple[List[Any], List[Any], List[Any]]] = []
     for i in range(0, n, batch_size):
-        chunks.append((int_list[i : i + batch_size], ext_list[i : i + batch_size], sim_list[i : i + batch_size]))
+        chunks.append((list(int_list[i : i + batch_size]), list(ext_list[i : i + batch_size]), list(sim_list[i : i + batch_size])))
 
     results: List[Dict[str, Any]] = []
     with ProcessPoolExecutor(max_workers=max_workers) as ex:

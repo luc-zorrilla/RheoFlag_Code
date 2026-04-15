@@ -522,6 +522,52 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
 
     return sim_output
 
+def ViscoElasticFilament_create_params_list(int_keys: List[str], ext_keys: List[str], sim_keys: List[str], params_list_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """ Generate all combinations of the parameter lists. 
+    Useful for parallel computations of varying model parameters. """
+    
+    params_list = []
+    # Internal parameters
+    for gamma in params_list_dict["gamma_list"]:
+        for k in range(len(params_list_dict["N_list"])):
+            
+            N = params_list_dict["N_list"][k]
+            
+            # N-dependent lists
+            taus_b = params_list_dict["taus_b_list"][k]
+            X_0 = params_list_dict["X_0_list"][k]
+            Lambdas = params_list_dict["Lambdas_list"][k]
+            Zetas = params_list_dict["Zetas_list"][k]
+            
+            for k0 in params_list_dict["k0_list"]:
+                for bool_EI in params_list_dict["bool_EI_list"]:
+                    for Sp4 in params_list_dict["Sp4_list"]:
+                        for Beta in params_list_dict["Beta_list"]:
+                            for tau_s in params_list_dict["tau_s_list"]:
+                                for n_L in params_list_dict["n_L_list"]:
+                                    for m_L in params_list_dict["m_L_list"]:
+
+                                        # External parameters
+                                        for InterpFlow in params_list_dict["InterpFlow_list"]: # Change to A,w0,psi for the other one
+                                            
+                                            # Simulation parameters
+                                            for l in range(len(params_list_dict["T_span_list"])):
+                                                
+                                                T_span = params_list_dict["T_span_list"][l]
+                                                # T_span dependent lists
+                                                T_eval_sublist =params_list_dict["T_eval_list"][l]
+
+                                                for T_eval in T_eval_sublist:
+                                                    for T_sim_max in params_list_dict["T_sim_max_list"]:
+                                                        for method in params_list_dict["method_list"]:
+
+                                                            int_params = {key:eval(key) for key in int_keys}
+                                                            ext_params = {key:eval(key) for key in ext_keys}
+                                                            sim_params = {key:eval(key) for key in sim_keys}
+                                                            params_list.append((int_params, ext_params, sim_params))
+
+    return params_list
+
 class ViscoElasticFilament(Model):
     def __init__(self, int_params: Any, ext_params: Any, sim_params: Any):
         super().__init__(int_params, ext_params, sim_params)
@@ -577,7 +623,6 @@ def FlowParams_to_InterpFlow(int_params, ext_params, sim_params):
 
     return {'Lambdas': ext_params['Lambdas'], 'Zetas': ext_params['Zetas'], 'InterpFlow': InterpFlow}
     
-
 # Define the ViscoElasticFilament_FlowParams class by composing the ViscoElasticFilament class
 ViscoElasticFilament_FlowParams = compose_model(
     ViscoElasticFilament,
