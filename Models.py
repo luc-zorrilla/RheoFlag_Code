@@ -1,4 +1,4 @@
-from concurrent.futures import ProcessPoolExecutor
+from joblib import Parallel, delayed
 from typing import Any, Callable, Iterable, List, Sequence, Type, Optional, Tuple, Dict, Literal
 import numpy as np
 import logging
@@ -576,28 +576,53 @@ def _batch_worker(
             outputs.append(m.simulate_single())
     return outputs
 
+# def parallel_simulate_batch(
+#     model_cls: Type[Model],
+#     params_list: Iterable[Tuple[Any, Any, Any]],
+#     batch_size: int = 32,
+#     max_workers: Optional[int] = None,
+# ) -> List[Dict[str, Any]]:
+#     """
+#     Run many simulations in parallel using ProcessPoolExecutor with chunking.
+#     Returns: List[{"value": np.ndarray, "shape": tuple}]
+#     """
+#     # Unpack the input list of tuples into separate lists
+#     int_list, ext_list, sim_list = zip(*params_list)
+#     n = len(int_list)
+
+#     # Create chunks
+#     chunks: List[Tuple[List[Any], List[Any], List[Any]]] = []
+#     for i in range(0, n, batch_size):
+#         chunks.append((list(int_list[i : i + batch_size]), list(ext_list[i : i + batch_size]), list(sim_list[i : i + batch_size])))
+
+#     results: List[Dict[str, Any]] = []
+#     with ProcessPoolExecutor(max_workers=max_workers) as ex:
+#         futures = [ex.submit(_batch_worker, model_cls, c[0], c[1], c[2]) for c in chunks]
+#         for fut in futures:
+#             results.extend(fut.result())
+#     return results
+
 def parallel_simulate_batch(
     model_cls: Type[Model],
     params_list: Iterable[Tuple[Any, Any, Any]],
     batch_size: int = 32,
-    max_workers: Optional[int] = None,
+    n_jobs: int = 4,
 ) -> List[Dict[str, Any]]:
-    """
-    Run many simulations in parallel using ProcessPoolExecutor with chunking.
-    Returns: List[{"value": np.ndarray, "shape": tuple}]
-    """
-    # Unpack the input list of tuples into separate lists
+    """joblib handles pickling of nested classes better."""
     int_list, ext_list, sim_list = zip(*params_list)
     n = len(int_list)
 
-    # Create chunks
-    chunks: List[Tuple[List[Any], List[Any], List[Any]]] = []
+    results = []
     for i in range(0, n, batch_size):
-        chunks.append((list(int_list[i : i + batch_size]), list(ext_list[i : i + batch_size]), list(sim_list[i : i + batch_size])))
-
-    results: List[Dict[str, Any]] = []
-    with ProcessPoolExecutor(max_workers=max_workers) as ex:
-        futures = [ex.submit(_batch_worker, model_cls, c[0], c[1], c[2]) for c in chunks]
-        for fut in futures:
-            results.extend(fut.result())
+        chunk_int = list(int_list[i : i + batch_size])
+        chunk_ext = list(ext_list[i : i + batch_size])
+        chunk_sim = list(sim_list[i : i + batch_size])
+        
+        batch_results = Parallel(n_jobs=n_jobs)(
+            delayed(_batch_worker)(model_cls, [ip], [ep], [sp]) 
+            for ip, ep, sp in zip(chunk_int, chunk_ext, chunk_sim)
+        )
+        for batch in batch_results:
+            results.extend(batch)
+    
     return results
