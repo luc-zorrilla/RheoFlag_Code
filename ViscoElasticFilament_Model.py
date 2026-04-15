@@ -2,8 +2,436 @@ import numpy as np
 from typing import Any, Dict, List, Optional, Sequence
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
+from Models import Model, reduce_model, reconstruct_model, merge_models, merge_multiple_models, compose_model, parallel_simulate_batch
 import time
 
+## --- Initial conditions --- ##
+
+def StraightLine(N):
+    """ A straight line """
+    X_0 = np.zeros(N+2, dtype = np.double)
+    return X_0
+
+def Bend(N, k = 2, phi = np.pi / 4):
+    """ A bend (of the kth segment). k = 2 and phi = pi/4 corresponds to ProximalBend """
+    X_0 = np.zeros(N+2, np.double)
+    X_0[k] = phi
+    return X_0
+
+def ProximalBend(N):
+    """ A proximal bend (of the first segment) """
+    X_0 = Bend(N, k = 2, phi = np.pi/4)
+    return X_0    
+
+def SecondBend(N):
+    """ A proximal bend (of the second segment) """
+    X_0 = Bend(N, k = 3, phi = np.pi/1024)
+    return X_0
+
+## --- Parameter functions --- ##
+
+def Theta(X, k):
+    """ Returns Theta_k from X_Np2. """
+
+    theta_k = np.sum(X[2:k+3])
+    return theta_k
+
+def X2(X, i):
+    """ Returns non-dimensional position vector X_i from X_Np2. """
+
+    X_2 = np.zeros(2)
+    # print("X[0]", X[0])
+    # print("X_2[0]", X_2[0])
+    X_2[0] = X[0]
+    X_2[1] = X[1]
+    for k in range(i):
+        theta_k = Theta(X, k)
+        X_2[0] += np.cos(theta_k)
+        X_2[1] += np.sin(theta_k)
+    return X_2
+
+def X3N(X):
+    """ Returns adimensional X_3N vector from X_Np2. """
+
+    N = X.shape[0]-2
+    X_3N = np.zeros((3*N,1), dtype=np.double)
+
+    for i in range(N):
+        X_2 = X2(X, i) # X_2 is adimensional
+        theta_i = Theta(X, i)
+        X_3N[i,0] = X_2[0]
+        X_3N[N+i, 0] = X_2[1]
+        X_3N[2*N+i, 0] = theta_i
+
+    return X_3N
+
+def XNp2(X_3N):
+    """ Returns adimensional X_Np2 vector from X_3N. """
+
+    N = X_3N.shape[0]//3
+    X_Np2 = np.zeros((N+2,1), dtype=np.double)
+
+    X_Np2[0] = X_3N[0,0] # x_0
+    X_Np2[1] = X_3N[N,0] # y_0
+    X_Np2[2] = X_3N[2*N,0] # alpha_0 = theta_0
+    X_Np2[3:] = X_3N[2*N+1:,0] - X_3N[2*N:-1,0] # alpha_i = theta_i - theta_{i-1}
+    return X_Np2
+
+# Unit test
+# N = 5
+# X = ProximalBend(N)
+# X_3N = X3N(X)
+# print("X = ", X)
+# print("X_3N = ", X_3N)
+
+def QQ(X_3N):
+    """ Non-dimensional Transfert matrix from X_Np2_dot to X_3N_dot. 
+    It is shape-dependent while the opposite transfert matrix is not. """
+
+    N = X_3N.shape[0]//3
+    Q = np.zeros((3*N, N+2))
+    Q[:N,0] = np.ones((N,1)).ravel()
+    Q[N:2*N,1] = np.ones((N,1)).ravel()
+
+    Q_x = np.zeros((N,N))
+    Q_y = np.zeros((N,N))
+    Q_theta = np.tri(N)
+    
+    for i in range(1,N):
+        theta_im1 = X_3N[2*N+i-1,0]
+        Q_x[i,:i] = Q_x[i-1,:i] - np.sin(theta_im1)*np.ones((1,i))
+        Q_y[i,:i] = Q_y[i-1,:i] + np.cos(theta_im1)*np.ones((1,i))
+    Q[:N,2:] = Q_x
+    Q[N:2*N,2:] = Q_y
+    Q[2*N:3*N,2:] = Q_theta
+    return Q
+
+## --- Fluid drag --- ##
+
+def Eta(mu, r, L, h = -1):
+    """ Returns the parallel drag coefficient (RFT). """
+    if h<0:
+        return 2 * np.pi * mu / (np.log(L/r) - 0.807)
+    else:
+        return 2 * np.pi * mu / np.log(2*h/r)
+
+def Xi(mu, r, L, h = -1):
+    """ Returns the perpendicular drag coefficient (RFT). """
+    if h<0:
+        return 4 * np.pi * mu / (np.log(L/r) + 0.193)
+    else:
+        return 2 * Eta(mu, r, L, h)
+
+def GG(theta, gamma):
+    """ Computes the matrix G of fluid drag for RFT computation. """
+
+    G = np.zeros((3,5))
+    cos = np.cos(theta)
+    sin = np.sin(theta)
+
+    G[0,0] = (gamma-1)*cos*sin
+    G[1,1] = - G[0,0]
+    G[0,1] = - sin**2 - gamma*cos**2
+    G[1,0] = cos**2 + gamma*sin**2
+    G[0,2] = - gamma*cos/2
+    G[2,1] = G[0,2]
+    G[1,2] = - gamma*sin/2
+    G[2,0] = - G[1,2]
+    G[2,2] = - gamma/3
+
+    G[0,3] = 0
+    G[0,4] = 0
+    G[1,3] = 0
+    G[1,4] = 0    
+
+    # Components used for external flow only
+    G[2,3] = - gamma * sin
+    G[2,4] = gamma * cos
+
+    return G
+
+def UU(X_3N, k, gamma):
+    """ Non-dimensional operator G @ [X_dot] """
+    N = X_3N.shape[0]//3
+    theta_k = X_3N[2*N+k, 0]
+    G = GG(theta_k, gamma)
+    U = np.zeros((3, 3*N))
+    U[:,k] = G[:,0]
+    U[:,N+k] = G[:,1]
+    U[:,2*N+k] = G[:,2]
+    return U
+
+def DD(X_3N, k, i):
+    """ Returns non-dimensional (x_k-x_j, y_k-y_j, 1) """
+    D = np.zeros((1,3))
+    N = X_3N.shape[0]//3
+    D[0,0] = X_3N[k,0] - X_3N[i,0]
+    D[0,1] = X_3N[N+k,0] - X_3N[N+i,0]
+    D[0,2] = 1
+    return D
+
+def AA(X_3N, gamma):
+    """ Computes and returns non-dimensional A(X_3N) such that A @ X_3N_dot = A @ [Q @ X_dot] = B. """
+
+    N = X_3N.shape[0]//3
+    A = np.zeros((N+2,3*N))
+
+    A[0,0] = 1 # 1*x0_dot = b_0
+    A[1,N] = 1 # 1*y0_dot = b_1
+    # A[2,2*N] = 1 # 1*theta_0_dot = b_2
+    for j in range(0, N):
+        for i in range(j, N):
+            A[j+2,:] = A[j+2,:] + DD(X_3N, i, j) @ UU(X_3N, i, gamma)
+    return A
+
+## A dashpots
+def ADB(taus_b, N):
+    """ Returns the matrix used to model bending dashpots all along the axoneme.
+    taus_b is a list of non-dimensional internal bending viscosities. """
+
+    if len(taus_b)==(N-1):
+        A_DB = np.diag([0,0,0] + taus_b)
+    else:
+        A_DB = np.zeros((N+2, N+2))
+    return A_DB
+
+def ADS(N):
+    """ Returns the matrix A_DS used to model shear dissipation all along the axoneme.
+    taus_s is a list of non-dimensional internal shearing viscosity.
+    Remark: A_DS applies to X_3N_dot and not directly to X_Np2_dot """
+
+    A_DS = np.zeros((N+2,3*N))
+    A_DS[2:, 2*N:] = np.triu(np.ones((N, N))) # upper triangular matrix
+    A_DS[2:, 2*N] = np.arange(-N, 0, 1) # change first column
+    return A_DS
+
+# N = 10
+# A_DS = ADS(N)
+# print("A_DS = ", A_DS)
+# exit()
+
+## --- External flow --- ##
+
+def CreateFlowField(A = 0., w0 = 0., psi = 0., T_meas = [], filename = ""):
+
+    """ Creates a non-dimensional flow field and returns a string and an array representing resp. the type and data
+    - 1. If a filename is given, import flow field from the file (PIV);
+    - 2. If filename = "" and if A = 0 or T_meas = [], there is no flow field: return 0
+    - 3. If filemame = "" and if A > 0 and if w0 = 0, returns a constant homogeneous flow
+    - 4. If filemame = "" and if A > 0 and if w0 > 0, returns [A*sin(t)] for t in T (homogeneous flow)
+    Returned flow field in the 2 last cases is an array of shape (2x|T|)
+    psi is the angle between the x-axis and the flow.
+
+    Note: for a non-dimensional flow, A should be chosen in non-dimensional units and t is non-dimensional (i.e., counted in w0 units)
+
+    """
+
+    X_flow_field = 0
+    return_string = "NO FLOW"
+
+    if filename == "": # Cases 2,3,4
+        if len(T_meas)==0 or A == 0: # Case 2
+            return return_string, X_flow_field
+        else: # Cases 3,4
+            X_flow_field = np.zeros((2,len(T_meas)))
+            if w0==0: # Case 3
+                X_flow_field[0,:] = A*np.cos(psi)
+                X_flow_field[1,:] = A*np.sin(psi)
+                return_string = "CONSTANT FLOW: (psi, A) = (" + str(psi) + ", " + str(A) + ")"
+                return return_string, X_flow_field
+
+            else: # Case 4
+                for t in range(len(T_meas)):
+                    X_flow_field[0,t] = A*np.sin(w0*T_meas[t])*np.cos(psi)
+                    X_flow_field[1,t] = A*np.sin(w0*T_meas[t])*np.sin(psi)
+                return_string = "SINE FLOW: (psi, A, w0) = (" + str(psi) + ", " + str(A) + ", " + str(w0) + ")"
+
+                return return_string, X_flow_field
+
+    else: # Case 1
+        # Import field from filename (Change later)   
+        return_string = "PIV-IMPORTED from " + filename
+        return return_string, X_flow_field 
+
+def Flow(X_3N, X_flow_field = np.array([0]) ):
+
+    """ Computes non-dimensional average flow speed and 1st moment of flow speed on each axoneme segment
+    given a flow vector field X_flow_field. There are N segments, numerated from 0 to N-1.
+    If a homogeneous flow is imposed, the flow is supposed to be constant within the same segment and
+    the first moment is a simple average. """
+
+    N = X_3N.shape[0]//3
+    X_dot_flow = np.zeros((4*N,1))
+
+    # No flow is imposed
+    if np.shape(X_flow_field)[0] == 1:
+        return X_dot_flow
+
+    # A homogeneous flow is imposed
+    elif np.shape(X_flow_field)[0] == 2:
+        X_dot_flow[:N, 0] = X_flow_field[0] # Flow velocity on x axis
+        X_dot_flow[N:2*N, 0] = X_flow_field[1] # Flow velocity on y axis
+        X_dot_flow[2*N:3*N, 0] = (1 / 2) * X_flow_field[0] # First moment of flow velocity on x axis
+        X_dot_flow[3*N:, 0] = (1 / 2) * X_flow_field[1] # First moment of flow velocity on y axis
+        return X_dot_flow
+
+    # An inhomogeneous flow is imposed, e.g. with PIV experiments
+    else: 
+        # Add things here later
+        return X_dot_flow
+
+def TT_flow(X_dot_flow, k):
+    """ Non-dimensional operator [X_dot_flow]_k where X_dot_flow is of shape (4*N x 1). 
+    Returns the external flow components that contribute to the hydrodynamic drag, i.e.,
+        - the flow speed on each segment (2 scalars),
+        - the first moment of flow speed on each segment (2 scalars),
+        - there is no direct contribution for the angle (see equations) (1 scalar). 
+    """
+
+    T_flow_k = np.zeros((5,1))
+    N = X_dot_flow.shape[0]//4
+    T_flow_k[2] = 0 # No (direct!) contribution for the filament angle
+
+    T_flow_k[0] = - X_dot_flow[k] # Opposite of Flow velocity on x axis
+    T_flow_k[1] = - X_dot_flow[N+k] # Opposite of Flow velocity on y axis
+    T_flow_k[3] = X_dot_flow[2*N+k] # First moment of flow velocity on x axis
+    T_flow_k[4] = X_dot_flow[3*N+k] # First moment of flow velocity on y axis
+
+    return T_flow_k
+
+# Test
+# Delta_S = 0.1
+# N = 10
+# X = ProximalBend(N)
+# X_dot_flow_test = Flow(X, Delta_S,-2)
+# print("X_dot_flow_test: ", X_dot_flow_test)
+# for k in range(8):
+#     T_flow_k = TT_flow(X_dot_flow_test, k, Delta_S)
+#     print("T_flow_k for k = ", k, " is: ", T_flow_k)
+# exit()
+
+## --- Right-hand side --- ##
+
+def BC_L(X_3N, n_L=[0,0], m_L=0):
+    """Returns non-dimensional B_C representing boundary conditions at the distal end. 
+    Zero is default for a free end. n_L and m_L are chosen adimensionally."""
+
+    N = X_3N.shape[0]//3
+    B_C = np.zeros((N+2,1))
+
+    ## point force and point moment at distal end.
+    x_L = X_3N[N-1, 0] + np.cos(X_3N[-1, 0])
+    y_L = X_3N[2*N-1, 0] + np.sin(X_3N[-1, 0])
+    
+    B_C[0] = - n_L[0]
+    B_C[1] = - n_L[1]
+    B_C[2:] = (y_L - X_3N[N:2*N])*n_L[0] - (x_L - X_3N[:N])*n_L[1] - m_L
+
+    return B_C
+
+def BC_0(X_3N, n_0 = [0,0], m_0 = 0):
+    """ Returns non-dimensional right-hand side of the differential system for boundary conditions at s = 0 (proximal end). """
+
+    N = X_3N.shape[0]//3
+    B_C = np.zeros((N+2,1))
+
+    B_C[0] = n_0[0] # force equation on x axis
+    B_C[1] = n_0[1] # force equation y axis
+    B_C[2] = m_0
+    # Partial filament torque balances (B_C[3:]) does not depend on torque or force at s = 0.
+    
+    return B_C
+
+def BB(X_3N): # Argument X_3N could be replaced by X
+    """ Returns non-dimensional right-hand side of the differential system for bending elasticity. """
+
+    N = X_3N.shape[0]//3
+    B = np.zeros((N+2,1))
+
+    B[0] = 0 # force equation (here on x axis) is not affected by elasticity
+    B[1] = 0 # force equation (here on y axis) is not affected by elasticity    
+    B[2] = 0 # total torque equation does not depend on bending resistance
+
+    # Bending resistance (constitutive equations)
+    B[3:] = (X_3N[2*N+1:, :] - X_3N[2*N:-1, :]) # Bending resistance
+    
+    return B
+
+def BS(X_3N):
+    """ Returns non-dimensional right-hand side of the differential system for shear elasticity. """
+
+    N = X_3N.shape[0]//3
+    B = np.zeros((N+2,1))
+
+    # Boundary conditions at proximal end
+    B[0] = 0 # No force on x axis due to shear at s = 0
+    B[1] = 0 # No force on y axis due to shear at s = 0
+    B[2] = 0 # No torque due to shear at s = 0
+    for i in range(N-1):
+        B[3+i] = np.sum(X_3N[2*N+i+1:, 0]) - (N-i-1)*X_3N[2*N, 0] # Sliding resistance        
+    return B
+
+def BFlow(X_3N, X_dot_flow, gamma):
+    """ Returns non-dimensional B_flow representing moments due to background flow. This is similar to computations on the left-hand side of the differential equation.
+    Importantly, when put on the right-hand side of the equation one should add a minus sign. """
+
+    N = X_3N.shape[0]//3
+    B_flow = np.zeros((N+2, 1))
+
+    B_flow[0,0] = 0
+    B_flow[1,0] = 0
+
+    for j in range(N):
+        for i in range(j, N):
+            theta_i = X_3N[2*N+i, 0]
+            B_flow[j+2,0] += np.squeeze(DD(X_3N, i, j) @ GG(theta_i, gamma) @ TT_flow(X_dot_flow, i))
+    return B_flow
+
+# # Unit test
+# N = 4
+# Delta_S = 1
+# X = StraightLine(N)
+# X_3N = X3N(X, Delta_S)
+# print("X_3N = ", X_3N)
+# X_dot_flow_test = Flow(X, Delta_S, -2)
+# print("X_dot_flow_test: ", X_dot_flow_test)
+# eta = 1
+# gamma = 1
+# B_Flow = BFlow(X_3N, X_dot_flow_test, eta, gamma, Delta_S)
+# print("B_Flow = ", B_Flow)
+# exit()
+
+def BF(X_3N, Lambdas):
+    """ returns B_F representing non-dimensional moments of uniform density forces on each segment. """
+    N = len(Lambdas)
+    B_F = np.zeros((N+2,1))
+    if Lambdas == [0]*N:
+        return B_F
+    else:
+        for j in range(N):
+            for i in range(j, N):
+                Lambda_i = Lambdas[i]
+                B_F[j+2,0] = B_F[j+2,0] + Lambda_i[1] * (X_3N[i, 0] - X_3N[j, 0] + np.cos(X_3N[2*N+i, 0])/2) - Lambda_i[0] * (X_3N[N+i, 0] - X_3N[N+j, 0] + np.sin(X_3N[2*N+i, 0])/2)
+        return B_F
+
+def BM(Zetas):
+    """returns B_M representing torques between each segment. """
+    N = len(Zetas)
+    B_M = np.zeros((N+2,1))
+    if Zetas == [0]*N:
+        return B_M
+    else:
+        for j in range(N):
+            B_M[j+2,0] = np.sum(Zetas[j:])
+        return B_M
+
+### Active bending moments
+
+def ActiveBending(X):
+    # try with local (one node or more) constant + dissipation ()
+    N = X.shape[0]-2
+    B_active = np.zeros((N+2,1))
+    return B_active
 
 ## --- Differential system AQX_dot = B --- ##
     
@@ -33,10 +461,10 @@ def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L
     A_DS = tau_s * ADS(N)
 
     if InterpFlow == 0: # No external flow is given
-        X_dot_flow = Flow(X_3N)
+        X_flow = np.array([0])
     else: # External flow is given
         X_flow = InterpFlow(t) 
-        X_dot_flow = Flow(X_3N, X_flow)
+    X_dot_flow = Flow(X_3N, X_flow)
 
     B = int(bool_EI) * BB(X_3N) + BC_L(X_3N, n_L, m_L) + BC_0(X_3N, n_0, m_0) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
 
@@ -59,23 +487,11 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
     Returns: {"value": np.ndarray, "shape": tuple} # Is shape necessary?
     """
 
-    X_0, N, taus_b, tau_s, gamma, n_L, m_L, Sp4, k0 = int_params # Change taus_b for tau_b? Or tau_s for taus_s?
-    Lambdas, Zetas, A, w0, X_flow_field_string, X_flow_field, InterpFlow = ext_params
+    X_0, N, taus_b, tau_s, gamma, n_L, m_L, Sp4, k0, bool_EI = int_params # Change taus_b for tau_b? Or tau_s for taus_s?
+    Lambdas, Zetas, InterpFlow = ext_params
     T_span, T_eval, T_sim_max, method = sim_params
-
-    # --- COMPLETE THIS PART --- #
-    # If the flow has been interpolated, use it as is.
-    # Else, if the flow field is not existent (X_flow_field_string = "NO FLOW"), do without it.
-    #    # If the flow field is not given and not constructed yet, construct it with (A,w0).
-    #    # If the flow field is already constructed or given, interpolate it.
-    # --- COMPLETE THIS PART --- #
     
-    # Create an interpolation function for the flow field if necessary
-    if X_flow_field_string != "NO FLOW":
-        InterpFlow = interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
-    else:
-        InterpFlow = 0
-    Args = (Sp4, k0, True, gamma, taus_b, tau_s, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
+    Args = (Sp4, k0, bool_EI, gamma, taus_b, tau_s, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
 
     # Define the time limiter
     class StopOnTime:
@@ -123,4 +539,41 @@ class ViscoElasticFilament(Model):
         Returns: {"value": np.ndarray, "shape": tuple} # Is shape necessary?
         """
 
-        return ViscoElasticFilament_Simulate(self.int_params, self.ext_params, self.sim_params)
+        res = ViscoElasticFilament_Simulate(self.int_params, self.ext_params, self.sim_params)
+        self.sim_output = res
+        return res
+
+
+    @classmethod
+    def simulate_batch(
+        cls,
+        int_params_batch: Sequence[Any],
+        ext_params_batch: Sequence[Any],
+        sim_params_batch: Sequence[Any],
+    ) -> List[Dict[str, Any]]:
+        """
+        Vectorized batch implementation (if possible).
+        Works if int_params_batch are broadcastable to an array shape (n, k). # Not sure about this.
+        Returns: List[{"value": np.ndarray, "shape": tuple}]
+        """
+        
+        results = []
+        for ip, ep, sp in zip(int_params_batch, ext_params_batch, sim_params_batch):
+            instance = cls(ip, ep, sp)
+            output = instance.simulate_single()
+            results.append(output)
+        return results
+
+# Define the pre-determined function to transform (A, w0) into InterpFlow
+def FlowParams_to_InterpFlow(ext_params):
+    # Example transformation function
+    # This should be replaced with the actual transformation logic
+    A, w0 = ext_params['A'], ext_params['w0']
+    InterpFlow = A * np.sin(w0)
+    return {'Lambdas': ext_params['Lambdas'], 'Zetas': ext_params['Zetas'], 'InterpFlow': InterpFlow}
+
+# Define the ViscoElasticFilament_FlowParams class by composing the ViscoElasticFilament class
+ViscoElasticFilament_FlowParams = compose_model(
+    ViscoElasticFilament,
+    compose_ext_params=FlowParams_to_InterpFlow
+)

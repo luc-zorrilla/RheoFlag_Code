@@ -55,6 +55,16 @@ class Model:
             output = instance.simulate_single()
             results.append(output)
         return results
+    
+    def write_sim_output(self, filepath):
+        """Write simulation output and Model metadata."""
+        # TO BE COMPLETED
+        return
+
+    def pickle_model(self, filepath):
+        """Pickle Model instance."""
+        # TO BE COMPLETED
+        return
 
 # ----------------------
 # Example model: Square (x -> x**2)
@@ -429,6 +439,98 @@ def merge_multiple_models(
             }
 
     return MergedModel
+
+def compose_model(
+    model_class: Type[Model],
+    compose_int_params: Optional[Callable[[np.ndarray], np.ndarray]] = None,
+    compose_ext_params: Optional[Callable[[Any], Any]] = None,
+    compose_sim_params: Optional[Callable[[Any], Any]] = None
+) -> Type[Model]:
+    """
+    Create a new Model class by composing input parameters with functions.
+
+    The composed model applies composition functions to the internal, external, and
+    simulation parameters before passing them to the base model's simulate_single() method.
+
+    Args:
+        model_class: A Model subclass to compose.
+        compose_int_params: Optional callable that transforms internal parameters.
+                           Signature: np.ndarray -> np.ndarray
+        compose_ext_params: Optional callable that transforms external parameters.
+                           Signature: Any -> Any
+        compose_sim_params: Optional callable that transforms simulation parameters.
+                           Signature: Any -> Any
+
+    Returns:
+        A new Model class with composed parameter behavior.
+
+    Example:
+        # Create Identity from Square + sqrt on int_params
+        class Square(Model):
+            def simulate_single(self) -> Dict[str, Any]:
+                return {"value": self.int_params ** 2, "shape": self.int_params.shape}
+
+        Identity = compose_model(
+            Square,
+            compose_int_params=np.sqrt,
+            compose_ext_params=lambda d: {**d, "scale": d["scale"] * 0.5}
+        )
+        identity_instance = Identity(int_params=25.0, ext_params={"scale": 2.0}, sim_params=None)
+        output = identity_instance.simulate_single()  # Square(sqrt(25.0)) with modified ext_params
+    """
+
+    class ComposedModel(model_class):
+        def __init__(self, int_params: np.ndarray, ext_params: Any, sim_params: Any):
+            # Apply composition functions
+            transformed_int_params = int_params
+            transformed_ext_params = ext_params
+            transformed_sim_params = sim_params
+
+            if compose_int_params:
+                transformed_int_params = compose_int_params(int_params)
+            if compose_ext_params:
+                transformed_ext_params = compose_ext_params(ext_params)
+            if compose_sim_params:
+                transformed_sim_params = compose_sim_params(sim_params)
+
+            # Initialize the base model with transformed parameters
+            super().__init__(transformed_int_params, transformed_ext_params, transformed_sim_params)
+
+        @classmethod
+        def simulate_batch(
+            cls,
+            int_params_batch: Sequence[Any],
+            ext_params_batch: Sequence[Any],
+            sim_params_batch: Sequence[Any],
+        ) -> List[Dict[str, Any]]:
+            """
+            Batch simulation: apply composition functions to all parameters,
+            then run base model batch.
+            """
+            transformed_int_params_batch = int_params_batch
+            transformed_ext_params_batch = ext_params_batch
+            transformed_sim_params_batch = sim_params_batch
+
+            if compose_int_params:
+                transformed_int_params_batch = [
+                    compose_int_params(ip) for ip in int_params_batch
+                ]
+            if compose_ext_params:
+                transformed_ext_params_batch = [
+                    compose_ext_params(ep) for ep in ext_params_batch
+                ]
+            if compose_sim_params:
+                transformed_sim_params_batch = [
+                    compose_sim_params(sp) for sp in sim_params_batch
+                ]
+
+            return super().simulate_batch(
+                transformed_int_params_batch,
+                transformed_ext_params_batch,
+                transformed_sim_params_batch
+            )
+
+    return ComposedModel
 
 # ----------------------
 # Parallel runner
