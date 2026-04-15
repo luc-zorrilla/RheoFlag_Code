@@ -487,11 +487,7 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
     Returns: {"value": np.ndarray, "shape": tuple} # Is shape necessary?
     """
 
-    X_0, N, taus_b, tau_s, gamma, n_L, m_L, Sp4, k0, bool_EI = int_params # Change taus_b for tau_b? Or tau_s for taus_s?
-    Lambdas, Zetas, InterpFlow = ext_params
-    T_span, T_eval, T_sim_max, method = sim_params
-    
-    Args = (Sp4, k0, bool_EI, gamma, taus_b, tau_s, gamma, n_L, m_L, Lambdas, Zetas, InterpFlow)
+    Args = (int_params['Sp4'], int_params['k0'], int_params['bool_EI'], int_params['gamma'], int_params['taus_b'], int_params['tau_s'], int_params['gamma'], int_params['n_L'], int_params['m_L'], ext_params['Lambdas'], ext_params['Zetas'], ext_params['InterpFlow'])
 
     # Define the time limiter
     class StopOnTime:
@@ -499,15 +495,15 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
             self.max_simulation_time = max_simulation_time
             self.start_time = time.time()
 
-        def terminate_integration(self, t, y):
+        def terminate_integration(self, t, y, *args):
             if time.time() - self.start_time > self.max_simulation_time:
                 return 0
             return 1
-    time_limiter = StopOnTime(T_sim_max)
+    time_limiter = StopOnTime(sim_params['T_sim_max'])
 
     # Run the simulation
     try:
-        sol = solve_ivp(fun = g, t_span = T_span, y0 = X_0, args=Args, t_eval=T_eval, method = method, events=time_limiter.terminate_integration)
+        sol = solve_ivp(fun = g, t_span = sim_params['T_span'], y0 = int_params['X_0'], args=Args, t_eval=sim_params['T_eval'], method = sim_params['method'], events=time_limiter.terminate_integration)
         T_sim = time.time() - time_limiter.start_time
 
         if sol.t_events[0].size > 0:
@@ -517,6 +513,7 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
             sim_output = {"value": None, "shape": None}
         else:
             sim_output = {"value": sol.y, "shape": sol.y.shape}
+
     except Exception as ex:
         T_sim = np.inf
         mistake = np.array([str(ex)])
@@ -526,7 +523,7 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
     return sim_output
 
 class ViscoElasticFilament(Model):
-    def __init__(self, int_params: np.ndarray, ext_params: Any, sim_params: Any):
+    def __init__(self, int_params: Any, ext_params: Any, sim_params: Any):
         super().__init__(int_params, ext_params, sim_params)
         self.int_params = int_params
         self.ext_params = ext_params
@@ -564,16 +561,25 @@ class ViscoElasticFilament(Model):
             results.append(output)
         return results
 
-# Define the pre-determined function to transform (A, w0) into InterpFlow
-def FlowParams_to_InterpFlow(ext_params):
-    # Example transformation function
-    # This should be replaced with the actual transformation logic
-    A, w0 = ext_params['A'], ext_params['w0']
-    InterpFlow = A * np.sin(w0)
+# Define the pre-determined function to transform (A, w0, psi) into InterpFlow
+def FlowParams_to_InterpFlow(int_params, ext_params, sim_params):
+    """ Transform external parameters (Lambdas, Zetas, A, w0, psi) -> (Lambdas, Zetas, InterpFlow). """
+    
+    ## Intermediate parameters
+    T_eval = sim_params['T_eval']
+    X_flow_field_string, X_flow_field = CreateFlowField(ext_params['A'], ext_params['w0'], ext_params['psi'], T_eval)
+
+    ## Final parameters        
+    if X_flow_field_string != "NO FLOW":
+        InterpFlow = interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
+    else:         
+        InterpFlow = 0
+
     return {'Lambdas': ext_params['Lambdas'], 'Zetas': ext_params['Zetas'], 'InterpFlow': InterpFlow}
+    
 
 # Define the ViscoElasticFilament_FlowParams class by composing the ViscoElasticFilament class
 ViscoElasticFilament_FlowParams = compose_model(
     ViscoElasticFilament,
-    compose_ext_params=FlowParams_to_InterpFlow
+    compose_int_params=FlowParams_to_InterpFlow
 )

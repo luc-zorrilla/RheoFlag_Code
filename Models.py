@@ -2,6 +2,7 @@ from concurrent.futures import ProcessPoolExecutor
 from typing import Any, Callable, Iterable, List, Sequence, Type, Optional, Tuple, Dict, Literal
 import numpy as np
 import logging
+from itertools import zip_longest
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +25,7 @@ class Model:
     """
 
     def __init__(self, int_params: np.ndarray, ext_params: Any, sim_params: Any):
-        self.int_params = np.asarray(int_params, dtype=float)
+        self.int_params = int_params
         self.ext_params = ext_params
         self.sim_params = sim_params
         self.sim_output: Optional[Dict[str, Any]] = None  # {"value": np.ndarray, "shape": tuple}
@@ -442,7 +443,7 @@ def merge_multiple_models(
 
 def compose_model(
     model_class: Type[Model],
-    compose_int_params: Optional[Callable[[np.ndarray], np.ndarray]] = None,
+    compose_int_params: Optional[Callable[[Any], Any]] = None,
     compose_ext_params: Optional[Callable[[Any], Any]] = None,
     compose_sim_params: Optional[Callable[[Any], Any]] = None
 ) -> Type[Model]:
@@ -455,7 +456,7 @@ def compose_model(
     Args:
         model_class: A Model subclass to compose.
         compose_int_params: Optional callable that transforms internal parameters.
-                           Signature: np.ndarray -> np.ndarray
+                           Signature: Any -> Any
         compose_ext_params: Optional callable that transforms external parameters.
                            Signature: Any -> Any
         compose_sim_params: Optional callable that transforms simulation parameters.
@@ -487,48 +488,60 @@ def compose_model(
             transformed_sim_params = sim_params
 
             if compose_int_params:
-                transformed_int_params = compose_int_params(int_params)
+                transformed_int_params = compose_int_params(int_params, ext_params, sim_params)
             if compose_ext_params:
-                transformed_ext_params = compose_ext_params(ext_params)
+                transformed_ext_params = compose_ext_params(int_params, ext_params, sim_params)
             if compose_sim_params:
-                transformed_sim_params = compose_sim_params(sim_params)
+                transformed_sim_params = compose_sim_params(int_params, ext_params, sim_params)
 
             # Initialize the base model with transformed parameters
             super().__init__(transformed_int_params, transformed_ext_params, transformed_sim_params)
 
-        @classmethod
-        def simulate_batch(
-            cls,
-            int_params_batch: Sequence[Any],
-            ext_params_batch: Sequence[Any],
-            sim_params_batch: Sequence[Any],
-        ) -> List[Dict[str, Any]]:
-            """
-            Batch simulation: apply composition functions to all parameters,
-            then run base model batch.
-            """
-            transformed_int_params_batch = int_params_batch
-            transformed_ext_params_batch = ext_params_batch
-            transformed_sim_params_batch = sim_params_batch
+    @classmethod
+    def simulate_batch(
+        cls,
+        int_params_batch: Sequence[Any],
+        ext_params_batch: Sequence[Any],
+        sim_params_batch: Sequence[Any],
+    ) -> List[Dict[str, Any]]:
+        """
+        Batch simulation: apply composition functions to all parameters,
+        then run base model batch.
+        """
+        transformed_int_params_batch = []
+        transformed_ext_params_batch = []
+        transformed_sim_params_batch = []
+
+        # Use zip_longest to handle batches of different sizes
+        for int_params, ext_params, sim_params in zip_longest(int_params_batch, ext_params_batch, sim_params_batch, fillvalue=None):
+            if int_params is None or ext_params is None or sim_params is None:
+                continue  # Skip this iteration if any of the parameters are None
 
             if compose_int_params:
-                transformed_int_params_batch = [
-                    compose_int_params(ip) for ip in int_params_batch
-                ]
-            if compose_ext_params:
-                transformed_ext_params_batch = [
-                    compose_ext_params(ep) for ep in ext_params_batch
-                ]
-            if compose_sim_params:
-                transformed_sim_params_batch = [
-                    compose_sim_params(sp) for sp in sim_params_batch
-                ]
+                transformed_int_params = compose_int_params(int_params, ext_params, sim_params)
+            else:
+                transformed_int_params = int_params
 
-            return super().simulate_batch(
-                transformed_int_params_batch,
-                transformed_ext_params_batch,
-                transformed_sim_params_batch
-            )
+            if compose_ext_params:
+                transformed_ext_params = compose_ext_params(int_params, ext_params, sim_params)
+            else:
+                transformed_ext_params = ext_params
+
+            if compose_sim_params:
+                transformed_sim_params = compose_sim_params(int_params, ext_params, sim_params)
+            else:
+                transformed_sim_params = sim_params
+
+            transformed_int_params_batch.append(transformed_int_params)
+            transformed_ext_params_batch.append(transformed_ext_params)
+            transformed_sim_params_batch.append(transformed_sim_params)
+
+        return super().simulate_batch(
+            transformed_int_params_batch,
+            transformed_ext_params_batch,
+            transformed_sim_params_batch
+        )
+
 
     return ComposedModel
 

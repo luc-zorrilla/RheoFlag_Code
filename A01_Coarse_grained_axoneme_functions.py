@@ -406,7 +406,7 @@ def CreateFlowField(A = 0., w0 = 0., psi = 0., T_meas = [], filename = ""):
     else: # Case 1
         # Import field from filename (Change later)   
         return_string = "PIV-IMPORTED from " + filename
-        return return_string, X_flow_field 
+        return return_string, X_flow_field
 
 def Flow(X_3N, X_flow_field = np.array([0]) ):
 
