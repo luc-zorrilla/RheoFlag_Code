@@ -3,10 +3,22 @@ from typing import Any, Callable, Iterable, List, Sequence, Type, Optional, Tupl
 import numpy as np
 import logging
 from itertools import zip_longest, product
+import json
+import dill as pickle # enhanced pickle library that handles function pickling as well
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def numpy_serializer(obj):
+    """Function to serialize NumPy types for json.dumps default."""
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    # Add checks for other numpy types if needed (np.integer, np.floating)
+    # raise TypeError # Optionally raise error for unhandled types
+    # For simplicity here, we only handle ndarray
+    return obj # Or let default handle/error out
 
 # --- Core model base ---
 class Model:
@@ -58,24 +70,51 @@ class Model:
         return results
     
     def write_sim_output(self, filepath):
-        """Write simulation output and Model metadata."""
-        # TO BE COMPLETED
-        return
+        """Write simulation output and metadata as human-readable JSON."""
+        if self.sim_output is None:
+            raise ValueError("No simulation output. Run simulate_single() first.")
+        
+        filepath = Path(filepath)
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        
+        data = {
+            'int_params': self.int_params,
+            'ext_params': self.ext_params,
+            'sim_params': self.sim_params,
+            'sim_output': {
+                'value': self.sim_output['value'].tolist(),
+                'shape': self.sim_output['shape']
+            }
+        }
+        
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=2, default=numpy_serializer)
 
     def read_sim_output(self, filepath):
-        """Read simulation output and Model metadata."""
-        # TO BE COMPLETED
-        return
+        """Read simulation output and metadata from JSON."""
+        with open(filepath, 'r') as f:
+            data = json.load(f)
+        
+        self.int_params = data['int_params']
+        self.ext_params = data['ext_params']
+        self.sim_params = data['sim_params']
+        self.sim_output = {
+            'value': np.array(data['sim_output']['value']),
+            'shape': tuple(data['sim_output']['shape'])
+        }
 
     def pickle_model(self, filepath):
-        """Pickle Model instance."""
-        # TO BE COMPLETED
-        return
-    
-    def unpickle_model(self, filepath):
-        """Unpickle Model instance."""
-        # TO BE COMPLETED - Could be a function rather than a method.
-        return        
+        """Pickle entire Model instance."""
+        filepath = Path(filepath)
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        
+        with open(filepath, 'wb') as f:
+            pickle.dump(self, f, protocol = -1)
+
+def unpickle_model(filepath):
+    """Unpickle and restore a Model instance."""
+    with open(filepath, 'rb') as f:
+        return pickle.load(f)    
 
 # ----------------------
 # Example model: Square (x -> x**2)
@@ -83,12 +122,12 @@ class Model:
 class Square(Model):
     """
     Simple model where internal parameter x maps to x**2.
-    - int_params: scalar or 1D array (we treat it elementwise)
+    - int_params: dict
     - ext_params, sim_params: unused here but accepted for generality
     """
 
     def simulate_single(self) -> Dict[str, Any]:
-        x = np.asarray(self.int_params, dtype=float)
+        x = np.asarray(self.int_params['x'], dtype=float)
         output = x ** 2
         self.sim_output = {"value": output, "shape": output.shape}
         return self.sim_output
@@ -105,12 +144,30 @@ class Square(Model):
         Works if int_params_batch are broadcastable to an array shape (n, k).
         Returns: List[{"value": np.ndarray, "shape": tuple}]
         """
-        flat = np.asarray(int_params_batch, dtype=float)
+        flat = np.asarray([int_params['x'] for int_params in int_params_batch], dtype=float)
         results = []
         for arr in flat:
             output = arr ** 2
             results.append({"value": output, "shape": output.shape})
         return results
+
+
+def Square_create_params_list(int_keys: List[str], ext_keys: List[str], sim_keys: List[str], params_list_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """ Generate all combinations of the parameter lists. 
+    Useful for parallel computations of varying model parameters. 
+    
+    Note: Could be generalised -- in this case -- to loop over all keys."""
+    
+    params_list = []
+    for x in params_list_dict["x_list"]: 
+
+        int_params = {key:eval(key) for key in int_keys}
+        ext_params = {key:eval(key) for key in ext_keys}
+        sim_params = {key:eval(key) for key in sim_keys}
+        params_list.append((int_params, ext_params, sim_params))
+
+    return params_list
+
 
 # --- Functions on models ---
 def reduce_model(
@@ -205,248 +262,6 @@ def reconstruct_model(
 
     return ReconstructedModel
 
-# --- Model Merging ---
-def merge_models(
-    model1: Model,
-    model2: Model,
-    *,
-    int_strategy: Literal["concat", "model1", "model2"] = "concat",
-    ext_strategy: Literal["model1", "model2", "merge"] = "model1",
-    sim_strategy: Literal["model1", "model2", "merge"] = "model1",
-) -> Type[Model]:
-    """
-    Merge two instances of the same Model subclass into a single new Model subclass.
-    """
-    if type(model1) != type(model2):
-        raise ValueError(
-            f"Both models must be instances of the same subclass. "
-            f"Got {type(model1).__name__} and {type(model2).__name__}."
-        )
-
-    original_model_class = type(model1)
-
-    # Compute merged int_params based on strategy
-    if int_strategy == "concat":
-        merged_int_params = np.vstack([model1.int_params, model2.int_params])
-    elif int_strategy == "model1":
-        merged_int_params = model1.int_params.copy()
-    elif int_strategy == "model2":
-        merged_int_params = model2.int_params.copy()
-    else:
-        raise ValueError(
-            f"Unknown int_strategy: {int_strategy}. "
-            f"Choose from: 'concat', 'model1', 'model2'."
-        )
-
-    # Compute merged ext_params based on strategy
-    if ext_strategy == "model1":
-        merged_ext_params = model1.ext_params
-    elif ext_strategy == "model2":
-        merged_ext_params = model2.ext_params
-    elif ext_strategy == "merge":
-        merged_ext_params = model1.ext_params if model1.ext_params is not None else model2.ext_params
-    else:
-        raise ValueError(
-            f"Unknown ext_strategy: {ext_strategy}. "
-            f"Choose from: 'model1', 'model2', 'merge'."
-        )
-
-    # Compute merged sim_params based on strategy
-    if sim_strategy == "model1":
-        merged_sim_params = model1.sim_params
-    elif sim_strategy == "model2":
-        merged_sim_params = model2.sim_params
-    elif sim_strategy == "merge":
-        merged_sim_params = model1.sim_params if model1.sim_params is not None else model2.sim_params
-    else:
-        raise ValueError(
-            f"Unknown sim_strategy: {sim_strategy}. "
-            f"Choose from: 'model1', 'model2', 'merge'."
-        )
-
-    class MergedModel(Model):
-        """
-        A merged model combining two parent Model instances.
-        """
-
-        def __init__(
-            self,
-            int_params: Optional[np.ndarray] = None,
-            ext_params: Any = None,
-            sim_params: Any = None,
-        ):
-            if int_params is None:
-                int_params = merged_int_params
-            if ext_params is None:
-                ext_params = merged_ext_params
-            if sim_params is None:
-                sim_params = merged_sim_params
-            super().__init__(int_params, ext_params, sim_params)
-            self.parent_model1 = model1
-            self.parent_model2 = model2
-            self.int_strategy = int_strategy
-            self.ext_strategy = ext_strategy
-            self.sim_strategy = sim_strategy
-
-        def simulate_single(self) -> Dict[str, Any]:
-            instance = original_model_class(self.int_params, self.ext_params, self.sim_params)
-            output = instance.simulate_single()
-            self.sim_output = output
-            return output
-
-        @classmethod
-        def simulate_batch(
-            cls,
-            int_params_batch: Sequence[Any],
-            ext_params_batch: Sequence[Any],
-            sim_params_batch: Sequence[Any],
-        ) -> List[Dict[str, Any]]:
-            return original_model_class.simulate_batch(
-                int_params_batch, ext_params_batch, sim_params_batch
-            )
-
-        def get_parent_outputs(self) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-            output1 = self.parent_model1.simulate_single()
-            output2 = self.parent_model2.simulate_single()
-            return output1, output2
-
-        def get_merged_info(self) -> Dict[str, Any]:
-            return {
-                "int_strategy": self.int_strategy,
-                "ext_strategy": self.ext_strategy,
-                "sim_strategy": self.sim_strategy,
-                "parent_model1": self.parent_model1,
-                "parent_model2": self.parent_model2,
-                "parent1_int_params": self.parent_model1.int_params,
-                "parent2_int_params": self.parent_model2.int_params,
-                "parent1_ext_params": self.parent_model1.ext_params,
-                "parent2_ext_params": self.parent_model2.ext_params,
-                "parent1_sim_params": self.parent_model1.sim_params,
-                "parent2_sim_params": self.parent_model2.sim_params,
-                "merged_int_params": self.int_params,
-                "merged_ext_params": self.ext_params,
-                "merged_sim_params": self.sim_params,
-            }
-
-    return MergedModel
-
-# --- Multiple Model Merging ---
-def merge_multiple_models(
-    *models: Model,
-    int_strategy: Literal["average", "concat", "first", "last"] = "average",
-    ext_strategy: Literal["first", "last", "merge"] = "first",
-    sim_strategy: Literal["first", "last", "merge"] = "first",
-) -> Type[Model]:
-    """
-    Merge an arbitrary number of Model instances into a single new Model subclass.
-    """
-    if len(models) < 2:
-        raise ValueError("At least two models must be provided for merging.")
-    if not all(type(m) == type(models[0]) for m in models):
-        raise ValueError("All models must be instances of the same subclass.")
-
-    original_model_class = type(models[0])
-
-    # Compute merged int_params based on strategy
-    if int_strategy == "concat":
-        merged_int_params = np.vstack([m.int_params for m in models])
-    elif int_strategy == "first":
-        merged_int_params = models[0].int_params.copy()
-    elif int_strategy == "last":
-        merged_int_params = models[-1].int_params.copy()
-    elif int_strategy == "average":
-        merged_int_params = np.mean([m.int_params for m in models], axis=0)
-    else:
-        raise ValueError(
-            f"Unknown int_strategy: {int_strategy}. "
-            f"Choose from: 'concat', 'first', 'last', 'average'."
-        )
-
-    # Compute merged ext_params based on strategy
-    if ext_strategy == "first":
-        merged_ext_params = models[0].ext_params
-    elif ext_strategy == "last":
-        merged_ext_params = models[-1].ext_params
-    elif ext_strategy == "merge":
-        merged_ext_params = next((m.ext_params for m in models if m.ext_params is not None), None)
-    else:
-        raise ValueError(
-            f"Unknown ext_strategy: {ext_strategy}. "
-            f"Choose from: 'first', 'last', 'merge'."
-        )
-
-    # Compute merged sim_params based on strategy
-    if sim_strategy == "first":
-        merged_sim_params = models[0].sim_params
-    elif sim_strategy == "last":
-        merged_sim_params = models[-1].sim_params
-    elif sim_strategy == "merge":
-        merged_sim_params = next((m.sim_params for m in models if m.sim_params is not None), None)
-    else:
-        raise ValueError(
-            f"Unknown sim_strategy: {sim_strategy}. "
-            f"Choose from: 'first', 'last', 'merge'."
-        )
-
-    class MergedModel(Model):
-        """
-        A merged model combining multiple parent Model instances.
-        """
-
-        def __init__(
-            self,
-            int_params: Optional[np.ndarray] = None,
-            ext_params: Any = None,
-            sim_params: Any = None,
-        ):
-            if int_params is None:
-                int_params = merged_int_params
-            if ext_params is None:
-                ext_params = merged_ext_params
-            if sim_params is None:
-                sim_params = merged_sim_params
-            super().__init__(int_params, ext_params, sim_params)
-            self.parent_models = models
-            self.int_strategy = int_strategy
-            self.ext_strategy = ext_strategy
-            self.sim_strategy = sim_strategy
-
-        def simulate_single(self) -> Dict[str, Any]:
-            instance = original_model_class(self.int_params, self.ext_params, self.sim_params)
-            output = instance.simulate_single()
-            self.sim_output = output
-            return output
-
-        @classmethod
-        def simulate_batch(
-            cls,
-            int_params_batch: Sequence[Any],
-            ext_params_batch: Sequence[Any],
-            sim_params_batch: Sequence[Any],
-        ) -> List[Dict[str, Any]]:
-            return original_model_class.simulate_batch(
-                int_params_batch, ext_params_batch, sim_params_batch
-            )
-
-        def get_parent_outputs(self) -> List[Dict[str, Any]]:
-            return [m.simulate_single() for m in self.parent_models]
-
-        def get_merged_info(self) -> Dict[str, Any]:
-            return {
-                "int_strategy": self.int_strategy,
-                "ext_strategy": self.ext_strategy,
-                "sim_strategy": self.sim_strategy,
-                "parent_models": self.parent_models,
-                "parent_int_params": [m.int_params for m in self.parent_models],
-                "parent_ext_params": [m.ext_params for m in self.parent_models],
-                "parent_sim_params": [m.sim_params for m in self.parent_models],
-                "merged_int_params": self.int_params,
-                "merged_ext_params": self.ext_params,
-                "merged_sim_params": self.sim_params,
-            }
-
-    return MergedModel
-
 def compose_model(
     model_class: Type[Model],
     compose_int_params: Optional[Callable[[Any], Any]] = None,
@@ -475,14 +290,14 @@ def compose_model(
         # Create Identity from Square + sqrt on int_params
         class Square(Model):
             def simulate_single(self) -> Dict[str, Any]:
-                return {"value": self.int_params ** 2, "shape": self.int_params.shape}
+                return {"value": self.int_params['x'] ** 2, "shape": self.int_params.shape}
 
         Identity = compose_model(
             Square,
             compose_int_params=np.sqrt,
             compose_ext_params=lambda d: {**d, "scale": d["scale"] * 0.5}
         )
-        identity_instance = Identity(int_params=25.0, ext_params={"scale": 2.0}, sim_params=None)
+        identity_instance = Identity(int_params={'x':25.0}, ext_params={"scale": 2.0}, sim_params=None)
         output = identity_instance.simulate_single()  # Square(sqrt(25.0)) with modified ext_params
     """
 
@@ -575,32 +390,6 @@ def _batch_worker(
             m = model_cls(ip, ep, sp)
             outputs.append(m.simulate_single())
     return outputs
-
-# def parallel_simulate_batch(
-#     model_cls: Type[Model],
-#     params_list: Iterable[Tuple[Any, Any, Any]],
-#     batch_size: int = 32,
-#     max_workers: Optional[int] = None,
-# ) -> List[Dict[str, Any]]:
-#     """
-#     Run many simulations in parallel using ProcessPoolExecutor with chunking.
-#     Returns: List[{"value": np.ndarray, "shape": tuple}]
-#     """
-#     # Unpack the input list of tuples into separate lists
-#     int_list, ext_list, sim_list = zip(*params_list)
-#     n = len(int_list)
-
-#     # Create chunks
-#     chunks: List[Tuple[List[Any], List[Any], List[Any]]] = []
-#     for i in range(0, n, batch_size):
-#         chunks.append((list(int_list[i : i + batch_size]), list(ext_list[i : i + batch_size]), list(sim_list[i : i + batch_size])))
-
-#     results: List[Dict[str, Any]] = []
-#     with ProcessPoolExecutor(max_workers=max_workers) as ex:
-#         futures = [ex.submit(_batch_worker, model_cls, c[0], c[1], c[2]) for c in chunks]
-#         for fut in futures:
-#             results.extend(fut.result())
-#     return results
 
 def parallel_simulate_batch(
     model_cls: Type[Model],
