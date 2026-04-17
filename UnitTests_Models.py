@@ -179,13 +179,12 @@ class TestSquareModelSerialization:
         filepath = Path(temp_dir) / "output.json"
         square_instance.write_sim_output(filepath)
         
-        with open(filepath, 'r') as f:
-            data = json.load(f)
+        square_instance.read_sim_output(filepath)
         
-        assert 'value' in data['sim_output'], "Missing 'value' in sim_output."
-        assert 'shape' in data['sim_output'], "Missing 'shape' in sim_output."
-        assert isinstance(data['sim_output']['value'], list), "'value' should be a list after JSON serialization."
-        assert isinstance(data['sim_output']['shape'], list), "'shape' should be a list."
+        assert 'value' in square_instance.sim_output, "Missing 'value' in sim_output."
+        assert 'shape' in square_instance.sim_output, "Missing 'shape' in sim_output."
+        assert isinstance(square_instance.sim_output['value'], np.ndarray), "'value' should be a list after JSON serialization."
+        assert isinstance(square_instance.sim_output['shape'], tuple), "'shape' should be a list."
 
     def test_write_sim_output_raises_without_simulation(self, temp_dir):
         """Test that write_sim_output raises ValueError if simulate_single() hasn't been run."""

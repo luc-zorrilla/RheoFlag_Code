@@ -11,14 +11,78 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def numpy_serializer(obj):
-    """Function to serialize NumPy types for json.dumps default."""
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    # Add checks for other numpy types if needed (np.integer, np.floating)
-    # raise TypeError # Optionally raise error for unhandled types
-    # For simplicity here, we only handle ndarray
-    return obj # Or let default handle/error out
+class NumpyTupleEncoder(json.JSONEncoder):
+    """Custom JSON encoder that recursively marks numpy arrays and tuples with type metadata."""
+    
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return {
+                "__numpy_array__": True,
+                "dtype": str(obj.dtype),
+                "value": obj.tolist()
+            }
+        elif isinstance(obj, tuple):
+            return {
+                "__tuple__": True,
+                "value": list(obj)
+            }
+        return super().default(obj)
+    
+    def encode(self, o):
+        """Pre-process the entire object tree to mark tuples and arrays."""
+        o = self._mark_types(o)
+        return super().encode(o)
+    
+    @staticmethod
+    def _mark_types(obj):
+        """Recursively walk the object tree and mark numpy arrays and tuples."""
+        if isinstance(obj, np.ndarray):
+            return {
+                "__numpy_array__": True,
+                "dtype": str(obj.dtype),
+                "value": obj.tolist()
+            }
+        elif isinstance(obj, tuple):
+            return {
+                "__tuple__": True,
+                "value": [NumpyTupleEncoder._mark_types(item) for item in obj]
+            }
+        elif isinstance(obj, dict):
+            return {key: NumpyTupleEncoder._mark_types(val) for key, val in obj.items()}
+        elif isinstance(obj, list):
+            return [NumpyTupleEncoder._mark_types(item) for item in obj]
+        return obj
+
+
+class NumpyTupleDecoder(json.JSONDecoder):
+    """Custom JSON decoder that recursively reconstructs numpy arrays and tuples."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(object_hook=self.object_hook, *args, **kwargs)
+
+    @staticmethod
+    def object_hook(obj):
+        """Recursively process all dictionary objects."""
+        if isinstance(obj, dict):
+            # Check for numpy array marker
+            if obj.get("__numpy_array__"):
+                return np.array(obj["value"], dtype=obj["dtype"])
+            # Check for tuple marker
+            elif obj.get("__tuple__"):
+                # Recursively decode tuple elements in case they contain arrays/tuples
+                decoded_value = [
+                    NumpyTupleDecoder.object_hook(item) if isinstance(item, dict) else item
+                    for item in obj["value"]
+                ]
+                return tuple(decoded_value)
+            else:
+                # Recursively process regular dictionary values
+                return {key: NumpyTupleDecoder.object_hook(val) if isinstance(val, dict) else val 
+                        for key, val in obj.items()}
+        elif isinstance(obj, list):
+            # Recursively process list elements
+            return [NumpyTupleDecoder.object_hook(item) if isinstance(item, dict) else item 
+                    for item in obj]
+        return obj
 
 # --- Core model base ---
 class Model:
@@ -70,7 +134,7 @@ class Model:
         return results
     
     def write_sim_output(self, filepath):
-        """Write simulation output and metadata as human-readable JSON."""
+        """Write simulation output with numpy array and tuple preservation."""
         if self.sim_output is None:
             raise ValueError("No simulation output. Run simulate_single() first.")
         
@@ -78,31 +142,38 @@ class Model:
         filepath.parent.mkdir(parents=True, exist_ok=True)
         
         data = {
-            'int_params': self.int_params,
+            'int_params': self.int_params,  # Handles numpy arrays and tuples via encoder
             'ext_params': self.ext_params,
             'sim_params': self.sim_params,
             'sim_output': {
-                'value': self.sim_output['value'].tolist(),
-                'shape': self.sim_output['shape']
+                'value': self.sim_output['value'],
+                'shape': self.sim_output['shape']  # Will be encoded as tuple
             }
         }
+
+        # Pre-process to mark all tuples and arrays
+        data = NumpyTupleEncoder._mark_types(data)        
         
         with open(filepath, 'w') as f:
-            json.dump(data, f, indent=2, default=numpy_serializer)
+            json.dump(data, f, indent=2, cls=NumpyTupleEncoder)
 
     def read_sim_output(self, filepath):
-        """Read simulation output and metadata from JSON."""
+        """Read simulation output and restore numpy arrays and tuples."""
         with open(filepath, 'r') as f:
-            data = json.load(f)
+            data = json.load(f, cls=NumpyTupleDecoder)
         
         self.int_params = data['int_params']
         self.ext_params = data['ext_params']
         self.sim_params = data['sim_params']
         self.sim_output = {
-            'value': np.array(data['sim_output']['value']),
-            'shape': tuple(data['sim_output']['shape'])
+            'value': data['sim_output']['value'],  # Already a numpy array from decoder
+            'shape': data['sim_output']['shape']   # Already a tuple from decoder
         }
 
+        # # Verify shape is a tuple
+        # assert isinstance(self.sim_output['shape'], tuple), \
+        #     f"Expected tuple, got {type(self.sim_output['shape'])}"        
+        
     def pickle_model(self, filepath):
         """Pickle entire Model instance."""
         filepath = Path(filepath)
