@@ -2,7 +2,8 @@ import numpy as np
 from typing import Any, Dict, List, Optional, Sequence
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
-from Models import Model, reduce_model, reconstruct_model, merge_models, merge_multiple_models, compose_model, parallel_simulate_batch
+from scipy.linalg import solve
+from Models import Model, reduce_model, reconstruct_model, compose_model, parallel_simulate_batch
 import time
 
 ## --- Initial conditions --- ##
@@ -69,7 +70,7 @@ def XNp2(X_3N):
     """ Returns adimensional X_Np2 vector from X_3N. """
 
     N = X_3N.shape[0]//3
-    X_Np2 = np.zeros((N+2,1), dtype=np.double)
+    X_Np2 = np.zeros((N+2,), dtype=np.double)
 
     X_Np2[0] = X_3N[0,0] # x_0
     X_Np2[1] = X_3N[N,0] # y_0
@@ -434,51 +435,103 @@ def ActiveBending(X):
     return B_active
 
 ## --- Differential system AQX_dot = B --- ##
-    
-def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s = 0, gamma = 2, n_L=[0,0], m_L=0, Lambdas=0, Zetas=0, InterpFlow = 0):
 
-    """ Returns the non-dimensionalized equation X_tilde_dot = g(X_tilde; t; parameters). 
-    The difference with f(t,X) is that X is extended to add theta_0_dot, giving X_tilde. 
-    Since a second order equation in time is perscribed at the base, it can be turned 
-    into a first order equation and added to the matricial system.
-    """
+def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s=0,
+    gamma=2, n_L=[0,0], m_L=0,
+    Lambdas=0, Zetas=0, InterpFlow=0):
 
-    # Boundary conditions (basal hinge, free distal end)
-    n_0 = n_L # No displacement at the base
-    m_0 = k0*X[2] # Rotation at the base is allowed
-
-    ##################################################################
-    ###### Solve the linear system with infinite basal stiffness #####
-    N = X.shape[0]-2
+    # --- Setup ---
+    N = X.shape[0] - 2
     X_3N = X3N(X)
 
-    A = AA(X_3N, gamma)
+    # Extract coordinates
+    x = X_3N[:N, 0]
+    y = X_3N[N:2*N, 0]
+    theta = X_3N[2*N:, 0]
 
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
+
+    # Boundary conditions
+    n_0 = n_L
+    m_0 = k0 * X[2]
+
+    # --- Precompute GG matrices ---
+    G_all = [GG(theta[i], gamma) for i in range(N)]
+
+    # --- Build A (optimized AA) ---
+    A = np.zeros((N+2, 3*N))
+    A[0, 0] = 1
+    A[1, N] = 1
+
+    U_i = np.zeros((3, 3*N))
+
+    for j in range(N):
+        for i in range(j, N):
+
+            # D_ij
+            D = np.array([[x[i] - x[j], y[i] - y[j], 1]])
+
+            # Build U_i using cached G
+            U_i.fill(0)
+            G_i = G_all[i]
+            U_i[:, i] = G_i[:, 0]
+            U_i[:, N+i] = G_i[:, 1]
+            U_i[:, 2*N+i] = G_i[:, 2]
+
+            A[j+2, :] += (D @ U_i).ravel()
+
+    # --- Q matrix (unchanged) ---
     Q = QQ(X_3N)
 
+    # --- Dissipation matrices ---
     A_DB = int(bool_EI) * ADB(taus_b, N)
-
     A_DS = tau_s * ADS(N)
 
-    if InterpFlow == 0: # No external flow is given
+    # --- Flow ---
+    if InterpFlow == 0:
         X_flow = np.array([0])
-    else: # External flow is given
-        X_flow = InterpFlow(t) 
+    else:
+        X_flow = InterpFlow(t)
+
     X_dot_flow = Flow(X_3N, X_flow)
 
-    B = int(bool_EI) * BB(X_3N) + BC_L(X_3N, n_L, m_L) + BC_0(X_3N, n_0, m_0) + Beta * BS(X_3N) - BF(X_3N, Lambdas) - BM(Zetas) + ActiveBending(X) - Sp4 * BFlow(X_3N, X_dot_flow, gamma)
+    # --- BFlow (optimized) ---
+    B_flow = np.zeros((N+2, 1))
 
-    A_tilde = (Sp4 * A - Beta * A_DS ) @ Q - A_DB
+    for j in range(N):
+        for i in range(j, N):
+            D = np.array([[x[i] - x[j], y[i] - y[j], 1]])
+            T = TT_flow(X_dot_flow, i)
+            B_flow[j+2, 0] += (D @ G_all[i] @ T).item()
 
-    X_dot = (np.linalg.inv(A_tilde) @ B).ravel()
+    # --- RHS ---
+    B = (
+        int(bool_EI) * BB(X_3N)
+        + BC_L(X_3N, n_L, m_L)
+        + BC_0(X_3N, n_0, m_0)
+        + Beta * BS(X_3N)
+        - BF(X_3N, Lambdas)
+        - BM(Zetas)
+        + ActiveBending(X)
+        - Sp4 * B_flow
+    )
 
-    ##################################################################
+    # --- Final system ---
+    A_tilde = (Sp4 * A - Beta * A_DS) @ Q - A_DB
 
-    # Enforce \dot(x0) = \dot(y0) = 0, because error propagation breaks it.
+    # --- Solve system (optimized) ---
+    try:
+        X_dot = np.linalg.solve(A_tilde, B).ravel()
+    except np.linalg.LinAlgError:
+        X_dot = (np.linalg.pinv(A_tilde) @ B).ravel()
+
+    # --- Enforce fixed base ---
     X_dot[0] = 0
     X_dot[1] = 0
-    
+
     return X_dot
+
 
 def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
     """

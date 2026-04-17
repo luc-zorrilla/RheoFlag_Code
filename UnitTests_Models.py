@@ -331,3 +331,7 @@ class TestSquareModelSerialization:
         
         np.testing.assert_array_equal(json_model.sim_output['value'], pkl_model.sim_output['value'])
         assert json_model.sim_output['shape'] == pkl_model.sim_output['shape']
+
+if __name__ == "__main__":
+    # Run pytest programmatically
+    pytest.main([__file__, "-v", "--tb=short"])
