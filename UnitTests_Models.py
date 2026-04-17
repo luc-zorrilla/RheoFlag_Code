@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from Models import Model, Square, Square_create_params_list, unpickle_model, compose_model, parallel_simulate_batch # reduce_model, reconstruct_model
+from Models import Model, Square, Square_create_params_list, unpickle_model, compose_model, parallel_simulate_batch
 import tempfile
 import shutil
 import dill as pickle # enhanced pickle library that handles function pickling as well

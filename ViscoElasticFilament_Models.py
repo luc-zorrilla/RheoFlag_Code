@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 from scipy.linalg import solve
-from Models import Model, reduce_model, reconstruct_model, compose_model, parallel_simulate_batch
+from Models import Model, compose_model, parallel_simulate_batch
 import time
 
 ## --- Initial conditions --- ##
@@ -300,17 +300,6 @@ def TT_flow(X_dot_flow, k):
 
     return T_flow_k
 
-# Test
-# Delta_S = 0.1
-# N = 10
-# X = ProximalBend(N)
-# X_dot_flow_test = Flow(X, Delta_S,-2)
-# print("X_dot_flow_test: ", X_dot_flow_test)
-# for k in range(8):
-#     T_flow_k = TT_flow(X_dot_flow_test, k, Delta_S)
-#     print("T_flow_k for k = ", k, " is: ", T_flow_k)
-# exit()
-
 ## --- Right-hand side --- ##
 
 def BC_L(X_3N, n_L=[0,0], m_L=0):
@@ -388,20 +377,6 @@ def BFlow(X_3N, X_dot_flow, gamma):
             B_flow[j+2,0] += np.squeeze(DD(X_3N, i, j) @ GG(theta_i, gamma) @ TT_flow(X_dot_flow, i))
     return B_flow
 
-# # Unit test
-# N = 4
-# Delta_S = 1
-# X = StraightLine(N)
-# X_3N = X3N(X, Delta_S)
-# print("X_3N = ", X_3N)
-# X_dot_flow_test = Flow(X, Delta_S, -2)
-# print("X_dot_flow_test: ", X_dot_flow_test)
-# eta = 1
-# gamma = 1
-# B_Flow = BFlow(X_3N, X_dot_flow_test, eta, gamma, Delta_S)
-# print("B_Flow = ", B_Flow)
-# exit()
-
 def BF(X_3N, Lambdas):
     """ returns B_F representing non-dimensional moments of uniform density forces on each segment. """
     N = len(Lambdas)
@@ -437,8 +412,8 @@ def ActiveBending(X):
 ## --- Differential system AQX_dot = B --- ##
 
 def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s=0,
-          gamma=2, n_L=[0,0], m_L=0,
-          Lambdas=0, Zetas=0, InterpFlow=0):
+        gamma=2, n_L=[0,0], m_L=0,
+        Lambdas=0, Zetas=0, InterpFlow=0):
 
     # --- Setup ---
     N = X.shape[0] - 2
@@ -572,6 +547,78 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
         sim_output = {"value": None, "shape": None}
 
     return sim_output
+
+    
+def make_minimal_params():
+    """
+    Minimal parameters for ViscoElasticFilament.
+    """
+    N = 10
+    X0 = StraightLine(N)
+
+    return {
+        'int_params': {
+            'Sp4': 1.0,
+            'N': N,
+            'k0': 1e13,
+            'bool_EI': True,
+            'gamma': 2,
+            'taus_b': [0.0]*N,
+            'tau_s': 0.0,
+            'n_L': [0, 0],
+            'm_L': 0,
+            'X_0': X0,
+        },
+        'ext_params': {
+            'Lambdas': [[0.0, 0.0]]*N,
+            'Zetas': [0.0]*N,
+            'InterpFlow': 0,
+        },
+        'sim_params': {
+            'T_span': (0.0, 1.0),
+            'T_eval': np.linspace(0, 1, 10),
+            'T_sim_max': 30.0,
+            'method': 'BDF',
+        }
+    }
+        
+
+def make_minimal_params_with_flow():
+    """
+    Minimal parameters for ViscoElasticFilament_FlowParams.
+    Uses A, w0, psi instead of InterpFlow.
+    """
+    N = 10
+    X0 = StraightLine(N)
+
+    return {
+        'int_params': {
+            'Sp4': 1.0,
+            'N': N,
+            'k0': 1e13,
+            'bool_EI': True,
+            'gamma': 2,
+            'taus_b': [0.0]*N,
+            'tau_s': 0.0,
+            'n_L': [0, 0],
+            'm_L': 0,
+            'X_0': X0,
+        },
+        'ext_params': {
+            'Lambdas': [[0.0, 0.0]]*N,
+            'Zetas': [0.0]*N,
+            'A': 1e-5,           # Amplitude
+            'w0': 1e0,           # Angular frequency (rad/s)
+            'psi': np.pi/2,          # Flow angle (radians)
+        },
+        'sim_params': {
+            'T_span': (0.0, 1.0),
+            'T_eval': np.linspace(0, 1, 10),
+            'T_sim_max': 30.0,
+            'method': 'BDF',
+        }
+    }
+
 
 def ViscoElasticFilament_create_params_list(int_keys: List[str], ext_keys: List[str], sim_keys: List[str], params_list_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
     """ Generate all combinations of the parameter lists. 
@@ -728,3 +775,15 @@ ViscoElasticFilament_FlowParams = compose_model(
     ViscoElasticFilament,
     compose_ext_params=FlowParams_to_InterpFlow
 )
+
+if __name__ == "__main__":
+
+    # ViscoElasticFilament simulation
+    minimal_params = make_minimal_params()
+    model = ViscoElasticFilament(**minimal_params)
+    output = model.simulate_single()
+
+    # ViscoElasticFilament_FlowParams simulation
+    minimal_params_with_flow = make_minimal_params_with_flow()
+    model = ViscoElasticFilament_FlowParams(**minimal_params_with_flow)
+    output = model.simulate_single()

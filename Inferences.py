@@ -183,7 +183,6 @@ class Inference:
             print("Warning: Hessian singular, covariance unavailable.")
             self.covariance = None
 
-
 class BatchInference:
     """
     Parallel inference over multiple ground-truth samples or initial guesses.
@@ -224,40 +223,3 @@ class BatchInference:
             for ig, ep, sp in zip(initial_guesses, ext_params_batch, sim_params_batch)
         )
         return results
-
-if __name__ == "__main__":
-    # 1. Define custom loss function
-    def mse_loss(predicted, ground_truth):
-        return np.mean((predicted - ground_truth) ** 2)
-
-    # 2. Create ground truth (from a Model instance)
-    true_model = Square(int_params={'x': 3.5134}, ext_params=None, sim_params=None)
-    ground_truth = true_model.simulate_single()['value']  # 12.25
-
-    # 3. Set up inference
-    inference = Inference(
-        model_class=Square,
-        ground_truth=ground_truth,
-        loss_fn=mse_loss,
-        optimizer_kwargs={'method': 'L-BFGS-B', 'options': {'ftol': 1e-9}}
-    )
-
-    # 4. Run single inference with initial guess
-    result = inference.infer(
-        initial_guess={'x': 2.0},
-        ext_params=None,
-        sim_params=None
-    )
-
-    print(f"Inferred x: {result['params']['x']:.6f}")
-    print(f"Std error: {result['std_errors'][0]:.6f}")
-    print(f"Covariance:\n{result['covariance']}")
-
-    # 5. Run multiple inferences in parallel
-    batch_inference = BatchInference(inference, n_jobs=-1)
-    batch_results = batch_inference.infer_batch(
-        initial_guesses=[{'x': 1.0}, {'x': 2.0}, {'x': 4.0}, {'x': 5.0}],
-    )
-
-    for i, res in enumerate(batch_results):
-        print(f"Run {i}: x = {res['params']['x']:.4f} ± {res['std_errors'][0]:.4f}")
