@@ -437,54 +437,49 @@ def ActiveBending(X):
 ## --- Differential system AQX_dot = B --- ##
 
 def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s=0,
-    gamma=2, n_L=[0,0], m_L=0,
-    Lambdas=0, Zetas=0, InterpFlow=0):
+          gamma=2, n_L=[0,0], m_L=0,
+          Lambdas=0, Zetas=0, InterpFlow=0):
 
     # --- Setup ---
     N = X.shape[0] - 2
     X_3N = X3N(X)
 
-    # Extract coordinates
     x = X_3N[:N, 0]
     y = X_3N[N:2*N, 0]
     theta = X_3N[2*N:, 0]
 
-    cos_theta = np.cos(theta)
-    sin_theta = np.sin(theta)
-
-    # Boundary conditions
+    # --- Boundary conditions ---
     n_0 = n_L
     m_0 = k0 * X[2]
 
-    # --- Precompute GG matrices ---
+    # --- Precompute GG ---
     G_all = [GG(theta[i], gamma) for i in range(N)]
 
-    # --- Build A (optimized AA) ---
+    # --- Build A (optimized, no U_i) ---
     A = np.zeros((N+2, 3*N))
     A[0, 0] = 1
     A[1, N] = 1
 
-    U_i = np.zeros((3, 3*N))
-
     for j in range(N):
+        row = A[j+2]
+
         for i in range(j, N):
+            dx = x[i] - x[j]
+            dy = y[i] - y[j]
 
-            # D_ij
-            D = np.array([[x[i] - x[j], y[i] - y[j], 1]])
+            D = np.array([dx, dy, 1.0])
 
-            # Build U_i using cached G
-            U_i.fill(0)
             G_i = G_all[i]
-            U_i[:, i] = G_i[:, 0]
-            U_i[:, N+i] = G_i[:, 1]
-            U_i[:, 2*N+i] = G_i[:, 2]
+            dG = D @ G_i   # shape (5,)
 
-            A[j+2, :] += (D @ U_i).ravel()
+            row[i]     += dG[0]
+            row[N+i]   += dG[1]
+            row[2*N+i] += dG[2]
 
-    # --- Q matrix (unchanged) ---
+    # --- Q matrix ---
     Q = QQ(X_3N)
 
-    # --- Dissipation matrices ---
+    # --- Dissipation ---
     A_DB = int(bool_EI) * ADB(taus_b, N)
     A_DS = tau_s * ADS(N)
 
@@ -496,12 +491,16 @@ def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s=0,
 
     X_dot_flow = Flow(X_3N, X_flow)
 
-    # --- BFlow (optimized) ---
+    # --- BFlow (kept consistent with same idea) ---
     B_flow = np.zeros((N+2, 1))
 
     for j in range(N):
         for i in range(j, N):
-            D = np.array([[x[i] - x[j], y[i] - y[j], 1]])
+            dx = x[i] - x[j]
+            dy = y[i] - y[j]
+
+            D = np.array([[dx, dy, 1.0]])
+
             T = TT_flow(X_dot_flow, i)
             B_flow[j+2, 0] += (D @ G_all[i] @ T).item()
 
@@ -517,21 +516,20 @@ def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s=0,
         - Sp4 * B_flow
     )
 
-    # --- Final system ---
+    # --- System matrix ---
     A_tilde = (Sp4 * A - Beta * A_DS) @ Q - A_DB
 
-    # --- Solve system (optimized) ---
+    # --- Solve ---
     try:
         X_dot = np.linalg.solve(A_tilde, B).ravel()
     except np.linalg.LinAlgError:
         X_dot = (np.linalg.pinv(A_tilde) @ B).ravel()
 
-    # --- Enforce fixed base ---
+    # --- Enforce base constraints ---
     X_dot[0] = 0
     X_dot[1] = 0
 
     return X_dot
-
 
 def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
     """
