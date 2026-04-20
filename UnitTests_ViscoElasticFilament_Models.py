@@ -153,6 +153,7 @@ def test_g_output_shape():
 
     params = dict(
         Sp4=1,
+        N = N,
         k0=1,
         bool_EI=True,
         Beta=1,
@@ -177,6 +178,7 @@ def test_g_fixed_base():
     params = dict(
         Sp4=1,
         k0=1,
+        N = N,
         bool_EI=True,
         Beta=1,
         taus_b=[1]*(N-1),
@@ -204,6 +206,7 @@ def test_simulation_runs():
 
     int_params = {
         "Sp4": 1,
+        "N":N,
         "k0": 1e13,
         "bool_EI": True,
         "gamma": 2,
@@ -506,6 +509,7 @@ class TestViscoElasticFilamentFlowParams:
         # You can relax this if small flows don't significantly change output
         # difference = np.linalg.norm(traj_with_flow - traj_no_flow)
         # print(f"\nTrajectory difference (with vs without flow): {difference}")
+
 class TestViscoElasticFilamentBatch:
     """Unit tests for ViscoElasticFilament.simulate_batch()"""
     

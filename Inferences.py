@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.optimize import minimize, approx_fprime
+import scipy.differentiate as sd
 from typing import Callable, Dict, Any, Tuple
 import joblib
 from functools import partial
@@ -9,6 +10,33 @@ from Models import Model, Square
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def Vectorize_Functional(func, m):
+    """ 
+    This function vectorizes a functional with m input parameters, 
+    by wrapping it inside another function.
+    """
+
+    def f_vec(x):
+
+        x = np.array(x, copy=False)
+        if x.ndim < 1 or x.shape[0] != m:
+            raise ValueError(f"Expected first dim {m}, got {x.shape}")
+
+        # Flatten extra dims
+        extra_shape = x.shape[1:]
+        p = int(np.prod(extra_shape, dtype=int)) if extra_shape else 1
+        x_flat = x.reshape(m, p)
+
+        # apply func to each column
+        out = np.empty(p, dtype=float)
+        for j in range(p):
+            out[j] = func(x_flat[:, j])
+        # reshape back to extra_shape
+        return out.reshape(extra_shape)
+
+    return f_vec
 
 class Inference:
     """
@@ -127,6 +155,7 @@ class Inference:
             'params': optimal_params,
             'loss': self.result.fun,
             'covariance': self.covariance,
+            'hessian': self.hessian,
             'std_errors': np.sqrt(np.diag(self.covariance)) if self.covariance is not None else None,
             'iterations': self.result.nit,
         }
@@ -147,38 +176,52 @@ class Inference:
             ext_params, sim_params: Model parameters
             eps: Step size for finite differences
         """
-        # Gradient function for Hessian computation
-        def grad_fn(x):
-            return approx_fprime(
-                x,
-                partial(
+
+        m = len(param_keys) # number of variables
+
+        self.hessian = sd.hessian(
+                f = Vectorize_Functional(partial(
                     self.objective,
                     param_keys=param_keys,
                     ext_params=ext_params,
                     sim_params=sim_params,
-                ),
-                epsilon=eps
-            )
+                    ),
+                m = m,
+                ), 
+                x = self.result.x).ddf
+
+        # # Gradient function for Hessian computation
+        # def grad_fn(x):
+        #     return approx_fprime(
+        #         x,
+        #         partial(
+        #             self.objective,
+        #             param_keys=param_keys,
+        #             ext_params=ext_params,
+        #             sim_params=sim_params,
+        #         ),
+        #         epsilon=eps
+        #     )
         
-        # Numerical Hessian (finite differences of gradients)
-        n = len(self.result.x)
-        hessian = np.zeros((n, n))
+        # # Numerical Hessian (finite differences of gradients)
+        # n = len(self.result.x)
+        # hessian = np.zeros((n, n))
         
-        for i in range(n):
-            x_plus = self.result.x.copy()
-            x_plus[i] += eps
-            x_minus = self.result.x.copy()
-            x_minus[i] -= eps
+        # for i in range(n):
+        #     x_plus = self.result.x.copy()
+        #     x_plus[i] += eps
+        #     x_minus = self.result.x.copy()
+        #     x_minus[i] -= eps
             
-            grad_plus = grad_fn(x_plus)
-            grad_minus = grad_fn(x_minus)
+        #     grad_plus = grad_fn(x_plus)
+        #     grad_minus = grad_fn(x_minus)
             
-            hessian[i, :] = (grad_plus - grad_minus) / (2 * eps)
+        #     hessian[i, :] = (grad_plus - grad_minus) / (2 * eps)
         
-        self.hessian = hessian
+        # self.hessian = hessian
         
         try:
-            self.covariance = np.linalg.inv(hessian)
+            self.covariance = np.linalg.inv(self.hessian)
         except np.linalg.LinAlgError:
             print("Warning: Hessian singular, covariance unavailable.")
             self.covariance = None
