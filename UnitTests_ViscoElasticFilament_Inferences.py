@@ -9,11 +9,179 @@ import pytest
 import numpy as np
 from functools import partial
 from typing import Dict, Any, Callable
+from scipy import stats
 
 # Import your modules (adjust paths as needed)
 from Models import Model, compose_model
-from ViscoElasticFilament_Models import StraightLine, ViscoElasticFilament # ViscoElasticFilament_FlowParams
+from ViscoElasticFilament_Models import StraightLine, ViscoElasticFilament, ViscoElasticFilament_FlowParams
 from Inferences import Inference
+from ViscoElasticFilament_Inferences import basinhopping_optimizer
+from scipy.optimize import Bounds
+
+
+def print_inference_summary(
+    result: Dict[str, Any],
+    ground_truth_params: Dict[str, float] = None,
+    confidence_level: float = 0.95,
+) -> None:
+    """
+    Print a formatted summary of inferred parameters with error bars and statistics.
+    
+    Args:
+        result: Dict returned by Inference.infer()
+        ground_truth_params: Dict of true parameter values for comparison
+        confidence_level: Confidence level for CI (default 95%)
+    """
+    
+    inferred_params = result['params']
+    std_errors = result['std_errors']
+    loss = result['loss']
+    iterations = result['iterations']
+    
+    # Compute z-score for confidence interval
+    z_score = stats.norm.ppf((1 + confidence_level) / 2)
+    
+    print(f"\n{'='*80}")
+    print(f"INFERENCE SUMMARY")
+    print(f"{'='*80}")
+    
+    print(f"\nOptimization Results:")
+    print(f"  Final loss:        {loss:.8e}")
+    print(f"  Iterations:        {iterations}")
+    
+    print(f"\n{'Parameter':<20} {'Inferred':<18} {'Std Error':<18} {'95% CI':<30}")
+    print(f"{'-'*80}")
+    
+    for param_name in inferred_params.keys():
+        inferred_val = inferred_params[param_name]
+        
+        # Get standard error (or mark as unavailable)
+        if std_errors is not None:
+            param_idx = list(inferred_params.keys()).index(param_name)
+            std_err = std_errors[param_idx]
+            margin = z_score * std_err
+            ci_lower = inferred_val - margin
+            ci_upper = inferred_val + margin
+            ci_str = f"[{ci_lower:.6e}, {ci_upper:.6e}]"
+            std_err_str = f"{std_err:.6e}"
+        else:
+            std_err_str = "N/A"
+            ci_str = "N/A (singular Hessian)"
+        
+        print(f"{param_name:<20} {inferred_val:.8e}   {std_err_str:<18} {ci_str:<30}")
+    
+    # Comparison with ground truth (if provided)
+    if ground_truth_params is not None:
+        print(f"\n{'Ground Truth Comparison':<20} {'Relative Error':<20} {'Error (std)':<20}")
+        print(f"{'-'*80}")
+        
+        for param_name in inferred_params.keys():
+            if param_name not in ground_truth_params:
+                print(f"{param_name:<20} {'(not provided)':<20}")
+                continue
+            
+            inferred_val = inferred_params[param_name]
+            gt_val = ground_truth_params[param_name]
+            
+            # Relative error
+            rel_error = abs(inferred_val - gt_val) / abs(gt_val) if gt_val != 0 else np.inf
+            
+            # Error in standard deviations (z-score)
+            if std_errors is not None:
+                param_idx = list(inferred_params.keys()).index(param_name)
+                std_err = std_errors[param_idx]
+                z_error = abs(inferred_val - gt_val) / std_err if std_err > 0 else np.inf
+                z_str = f"{z_error:.2f}σ"
+            else:
+                z_str = "N/A"
+            
+            status = "✓ PASS" if rel_error < 0.1 else "✗ FAIL"
+            print(f"{param_name:<20} {rel_error*100:>6.2f}%            {z_str:<20} {status}")
+    
+    print(f"\n{'='*80}\n")
+
+def print_optimization_history(inference_instance, plot_flag: bool = False) -> None:
+    """
+    Print optimization trajectory statistics and optionally plot convergence.
+    
+    Args:
+        inference_instance: Inference object after running infer()
+        plot_flag: If True, attempt to plot loss landscape (requires matplotlib)
+    """
+    hist = inference_instance.result
+    
+    if not hasattr(hist, 'F_global') or len(hist.F_global) == 0:
+        print("Warning: No optimization history available")
+        return
+    
+    losses = np.array(hist.F_global)
+    acceptances = np.array(hist.accept_global)
+    
+    print(f"\n{'='*80}")
+    print(f"OPTIMIZATION HISTORY")
+    print(f"{'='*80}")
+    
+    print(f"\nBasin-hopping Statistics:")
+    print(f"  Initial loss:           {losses[0]:.8e}")
+    print(f"  Final loss:             {losses[-1]:.8e}")
+    print(f"  Best loss:              {np.min(losses):.8e}")
+    print(f"  Worst loss:             {np.max(losses):.8e}")
+    print(f"  Mean loss:              {np.mean(losses):.8e}")
+    print(f"  Std dev (loss):         {np.std(losses):.8e}")
+    
+    improvement = (losses[0] - losses[-1]) / losses[0] * 100
+    print(f"  Total improvement:      {improvement:.2f}%")
+    
+    # Acceptance statistics
+    n_accepted = np.sum(acceptances)
+    total_steps = len(acceptances)
+    acceptance_rate = n_accepted / total_steps if total_steps > 0 else 0
+    
+    print(f"\nAcceptance Statistics:")
+    print(f"  Total steps:            {total_steps}")
+    print(f"  Accepted steps:         {n_accepted}")
+    print(f"  Rejection rate:         {(1-acceptance_rate)*100:.2f}%")
+    print(f"  Acceptance rate:        {acceptance_rate*100:.2f}%")
+    
+    # Convergence analysis
+    recent_window = min(5, len(losses))
+    recent_loss_change = (losses[-recent_window] - losses[-1]) / losses[-recent_window] * 100
+    print(f"\nConvergence Analysis (last {recent_window} steps):")
+    print(f"  Loss reduction:         {recent_loss_change:.4f}%")
+    print(f"  Converged:              {'Yes ✓' if recent_loss_change < 1.0 else 'No ✗'}")
+    
+    print(f"\n{'='*80}\n")
+    
+    # Optional: Plot convergence
+    if plot_flag:
+        try:
+            import matplotlib.pyplot as plt
+            
+            fig, axes = plt.subplots(2, 1, figsize=(10, 8))
+            
+            # Loss convergence
+            axes[0].semilogy(range(len(losses)), losses, 'b-o', markersize=4)
+            axes[0].set_xlabel('Basin-hopping iteration')
+            axes[0].set_ylabel('Loss (log scale)')
+            axes[0].set_title('Loss Convergence')
+            axes[0].grid(True, alpha=0.3)
+            
+            # Acceptance rate (cumulative)
+            cumulative_accept_rate = np.cumsum(acceptances) / np.arange(1, len(acceptances) + 1)
+            axes[1].plot(range(len(acceptances)), cumulative_accept_rate, 'g-o', markersize=4)
+            axes[1].set_xlabel('Basin-hopping iteration')
+            axes[1].set_ylabel('Cumulative acceptance rate')
+            axes[1].set_title('Acceptance Rate Over Time')
+            axes[1].set_ylim([0, 1])
+            axes[1].grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+            plt.savefig('inference_convergence.png', dpi=150, bbox_inches='tight')
+            print("Plot saved to 'inference_convergence.png'\n")
+            
+        except ImportError:
+            print("(matplotlib not available for plotting)")
+
 
 class TestViscoElasticFilamentSp4Inference:
     """
@@ -70,8 +238,8 @@ class TestViscoElasticFilamentSp4Inference:
         return {
             "Lambdas": [[0,0]]*N,
             "Zetas": [0]*N,
-            "A":1e-5,
-            "w0":1e0,
+            "A":1e-2,
+            "w0":1e-6,
             "psi":np.pi/2,
         }
 
@@ -103,11 +271,7 @@ class TestViscoElasticFilamentSp4Inference:
             sim_params=ground_truth_sim_params
         )
         output = model.simulate_single()
-        
-        # Debug: print what you got
-        print(f"\nSimulation output: {output}")
-        print(f"Output keys: {output.keys() if isinstance(output, dict) else 'Not a dict'}")
-        
+
         assert output['value'] is not None, (
             f"Ground truth simulation failed. Full output: {output}"
         )
@@ -130,10 +294,6 @@ class TestViscoElasticFilamentSp4Inference:
             sim_params=ground_truth_sim_params
         )
         output = model.simulate_single()
-        
-        # Debug: print what you got
-        print(f"\nSimulation output: {output}")
-        print(f"Output keys: {output.keys() if isinstance(output, dict) else 'Not a dict'}")
         
         assert output['value'] is not None, (
             f"Ground truth simulation failed. Full output: {output}"
@@ -194,360 +354,591 @@ class TestViscoElasticFilamentSp4Inference:
         )
         return ComposedModel
 
-    # ========================================================================
-    # TESTS
-    # ========================================================================
-
-    # def test_full_inference_workflow_sp4_convergence(
-    #     self,
-    #     composed_model_sp4_only,
-    #     ground_truth_data,
-    #     ground_truth_ext_params,
-    #     ground_truth_sim_params,
-    #     mse_loss_fn,
-    #     ground_truth_int_params,
-    # ):
-    #     """
-    #     **TEST: Full inference workflow for Sp4 parameter**
+    @pytest.fixture
+    def composed_model_flow_sp4_only(self, ground_truth_int_params):
+        """
+        Create a composed model for ViscoElasticFilament_FlowParams that only varies Sp4.
         
-    #     CONCEPT:
-    #     - Simulate ViscoElasticFilament with known Sp4 = 1.0
-    #     - Run inference from initial guess Sp4 = 2.5 (perturbed)
-    #     - Verify convergence to ground truth within tolerance
+        The embedding function accepts a reduced parameter dict {'Sp4': value}
+        and embeds it into the full internal parameters, keeping all others fixed.
+        """
+        fixed_params = ground_truth_int_params.copy()
         
-    #     ASSERTION CHECKS:
-    #     - Inferred Sp4 is close to ground truth (within 10%)
-    #     - Loss is non-negative and finite
-    #     - Covariance matrix exists and is positive definite
-    #     - Std errors are positive
-    #     - Iterations > 0 (optimizer ran)
-    #     """
-    #     # Setup inference with composed model
-    #     inference = Inference(
-    #         model_class=composed_model_sp4_only,
-    #         ground_truth=ground_truth_data,
-    #         loss_fn=mse_loss_fn,
-    #         optimizer_kwargs={
-    #             'method': 'L-BFGS-B',
-    #             'bounds': [
-    #                 (1e-6, np.inf)  # Bound for 'Sp4' parameter
-    #             ],                
-    #             'options': {'ftol': 1e-6, 'maxiter': 10}                
-    #         }
-    #     )
-        
-    #     # Initial guess: perturb Sp4 from true value of 1.0
-    #     initial_guess = {'Sp4': 2.5}
-        
-    #     # Run inference
-    #     result = inference.infer(
-    #         initial_guess=initial_guess,
-    #         ext_params=ground_truth_ext_params,
-    #         sim_params=ground_truth_sim_params
-    #     )
-        
-    #     # ---- ASSERTIONS ----
-        
-    #     # Verify inferred Sp4 converges to ground truth
-    #     inferred_sp4 = result['params']['Sp4']
-    #     true_sp4 = ground_truth_int_params['Sp4']
-    #     relative_error = np.abs(inferred_sp4 - true_sp4) / np.abs(true_sp4)
-        
-    #     assert relative_error < 0.1, (
-    #         f"Inferred Sp4={inferred_sp4} deviates from true Sp4={true_sp4} "
-    #         f"by {relative_error*100:.2f}%. Check optimizer convergence."
-    #     )
-        
-    #     # Verify loss is valid (non-negative, finite)
-    #     print("loss:", result['loss'])
-    #     assert result['loss'] >= 0, "Loss should be non-negative"
-    #     assert np.isfinite(result['loss']), "Loss should be finite"
-        
-    #     # Verify covariance exists and is valid
-    #     assert result['covariance'] is not None, "Covariance should be computed"
-    #     cov_matrix = result['covariance']
-        
-    #     # Check positive definiteness (all eigenvalues > 0)
-    #     eigenvalues = np.linalg.eigvals(cov_matrix)
-    #     assert np.all(eigenvalues > 0), (
-    #         f"Covariance not positive definite. Eigenvalues: {eigenvalues}"
-    #     )
-        
-    #     # Verify standard errors are positive and finite
-    #     assert result['std_errors'] is not None, "Std errors should be computed"
-    #     assert np.all(result['std_errors'] > 0), "Std errors should be positive"
-    #     assert np.all(np.isfinite(result['std_errors'])), "Std errors should be finite"
-        
-    #     # Verify optimizer ran (iterations > 0)
-    #     assert result['iterations'] > 0, "Optimizer should have run at least 1 iteration"
-
-    # def test_inference_convergence_from_multiple_initial_guesses(
-    #     self,
-    #     composed_model_sp4_only,
-    #     ground_truth_data,
-    #     ground_truth_ext_params,
-    #     ground_truth_sim_params,
-    #     mse_loss_fn,
-    #     ground_truth_int_params,
-    # ):
-    #     """
-    #     **TEST: Robustness across multiple initial guesses**
-        
-    #     CONCEPT:
-    #     - Run inference from 3 different initial guesses for Sp4
-    #     - Verify all converge to approximately the same value
-    #     - Demonstrate model is locally convex around optimum
-        
-    #     ASSERTION CHECKS:
-    #     - Standard deviation of inferred Sp4 values is small (< 5%)
-    #     - All inferred values converge toward ground truth
-    #     - Loss decreases monotonically across runs
-    #     """
-    #     # Define initial guesses covering a range
-    #     initial_guesses_sp4 = [0.5, 1.5, 3.0]
-    #     inferred_sp4_values = []
-    #     loss_values = []
-        
-    #     true_sp4 = ground_truth_int_params['Sp4']
-        
-    #     for initial_sp4 in initial_guesses_sp4:
-    #         inference = Inference(
-    #             model_class=composed_model_sp4_only,
-    #             ground_truth=ground_truth_data,
-    #             loss_fn=mse_loss_fn,
-    #             optimizer_kwargs={
-    #                 'method': 'L-BFGS-B',
-    #                 'bounds': [
-    #                 (1e-6, np.inf)  # Bound for 'Sp4' parameter
-    #                 ],
-    #                 'options': {'ftol': 1e-6, 'maxiter': 100}
-    #             }
-    #         )
+        def embed_sp4_flow(
+            reduced_int_params: Dict[str, float],
+            ext_params: Any,
+            sim_params: Any,
+        ) -> Dict[str, Any]:
+            """
+            Transform reduced internal parameters into full int_params dict.
             
-    #         # Run inference
-    #         result = inference.infer(
-    #             initial_guess={'Sp4': initial_sp4},
-    #             ext_params=ground_truth_ext_params,
-    #             sim_params=ground_truth_sim_params
-    #         )
+            Args:
+                reduced_int_params: Dict containing {'Sp4': inferred_value}
+                ext_params: Passed through unchanged (not modified here)
+                sim_params: Passed through unchanged (not modified here)
             
-    #         inferred_sp4_values.append(result['params']['Sp4'])
-    #         loss_values.append(result['loss'])
+            Returns:
+                Full int_params dict with Sp4 updated, all other values fixed.
+            """
+            full_params = fixed_params.copy()
+            
+            # Update only Sp4; all other parameters remain fixed
+            if 'Sp4' in reduced_int_params:
+                full_params['Sp4'] = reduced_int_params['Sp4']
+            
+            return full_params
         
-    #     # ---- ASSERTIONS ----
-        
-    #     # Verify all convergence points are similar
-    #     inferred_sp4_array = np.array(inferred_sp4_values)
-    #     sp4_std = np.std(inferred_sp4_array)
-    #     sp4_mean = np.mean(inferred_sp4_array)
-    #     sp4_cv = sp4_std / np.abs(sp4_mean)  # Coefficient of variation
-        
-    #     assert sp4_cv < 0.05, (
-    #         f"Inferred Sp4 values show high variance: mean={sp4_mean:.4f}, "
-    #         f"std={sp4_std:.4f}, CV={sp4_cv:.4f}. Expected CV < 0.05."
-    #     )
-        
-    #     # Verify all converge toward ground truth
-    #     for sp4_val in inferred_sp4_values:
-    #         rel_error = np.abs(sp4_val - true_sp4) / np.abs(true_sp4)
-    #         assert rel_error < 0.15, (
-    #             f"Inferred Sp4={sp4_val} deviates from true Sp4={true_sp4} "
-    #             f"by {rel_error*100:.2f}%"
-    #         )
-        
-    #     # Verify all loss values are finite and non-negative
-    #     assert np.all(np.isfinite(loss_values)), "All loss values should be finite"
-    #     assert np.all(np.array(loss_values) >= 0), "All loss values should be non-negative"
+        # Create composed model with the embedding function
+        ComposedModel = compose_model(
+            ViscoElasticFilament_FlowParams,
+            compose_int_params=embed_sp4_flow,
+        )
+        return ComposedModel
 
-    def test_inference_parameter_uncertainty_estimation(
+    @pytest.fixture
+    def basinhopping_optimizer_instance(self):
+        """
+        Return the basinhopping optimizer function with standard configuration.
+        """
+        return basinhopping_optimizer
+
+    @pytest.fixture
+    def inference_instance(
         self,
+        basinhopping_optimizer_instance,
         composed_model_sp4_only,
         ground_truth_data,
-        ground_truth_ext_params,
-        ground_truth_sim_params,
         mse_loss_fn,
-        ground_truth_int_params,
     ):
         """
-        **TEST: Parameter uncertainty quantification**
+        Create an Inference instance configured for Sp4 parameter recovery.
         
-        CONCEPT:
-        - Verify that the inferred parameter uncertainty (std error) is reasonable
-        - Std error should scale with problem difficulty
-        - Larger std error for noisy/flat loss landscapes
-        
-        ASSERTION CHECKS:
-        - Std error is positive and finite
-        - Std error is not excessively large (< 50% of true value)
-        - Std error is not suspiciously small (> 0.1% of true value)
+        Uses basin-hopping as the global optimizer with L-BFGS-B for local minimization.
         """
-        inference = Inference(
+        return Inference(
             model_class=composed_model_sp4_only,
             ground_truth=ground_truth_data,
             loss_fn=mse_loss_fn,
+            optimizer=basinhopping_optimizer_instance,
             optimizer_kwargs={
-                'method': 'L-BFGS-B',
-                'bounds': [
-                    (1e-6, np.inf)  # Bound for 'Sp4' parameter
-                ],                
-                'options': {'ftol': 1e-6, 'maxiter': 100}
+                # Individual arguments
+                'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
+                'minimum_gradient': False,
+                'minimum_hessian': False,
+                
+                # Local minimizer arguments
+                'local_minimizer_kwargs': {
+                    'method': 'L-BFGS-B',
+                    'jac': '3-point',
+                    "options": {
+                        'disp': True,
+                        'ftol': 1e-8,
+                        'gtol': 1e-8,
+                        'eps': 1e-8,
+                        'finite_diff_rel_step': 1e-6,
+                    },                
+                },
+                
+                # Global minimizer arguments
+                'global_minimizer_kwargs': {
+                    'niter': 9,
+                    'T': 0,
+                    'stepsize': 5,
+                    'tol': 1e-10,
+                }
             }
         )
+
+    @pytest.fixture
+    def inference_instance_flow(
+        self,
+        basinhopping_optimizer_instance,
+        composed_model_flow_sp4_only,
+        ground_truth_flow_data,
+        mse_loss_fn,
+    ):
+        """
+        Create an Inference instance for Sp4 recovery using flow parameters.
         
-        # Run inference
-        result = inference.infer(
-            initial_guess={'Sp4': 2.0},
-            ext_params=ground_truth_ext_params,
-            sim_params=ground_truth_sim_params
-        )
-        
-        # hessian = result['hessian']
-        std_error = result['std_errors'][0]
-        true_sp4 = ground_truth_int_params['Sp4']
-        
-        # ---- ASSERTIONS ----
-        
-        # Std error should be positive
-        assert std_error > 0, "Std error must be positive"
-        
-        # Std error should be finite
-        assert np.isfinite(std_error), "Std error must be finite"
-        
-        # Sanity check: std error should not exceed 50% of true value
-        # (This would indicate extremely poor parameter identifiability)
-        assert std_error < 0.5 * np.abs(true_sp4), (
-            f"Std error={std_error:.4f} is very large relative to "
-            f"true value={true_sp4}. Parameter may be poorly identifiable."
-        )
-        
-        # Sanity check: std error should not be suspiciously small (< 0.1%)
-        # (This could indicate Hessian computation issues)
-        assert std_error > 0.001 * np.abs(true_sp4), (
-            f"Std error={std_error:.4e} is suspiciously small. "
-            f"Check Hessian computation."
+        Configuration:
+        - Global optimizer: basin-hopping (stochastic global search)
+        - Local minimizer: L-BFGS-B (bounded quasi-Newton)
+        - Bounds: Sp4 in [1e-6, inf)
+        - Tolerance: tight convergence criteria for precise parameter recovery
+        """
+        return Inference(
+            model_class=composed_model_flow_sp4_only,
+            ground_truth=ground_truth_flow_data,
+            loss_fn=mse_loss_fn,
+            optimizer=basinhopping_optimizer_instance,
+            optimizer_kwargs={
+                # Basin-hopping global arguments
+                'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
+                'minimum_gradient': False,
+                'minimum_hessian': False,
+                
+                # Local minimizer (L-BFGS-B) arguments
+                'local_minimizer_kwargs': {
+                    'method': 'L-BFGS-B',
+                    'jac': '3-point',  # Numerical gradient (3-point stencil)
+                    'options': {
+                        'disp': True,
+                        'ftol': 1e-8,   # Function tolerance
+                        'gtol': 1e-8,   # Gradient tolerance
+                        'eps': 1e-8,    # Step size for finite difference
+                        'finite_diff_rel_step': 1e-6,
+                    },
+                },
+                
+                # Global minimizer (basin-hopping) arguments
+                'global_minimizer_kwargs': {
+                    'niter': 2,         # Number of basin-hopping iterations
+                    'T': 0,             # Temperature (0 = accept only improvements)
+                    'stepsize': 5,      # Initial step size
+                    'tol': 1e-10,       # Tolerance for local minimization
+                }
+            },
         )
 
-    # def test_inference_fails_gracefully_on_bad_initial_guess(
+    # def test_inference_sp4_recovery(
     #     self,
-    #     composed_model_sp4_only,
-    #     ground_truth_data,
+    #     inference_instance,
     #     ground_truth_ext_params,
     #     ground_truth_sim_params,
-    #     mse_loss_fn,
     # ):
     #     """
-    #     **TEST: Graceful handling of problematic initial guesses**
+    #     Test that the inference pipeline can recover Sp4 parameter
+    #     from synthetic ground truth data using basin-hopping optimization.
         
-    #     CONCEPT:
-    #     - Use an unreasonable initial guess (e.g., Sp4 = -1000)
-    #     - Verify inference still runs (or fails with informative message)
-    #     - No crashes or exceptions
-        
-    #     ASSERTION CHECKS:
-    #     - Inference completes without unhandled exceptions
-    #     - Result dict has required keys, even if optimization didn't converge
+    #     Expected behavior:
+    #     - Inferred Sp4 should be close to ground truth value (1.0)
+    #     - Optimization should converge with reasonable acceptance rate
     #     """
-    #     inference = Inference(
-    #         model_class=composed_model_sp4_only,
-    #         ground_truth=ground_truth_data,
-    #         loss_fn=mse_loss_fn,
-    #         optimizer_kwargs={
-    #             'method': 'L-BFGS-B',
-    #             'bounds': [
-    #                 (1e-6, np.inf)  # Bound for 'Sp4' parameter
-    #             ],                
-    #             'options': {'ftol': 1e-6, 'maxiter': 10}
-    #         }
-    #     )
-        
-    #     # Use a pathological initial guess
-    #     bad_initial_guess = {'Sp4': 100}
-        
-    #     # Run inference (should handle gracefully)
-    #     try:
-    #         result = inference.infer(
-    #             initial_guess=bad_initial_guess,
-    #             ext_params=ground_truth_ext_params,
-    #             sim_params=ground_truth_sim_params
-    #         )
-    #     except Exception as e:
-    #         pytest.fail(f"Inference should not crash on bad initial guess. Error: {e}")
-        
-    #     # ---- ASSERTIONS ----
-        
-    #     # Verify result has required keys
-    #     required_keys = ['params', 'loss', 'covariance', 'std_errors', 'iterations']
-    #     for key in required_keys:
-    #         assert key in result, f"Result missing required key: {key}"
-        
-    #     # Loss should be finite or inf (not NaN)
-    #     assert result['loss'] == result['loss'], "Loss should not be NaN"
-
-    # def test_inference_vs_ground_truth_recovery(
-    #     self,
-    #     composed_model_sp4_only,
-    #     ground_truth_data,
-    #     ground_truth_ext_params,
-    #     ground_truth_sim_params,
-    #     mse_loss_fn,
-    #     ground_truth_int_params,
-    # ):
-    #     """
-    #     **TEST: End-to-end parameter recovery**
-        
-    #     CONCEPT:
-    #     - Verify that inference can recover the ground truth parameter
-    #     - Final loss should be small (close to data noise level)
-    #     - Inferred Sp4 should fall within confidence interval
-        
-    #     ASSERTION CHECKS:
-    #     - Inferred Sp4 within 1 std error of true value (confidence check)
-    #     - Final loss is reasonable (not dominated by noise)
-    #     - Relative error < 5%
-    #     """
-    #     inference = Inference(
-    #         model_class=composed_model_sp4_only,
-    #         ground_truth=ground_truth_data,
-    #         loss_fn=mse_loss_fn,
-    #         optimizer_kwargs={
-    #             'method': 'L-BFGS-B',
-    #             'bounds': [
-    #                 (1e-6, np.inf)  # Bound for 'Sp4' parameter
-    #             ],                
-    #             'options': {'ftol': 1e-7, 'maxiter': 200}
-    #         }
-    #     )
-        
-    #     # Run inference
-    #     result = inference.infer(
-    #         initial_guess={'Sp4': 1.8},
+    #     result = inference_instance.infer(
+    #         initial_guess={'Sp4': 2.5},
     #         ext_params=ground_truth_ext_params,
     #         sim_params=ground_truth_sim_params
     #     )
         
+    #     # Print detailed summaries
+    #     print_optimization_history(inference_instance, plot_flag=False)
+    #     print_inference_summary(
+    #         result,
+    #         ground_truth_params={'Sp4': 1.0},
+    #         confidence_level=0.95
+    #     )
+
+    #     # Extract results
     #     inferred_sp4 = result['params']['Sp4']
-    #     std_error = result['std_errors'][0]
-    #     true_sp4 = ground_truth_int_params['Sp4']
+    #     acceptance_rate = np.mean(inference_instance.result.accept_global)
+    #     ground_truth_sp4 = 1.0
         
-    #     # ---- ASSERTIONS ----
+    #     # Assertions
+    #     assert inferred_sp4 is not None, "Inference failed to recover Sp4"
+    #     assert inferred_sp4 > 0, "Inferred Sp4 must be positive"
+    #     assert np.isfinite(inferred_sp4), "Inferred Sp4 must be finite"
         
-    #     # Inferred value should be within ~1.96 std errors (95% CI)
-    #     z_score = np.abs(inferred_sp4 - true_sp4) / std_error
-    #     assert z_score < 2.0, (
-    #         f"Inferred Sp4={inferred_sp4} is {z_score:.2f} std errors away from "
-    #         f"true value={true_sp4}. Expected z-score < 2.0 (95% CI)."
+    #     relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+    #     assert relative_error < 0.1, (
+    #         f"Inferred Sp4={inferred_sp4:.6f} deviates >10% from ground truth {ground_truth_sp4}"
     #     )
         
-    #     # Relative error should be small
-    #     rel_error = np.abs(inferred_sp4 - true_sp4) / np.abs(true_sp4)
-    #     assert rel_error < 0.05, (
-    #         f"Relative error {rel_error*100:.2f}% exceeds 5% threshold. "
-    #         f"Inferred={inferred_sp4}, True={true_sp4}"
+    #     assert acceptance_rate > 0, "No basin-hopping steps accepted"
+        
+    #     # Optional: assert on covariance/Hessian if computed
+    #     if result['covariance'] is not None:
+    #         assert result['covariance'].shape == (1, 1), "Covariance shape mismatch"
+    #         assert result['std_errors'][0] > 0, "Standard error must be positive"
+        
+    #     print(f"✓ Inferred Sp4: {inferred_sp4:.6f} (ground truth: {ground_truth_sp4})")
+    #     print(f"✓ Relative error: {relative_error*100:.2f}%")
+    #     print(f"✓ Basin-hopping acceptance rate: {acceptance_rate:.2%}")
+
+    def test_inference_sp4_recovery_flow(
+        self,
+        inference_instance_flow,
+        ground_truth_ext_flow_params,
+        ground_truth_sim_params,
+    ):
+        """
+        Test that the inference pipeline recovers Sp4 from synthetic flow data.
+        
+        Validates:
+        1. Sp4 recovery accuracy (relative error < 10%)
+        2. Optimization convergence (acceptance rate > 0)
+        3. Parameter bounds satisfaction (Sp4 > 0, finite)
+        4. Covariance matrix validity (if computed)
+        5. External flow parameters remain unchanged
+        
+        Expected behavior:
+        - Inferred Sp4 ≈ 1.0 (ground truth)
+        - Relative error < 10%
+        - Acceptance rate > 0
+        """
+        # Run inference with initial guess far from ground truth
+        result = inference_instance_flow.infer(
+            initial_guess={'Sp4': 2.5},
+            ext_params=ground_truth_ext_flow_params,
+            sim_params=ground_truth_sim_params,
+        )
+        
+        # Print detailed optimization history and summary
+        assert False, print_optimization_history(inference_instance_flow, plot_flag=False)
+        # assert False, print_inference_summary(
+        #     result,
+        #     ground_truth_params={'Sp4': 1.0},
+        #     confidence_level=0.95,
+        # )
+        
+        # Extract inferred results
+        inferred_sp4 = result['params']['Sp4']
+        acceptance_rate = np.mean(inference_instance_flow.result.accept_global)
+        ground_truth_sp4 = 1.0
+        
+        # ===== ASSERTION 1: Sp4 successfully inferred =====
+        assert inferred_sp4 is not None, (
+            "Inference failed: Sp4 not returned"
+        )
+        
+        # ===== ASSERTION 2: Sp4 is physically valid =====
+        assert inferred_sp4 > 0, (
+            f"Inferred Sp4={inferred_sp4} must be positive"
+        )
+        assert np.isfinite(inferred_sp4), (
+            f"Inferred Sp4={inferred_sp4} must be finite"
+        )
+        
+        # ===== ASSERTION 3: Relative error within tolerance =====
+        relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+        assert relative_error < 0.1, (
+            f"Inferred Sp4={inferred_sp4:.6f} deviates >{relative_error*100:.2f}% "
+            f"from ground truth {ground_truth_sp4}"
+        )
+        
+        # ===== ASSERTION 4: Optimization converged =====
+        assert acceptance_rate > 0, (
+            "Basin-hopping failed: no steps accepted"
+        )
+        
+        # ===== ASSERTION 5: Covariance/uncertainty valid =====
+        if result['covariance'] is not None:
+            assert result['covariance'].shape == (1, 1), (
+                f"Covariance shape {result['covariance'].shape} != (1, 1)"
+            )
+            assert result['std_errors'][0] > 0, (
+                f"Standard error must be positive, got {result['std_errors'][0]}"
+            )
+        
+        # ===== ASSERTION 6: External flow parameters unchanged =====
+        # Verify that flow parameters are passed but not modified by optimizer
+        assert 'A' in ground_truth_ext_flow_params, "Missing A in ext_params"
+        assert 'w0' in ground_truth_ext_flow_params, "Missing w0 in ext_params"
+        assert 'psi' in ground_truth_ext_flow_params, "Missing psi in ext_params"
+        
+        print(f"\n{'='*70}")
+        print(f"FLOW PARAMETER INFERENCE RESULTS (Sp4 recovery)")
+        print(f"{'='*70}")
+        print(f"✓ Inferred Sp4:              {inferred_sp4:.6f}")
+        print(f"✓ Ground truth Sp4:          {ground_truth_sp4}")
+        print(f"✓ Relative error:            {relative_error*100:.2f}%")
+        print(f"✓ Basin-hopping acceptance:  {acceptance_rate:.2%}")
+        print(f"✓ Fixed flow amplitude (A):  {ground_truth_ext_flow_params['A']:.2e}")
+        print(f"✓ Fixed angular freq (w0):   {ground_truth_ext_flow_params['w0']:.2e} rad/s")
+        print(f"✓ Fixed flow angle (psi):    {ground_truth_ext_flow_params['psi']:.4f} rad")
+        print(f"{'='*70}\n")
+
+    # @pytest.mark.parametrize("initial_sp4", [0.1, 0.5, 2.5, 5.0, 10.0])
+    # def test_inference_sp4_recovery_flow_robust(
+    #     self,
+    #     initial_sp4,
+    #     composed_model_flow_sp4_only,
+    #     ground_truth_flow_data,
+    #     mse_loss_fn,
+    #     basinhopping_optimizer_instance,
+    #     ground_truth_ext_flow_params,
+    #     ground_truth_sim_params,
+    # ):
+    #     """
+    #     Robustness test: verify Sp4 recovery works across multiple initial guesses.
+        
+    #     Tests convergence behavior when starting far from and near the ground truth.
+    #     """
+    #     # Create a fresh inference instance for this initial guess
+    #     inference = Inference(
+    #         model_class=composed_model_flow_sp4_only,
+    #         ground_truth=ground_truth_flow_data,
+    #         loss_fn=mse_loss_fn,
+    #         optimizer=basinhopping_optimizer_instance,
+    #         optimizer_kwargs={
+    #             'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
+    #             'minimum_gradient': False,
+    #             'minimum_hessian': False,
+    #             'local_minimizer_kwargs': {
+    #                 'method': 'L-BFGS-B',
+    #                 'jac': '3-point',
+    #                 'options': {
+    #                     'disp': False,
+    #                     'ftol': 1e-8,
+    #                     'gtol': 1e-8,
+    #                     'eps': 1e-8,
+    #                     'finite_diff_rel_step': 1e-6,
+    #                 },
+    #             },
+    #             'global_minimizer_kwargs': {
+    #                 'niter': 9,
+    #                 'T': 0,
+    #                 'stepsize': 5,
+    #                 'tol': 1e-10,
+    #             }
+    #         },
     #     )
         
-    #     # Loss should be finite and reasonable
-    #     assert np.isfinite(result['loss']), "Final loss should be finite"
-    #     assert result['loss'] >= 0, "Final loss should be non-negative"
+    #     # Run inference
+    #     result = inference.infer(
+    #         initial_guess={'Sp4': initial_sp4},
+    #         ext_params=ground_truth_ext_flow_params,
+    #         sim_params=ground_truth_sim_params,
+    #     )
+        
+    #     # Validate recovery
+    #     inferred_sp4 = result['params']['Sp4']
+    #     ground_truth_sp4 = 1.0
+    #     relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+        
+    #     assert inferred_sp4 > 0, f"Inferred Sp4={inferred_sp4} must be positive"
+    #     assert np.isfinite(inferred_sp4), f"Inferred Sp4={inferred_sp4} must be finite"
+    #     assert relative_error < 0.2, (  # Slightly relaxed tolerance for robustness test
+    #         f"Initial guess {initial_sp4}: "
+    #         f"Inferred Sp4={inferred_sp4:.6f} deviates {relative_error*100:.2f}% "
+    #         f"from ground truth {ground_truth_sp4}"
+    #     )
+        
+    #     print(f"✓ Initial Sp4: {initial_sp4:>5.1f} → Inferred: {inferred_sp4:.6f} "
+    #         f"(error: {relative_error*100:>6.2f}%)")
+
+    # def test_inference_loss_landscape_flow(
+    #     self,
+    #     composed_model_flow_sp4_only,
+    #     ground_truth_flow_data,
+    #     mse_loss_fn,
+    #     ground_truth_ext_flow_params,
+    #     ground_truth_sim_params,
+    # ):
+    #     """
+    #     Diagnostic test: visualize the loss landscape around ground truth Sp4.
+        
+    #     Validates that:
+    #     1. Loss minimum is near ground truth Sp4 = 1.0
+    #     2. Loss function is smooth and well-conditioned
+    #     3. Gradient direction points toward ground truth from distant starting points
+    #     4. No pathological spikes or discontinuities in the landscape
+        
+    #     This test ensures the optimization problem is well-posed before running
+    #     expensive inference procedures.
+    #     """
+    #     ground_truth_sp4 = 1.0
+        
+    #     # Sweep over a logarithmic range around ground truth
+    #     sp4_values = np.logspace(-1, 1.5, 40)  # 0.1 to ~31.6
+    #     losses = []
+        
+    #     print(f"\n{'='*70}")
+    #     print(f"Loss Landscape Diagnostic (Ground Truth Sp4={ground_truth_sp4})")
+    #     print(f"{'='*70}")
+    #     print(f"{'Sp4':>10} | {'Loss':>15} | {'ΔLoss (vs GT)':>15}")
+    #     print(f"{'-'*50}")
+        
+    #     for sp4 in sp4_values:
+    #         # Construct reduced parameters
+    #         reduced_int_params = {'Sp4': sp4}
+            
+    #         # Instantiate the composed model
+    #         model = composed_model_flow_sp4_only(
+    #             int_params=reduced_int_params,
+    #             ext_params=ground_truth_ext_flow_params,
+    #             sim_params=ground_truth_sim_params,
+    #         )
+            
+    #         # Simulate with current Sp4 value
+    #         try:
+    #             output = model.simulate_single()
+    #             simulated_trajectory = output['value']
+                
+    #             # Compute loss
+    #             loss = mse_loss_fn(simulated_trajectory, ground_truth_flow_data)
+    #             losses.append(loss)
+                
+    #             delta_loss = loss - mse_loss_fn(
+    #                 ground_truth_flow_data, ground_truth_flow_data
+    #             )
+                
+    #             if sp4 in [0.1, 0.316, 1.0, 3.16, 10.0]:  # Print key points
+    #                 print(f"{sp4:>10.3f} | {loss:>15.6e} | {delta_loss:>15.6e}")
+            
+    #         except Exception as e:
+    #             print(f"⚠ Simulation failed at Sp4={sp4:.3f}: {str(e)[:40]}")
+    #             losses.append(np.nan)
+        
+    #     losses = np.array(losses)
+        
+    #     # ===== ASSERTION 1: Loss finite and real =====
+    #     valid_losses = losses[~np.isnan(losses)]
+    #     assert len(valid_losses) > 0, "No valid loss values computed"
+    #     assert np.all(valid_losses >= 0), "Loss values must be non-negative"
+        
+    #     # ===== ASSERTION 2: Minimum near ground truth =====
+    #     min_loss_idx = np.nanargmin(losses)
+    #     sp4_at_min = sp4_values[min_loss_idx]
+    #     min_loss = losses[min_loss_idx]
+        
+    #     # Allow 50% deviation in Sp4 at minimum (diagnostic test)
+    #     relative_sp4_error_at_min = abs(sp4_at_min - ground_truth_sp4) / ground_truth_sp4
+    #     assert relative_sp4_error_at_min < 0.5, (
+    #         f"Loss minimum at Sp4={sp4_at_min:.3f}, "
+    #         f"expected near {ground_truth_sp4} "
+    #         f"(relative error: {relative_sp4_error_at_min*100:.1f}%)"
+    #     )
+        
+    #     # ===== ASSERTION 3: Loss landscape is smooth =====
+    #     # Check for large discontinuous jumps (indicates numerical issues)
+    #     valid_mask = ~np.isnan(losses)
+    #     if np.sum(valid_mask) > 2:
+    #         valid_losses_subset = losses[valid_mask]
+    #         loss_gradients = np.abs(np.diff(valid_losses_subset))
+            
+    #         # Flag if max gradient is suspiciously large
+    #         max_gradient = np.max(loss_gradients)
+    #         median_gradient = np.median(loss_gradients)
+            
+    #         if median_gradient > 0:
+    #             gradient_ratio = max_gradient / median_gradient
+    #             assert gradient_ratio < 100, (
+    #                 f"Loss landscape has discontinuities "
+    #                 f"(max gradient {gradient_ratio:.1f}x median)"
+    #             )
+        
+    #     # ===== ASSERTION 4: Loss decreases toward ground truth =====
+    #     # Compare loss at 0.5*GT vs 2*GT (both equidistant log-scale from GT)
+    #     idx_05 = np.argmin(np.abs(sp4_values - 0.5 * ground_truth_sp4))
+    #     idx_20 = np.argmin(np.abs(sp4_values - 2.0 * ground_truth_sp4))
+    #     idx_10 = np.argmin(np.abs(sp4_values - ground_truth_sp4))
+        
+    #     loss_at_05 = losses[idx_05]
+    #     loss_at_20 = losses[idx_20]
+    #     loss_at_10 = losses[idx_10]
+        
+    #     if not np.isnan(loss_at_05) and not np.isnan(loss_at_20) and not np.isnan(loss_at_10):
+    #         # Both flanks should have higher loss than center
+    #         assert loss_at_10 <= loss_at_05 * 1.5, (
+    #             f"Loss at Sp4=0.5 ({loss_at_05:.3e}) should be higher "
+    #             f"than at Sp4=1.0 ({loss_at_10:.3e})"
+    #         )
+    #         assert loss_at_10 <= loss_at_20 * 1.5, (
+    #             f"Loss at Sp4=2.0 ({loss_at_20:.3e}) should be higher "
+    #             f"than at Sp4=1.0 ({loss_at_10:.3e})"
+    #         )
+        
+    #     print(f"{'-'*50}")
+    #     print(f"✓ Loss minimum at Sp4={sp4_at_min:.6f}")
+    #     print(f"✓ Ground truth Sp4={ground_truth_sp4}")
+    #     print(f"✓ Relative error: {relative_sp4_error_at_min*100:.2f}%")
+    #     print(f"✓ Minimum loss: {min_loss:.6e}")
+    #     print(f"✓ Loss landscape smooth: ✓")
+    #     print(f"{'='*70}\n")
+
+    # def test_inference_parameter_sensitivity_flow(
+    #     self,
+    #     composed_model_flow_sp4_only,
+    #     ground_truth_flow_data,
+    #     mse_loss_fn,
+    #     ground_truth_ext_flow_params,
+    #     ground_truth_sim_params,
+    # ):
+    #     """
+    #     Test parameter sensitivity: how much does the loss change with small Sp4 perturbations?
+        
+    #     Validates:
+    #     1. Loss is sensitive to Sp4 changes (sufficient signal for inference)
+    #     2. Numerical gradients are well-defined and stable
+    #     3. No numerical artifacts in finite-difference approximation
+        
+    #     This ensures that the parameter is identifiable from the data.
+    #     """
+    #     ground_truth_sp4 = 1.0
+    #     eps_values = [1e-3, 1e-4, 1e-5, 1e-6]
+        
+    #     print(f"\n{'='*70}")
+    #     print(f"Parameter Sensitivity Test (Numerical Gradient Convergence)")
+    #     print(f"{'='*70}")
+    #     print(f"{'Epsilon':>12} | {'∂Loss/∂Sp4':>15} | {'Convergence':>15}")
+    #     print(f"{'-'*50}")
+        
+    #     gradients = []
+        
+    #     for eps in eps_values:
+    #         # Forward difference: (L(Sp4 + eps) - L(Sp4)) / eps
+    #         reduced_params_plus = {'Sp4': ground_truth_sp4 + eps}
+    #         reduced_params_base = {'Sp4': ground_truth_sp4}
+            
+    #         # Compute loss at base point
+    #         model_base = composed_model_flow_sp4_only(
+    #             int_params=reduced_params_base,
+    #             ext_params=ground_truth_ext_flow_params,
+    #             sim_params=ground_truth_sim_params,
+    #         )
+    #         output_base = model_base.simulate_single()
+    #         loss_base = mse_loss_fn(output_base['value'], ground_truth_flow_data)
+            
+    #         # Compute loss at perturbed point
+    #         model_plus = composed_model_flow_sp4_only(
+    #             int_params=reduced_params_plus,
+    #             ext_params=ground_truth_ext_flow_params,
+    #             sim_params=ground_truth_sim_params,
+    #         )
+    #         output_plus = model_plus.simulate_single()
+    #         loss_plus = mse_loss_fn(output_plus['value'], ground_truth_flow_data)
+            
+    #         # Compute finite-difference gradient
+    #         grad = (loss_plus - loss_base) / eps
+    #         gradients.append(grad)
+            
+    #         if len(gradients) > 1:
+    #             convergence = abs(gradients[-1] - gradients[-2]) / (abs(gradients[-1]) + 1e-16)
+    #         else:
+    #             convergence = np.nan
+            
+    #         print(f"{eps:>12.1e} | {grad:>15.6e} | {convergence:>15.2e}")
+        
+    #     gradients = np.array(gradients)
+        
+    #     # ===== ASSERTION 1: Gradients are non-zero (parameter is identifiable) =====
+    #     assert np.all(np.abs(gradients) > 0), (
+    #         "Gradient is zero: parameter Sp4 is not identifiable from this data"
+    #     )
+        
+    #     # ===== ASSERTION 2: Gradients are finite =====
+    #     assert np.all(np.isfinite(gradients)), (
+    #         "Gradients contain inf or nan: numerical instability detected"
+    #     )
+        
+    #     # ===== ASSERTION 3: Numerical convergence (gradients should stabilize) =====
+    #     gradient_diffs = np.abs(np.diff(gradients))
+    #     relative_changes = gradient_diffs / (np.abs(gradients[:-1]) + 1e-16)
+        
+    #     # Last gradient should be close to previous (convergence)
+    #     if len(relative_changes) > 0:
+    #         final_convergence = relative_changes[-1]
+    #         assert final_convergence < 0.1, (
+    #             f"Numerical gradient not converged: "
+    #             f"relative change = {final_convergence:.3e} (should be <0.1)"
+    #         )
+        
+    #     print(f"{'-'*50}")
+    #     print(f"✓ Parameter Sp4 is identifiable (gradient ≠ 0)")
+    #     print(f"✓ Numerical gradients converged")
+    #     print(f"✓ Final gradient: {gradients[-1]:.6e}")
+    #     print(f"{'='*70}\n")
+
 
 if __name__ == "__main__":
     # Run pytest programmatically

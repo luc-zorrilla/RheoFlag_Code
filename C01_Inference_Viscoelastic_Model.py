@@ -11,7 +11,7 @@ import multiprocessing as mp
 import dill as pickle # enhanced pickle library that handles function pickling as well
 from pathlib import Path
 
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'BendingElasticity_BendingViscosity_Clamped')
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'MultiplePeriods' / 'LastPeriod' / 'Test')
 from datetime import datetime
 import copy
 
@@ -473,23 +473,24 @@ if __name__ == '__main__':
         T = 0 # Temperature of the Basin-hopping algorithm. If T=0, only steps minimizing energy are accepted (apparently not...).
         stepsize = 5 # Step size of the Basin-hopping algorithm
         jac = '3-point'
-        eps = 1e-8
+        eps = 1e-8 # ?
         tol = 1e-10 # Tolerance threshold for the basin-hopping algorithm
 
         ftol = 1e-8 # Tolerance functional threshold for the local minimizer
         gtol = 1e-8 # Tolerance gradient threshold for the local minimizer        
         finite_diff_rel_step = 1e-6 # Maximum step size for finite difference calculation of the gradient
+
         minimum_gradient = False # Whether to compute gradient at found minimum
         minimum_hessian = True # Whether to compute hessian at found minimum
         opt_args = {"niter":niter, "T":T, "stepsize":stepsize, 'jac':jac, "ftol":ftol, "gtol":gtol, "eps":eps, "finite_diff_rel_step":finite_diff_rel_step, "minimum_gradient":minimum_gradient, "minimum_hessian":minimum_hessian, 'tol':tol}
         
-        Sp4_guess = 1e1
+        Sp4_guess = 2.5e0
         Beta_guess = 0
         tau_b_guess = 0
         tau_s_guess = 0
         for Sp4_guess in [1e1]:
 
-            guess_variable_params = {'tau_b':tau_b_guess} # 'Sp4':Sp4_guess, 'Beta':Beta_guess, 'tau_b':tau_b_guess, 'tau_s':tau_s_guess}
+            guess_variable_params = {'Sp4':Sp4_guess} # 'Sp4':Sp4_guess, 'Beta':Beta_guess, 'tau_b':tau_b_guess, 'tau_s':tau_s_guess}
 
             ## Bounds 
             Sp4_min = np.double(1e-6)
@@ -513,10 +514,10 @@ if __name__ == '__main__':
             bounds = Bounds(lb,  ub)
 
             # Flow field
-            m1 = 8
-            A_vec = np.float_power(10, np.linspace(-10, -3, num = m1))
-            m2 = 16
-            w0_vec = np.float_power(10, np.linspace(-9, 6, num = m2))
+            m1 = 1
+            A_vec = np.array([0]) # np.float_power(10, np.linspace(-10, -3, num = m1))
+            m2 = 1
+            w0_vec = np.array([0]) # np.float_power(10, np.linspace(-9, 6, num = m2))
             m3 = 1
             psi_vec = np.array([np.pi/2]) # np.linspace(0, np.pi/2, num = m3)
 
@@ -554,7 +555,7 @@ if __name__ == '__main__':
             #### External forcings
             n_L = [0,0]
             m_L = 0
-            Lambda = [0,0]
+            Lambda = [0,1e-5]
             Lambdas = [Lambda for k in range(N)]
             Zeta = 0
             Zetas = [Zeta]*N
@@ -574,8 +575,8 @@ if __name__ == '__main__':
 
                         ### Integration and time
                         method = 'BDF' # 'BDF'
-                        dT = 2*np.pi/w0 * (1/10)
-                        T_max = 2*np.pi/w0 * (10)
+                        dT =  1e0# 2*np.pi/w0 * (1/10)
+                        T_max = 1e3# 2*np.pi/w0 * (10)
                         T_span = [0, T_max]
                         T_eval = [dT*i for i in range(round(T_max/dT))]
                         T_sim_max = 1*3600

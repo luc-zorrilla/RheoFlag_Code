@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.optimize import minimize, approx_fprime
+from scipy.optimize import minimize
 import scipy.differentiate as sd
 from typing import Callable, Dict, Any, Tuple
 import joblib
@@ -51,32 +51,34 @@ class Inference:
     - Internal parameters (int_params)
     - Parameter covariance (from Hessian)
     """
-
     def __init__(
         self,
         model_class,
         ground_truth: np.ndarray,
         loss_fn: Callable,
+        optimizer: Callable = None,
         optimizer_kwargs: Dict[str, Any] = None,
-    ):
+        ):
         """
         Args:
             model_class: Model subclass (e.g., Square)
             ground_truth: Target data (numpy array)
             loss_fn: Callable(predicted, ground_truth) -> scalar loss
-            optimizer_kwargs: Dict of kwargs for scipy.optimize.minimize()
-                             (e.g., {'method': 'L-BFGS-B', 'options': {'ftol': 1e-6}})
+            optimizer: Callable that takes (objective, x0, **kwargs) and returns OptimizeResult
+                Defaults to scipy.optimize.minimize
+            optimizer_kwargs: Dict of kwargs for the optimizer
         """
         self.model_class = model_class
         self.ground_truth = ground_truth
         self.loss_fn = loss_fn
+        self.optimizer = optimizer or minimize
         self.optimizer_kwargs = optimizer_kwargs or {
             'method': 'L-BFGS-B',
             'options': {'ftol': 1e-8, 'maxiter': 1000}
         }
-        self.result = None # Result should contain all information from the inference steps.
-        self.hessian = None # Not needed
-        self.covariance = None # Not needed
+        self.result = None
+        self.hessian = None
+        self.covariance = None
 
     def objective(
         self,
@@ -84,7 +86,7 @@ class Inference:
         param_keys: Tuple[str, ...],
         ext_params: Any,
         sim_params: Any,
-    ) -> float:
+        ) -> float:
         """
         Objective function for optimizer.
         
@@ -112,26 +114,15 @@ class Inference:
         initial_guess: Dict[str, float],
         ext_params: Any = None,
         sim_params: Any = None,
-    ) -> Dict[str, Any]:
+        ) -> Dict[str, Any]:
         """
         Run optimization to infer parameters.
-        
-        Args:
-            initial_guess: Dict like {'x': 2.5} for Square model
-            ext_params, sim_params: External/simulation parameters (can be None)
-        
-        Returns:
-            Dict with keys:
-            - 'params': Optimal parameter dict
-            - 'loss': Final loss value
-            - 'covariance': Parameter covariance (from Hessian inverse)
-            - 'std_errors': Standard errors for each parameter
         """
         param_keys = tuple(initial_guess.keys())
         x0 = np.array([initial_guess[key] for key in param_keys])
         
-        # Run optimization
-        self.result = minimize(
+        # Run optimization with pluggable optimizer
+        self.result = self.optimizer(
             partial(
                 self.objective,
                 param_keys=param_keys,
@@ -160,13 +151,12 @@ class Inference:
             'iterations': self.result.nit,
         }
 
-    def _compute_hessian( # This could be replaced by a simple ddf from scipy...
+    def _compute_hessian(
         self,
         param_keys: Tuple[str, ...],
         ext_params: Any,
         sim_params: Any,
-        eps: float = 1e-5,
-    ):
+        ):
         """
         Compute Hessian numerically using finite differences.
         Invert to get parameter covariance.
@@ -189,36 +179,6 @@ class Inference:
                 m = m,
                 ), 
                 x = self.result.x).ddf
-
-        # # Gradient function for Hessian computation
-        # def grad_fn(x):
-        #     return approx_fprime(
-        #         x,
-        #         partial(
-        #             self.objective,
-        #             param_keys=param_keys,
-        #             ext_params=ext_params,
-        #             sim_params=sim_params,
-        #         ),
-        #         epsilon=eps
-        #     )
-        
-        # # Numerical Hessian (finite differences of gradients)
-        # n = len(self.result.x)
-        # hessian = np.zeros((n, n))
-        
-        # for i in range(n):
-        #     x_plus = self.result.x.copy()
-        #     x_plus[i] += eps
-        #     x_minus = self.result.x.copy()
-        #     x_minus[i] -= eps
-            
-        #     grad_plus = grad_fn(x_plus)
-        #     grad_minus = grad_fn(x_minus)
-            
-        #     hessian[i, :] = (grad_plus - grad_minus) / (2 * eps)
-        
-        # self.hessian = hessian
         
         try:
             self.covariance = np.linalg.inv(self.hessian)
