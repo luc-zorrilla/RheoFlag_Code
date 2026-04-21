@@ -5,19 +5,29 @@ Test suite for inferring the Sp4 internal parameter of the ViscoElasticFilament 
 Uses compose_model to create a reduced inference problem (only Sp4 varies).
 """
 
+# ========================================================================
+# MODULES
+# ========================================================================
+
 import pytest
 import numpy as np
 from functools import partial
 from typing import Dict, Any, Callable
 from scipy import stats
+from itertools import product
+import pandas as pd
+from pathlib import Path
 
 # Import your modules (adjust paths as needed)
 from Models import Model, compose_model
-from ViscoElasticFilament_Models import StraightLine, ViscoElasticFilament, ViscoElasticFilament_FlowParams
-from Inferences import Inference
+from ViscoElasticFilament_Models import StraightLine, ViscoElasticFilament, ViscoElasticFilament_create_params_list, ViscoElasticFilament_FlowParams, ViscoElasticFilament_FlowParams_create_params_list
+from Inferences import Inference, BatchInference
 from ViscoElasticFilament_Inferences import basinhopping_optimizer
 from scipy.optimize import Bounds
 
+# ========================================================================
+# FUNCTIONS
+# ========================================================================
 
 def print_inference_summary(
     result: Dict[str, Any],
@@ -181,7 +191,448 @@ def print_optimization_history(inference_instance, plot_flag: bool = False) -> N
             
         except ImportError:
             print("(matplotlib not available for plotting)")
+    
+    def to_dataframe(self):
+        """Convert results to pandas DataFrame."""
+        return pd.DataFrame(self.results)
+    
+    def save_csv(self, filepath='test_results.csv'):
+        """Save results to CSV."""
+        df = self.to_dataframe()
+        df.to_csv(filepath, index=False)
+        print(f"\n✓ Results saved to {filepath}")
+    
+    def print_summary(self):
+        df = self.to_dataframe()
+        
+        # Debug: Print collector state
+        print(f"\n[DEBUG] Collector has {len(self.results)} results")
+        if len(self.results) > 0:
+            print(f"[DEBUG] First result: {self.results[0]}")
+        
+        # Handle empty results
+        if len(df) == 0:
+            print("\n" + "="*120)
+            print("TEST RESULTS SUMMARY")
+            print("="*120)
+            print("No test results collected.")
+            print("="*120 + "\n")
+            return
+        
+        passed = len(df[df['Status'] == '✓ PASS'])
+        failed = len(df[df['Status'] == '✗ FAIL'])
+        total = len(df)
+        
+        print(f"\n{'='*120}")
+        print(f"TEST RESULTS SUMMARY")
+        print(f"{'='*120}")
+        print(f"Total tests: {total}")
+        print(f"Passed: {passed} ({passed/total*100:.1f}%)")
+        print(f"Failed: {failed} ({failed/total*100:.1f}%)")
+        print(f"{'='*120}\n")
+        print(df.to_string(index=False))
+        print(f"\n{'='*120}\n")
 
+# ========================================================================
+# FIXTURES
+# ========================================================================
+
+@pytest.fixture
+def ground_truth_int_params():
+    """
+    Define internal parameters with a known Sp4 ground truth value.
+    All other parameters are fixed for inference.
+    """
+    N = 10
+    X0 = StraightLine(N)
+    return {
+        'Sp4': 1.0,           # Ground truth to recover
+        'N': 10,            # Fixed
+        'k0': 1e13,            # Fixed
+        'bool_EI': True,      # Fixed
+        'Beta':0,        # Fixed
+        'taus_b': [0]*(N-1),  # Fixed
+        'tau_s': 0,        # Fixed
+        'gamma': 2,         # Fixed
+        'n_L': [0,0],            # Fixed
+        'm_L': 0,             # Fixed
+        'X_0': X0,  # Initial state (fixed for reproducibility)
+    }
+
+@pytest.fixture
+def ground_truth_ext_params():
+    """Define external parameters (fixed during inference)."""
+    N = 10
+    return {
+        "Lambdas": [[0,1e-6]]*N,
+        "Zetas": [0]*N,
+        "InterpFlow": 0
+    }
+
+@pytest.fixture
+def ground_truth_ext_flow_params():
+    """Define external parameters (fixed during inference)."""
+    N = 10
+    return {
+        "Lambdas": [[0,0]]*N,
+        "Zetas": [0]*N,
+        "A":1e-6,
+        "w0":1e-6,
+        "psi":np.pi/2,
+    }
+
+@pytest.fixture
+def ground_truth_sim_params():
+    """
+    Define simulation parameters.
+    Use BDF method for faster convergence compared to RK45.
+    """
+    return {
+        "T_span": (0.0, 1e3),
+        "T_eval": np.linspace(0, 1e3, int(1e2)),
+        "method": "BDF",
+        "T_sim_max": 300                  # Fast implicit solver
+    }
+
+@pytest.fixture
+def ground_truth_data(ground_truth_int_params, ground_truth_ext_params, ground_truth_sim_params):
+    """
+    Generate ground truth synthetic data by simulating ViscoElasticFilament
+    with known parameters.
+    
+    Returns:
+        np.ndarray: Simulated trajectory (shape depends on model)
+    """
+    model = ViscoElasticFilament(
+        int_params=ground_truth_int_params,
+        ext_params=ground_truth_ext_params,
+        sim_params=ground_truth_sim_params
+    )
+    output = model.simulate_single()
+
+    assert output['value'] is not None, (
+        f"Ground truth simulation failed. Full output: {output}"
+    )
+
+    return output['value']
+
+
+@pytest.fixture
+def ground_truth_flow_data(ground_truth_int_params, ground_truth_ext_flow_params, ground_truth_sim_params):
+    """
+    Generate ground truth synthetic data by simulating ViscoElasticFilament
+    with known parameters.
+    
+    Returns:
+        np.ndarray: Simulated trajectory (shape depends on model)
+    """
+    model = ViscoElasticFilament_FlowParams(
+        int_params=ground_truth_int_params,
+        ext_params=ground_truth_ext_flow_params,
+        sim_params=ground_truth_sim_params
+    )
+    output = model.simulate_single()
+    
+    assert output['value'] is not None, (
+        f"Ground truth simulation failed. Full output: {output}"
+    )
+
+    return output['value']
+
+
+@pytest.fixture
+def mse_loss_fn() -> Callable:
+    """
+    Define Mean Square Error loss function.
+    Returns np.inf if prediction is None (failed simulation).
+    """
+    def loss_fn(predicted: np.ndarray, ground_truth: np.ndarray) -> float:
+        if predicted is None:
+            return np.inf
+        # Flatten arrays
+        pred_flat = np.asarray(predicted).flatten()
+        truth_flat = np.asarray(ground_truth).flatten()
+        
+        # Truncate to match lengths
+        min_len = min(len(pred_flat), len(truth_flat))
+        return np.linalg.norm(pred_flat[:min_len] - truth_flat[:min_len])**2 / np.linalg.norm(truth_flat[:min_len])**2
+    
+    return loss_fn
+
+@pytest.fixture
+def composed_model_sp4_only(ground_truth_int_params):
+    """
+    Create a composed model that only varies Sp4.
+    
+    The compose function takes the reduced int_params {'Sp4': value}
+    and embeds it into the full parameter dict with fixed other values.
+    """
+    # Create a copy of fixed parameters
+    fixed_params = ground_truth_int_params.copy()
+    
+    def embed_sp4(reduced_int_params: Dict[str, float], ext_params: Any, sim_params: Any) -> Dict[str, Any]:
+        """
+        Transform reduced parameters {'Sp4': x} into full int_params.
+        
+        Args:
+            reduced_int_params: Dict with key 'Sp4' and inferred value
+            ext_params, sim_params: Passed through (not used here)
+        
+        Returns:
+            Full int_params dict with Sp4 updated, others fixed
+        """
+        full_params = fixed_params.copy()
+        full_params['Sp4'] = reduced_int_params['Sp4']
+        return full_params
+    
+    # Create composed model with the embedding function
+    ComposedModel = compose_model(
+        ViscoElasticFilament,
+        compose_int_params=embed_sp4
+    )
+    return ComposedModel
+
+@pytest.fixture
+def composed_model_flow_sp4_only(ground_truth_int_params):
+    """
+    Create a composed model for ViscoElasticFilament_FlowParams that only varies Sp4.
+    
+    The embedding function accepts a reduced parameter dict {'Sp4': value}
+    and embeds it into the full internal parameters, keeping all others fixed.
+    """
+    fixed_params = ground_truth_int_params.copy()
+    
+    def embed_sp4_flow(
+        reduced_int_params: Dict[str, float],
+        ext_params: Any,
+        sim_params: Any,
+    ) -> Dict[str, Any]:
+        """
+        Transform reduced internal parameters into full int_params dict.
+        
+        Args:
+            reduced_int_params: Dict containing {'Sp4': inferred_value}
+            ext_params: Passed through unchanged (not modified here)
+            sim_params: Passed through unchanged (not modified here)
+        
+        Returns:
+            Full int_params dict with Sp4 updated, all other values fixed.
+        """
+        full_params = fixed_params.copy()
+        
+        # Update only Sp4; all other parameters remain fixed
+        if 'Sp4' in reduced_int_params:
+            full_params['Sp4'] = reduced_int_params['Sp4']
+        
+        return full_params
+    
+    # Create composed model with the embedding function
+    ComposedModel = compose_model(
+        ViscoElasticFilament_FlowParams,
+        compose_int_params=embed_sp4_flow,
+    )
+    return ComposedModel
+
+@pytest.fixture
+def basinhopping_optimizer_instance():
+    """
+    Return the basinhopping optimizer function with standard configuration.
+    """
+    return basinhopping_optimizer
+
+@pytest.fixture
+def inference_instance(
+    basinhopping_optimizer_instance,
+    composed_model_sp4_only,
+    ground_truth_data,
+    mse_loss_fn,
+):
+    """
+    Create an Inference instance configured for Sp4 parameter recovery.
+    
+    Uses basin-hopping as the global optimizer with L-BFGS-B for local minimization.
+    """
+    return Inference(
+        model_class=composed_model_sp4_only,
+        ground_truth=ground_truth_data,
+        loss_fn=mse_loss_fn,
+        optimizer=basinhopping_optimizer_instance,
+        optimizer_kwargs={
+            # Individual arguments
+            'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
+            'minimum_gradient': False,
+            'minimum_hessian': False,
+            
+            # Local minimizer arguments
+            'local_minimizer_kwargs': {
+                'method': 'L-BFGS-B',
+                'jac': '3-point',
+                "options": {
+                    'disp': True,
+                    'ftol': 1e-8,
+                    'gtol': 1e-8,
+                    'eps': 1e-8,
+                    'finite_diff_rel_step': 1e-6,
+                },                
+            },
+            
+            # Global minimizer arguments
+            'global_minimizer_kwargs': {
+                'niter': 9,
+                'T': 0,
+                'stepsize': 5,
+                'tol': 1e-10,
+            }
+        }
+    )
+
+@pytest.fixture
+def inference_instance_flow(
+    basinhopping_optimizer_instance,
+    composed_model_flow_sp4_only,
+    ground_truth_flow_data,
+    mse_loss_fn,
+):
+    """
+    Create an Inference instance for Sp4 recovery using flow parameters.
+    
+    Configuration:
+    - Global optimizer: basin-hopping (stochastic global search)
+    - Local minimizer: L-BFGS-B (bounded quasi-Newton)
+    - Bounds: Sp4 in [1e-6, inf)
+    - Tolerance: tight convergence criteria for precise parameter recovery
+    """
+    return Inference(
+        model_class=composed_model_flow_sp4_only,
+        ground_truth=ground_truth_flow_data,
+        loss_fn=mse_loss_fn,
+        optimizer=basinhopping_optimizer_instance,
+        optimizer_kwargs={
+            # Basin-hopping global arguments
+            'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
+            'minimum_gradient': False,
+            'minimum_hessian': False,
+            
+            # Local minimizer (L-BFGS-B) arguments
+            'local_minimizer_kwargs': {
+                'method': 'L-BFGS-B',
+                'jac': '3-point',  # Numerical gradient (3-point stencil)
+                'options': {
+                    'disp': True,
+                    'ftol': 1e-8,   # Function tolerance
+                    'gtol': 1e-8,   # Gradient tolerance
+                    'eps': 1e-8,    # Step size for finite difference
+                    'finite_diff_rel_step': 1e-6,
+                },
+            },
+            
+            # Global minimizer (basin-hopping) arguments
+            'global_minimizer_kwargs': {
+                'niter': 9,         # Number of basin-hopping iterations
+                'T': 0,             # Temperature (0 = accept only improvements)
+                'stepsize': 5,      # Initial step size
+                'tol': 1e-10,       # Tolerance for local minimization
+            }
+        },
+    )
+
+@pytest.fixture
+def initial_guesses_sp4():
+    """
+    Fixed set of initial Sp4 guesses.
+    Ground truth Sp4 = 1.0
+    """
+    return [
+        {'Sp4': 0.3},
+        {'Sp4': 0.8},
+        {'Sp4': 1.2},
+        {'Sp4': 2.0},
+        {'Sp4': 5.0},
+    ]
+
+@pytest.fixture
+def params_list_dict_flow():
+    """
+    Parameter dictionary for batch parameter generation.
+    Creates combinations across all parameter dimensions.
+    """
+    N_values = [10]
+    return {
+        # Internal parameters
+        "gamma_list": [2],
+        "N_list": N_values,
+        "taus_b_list": [[0] * (n - 1) for n in N_values],
+        "X_0_list": [StraightLine(n) for n in N_values],
+        "k0_list": [1e13],
+        "bool_EI_list": [True],
+        "Sp4_list": [0.3, 0.8, 1.2],  # Will test 3 Sp4 values
+        "Beta_list": [0],
+        "tau_s_list": [0],
+        "n_L_list": [[0, 0]],
+        "m_L_list": [0],
+        
+        # External parameters (flow version)
+        "Lambdas_list": [[[0, 0]] * n for n in N_values],
+        "Zetas_list": [[0] * n for n in N_values],
+        "A_list": [1e-6],
+        "w0_list": [1e-6],
+        "psi_list": [np.pi / 2],
+        
+        # Simulation parameters
+        "T_span_list": [(0.0, 1e3)],
+        "T_eval_list": [
+            [np.linspace(0, 1e3, int(1e2))],  # One T_eval for the single T_span
+        ],
+        "T_sim_max_list": [300],
+        "method_list": ["BDF"],
+    }
+
+@pytest.fixture
+def ground_truth_params_list(params_list_dict_flow):
+    """
+    Generate list of ground truth parameter combinations from params_list_dict_flow.
+    
+    Uses ViscoElasticFilament_FlowParams_create_params_list to expand all Cartesian products
+    into (int_params, ext_params, sim_params) tuples.
+    
+    Returns:
+        List of tuples, each being (int_params, ext_params, sim_params)
+    
+    Example:
+        [
+            ({'Sp4': 0.3, 'gamma': 2, ...}, {'A': 1e-6, ...}, {'T_span': (0, 1e3), ...}),
+            ({'Sp4': 0.8, 'gamma': 2, ...}, {'A': 1e-6, ...}, {'T_span': (0, 1e3), ...}),
+            ...
+        ]
+    """
+    # Define parameter keys that ViscoElasticFilament_FlowParams_create_params_list expects
+    int_keys = [
+        "gamma", "N", "taus_b", "X_0", "k0", "bool_EI", "Sp4", 
+        "Beta", "tau_s", "n_L", "m_L"
+    ]
+    ext_keys = ["Lambdas", "Zetas", "A", "w0", "psi"]
+    sim_keys = ["T_span", "T_eval", "T_sim_max", "method"]
+    
+    # Generate all combinations
+    params_list = ViscoElasticFilament_FlowParams_create_params_list(
+        int_keys=int_keys,
+        ext_keys=ext_keys,
+        sim_keys=sim_keys,
+        params_list_dict=params_list_dict_flow,
+    )
+    
+    return params_list
+
+@pytest.fixture
+def batch_inference_instance(inference_instance_flow):
+    """
+    Create a BatchInference instance with parallel execution (n_jobs=-1).
+    """
+    return BatchInference(inference_instance_flow, n_jobs=-1)
+
+# ========================================================================
+# TESTS
+# ========================================================================
 
 class TestViscoElasticFilamentSp4Inference:
     """
@@ -194,311 +645,6 @@ class TestViscoElasticFilamentSp4Inference:
     4. Run inference to recover the ground truth Sp4
     5. Verify convergence and uncertainty estimates
     """
-
-    # ========================================================================
-    # FIXTURES
-    # ========================================================================
-
-    @pytest.fixture
-    def ground_truth_int_params(self):
-        """
-        Define internal parameters with a known Sp4 ground truth value.
-        All other parameters are fixed for inference.
-        """
-        N = 10
-        X0 = StraightLine(N)
-        return {
-            'Sp4': 1.0,           # Ground truth to recover
-            'N': 10,            # Fixed
-            'k0': 1e13,            # Fixed
-            'bool_EI': True,      # Fixed
-            'Beta':0,        # Fixed
-            'taus_b': [0]*(N-1),  # Fixed
-            'tau_s': 0,        # Fixed
-            'gamma': 2,         # Fixed
-            'n_L': [0,0],            # Fixed
-            'm_L': 0,             # Fixed
-            'X_0': X0,  # Initial state (fixed for reproducibility)
-        }
-
-    @pytest.fixture
-    def ground_truth_ext_params(self):
-        """Define external parameters (fixed during inference)."""
-        N = 10
-        return {
-            "Lambdas": [[0,1e-6]]*N,
-            "Zetas": [0]*N,
-            "InterpFlow": 0
-        }
-
-    @pytest.fixture
-    def ground_truth_ext_flow_params(self):
-        """Define external parameters (fixed during inference)."""
-        N = 10
-        return {
-            "Lambdas": [[0,0]]*N,
-            "Zetas": [0]*N,
-            "A":1e-6,
-            "w0":1e-6,
-            "psi":np.pi/2,
-        }
-
-    @pytest.fixture
-    def ground_truth_sim_params(self):
-        """
-        Define simulation parameters.
-        Use BDF method for faster convergence compared to RK45.
-        """
-        return {
-            "T_span": (0.0, 1e3),
-            "T_eval": np.linspace(0, 1e3, int(1e2)),
-            "method": "BDF",
-            "T_sim_max": 300                  # Fast implicit solver
-        }
-
-    @pytest.fixture
-    def ground_truth_data(self, ground_truth_int_params, ground_truth_ext_params, ground_truth_sim_params):
-        """
-        Generate ground truth synthetic data by simulating ViscoElasticFilament
-        with known parameters.
-        
-        Returns:
-            np.ndarray: Simulated trajectory (shape depends on model)
-        """
-        model = ViscoElasticFilament(
-            int_params=ground_truth_int_params,
-            ext_params=ground_truth_ext_params,
-            sim_params=ground_truth_sim_params
-        )
-        output = model.simulate_single()
-
-        assert output['value'] is not None, (
-            f"Ground truth simulation failed. Full output: {output}"
-        )
-
-        return output['value']
-
-
-    @pytest.fixture
-    def ground_truth_flow_data(self, ground_truth_int_params, ground_truth_ext_flow_params, ground_truth_sim_params):
-        """
-        Generate ground truth synthetic data by simulating ViscoElasticFilament
-        with known parameters.
-        
-        Returns:
-            np.ndarray: Simulated trajectory (shape depends on model)
-        """
-        model = ViscoElasticFilament_FlowParams(
-            int_params=ground_truth_int_params,
-            ext_params=ground_truth_ext_flow_params,
-            sim_params=ground_truth_sim_params
-        )
-        output = model.simulate_single()
-        
-        assert output['value'] is not None, (
-            f"Ground truth simulation failed. Full output: {output}"
-        )
-
-        return output['value']
-
-
-    @pytest.fixture
-    def mse_loss_fn(self) -> Callable:
-        """
-        Define Mean Square Error loss function.
-        Returns np.inf if prediction is None (failed simulation).
-        """
-        def loss_fn(predicted: np.ndarray, ground_truth: np.ndarray) -> float:
-            if predicted is None:
-                return np.inf
-            # Flatten arrays
-            pred_flat = np.asarray(predicted).flatten()
-            truth_flat = np.asarray(ground_truth).flatten()
-            
-            # Truncate to match lengths
-            min_len = min(len(pred_flat), len(truth_flat))
-            return np.linalg.norm(pred_flat[:min_len] - truth_flat[:min_len])**2 / np.linalg.norm(truth_flat[:min_len])**2
-        
-        return loss_fn
-
-    @pytest.fixture
-    def composed_model_sp4_only(self, ground_truth_int_params):
-        """
-        Create a composed model that only varies Sp4.
-        
-        The compose function takes the reduced int_params {'Sp4': value}
-        and embeds it into the full parameter dict with fixed other values.
-        """
-        # Create a copy of fixed parameters
-        fixed_params = ground_truth_int_params.copy()
-        
-        def embed_sp4(reduced_int_params: Dict[str, float], ext_params: Any, sim_params: Any) -> Dict[str, Any]:
-            """
-            Transform reduced parameters {'Sp4': x} into full int_params.
-            
-            Args:
-                reduced_int_params: Dict with key 'Sp4' and inferred value
-                ext_params, sim_params: Passed through (not used here)
-            
-            Returns:
-                Full int_params dict with Sp4 updated, others fixed
-            """
-            full_params = fixed_params.copy()
-            full_params['Sp4'] = reduced_int_params['Sp4']
-            return full_params
-        
-        # Create composed model with the embedding function
-        ComposedModel = compose_model(
-            ViscoElasticFilament,
-            compose_int_params=embed_sp4
-        )
-        return ComposedModel
-
-    @pytest.fixture
-    def composed_model_flow_sp4_only(self, ground_truth_int_params):
-        """
-        Create a composed model for ViscoElasticFilament_FlowParams that only varies Sp4.
-        
-        The embedding function accepts a reduced parameter dict {'Sp4': value}
-        and embeds it into the full internal parameters, keeping all others fixed.
-        """
-        fixed_params = ground_truth_int_params.copy()
-        
-        def embed_sp4_flow(
-            reduced_int_params: Dict[str, float],
-            ext_params: Any,
-            sim_params: Any,
-        ) -> Dict[str, Any]:
-            """
-            Transform reduced internal parameters into full int_params dict.
-            
-            Args:
-                reduced_int_params: Dict containing {'Sp4': inferred_value}
-                ext_params: Passed through unchanged (not modified here)
-                sim_params: Passed through unchanged (not modified here)
-            
-            Returns:
-                Full int_params dict with Sp4 updated, all other values fixed.
-            """
-            full_params = fixed_params.copy()
-            
-            # Update only Sp4; all other parameters remain fixed
-            if 'Sp4' in reduced_int_params:
-                full_params['Sp4'] = reduced_int_params['Sp4']
-            
-            return full_params
-        
-        # Create composed model with the embedding function
-        ComposedModel = compose_model(
-            ViscoElasticFilament_FlowParams,
-            compose_int_params=embed_sp4_flow,
-        )
-        return ComposedModel
-
-    @pytest.fixture
-    def basinhopping_optimizer_instance(self):
-        """
-        Return the basinhopping optimizer function with standard configuration.
-        """
-        return basinhopping_optimizer
-
-    @pytest.fixture
-    def inference_instance(
-        self,
-        basinhopping_optimizer_instance,
-        composed_model_sp4_only,
-        ground_truth_data,
-        mse_loss_fn,
-    ):
-        """
-        Create an Inference instance configured for Sp4 parameter recovery.
-        
-        Uses basin-hopping as the global optimizer with L-BFGS-B for local minimization.
-        """
-        return Inference(
-            model_class=composed_model_sp4_only,
-            ground_truth=ground_truth_data,
-            loss_fn=mse_loss_fn,
-            optimizer=basinhopping_optimizer_instance,
-            optimizer_kwargs={
-                # Individual arguments
-                'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
-                'minimum_gradient': False,
-                'minimum_hessian': False,
-                
-                # Local minimizer arguments
-                'local_minimizer_kwargs': {
-                    'method': 'L-BFGS-B',
-                    'jac': '3-point',
-                    "options": {
-                        'disp': True,
-                        'ftol': 1e-8,
-                        'gtol': 1e-8,
-                        'eps': 1e-8,
-                        'finite_diff_rel_step': 1e-6,
-                    },                
-                },
-                
-                # Global minimizer arguments
-                'global_minimizer_kwargs': {
-                    'niter': 9,
-                    'T': 0,
-                    'stepsize': 5,
-                    'tol': 1e-10,
-                }
-            }
-        )
-
-    @pytest.fixture
-    def inference_instance_flow(
-        self,
-        basinhopping_optimizer_instance,
-        composed_model_flow_sp4_only,
-        ground_truth_flow_data,
-        mse_loss_fn,
-    ):
-        """
-        Create an Inference instance for Sp4 recovery using flow parameters.
-        
-        Configuration:
-        - Global optimizer: basin-hopping (stochastic global search)
-        - Local minimizer: L-BFGS-B (bounded quasi-Newton)
-        - Bounds: Sp4 in [1e-6, inf)
-        - Tolerance: tight convergence criteria for precise parameter recovery
-        """
-        return Inference(
-            model_class=composed_model_flow_sp4_only,
-            ground_truth=ground_truth_flow_data,
-            loss_fn=mse_loss_fn,
-            optimizer=basinhopping_optimizer_instance,
-            optimizer_kwargs={
-                # Basin-hopping global arguments
-                'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
-                'minimum_gradient': False,
-                'minimum_hessian': False,
-                
-                # Local minimizer (L-BFGS-B) arguments
-                'local_minimizer_kwargs': {
-                    'method': 'L-BFGS-B',
-                    'jac': '3-point',  # Numerical gradient (3-point stencil)
-                    'options': {
-                        'disp': True,
-                        'ftol': 1e-8,   # Function tolerance
-                        'gtol': 1e-8,   # Gradient tolerance
-                        'eps': 1e-8,    # Step size for finite difference
-                        'finite_diff_rel_step': 1e-6,
-                    },
-                },
-                
-                # Global minimizer (basin-hopping) arguments
-                'global_minimizer_kwargs': {
-                    'niter': 9,         # Number of basin-hopping iterations
-                    'T': 0,             # Temperature (0 = accept only improvements)
-                    'stepsize': 5,      # Initial step size
-                    'tol': 1e-10,       # Tolerance for local minimization
-                }
-            },
-        )
 
     def test_inference_sp4_recovery(
         self,
@@ -846,96 +992,11 @@ class TestViscoElasticFilamentSp4Inference:
         print(f"✓ Loss landscape smooth: ✓")
         print(f"{'='*70}\n")
 
-    def test_inference_parameter_sensitivity_flow(
-        self,
-        composed_model_flow_sp4_only,
-        ground_truth_flow_data,
-        mse_loss_fn,
-        ground_truth_ext_flow_params,
-        ground_truth_sim_params,
-    ):
-        """
-        Test parameter sensitivity: how much does the loss change with small Sp4 perturbations?
-        
-        Validates:
-        1. Loss is sensitive to Sp4 changes (sufficient signal for inference)
-        2. Numerical gradients are well-defined and stable
-        3. No numerical artifacts in finite-difference approximation
-        
-        This ensures that the parameter is identifiable from the data.
-        """
-        ground_truth_sp4 = 1.0
-        eps_values = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
-        
-        print(f"\n{'='*70}")
-        print(f"Parameter Sensitivity Test")
-        print(f"{'='*70}")
-        print(f"{'Epsilon':>12} | {'∂Loss/∂Sp4':>15} | {'Hessian':>15}")
-        print(f"{'-'*50}")
-        
-        gradients = []
-        hessians = []
-        
-        for eps in eps_values:
-            # Forward difference: (L(Sp4 + eps) - L(Sp4)) / eps
-            reduced_params_plus = {'Sp4': ground_truth_sp4 + eps}
-            reduced_params_base = {'Sp4': ground_truth_sp4}
-            
-            # Compute loss at base point
-            model_base = composed_model_flow_sp4_only(
-                int_params=reduced_params_base,
-                ext_params=ground_truth_ext_flow_params,
-                sim_params=ground_truth_sim_params,
-            )
-            output_base = model_base.simulate_single()
-            loss_base = mse_loss_fn(output_base['value'], ground_truth_flow_data)
-            
-            # Compute loss at perturbed point
-            model_plus = composed_model_flow_sp4_only(
-                int_params=reduced_params_plus,
-                ext_params=ground_truth_ext_flow_params,
-                sim_params=ground_truth_sim_params,
-            )
-            output_plus = model_plus.simulate_single()
-            loss_plus = mse_loss_fn(output_plus['value'], ground_truth_flow_data)
-            
-            # Compute finite-difference gradient
-            grad = (loss_plus - loss_base) / eps
-            gradients.append(grad)
-            
-            if len(gradients) > 1:
-                hessian = abs(gradients[-1] - gradients[-2]) / eps
-                
-            else:
-                hessian = np.nan
-            
-            print(f"{eps:>12.1e} | {grad:>15.6e} | {hessian:>15.6e}")
-        
-        gradients = np.array(gradients)
-        hessians.append(hessian)
-        
-        # ===== ASSERTION 1: Gradients are non-zero (parameter is identifiable) =====
-        assert np.all(np.abs(gradients) > 0), (
-            "Gradient is zero: parameter Sp4 is not identifiable from this data"
-        )
-        
-        # ===== ASSERTION 2: Gradients are finite =====
-        assert np.all(np.isfinite(gradients)), (
-            "Gradients contain inf or nan: numerical instability detected"
-        )
-        
-        print(f"{'-'*50}")
-        print(f"✓ Parameter Sp4 is identifiable (gradient ≠ 0)")
-        print(f"✓ Final hessian: {hessians[-1]:.6e}")
-        print(f"{'='*70}\n")
-
 if __name__ == "__main__":
-
-    # Run pytest programmatically
-
+    
     pytest.main([
-        __file__,           # Run this file
-        "-vv",              # Very verbose (show all details)
-        "--tb=short",       # Short traceback format on failures
-        "-s",               # Show print() output (disable stdout capture)
+        __file__,
+        "-vv",
+        "--tb=short",
+        "-s",
     ])

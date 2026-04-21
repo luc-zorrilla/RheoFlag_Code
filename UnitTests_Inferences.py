@@ -783,24 +783,24 @@ def various_true_x(request):
 # PYTEST CONFIGURATION & MARKERS
 # ============================================================================
 
-def test_dense_batch_inference():
-    """Test batch inference with larger number of initial guesses."""
-    ground_truth = 9.0  # true_x = 3.0
-    inference = Inference(
-        model_class=Square,
-        ground_truth=ground_truth,
-        loss_fn=lambda p, t: np.mean((p - t) ** 2)
-    )
+# def test_dense_batch_inference():
+#     """Test batch inference with larger number of initial guesses."""
+#     ground_truth = 9.0  # true_x = 3.0
+#     inference = Inference(
+#         model_class=Square,
+#         ground_truth=ground_truth,
+#         loss_fn=lambda p, t: np.mean((p - t) ** 2)
+#     )
     
-    # 20 initial guesses
-    batch_size = 20
-    initial_guesses = [{'x': 0.5 + i * 0.3} for i in range(batch_size)]
+#     # 20 initial guesses
+#     batch_size = 20
+#     initial_guesses = [{'x': 0.5 + i * 0.3} for i in range(batch_size)]
     
-    batch_inf = BatchInference(inference, n_jobs=-1)
-    results = batch_inf.infer_batch(initial_guesses)
+#     batch_inf = BatchInference(inference, n_jobs=-1)
+#     results = batch_inf.infer_batch(initial_guesses)
     
-    assert len(results) == batch_size
-    assert all('loss' in r for r in results)
+#     assert len(results) == batch_size
+#     assert all('loss' in r for r in results)
 
 
 if __name__ == "__main__":

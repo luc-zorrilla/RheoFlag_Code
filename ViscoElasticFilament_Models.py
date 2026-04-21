@@ -619,7 +619,6 @@ def make_minimal_params_with_flow():
         }
     }
 
-
 def ViscoElasticFilament_create_params_list(int_keys: List[str], ext_keys: List[str], sim_keys: List[str], params_list_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
     """ Generate all combinations of the parameter lists. 
     Useful for parallel computations of varying model parameters. """

@@ -6,6 +6,8 @@ import joblib
 from functools import partial
 import logging
 from Models import Model, Square
+from itertools import product
+import pandas as pd
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -151,6 +153,32 @@ class Inference:
             'iterations': self.result.nit,
         }
 
+
+    def infer_batch(
+        self,
+        initial_guesses: list,
+        ext_params: Any = None,
+        sim_params: Any = None,
+        ) -> list:
+        """
+        Run inference on multiple initial guesses in parallel (for a fixed ground truth).
+        
+        Args:
+            initial_guesses: List of dicts, each like {'x': 2.5}
+            ext_params, sim_params: corresponding parameters (can be None)
+        
+        Returns:
+            List of inference results
+        """
+        ext_params_batch = [ext_params] * len(initial_guesses)
+        sim_params_batch = [sim_params] * len(initial_guesses)
+        
+        results = joblib.Parallel(n_jobs=self.n_jobs)(
+            joblib.delayed(self.inference.infer)(ig, ep, sp)
+            for ig, ep, sp in zip(initial_guesses, ext_params_batch, sim_params_batch)
+        )
+        return results
+
     def _compute_hessian(
         self,
         param_keys: Tuple[str, ...],
@@ -185,44 +213,6 @@ class Inference:
         except np.linalg.LinAlgError:
             print("Warning: Hessian singular, covariance unavailable.")
             self.covariance = None
-
-class BatchInference:
-    """
-    Parallel inference over multiple ground-truth samples or initial guesses.
-    """
-
-    def __init__(self, inference: Inference, n_jobs: int = -1):
-        """
-        Args:
-            inference: Inference instance (will be reused)
-            n_jobs: Number of parallel jobs (-1 = all CPUs)
-        """
-        self.inference = inference
-        self.n_jobs = n_jobs
-
-    def infer_batch(
-        self,
-        initial_guesses: list,
-        ext_params_batch: list = None,
-        sim_params_batch: list = None,
-    ) -> list:
-        """
-        Run inference on multiple initial guesses in parallel.
-        
-        Args:
-            initial_guesses: List of dicts, each like {'x': 2.5}
-            ext_params_batch, sim_params_batch: Corresponding parameters (can be None)
-        
-        Returns:
-            List of inference results
-        """
-        if ext_params_batch is None:
-            ext_params_batch = [None] * len(initial_guesses)
-        if sim_params_batch is None:
-            sim_params_batch = [None] * len(initial_guesses)
-        
-        results = joblib.Parallel(n_jobs=self.n_jobs)(
-            joblib.delayed(self.inference.infer)(ig, ep, sp)
-            for ig, ep, sp in zip(initial_guesses, ext_params_batch, sim_params_batch)
-        )
-        return results
+    
+    
+    
