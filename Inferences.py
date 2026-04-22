@@ -5,6 +5,7 @@ import numpy as np
 import joblib
 from scipy.optimize import minimize, OptimizeResult
 import scipy.differentiate as sd
+from itertools import product
 
 # ============================================================================
 # FUNCTIONS
@@ -150,36 +151,67 @@ class Inference:
         self.result: Optional[OptimizeResult] = None
         self.hessian: Optional[np.ndarray] = None
         self.covariance: Optional[np.ndarray] = None
-        
-        # Normalize ground truths and params to lists
-        self.ground_truths = self._normalize_list(ground_truths)
-        self.ext_params_list = self._normalize_list(ext_params_list, len(self.ground_truths))
-        self.sim_params_list = self._normalize_list(sim_params_list, len(self.ground_truths))
-        
-        # Verify consistency
-        assert len(self.ground_truths) == len(self.ext_params_list) == len(self.sim_params_list), \
-            f"Mismatched lengths: {len(self.ground_truths)} GTs vs {len(self.ext_params_list)} ext vs {len(self.sim_params_list)} sim"
-    
-    @staticmethod
-    def _normalize_list(value: Any, target_len: int = None) -> List:
-        """
-        Convert single value or list to list.
-        If single value, replicate target_len times.
 
-        # TODO: If value is not a list and target_len is None, make it a list with one element.
-        # TODO: If value is a list and target_len is None, return value.
-        # TODO: If value is a list and target_len is not None (corresponding to ext_params_list or sim_params_list)
-        #       target_len should be a multiple of len(value) and value should be multiplied to have target_len as final size.
-        #       otherwise raise an error. 
-        #       Remark: this is when assuming that ground_truths is a list made from simulation over product(ext_params_list, sim_params_list).
+        # Normalize all three together
+        self.ground_truths, self.ext_params_list, self.sim_params_list = self._normalize_lists(
+            ground_truths,
+            ext_params_list,
+            sim_params_list,
+        )
+
+        # Verify consistency
+        assert len(self.ground_truths) == len(self.ext_params_list) == len(self.sim_params_list), (
+            f"Mismatched lengths: {len(self.ground_truths)} GTs vs "
+            f"{len(self.ext_params_list)} ext vs {len(self.sim_params_list)} sim"
+        )
+
+    @staticmethod
+    def _normalize_lists(
+        ground_truths: List[np.ndarray] | np.ndarray,
+        ext_params_list: List[Any] | Any,
+        sim_params_list: List[Any] | Any,
+    ) -> tuple:
         """
-        if isinstance(value, list):
-            return value
-        elif target_len is not None:
-            return [value] * target_len
-        else:
-            return [value]
-    
+        Normalize ground_truths, ext_params_list, and sim_params_list together.
+        
+        - ext_params_list and sim_params_list are independent sets
+        - ground_truths must have length = len(ext_params_list) × len(sim_params_list)
+        - ext_params_list and sim_params_list are converted to Cartesian product order
+        
+        Args:
+            ground_truths: Single array or list of arrays
+            ext_params_list: Single dict or list of dicts
+            sim_params_list: Single dict or list of dicts
+        
+        Returns:
+            Tuple of (ground_truths_list, ext_params_list, sim_params_list)
+        
+        Raises:
+            ValueError: If lengths are incompatible
+        """
+        # Step 1: Convert to lists (not replicated yet)
+        gt_list = ground_truths if isinstance(ground_truths, list) else [ground_truths]
+        ext_list = ext_params_list if isinstance(ext_params_list, list) else [ext_params_list]
+        sim_list = sim_params_list if isinstance(sim_params_list, list) else [sim_params_list]
+        
+        # ext_list and sim_list are independent; generate all combinations
+        n_conditions = len(ext_list) * len(sim_list)
+        
+        # Verify ground_truths count matches
+        if len(gt_list) != n_conditions:
+            raise ValueError(
+                f"use_product=True: ground_truths length ({len(gt_list)}) "
+                f"must equal ext_params_list × sim_params_list "
+                f"({len(ext_list)} × {len(sim_list)} = {n_conditions})"
+            )
+        
+        # Create paired lists from product (in order)
+        paired_params = list(product(ext_list, sim_list))
+        ext_list = [ep for ep, _ in paired_params]
+        sim_list = [sp for _, sp in paired_params]
+        
+        return gt_list, ext_list, sim_list
+        
     def objective(
         self,
         param_vector: np.ndarray,

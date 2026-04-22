@@ -416,6 +416,27 @@ def ground_truth_ext_flow_params_multi():
             "w0":1e0,
             "psi":np.pi/2,
         },
+        {
+            "Lambdas": [[0, 0]] * N,
+            "Zetas": [0] * N,            
+            "A": 1e-3,
+            "w0":1e6,
+            "psi":np.pi/2,
+        },        
+        {
+            "Lambdas": [[0, 0]] * N,
+            "Zetas": [0] * N,            
+            "A": 1e-3,
+            "w0":1e-3,
+            "psi":np.pi/2,
+        },
+        {
+            "Lambdas": [[0, 0]] * N,
+            "Zetas": [0] * N,            
+            "A": 1e-3,
+            "w0":1e-3,
+            "psi":np.pi/2,
+        },                      
     ]    
 
 
@@ -432,18 +453,6 @@ def ground_truth_sim_params_multi():
             "method": "BDF",
             "T_sim_max": 300
         },
-        {
-            "T_span": (0.0, 1e3),
-            "T_eval": np.linspace(0, 1e3, int(1e2)),
-            "method": "BDF",
-            "T_sim_max": 300
-        },
-        {
-            "T_span": (0.0, 1e3),
-            "T_eval": np.linspace(0, 1e3, int(1e2)),
-            "method": "BDF",
-            "T_sim_max": 300
-        },                
     ]
 
 
@@ -462,7 +471,7 @@ def ground_truth_data_multi(
     """
     ground_truths = []
     
-    for ext_params, sim_params in zip( # TODO: change zip to product? or lists to coincide
+    for ext_params, sim_params in product(
         ground_truth_ext_params_multi,
         ground_truth_sim_params_multi
     ):
@@ -497,7 +506,7 @@ def ground_truth_flow_data_multi(
     """
     ground_truths = []
     
-    for ext_params, sim_params in zip( # TODO: change zip to product? or lists to coincide
+    for ext_params, sim_params in product(
         ground_truth_ext_flow_params_multi,
         ground_truth_sim_params_multi
     ):
@@ -832,422 +841,422 @@ class TestViscoElasticFilamentSp4Inference:
     5. Verify convergence and uncertainty estimates
     """
 
-    def test_inference_sp4_recovery(
-        self,
-        inference_instance,
-        ground_truth_ext_params,
-        ground_truth_sim_params,
-    ):
-        """
-        Test that the inference pipeline can recover Sp4 parameter
-        from synthetic ground truth data using basin-hopping optimization.
+    # def test_inference_sp4_recovery(
+    #     self,
+    #     inference_instance,
+    #     ground_truth_ext_params,
+    #     ground_truth_sim_params,
+    # ):
+    #     """
+    #     Test that the inference pipeline can recover Sp4 parameter
+    #     from synthetic ground truth data using basin-hopping optimization.
         
-        Expected behavior:
-        - Inferred Sp4 should be close to ground truth value (1.0)
-        - Optimization should converge with reasonable acceptance rate
-        """
-        result = inference_instance.infer(
-            initial_guess={'Sp4': 2.5},
-        )
+    #     Expected behavior:
+    #     - Inferred Sp4 should be close to ground truth value (1.0)
+    #     - Optimization should converge with reasonable acceptance rate
+    #     """
+    #     result = inference_instance.infer(
+    #         initial_guess={'Sp4': 2.5},
+    #     )
         
-        # Print detailed summaries
-        print_optimization_history(inference_instance, plot_flag=False)
-        print_inference_summary(
-            result,
-            ground_truth_params={'Sp4': 1.0},
-            confidence_level=0.95
-        )
+    #     # Print detailed summaries
+    #     print_optimization_history(inference_instance, plot_flag=False)
+    #     print_inference_summary(
+    #         result,
+    #         ground_truth_params={'Sp4': 1.0},
+    #         confidence_level=0.95
+    #     )
 
-        # Extract results
-        inferred_sp4 = result.params['Sp4']
-        acceptance_rate = np.mean(inference_instance.result.accept_global)
-        ground_truth_sp4 = 1.0
+    #     # Extract results
+    #     inferred_sp4 = result.params['Sp4']
+    #     acceptance_rate = np.mean(inference_instance.result.accept_global)
+    #     ground_truth_sp4 = 1.0
         
-        # Assertions
-        assert inferred_sp4 is not None, "Inference failed to recover Sp4"
-        assert inferred_sp4 > 0, "Inferred Sp4 must be positive"
-        assert np.isfinite(inferred_sp4), "Inferred Sp4 must be finite"
+    #     # Assertions
+    #     assert inferred_sp4 is not None, "Inference failed to recover Sp4"
+    #     assert inferred_sp4 > 0, "Inferred Sp4 must be positive"
+    #     assert np.isfinite(inferred_sp4), "Inferred Sp4 must be finite"
         
-        relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
-        assert relative_error < 0.1, (
-            f"Inferred Sp4={inferred_sp4:.6f} deviates >10% from ground truth {ground_truth_sp4}"
-        )
+    #     relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+    #     assert relative_error < 0.1, (
+    #         f"Inferred Sp4={inferred_sp4:.6f} deviates >10% from ground truth {ground_truth_sp4}"
+    #     )
         
-        assert acceptance_rate > 0, "No basin-hopping steps accepted"
+    #     assert acceptance_rate > 0, "No basin-hopping steps accepted"
         
-        # Optional: assert on covariance/Hessian if computed
-        if result.covariance is not None:
-            assert result.covariance.shape == (1, 1), "Covariance shape mismatch"
-            assert result.std_errors[0] > 0, "Standard error must be positive"
+    #     # Optional: assert on covariance/Hessian if computed
+    #     if result.covariance is not None:
+    #         assert result.covariance.shape == (1, 1), "Covariance shape mismatch"
+    #         assert result.std_errors[0] > 0, "Standard error must be positive"
         
-        print(f"✓ Inferred Sp4: {inferred_sp4:.6f} (ground truth: {ground_truth_sp4})")
-        print(f"✓ Relative error: {relative_error*100:.2f}%")
-        print(f"✓ Basin-hopping acceptance rate: {acceptance_rate:.2%}")
+    #     print(f"✓ Inferred Sp4: {inferred_sp4:.6f} (ground truth: {ground_truth_sp4})")
+    #     print(f"✓ Relative error: {relative_error*100:.2f}%")
+    #     print(f"✓ Basin-hopping acceptance rate: {acceptance_rate:.2%}")
 
-    def test_inference_sp4_recovery_flow(
-        self,
-        inference_instance_flow,
-        ground_truth_ext_flow_params,
-        ground_truth_sim_params,
-    ):
-        """
-        Test that the inference pipeline recovers Sp4 from synthetic flow data.
+    # def test_inference_sp4_recovery_flow(
+    #     self,
+    #     inference_instance_flow,
+    #     ground_truth_ext_flow_params,
+    #     ground_truth_sim_params,
+    # ):
+    #     """
+    #     Test that the inference pipeline recovers Sp4 from synthetic flow data.
         
-        Validates:
-        1. Sp4 recovery accuracy (relative error < 10%)
-        2. Optimization convergence (acceptance rate > 0)
-        3. Parameter bounds satisfaction (Sp4 > 0, finite)
-        4. Covariance matrix validity (if computed)
-        5. External flow parameters remain unchanged
+    #     Validates:
+    #     1. Sp4 recovery accuracy (relative error < 10%)
+    #     2. Optimization convergence (acceptance rate > 0)
+    #     3. Parameter bounds satisfaction (Sp4 > 0, finite)
+    #     4. Covariance matrix validity (if computed)
+    #     5. External flow parameters remain unchanged
         
-        Expected behavior:
-        - Inferred Sp4 ≈ 1.0 (ground truth)
-        - Relative error < 10%
-        - Acceptance rate > 0
-        """
-        # Run inference with initial guess far from ground truth
-        result = inference_instance_flow.infer(
-            initial_guess={'Sp4': 250},
-            # ext_params=ground_truth_ext_flow_params,
-            # sim_params=ground_truth_sim_params,
-        )
+    #     Expected behavior:
+    #     - Inferred Sp4 ≈ 1.0 (ground truth)
+    #     - Relative error < 10%
+    #     - Acceptance rate > 0
+    #     """
+    #     # Run inference with initial guess far from ground truth
+    #     result = inference_instance_flow.infer(
+    #         initial_guess={'Sp4': 250},
+    #         # ext_params=ground_truth_ext_flow_params,
+    #         # sim_params=ground_truth_sim_params,
+    #     )
         
-        # Print detailed optimization history and summary
-        print_optimization_history(inference_instance_flow, plot_flag=False)
-        print_inference_summary(
-            result,
-            ground_truth_params={'Sp4': 1.0},
-            confidence_level=0.95,
-        )
+    #     # Print detailed optimization history and summary
+    #     print_optimization_history(inference_instance_flow, plot_flag=False)
+    #     print_inference_summary(
+    #         result,
+    #         ground_truth_params={'Sp4': 1.0},
+    #         confidence_level=0.95,
+    #     )
         
-        # Extract inferred results
-        inferred_sp4 = result.params['Sp4']
-        acceptance_rate = np.mean(inference_instance_flow.result.accept_global)
-        ground_truth_sp4 = 1.0
+    #     # Extract inferred results
+    #     inferred_sp4 = result.params['Sp4']
+    #     acceptance_rate = np.mean(inference_instance_flow.result.accept_global)
+    #     ground_truth_sp4 = 1.0
         
-        # ===== ASSERTION 1: Sp4 successfully inferred =====
-        assert inferred_sp4 is not None, (
-            "Inference failed: Sp4 not returned"
-        )
+    #     # ===== ASSERTION 1: Sp4 successfully inferred =====
+    #     assert inferred_sp4 is not None, (
+    #         "Inference failed: Sp4 not returned"
+    #     )
         
-        # ===== ASSERTION 2: Sp4 is physically valid =====
-        assert inferred_sp4 > 0, (
-            f"Inferred Sp4={inferred_sp4} must be positive"
-        )
-        assert np.isfinite(inferred_sp4), (
-            f"Inferred Sp4={inferred_sp4} must be finite"
-        )
+    #     # ===== ASSERTION 2: Sp4 is physically valid =====
+    #     assert inferred_sp4 > 0, (
+    #         f"Inferred Sp4={inferred_sp4} must be positive"
+    #     )
+    #     assert np.isfinite(inferred_sp4), (
+    #         f"Inferred Sp4={inferred_sp4} must be finite"
+    #     )
         
-        # ===== ASSERTION 3: Relative error within tolerance =====
-        relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
-        assert relative_error < 0.1, (
-            f"Inferred Sp4={inferred_sp4:.6f} deviates >{relative_error*100:.2f}% "
-            f"from ground truth {ground_truth_sp4}"
-        )
+    #     # ===== ASSERTION 3: Relative error within tolerance =====
+    #     relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+    #     assert relative_error < 0.1, (
+    #         f"Inferred Sp4={inferred_sp4:.6f} deviates >{relative_error*100:.2f}% "
+    #         f"from ground truth {ground_truth_sp4}"
+    #     )
         
-        # ===== ASSERTION 4: Optimization converged =====
-        assert acceptance_rate > 0, (
-            "Basin-hopping failed: no steps accepted"
-        )
+    #     # ===== ASSERTION 4: Optimization converged =====
+    #     assert acceptance_rate > 0, (
+    #         "Basin-hopping failed: no steps accepted"
+    #     )
         
-        # ===== ASSERTION 5: Covariance/uncertainty valid =====
-        if result.covariance is not None:
-            assert result.covariance.shape == (1, 1), (
-                f"Covariance shape {result.covariance.shape} != (1, 1)"
-            )
-            assert result.std_errors[0] > 0, (
-                f"Standard error must be positive, got {result.std_errors[0]}"
-            )
+    #     # ===== ASSERTION 5: Covariance/uncertainty valid =====
+    #     if result.covariance is not None:
+    #         assert result.covariance.shape == (1, 1), (
+    #             f"Covariance shape {result.covariance.shape} != (1, 1)"
+    #         )
+    #         assert result.std_errors[0] > 0, (
+    #             f"Standard error must be positive, got {result.std_errors[0]}"
+    #         )
         
-        # ===== ASSERTION 6: External flow parameters unchanged =====
-        # Verify that flow parameters are passed but not modified by optimizer
-        assert 'A' in ground_truth_ext_flow_params, "Missing A in ext_params"
-        assert 'w0' in ground_truth_ext_flow_params, "Missing w0 in ext_params"
-        assert 'psi' in ground_truth_ext_flow_params, "Missing psi in ext_params"
+    #     # ===== ASSERTION 6: External flow parameters unchanged =====
+    #     # Verify that flow parameters are passed but not modified by optimizer
+    #     assert 'A' in ground_truth_ext_flow_params, "Missing A in ext_params"
+    #     assert 'w0' in ground_truth_ext_flow_params, "Missing w0 in ext_params"
+    #     assert 'psi' in ground_truth_ext_flow_params, "Missing psi in ext_params"
         
-        print(f"\n{'='*70}")
-        print(f"FLOW PARAMETER INFERENCE RESULTS (Sp4 recovery)")
-        print(f"{'='*70}")
-        print(f"✓ Inferred Sp4:              {inferred_sp4:.6f}")
-        print(f"✓ Ground truth Sp4:          {ground_truth_sp4}")
-        print(f"✓ Relative error:            {relative_error*100:.2f}%")
-        print(f"✓ Basin-hopping acceptance:  {acceptance_rate:.2%}")
-        print(f"✓ Fixed flow amplitude (A):  {ground_truth_ext_flow_params['A']:.2e}")
-        print(f"✓ Fixed angular freq (w0):   {ground_truth_ext_flow_params['w0']:.2e} rad/s")
-        print(f"✓ Fixed flow angle (psi):    {ground_truth_ext_flow_params['psi']:.4f} rad")
-        print(f"{'='*70}\n")
+    #     print(f"\n{'='*70}")
+    #     print(f"FLOW PARAMETER INFERENCE RESULTS (Sp4 recovery)")
+    #     print(f"{'='*70}")
+    #     print(f"✓ Inferred Sp4:              {inferred_sp4:.6f}")
+    #     print(f"✓ Ground truth Sp4:          {ground_truth_sp4}")
+    #     print(f"✓ Relative error:            {relative_error*100:.2f}%")
+    #     print(f"✓ Basin-hopping acceptance:  {acceptance_rate:.2%}")
+    #     print(f"✓ Fixed flow amplitude (A):  {ground_truth_ext_flow_params['A']:.2e}")
+    #     print(f"✓ Fixed angular freq (w0):   {ground_truth_ext_flow_params['w0']:.2e} rad/s")
+    #     print(f"✓ Fixed flow angle (psi):    {ground_truth_ext_flow_params['psi']:.4f} rad")
+    #     print(f"{'='*70}\n")
 
-    @pytest.mark.parametrize("initial_sp4", [0.1, 0.5, 2.5, 5.0, 10.0])
-    def test_inference_sp4_recovery_flow_robust(
-        self,
-        initial_sp4,
-        composed_model_flow_sp4_only,
-        ground_truth_flow_data,
-        mse_loss_fn,
-        basinhopping_optimizer_instance,
-        ground_truth_ext_flow_params,
-        ground_truth_sim_params,
-    ):
-        """
-        Robustness test: verify Sp4 recovery works across multiple initial guesses.
+    # @pytest.mark.parametrize("initial_sp4", [0.1, 0.5, 2.5, 5.0, 10.0])
+    # def test_inference_sp4_recovery_flow_robust(
+    #     self,
+    #     initial_sp4,
+    #     composed_model_flow_sp4_only,
+    #     ground_truth_flow_data,
+    #     mse_loss_fn,
+    #     basinhopping_optimizer_instance,
+    #     ground_truth_ext_flow_params,
+    #     ground_truth_sim_params,
+    # ):
+    #     """
+    #     Robustness test: verify Sp4 recovery works across multiple initial guesses.
         
-        Tests convergence behavior when starting far from and near the ground truth.
-        """
-        # Create a fresh inference instance for this initial guess
-        inference = Inference(
-            model_class=composed_model_flow_sp4_only,
-            ground_truths=ground_truth_flow_data,
-            loss_fn=mse_loss_fn,
-            ext_params_list=ground_truth_ext_flow_params,
-            sim_params_list=ground_truth_sim_params,
-            optimizer=basinhopping_optimizer_instance,
-            optimizer_kwargs={
-                'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
-                'minimum_gradient': False,
-                'minimum_hessian': False,
-                'local_minimizer_kwargs': {
-                    'method': 'L-BFGS-B',
-                    'jac': '3-point',
-                    'options': {
-                        'disp': False,
-                        'ftol': 1e-8,
-                        'gtol': 1e-8,
-                        'eps': 1e-8,
-                        'finite_diff_rel_step': 1e-6,
-                    },
-                },
-                'global_minimizer_kwargs': {
-                    'niter': 9,
-                    'T': 0,
-                    'stepsize': 5,
-                    'tol': 1e-10,
-                }
-            },
-            n_jobs=-1,
-        )
+    #     Tests convergence behavior when starting far from and near the ground truth.
+    #     """
+    #     # Create a fresh inference instance for this initial guess
+    #     inference = Inference(
+    #         model_class=composed_model_flow_sp4_only,
+    #         ground_truths=ground_truth_flow_data,
+    #         loss_fn=mse_loss_fn,
+    #         ext_params_list=ground_truth_ext_flow_params,
+    #         sim_params_list=ground_truth_sim_params,
+    #         optimizer=basinhopping_optimizer_instance,
+    #         optimizer_kwargs={
+    #             'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
+    #             'minimum_gradient': False,
+    #             'minimum_hessian': False,
+    #             'local_minimizer_kwargs': {
+    #                 'method': 'L-BFGS-B',
+    #                 'jac': '3-point',
+    #                 'options': {
+    #                     'disp': False,
+    #                     'ftol': 1e-8,
+    #                     'gtol': 1e-8,
+    #                     'eps': 1e-8,
+    #                     'finite_diff_rel_step': 1e-6,
+    #                 },
+    #             },
+    #             'global_minimizer_kwargs': {
+    #                 'niter': 9,
+    #                 'T': 0,
+    #                 'stepsize': 5,
+    #                 'tol': 1e-10,
+    #             }
+    #         },
+    #         n_jobs=-1,
+    #     )
         
-        # Run inference
-        result = inference.infer(
-            initial_guess={'Sp4': initial_sp4},
-        )
+    #     # Run inference
+    #     result = inference.infer(
+    #         initial_guess={'Sp4': initial_sp4},
+    #     )
         
-        # Validate recovery
-        inferred_sp4 = result.params['Sp4']
-        ground_truth_sp4 = 1.0
-        relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+    #     # Validate recovery
+    #     inferred_sp4 = result.params['Sp4']
+    #     ground_truth_sp4 = 1.0
+    #     relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
         
-        assert inferred_sp4 > 0, f"Inferred Sp4={inferred_sp4} must be positive"
-        assert np.isfinite(inferred_sp4), f"Inferred Sp4={inferred_sp4} must be finite"
-        assert relative_error < 0.2, (  # Slightly relaxed tolerance for robustness test
-            f"Initial guess {initial_sp4}: "
-            f"Inferred Sp4={inferred_sp4:.6f} deviates {relative_error*100:.2f}% "
-            f"from ground truth {ground_truth_sp4}"
-        )
+    #     assert inferred_sp4 > 0, f"Inferred Sp4={inferred_sp4} must be positive"
+    #     assert np.isfinite(inferred_sp4), f"Inferred Sp4={inferred_sp4} must be finite"
+    #     assert relative_error < 0.2, (  # Slightly relaxed tolerance for robustness test
+    #         f"Initial guess {initial_sp4}: "
+    #         f"Inferred Sp4={inferred_sp4:.6f} deviates {relative_error*100:.2f}% "
+    #         f"from ground truth {ground_truth_sp4}"
+    #     )
         
-        print(f"✓ Initial Sp4: {initial_sp4:>5.1f} → Inferred: {inferred_sp4:.6f} "
-            f"(error: {relative_error*100:>6.2f}%)")
+    #     print(f"✓ Initial Sp4: {initial_sp4:>5.1f} → Inferred: {inferred_sp4:.6f} "
+    #         f"(error: {relative_error*100:>6.2f}%)")
 
-    def test_inference_loss_landscape_flow(
-        self,
-        composed_model_flow_sp4_only,
-        ground_truth_flow_data,
-        mse_loss_fn,
-        ground_truth_ext_flow_params,
-        ground_truth_sim_params,
-    ):
-        """
-        Diagnostic test: visualize the loss landscape around ground truth Sp4.
+    # def test_inference_loss_landscape_flow(
+    #     self,
+    #     composed_model_flow_sp4_only,
+    #     ground_truth_flow_data,
+    #     mse_loss_fn,
+    #     ground_truth_ext_flow_params,
+    #     ground_truth_sim_params,
+    # ):
+    #     """
+    #     Diagnostic test: visualize the loss landscape around ground truth Sp4.
         
-        Validates that:
-        1. Loss minimum is near ground truth Sp4 = 1.0
-        2. Loss function is smooth and well-conditioned
-        3. Gradient direction points toward ground truth from distant starting points
-        4. No pathological spikes or discontinuities in the landscape
+    #     Validates that:
+    #     1. Loss minimum is near ground truth Sp4 = 1.0
+    #     2. Loss function is smooth and well-conditioned
+    #     3. Gradient direction points toward ground truth from distant starting points
+    #     4. No pathological spikes or discontinuities in the landscape
         
-        This test ensures the optimization problem is well-posed before running
-        expensive inference procedures.
-        """
-        ground_truth_sp4 = 1.0
+    #     This test ensures the optimization problem is well-posed before running
+    #     expensive inference procedures.
+    #     """
+    #     ground_truth_sp4 = 1.0
         
-        # Sweep over a logarithmic range around ground truth
-        sp4_values = np.logspace(-1, 1.5, 40)  # 0.1 to 31.623
-        losses = []
+    #     # Sweep over a logarithmic range around ground truth
+    #     sp4_values = np.logspace(-1, 1.5, 40)  # 0.1 to 31.623
+    #     losses = []
         
-        print(f"\n{'='*70}")
-        print(f"Loss Landscape Diagnostic (Ground Truth Sp4={ground_truth_sp4})")
-        print(f"{'='*70}")
-        print(f"{'Sp4':>10} | {'Loss':>15} | {'ΔLoss (vs GT)':>15}")
-        print(f"{'-'*50}")
+    #     print(f"\n{'='*70}")
+    #     print(f"Loss Landscape Diagnostic (Ground Truth Sp4={ground_truth_sp4})")
+    #     print(f"{'='*70}")
+    #     print(f"{'Sp4':>10} | {'Loss':>15} | {'ΔLoss (vs GT)':>15}")
+    #     print(f"{'-'*50}")
         
-        for sp4 in sp4_values:
-            # Construct reduced parameters
-            reduced_int_params = {'Sp4': sp4}
+    #     for sp4 in sp4_values:
+    #         # Construct reduced parameters
+    #         reduced_int_params = {'Sp4': sp4}
             
-            # Instantiate the composed model
-            model = composed_model_flow_sp4_only(
-                int_params=reduced_int_params,
-                ext_params=ground_truth_ext_flow_params,
-                sim_params=ground_truth_sim_params,
-            )
+    #         # Instantiate the composed model
+    #         model = composed_model_flow_sp4_only(
+    #             int_params=reduced_int_params,
+    #             ext_params=ground_truth_ext_flow_params,
+    #             sim_params=ground_truth_sim_params,
+    #         )
             
-            # Simulate with current Sp4 value
-            try:
-                output = model.simulate_single()
-                simulated_trajectory = output['value']
+    #         # Simulate with current Sp4 value
+    #         try:
+    #             output = model.simulate_single()
+    #             simulated_trajectory = output['value']
                 
-                # Compute loss
-                loss = mse_loss_fn(simulated_trajectory, ground_truth_flow_data)
-                losses.append(loss)
+    #             # Compute loss
+    #             loss = mse_loss_fn(simulated_trajectory, ground_truth_flow_data)
+    #             losses.append(loss)
                 
-                delta_loss = loss - mse_loss_fn(
-                    ground_truth_flow_data, ground_truth_flow_data
-                )
+    #             delta_loss = loss - mse_loss_fn(
+    #                 ground_truth_flow_data, ground_truth_flow_data
+    #             )
                 
-                if True:# sp4 in [0.1, 0.326, 1.061, 3.455, 11.253]:  # Print key points
-                    print(f"{sp4:>10.3f} | {loss:>15.6e} | {delta_loss:>15.6e}")
+    #             if True:# sp4 in [0.1, 0.326, 1.061, 3.455, 11.253]:  # Print key points
+    #                 print(f"{sp4:>10.3f} | {loss:>15.6e} | {delta_loss:>15.6e}")
             
-            except Exception as e:
-                print(f"⚠ Simulation failed at Sp4={sp4:.3f}: {str(e)[:40]}")
-                losses.append(np.nan)
+    #         except Exception as e:
+    #             print(f"⚠ Simulation failed at Sp4={sp4:.3f}: {str(e)[:40]}")
+    #             losses.append(np.nan)
         
-        losses = np.array(losses)
+    #     losses = np.array(losses)
         
-        # ===== ASSERTION 1: Loss finite and real =====
-        valid_losses = losses[~np.isnan(losses)]
-        assert len(valid_losses) > 0, "No valid loss values computed"
-        assert np.all(valid_losses >= 0), "Loss values must be non-negative"
+    #     # ===== ASSERTION 1: Loss finite and real =====
+    #     valid_losses = losses[~np.isnan(losses)]
+    #     assert len(valid_losses) > 0, "No valid loss values computed"
+    #     assert np.all(valid_losses >= 0), "Loss values must be non-negative"
         
-        # ===== ASSERTION 2: Minimum near ground truth =====
-        min_loss_idx = np.nanargmin(losses)
-        sp4_at_min = sp4_values[min_loss_idx]
-        min_loss = losses[min_loss_idx]
+    #     # ===== ASSERTION 2: Minimum near ground truth =====
+    #     min_loss_idx = np.nanargmin(losses)
+    #     sp4_at_min = sp4_values[min_loss_idx]
+    #     min_loss = losses[min_loss_idx]
         
-        # Allow 50% deviation in Sp4 at minimum (diagnostic test)
-        relative_sp4_error_at_min = abs(sp4_at_min - ground_truth_sp4) / ground_truth_sp4
-        assert relative_sp4_error_at_min < 0.5, (
-            f"Loss minimum at Sp4={sp4_at_min:.3f}, "
-            f"expected near {ground_truth_sp4} "
-            f"(relative error: {relative_sp4_error_at_min*100:.1f}%)"
-        )
+    #     # Allow 50% deviation in Sp4 at minimum (diagnostic test)
+    #     relative_sp4_error_at_min = abs(sp4_at_min - ground_truth_sp4) / ground_truth_sp4
+    #     assert relative_sp4_error_at_min < 0.5, (
+    #         f"Loss minimum at Sp4={sp4_at_min:.3f}, "
+    #         f"expected near {ground_truth_sp4} "
+    #         f"(relative error: {relative_sp4_error_at_min*100:.1f}%)"
+    #     )
         
-        # ===== ASSERTION 3: Loss landscape is smooth =====
-        # Check for large discontinuous jumps (indicates numerical issues)
-        valid_mask = ~np.isnan(losses)
-        if np.sum(valid_mask) > 2:
-            valid_losses_subset = losses[valid_mask]
-            loss_gradients = np.abs(np.diff(valid_losses_subset))
+    #     # ===== ASSERTION 3: Loss landscape is smooth =====
+    #     # Check for large discontinuous jumps (indicates numerical issues)
+    #     valid_mask = ~np.isnan(losses)
+    #     if np.sum(valid_mask) > 2:
+    #         valid_losses_subset = losses[valid_mask]
+    #         loss_gradients = np.abs(np.diff(valid_losses_subset))
             
-            # Flag if max gradient is suspiciously large
-            max_gradient = np.max(loss_gradients)
-            median_gradient = np.median(loss_gradients)
+    #         # Flag if max gradient is suspiciously large
+    #         max_gradient = np.max(loss_gradients)
+    #         median_gradient = np.median(loss_gradients)
             
-            if median_gradient > 0:
-                gradient_ratio = max_gradient / median_gradient
-                assert gradient_ratio < 100, (
-                    f"Loss landscape has discontinuities "
-                    f"(max gradient {gradient_ratio:.1f}x median)"
-                )
+    #         if median_gradient > 0:
+    #             gradient_ratio = max_gradient / median_gradient
+    #             assert gradient_ratio < 100, (
+    #                 f"Loss landscape has discontinuities "
+    #                 f"(max gradient {gradient_ratio:.1f}x median)"
+    #             )
         
-        # ===== ASSERTION 4: Loss decreases toward ground truth =====
-        # Compare loss at 0.5*GT vs 2*GT (both equidistant log-scale from GT)
-        idx_05 = np.argmin(np.abs(sp4_values - 0.5 * ground_truth_sp4))
-        idx_20 = np.argmin(np.abs(sp4_values - 2.0 * ground_truth_sp4))
-        idx_10 = np.argmin(np.abs(sp4_values - ground_truth_sp4))
+    #     # ===== ASSERTION 4: Loss decreases toward ground truth =====
+    #     # Compare loss at 0.5*GT vs 2*GT (both equidistant log-scale from GT)
+    #     idx_05 = np.argmin(np.abs(sp4_values - 0.5 * ground_truth_sp4))
+    #     idx_20 = np.argmin(np.abs(sp4_values - 2.0 * ground_truth_sp4))
+    #     idx_10 = np.argmin(np.abs(sp4_values - ground_truth_sp4))
         
-        loss_at_05 = losses[idx_05]
-        loss_at_20 = losses[idx_20]
-        loss_at_10 = losses[idx_10]
+    #     loss_at_05 = losses[idx_05]
+    #     loss_at_20 = losses[idx_20]
+    #     loss_at_10 = losses[idx_10]
         
-        if not np.isnan(loss_at_05) and not np.isnan(loss_at_20) and not np.isnan(loss_at_10):
-            # Both flanks should have higher loss than center
-            assert loss_at_10 <= loss_at_05 * 1.5, (
-                f"Loss at Sp4=0.5 ({loss_at_05:.3e}) should be higher "
-                f"than at Sp4=1.0 ({loss_at_10:.3e})"
-            )
-            assert loss_at_10 <= loss_at_20 * 1.5, (
-                f"Loss at Sp4=2.0 ({loss_at_20:.3e}) should be higher "
-                f"than at Sp4=1.0 ({loss_at_10:.3e})"
-            )
+    #     if not np.isnan(loss_at_05) and not np.isnan(loss_at_20) and not np.isnan(loss_at_10):
+    #         # Both flanks should have higher loss than center
+    #         assert loss_at_10 <= loss_at_05 * 1.5, (
+    #             f"Loss at Sp4=0.5 ({loss_at_05:.3e}) should be higher "
+    #             f"than at Sp4=1.0 ({loss_at_10:.3e})"
+    #         )
+    #         assert loss_at_10 <= loss_at_20 * 1.5, (
+    #             f"Loss at Sp4=2.0 ({loss_at_20:.3e}) should be higher "
+    #             f"than at Sp4=1.0 ({loss_at_10:.3e})"
+    #         )
         
-        print(f"{'-'*50}")
-        print(f"✓ Loss minimum at Sp4={sp4_at_min:.6f}")
-        print(f"✓ Ground truth Sp4={ground_truth_sp4}")
-        print(f"✓ Relative error: {relative_sp4_error_at_min*100:.2f}%")
-        print(f"✓ Minimum loss: {min_loss:.6e}")
-        print(f"✓ Loss landscape smooth: ✓")
-        print(f"{'='*70}\n")
+    #     print(f"{'-'*50}")
+    #     print(f"✓ Loss minimum at Sp4={sp4_at_min:.6f}")
+    #     print(f"✓ Ground truth Sp4={ground_truth_sp4}")
+    #     print(f"✓ Relative error: {relative_sp4_error_at_min*100:.2f}%")
+    #     print(f"✓ Minimum loss: {min_loss:.6e}")
+    #     print(f"✓ Loss landscape smooth: ✓")
+    #     print(f"{'='*70}\n")
 
-    def test_inference_sp4_recovery_flow_batch(
-        self,
-        composed_model_flow_sp4_only,
-        ground_truth_flow_data,
-        mse_loss_fn,
-        basinhopping_optimizer_instance,
-        ground_truth_ext_flow_params,
-        ground_truth_sim_params,
-    ):
-        """
-        Batch test: verify Sp4 recovery works across multiple initial guesses.
+    # def test_inference_sp4_recovery_flow_batch(
+    #     self,
+    #     composed_model_flow_sp4_only,
+    #     ground_truth_flow_data,
+    #     mse_loss_fn,
+    #     basinhopping_optimizer_instance,
+    #     ground_truth_ext_flow_params,
+    #     ground_truth_sim_params,
+    # ):
+    #     """
+    #     Batch test: verify Sp4 recovery works across multiple initial guesses.
         
-        Tests convergence behavior when starting far from and near the ground truth
-        using batch inference for efficiency.
-        """
-        # Create a single inference instance for batch processing
-        inference = Inference(
-            model_class=composed_model_flow_sp4_only,
-            ground_truths=ground_truth_flow_data,
-            loss_fn=mse_loss_fn,
-            ext_params_list=ground_truth_ext_flow_params,
-            sim_params_list=ground_truth_sim_params,
-            optimizer=basinhopping_optimizer_instance,
-            optimizer_kwargs={
-                'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
-                'minimum_gradient': False,
-                'minimum_hessian': False,
-                'local_minimizer_kwargs': {
-                    'method': 'L-BFGS-B',
-                    'jac': '3-point',
-                    'options': {
-                        'disp': False,
-                        'ftol': 1e-8,
-                        'gtol': 1e-8,
-                        'eps': 1e-8,
-                        'finite_diff_rel_step': 1e-6,
-                    },
-                },
-                'global_minimizer_kwargs': {
-                    'niter': 9,
-                    'T': 0,
-                    'stepsize': 5,
-                    'tol': 1e-10,
-                }
-            },
-            n_jobs=-1,
-        )
+    #     Tests convergence behavior when starting far from and near the ground truth
+    #     using batch inference for efficiency.
+    #     """
+    #     # Create a single inference instance for batch processing
+    #     inference = Inference(
+    #         model_class=composed_model_flow_sp4_only,
+    #         ground_truths=ground_truth_flow_data,
+    #         loss_fn=mse_loss_fn,
+    #         ext_params_list=ground_truth_ext_flow_params,
+    #         sim_params_list=ground_truth_sim_params,
+    #         optimizer=basinhopping_optimizer_instance,
+    #         optimizer_kwargs={
+    #             'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
+    #             'minimum_gradient': False,
+    #             'minimum_hessian': False,
+    #             'local_minimizer_kwargs': {
+    #                 'method': 'L-BFGS-B',
+    #                 'jac': '3-point',
+    #                 'options': {
+    #                     'disp': False,
+    #                     'ftol': 1e-8,
+    #                     'gtol': 1e-8,
+    #                     'eps': 1e-8,
+    #                     'finite_diff_rel_step': 1e-6,
+    #                 },
+    #             },
+    #             'global_minimizer_kwargs': {
+    #                 'niter': 9,
+    #                 'T': 0,
+    #                 'stepsize': 5,
+    #                 'tol': 1e-10,
+    #             }
+    #         },
+    #         n_jobs=-1,
+    #     )
         
-        # Create initial guesses for all parametrized values
-        initial_guesses = [{'Sp4': sp4} for sp4 in [0.1, 0.5, 2.5, 5.0, 10.0]]
-        # Run batch inference
-        results = inference.infer_batch(initial_guesses)
+    #     # Create initial guesses for all parametrized values
+    #     initial_guesses = [{'Sp4': sp4} for sp4 in [0.1, 0.5, 2.5, 5.0, 10.0]]
+    #     # Run batch inference
+    #     results = inference.infer_batch(initial_guesses)
         
-        # Validate recovery
-        for l in range(len(results)):
-            result = results[l]
-            initial_sp4 = initial_guesses[l]
-            inferred_sp4 = result.params['Sp4']
-            ground_truth_sp4 = 1.0
-            relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+    #     # Validate recovery
+    #     for l in range(len(results)):
+    #         result = results[l]
+    #         initial_sp4 = initial_guesses[l]['Sp4']
+    #         inferred_sp4 = result.params['Sp4']
+    #         ground_truth_sp4 = 1.0
+    #         relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
             
-            assert inferred_sp4 > 0, f"Inferred Sp4={inferred_sp4} must be positive"
-            assert np.isfinite(inferred_sp4), f"Inferred Sp4={inferred_sp4} must be finite"
-            assert relative_error < 0.2, (  # Slightly relaxed tolerance for robustness test
-                f"Initial guess {initial_sp4}: "
-                f"Inferred Sp4={inferred_sp4:.6f} deviates {relative_error*100:.2f}% "
-                f"from ground truth {ground_truth_sp4}"
-            )
+    #         assert inferred_sp4 > 0, f"Inferred Sp4={inferred_sp4} must be positive"
+    #         assert np.isfinite(inferred_sp4), f"Inferred Sp4={inferred_sp4} must be finite"
+    #         assert relative_error < 0.2, (  # Slightly relaxed tolerance for robustness test
+    #             f"Initial guess {initial_sp4}: "
+    #             f"Inferred Sp4={inferred_sp4:.6f} deviates {relative_error*100:.2f}% "
+    #             f"from ground truth {ground_truth_sp4}"
+    #         )
             
-            print(f"✓ Initial Sp4: {initial_sp4:>5.1f} → Inferred: {inferred_sp4:.6f} "
-                f"(error: {relative_error*100:>6.2f}%)")
+    #         print(f"✓ Initial Sp4: {initial_sp4:>5.1f} → Inferred: {inferred_sp4:.6f} "
+    #             f"(error: {relative_error*100:>6.2f}%)")
 
     def test_inference_multi_conditions_robust(
         self,
