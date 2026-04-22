@@ -339,6 +339,182 @@ def ground_truth_flow_data(ground_truth_int_params, ground_truth_ext_flow_params
 
     return output['value']
 
+# @pytest.fixture
+# def ground_truth_int_params_multi():
+#     """
+#     Internal parameters with ground truth values for inference.
+#     These will be used to generate ground truth data.
+#     """
+#     N = 10
+#     X0 = StraightLine(N)
+#     return {
+#         'Sp4': 1.0,           # Ground truth to recover
+#         'N': 10,
+#         'k0': 1e13,
+#         'bool_EI': True,
+#         'Beta': 0,
+#         'taus_b': [0] * (N - 1),
+#         'tau_s': 0,
+#         'gamma': 2,
+#         'n_L': [0, 0],
+#         'm_L': 0,
+#         'X_0': X0,
+#     }
+
+
+@pytest.fixture
+def ground_truth_ext_params_multi():
+    """
+    Multiple sets of external parameters.
+    Each represents a different experimental condition.
+    """
+    N = 10
+    return [
+        {
+            "Lambdas": [[0, 1e-6]] * N,
+            "Zetas": [0] * N,
+            "InterpFlow": 0
+        },
+        {
+            "Lambdas": [[0, 2e-6]] * N,
+            "Zetas": [1e-3] * N,
+            "InterpFlow": 0
+        },
+        {
+            "Lambdas": [[0, 0.5e-6]] * N,
+            "Zetas": [0.5e-3] * N,
+            "InterpFlow": 1
+        },
+    ]
+
+@pytest.fixture
+def ground_truth_ext_flow_params_multi():
+    """
+    Multiple sets of external parameters.
+    Each represents a different experimental condition.
+    """
+    N = 10
+    return [
+        {
+            "Lambdas": [[0, 0]] * N,
+            "Zetas": [0] * N,
+            "A": 1e-6,
+            "w0":1e-6,
+            "psi":np.pi/2,
+        },
+        {
+            "Lambdas": [[0, 0]] * N,
+            "Zetas": [0] * N,
+            "A": 1e-6,
+            "w0":1e-3,
+            "psi":np.pi/2,
+        },
+        {
+            "Lambdas": [[0, 0]] * N,
+            "Zetas": [0] * N,            
+            "A": 1e-6,
+            "w0":1e0,
+            "psi":np.pi/2,
+        },
+    ]    
+
+
+@pytest.fixture
+def ground_truth_sim_params_multi():
+    """
+    Multiple sets of simulation parameters.
+    Each represents different integration settings.
+    """
+    return [
+        {
+            "T_span": (0.0, 1e3),
+            "T_eval": np.linspace(0, 1e3, int(1e2)),
+            "method": "BDF",
+            "T_sim_max": 300
+        },
+        {
+            "T_span": (0.0, 1e3),
+            "T_eval": np.linspace(0, 1e3, int(1e2)),
+            "method": "BDF",
+            "T_sim_max": 300
+        },
+        {
+            "T_span": (0.0, 1e3),
+            "T_eval": np.linspace(0, 1e3, int(1e2)),
+            "method": "BDF",
+            "T_sim_max": 300
+        },                
+    ]
+
+
+@pytest.fixture
+def ground_truth_data_multi(
+    ground_truth_int_params,
+    ground_truth_ext_params_multi,
+    ground_truth_sim_params_multi,
+    composed_model_sp4_only,
+):
+    """
+    Generate ground truth data using the model with known parameters
+    across multiple external and simulation parameter sets.
+    
+    Returns a list of ground truth arrays (one per condition).
+    """
+    ground_truths = []
+    
+    for ext_params, sim_params in zip( # TODO: change zip to product? or lists to coincide
+        ground_truth_ext_params_multi,
+        ground_truth_sim_params_multi
+    ):
+        # Instantiate model with ground truth internal parameters
+        instance = composed_model_flow_sp4_only( 
+            ground_truth_int_params,
+            ext_params,
+            sim_params
+        )
+        
+        # Simulate to generate ground truth
+        sim_result = instance.simulate_single()
+        gt_data = sim_result['value']
+        
+        ground_truths.append(gt_data)
+    
+    return ground_truths
+
+
+@pytest.fixture
+def ground_truth_flow_data_multi(
+    ground_truth_int_params,
+    ground_truth_ext_flow_params_multi,
+    ground_truth_sim_params_multi,
+    composed_model_flow_sp4_only,
+):
+    """
+    Generate ground truth data using the model with known parameters
+    across multiple external and simulation parameter sets.
+    
+    Returns a list of ground truth arrays (one per condition).
+    """
+    ground_truths = []
+    
+    for ext_params, sim_params in zip( # TODO: change zip to product? or lists to coincide
+        ground_truth_ext_flow_params_multi,
+        ground_truth_sim_params_multi
+    ):
+        # Instantiate model with ground truth internal parameters
+        instance = composed_model_flow_sp4_only(
+            ground_truth_int_params,
+            ext_params,
+            sim_params
+        )
+        
+        # Simulate to generate ground truth
+        sim_result = instance.simulate_single()
+        gt_data = sim_result['value']
+        
+        ground_truths.append(gt_data)
+    
+    return ground_truths
 
 @pytest.fixture
 def mse_loss_fn() -> Callable:
@@ -1001,10 +1177,8 @@ class TestViscoElasticFilamentSp4Inference:
         print(f"✓ Loss landscape smooth: ✓")
         print(f"{'='*70}\n")
 
-    @pytest.mark.parametrize("initial_sp4", [0.1, 0.5, 2.5, 5.0, 10.0])
     def test_inference_sp4_recovery_flow_batch(
         self,
-        initial_sp4,
         composed_model_flow_sp4_only,
         ground_truth_flow_data,
         mse_loss_fn,
@@ -1053,28 +1227,115 @@ class TestViscoElasticFilamentSp4Inference:
         
         # Create initial guesses for all parametrized values
         initial_guesses = [{'Sp4': sp4} for sp4 in [0.1, 0.5, 2.5, 5.0, 10.0]]
-        
         # Run batch inference
         results = inference.infer_batch(initial_guesses)
         
-        # Validate recovery for the specific initial guess being tested
-        result_idx = [0.1, 0.5, 2.5, 5.0, 10.0].index(initial_sp4)
-        result = results[result_idx]
+        # Validate recovery
+        for l in range(len(results)):
+            result = results[l]
+            initial_sp4 = initial_guesses[l]
+            inferred_sp4 = result.params['Sp4']
+            ground_truth_sp4 = 1.0
+            relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+            
+            assert inferred_sp4 > 0, f"Inferred Sp4={inferred_sp4} must be positive"
+            assert np.isfinite(inferred_sp4), f"Inferred Sp4={inferred_sp4} must be finite"
+            assert relative_error < 0.2, (  # Slightly relaxed tolerance for robustness test
+                f"Initial guess {initial_sp4}: "
+                f"Inferred Sp4={inferred_sp4:.6f} deviates {relative_error*100:.2f}% "
+                f"from ground truth {ground_truth_sp4}"
+            )
+            
+            print(f"✓ Initial Sp4: {initial_sp4:>5.1f} → Inferred: {inferred_sp4:.6f} "
+                f"(error: {relative_error*100:>6.2f}%)")
+
+    def test_inference_multi_conditions_robust(
+        self,
+        composed_model_flow_sp4_only,
+        ground_truth_flow_data_multi,
+        ground_truth_ext_flow_params_multi,
+        ground_truth_sim_params_multi,
+        mse_loss_fn,
+        basinhopping_optimizer_instance,
+    ):
+        """
+        Robustness test: verify Sp4 recovery across multiple external and 
+        simulation parameter sets.
         
-        inferred_sp4 = result.params['Sp4']
-        ground_truth_sp4 = 1.0
-        relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+        This test:
+        1. Generates ground truth data under 3 different conditions
+        2. Attempts to recover Sp4 using batch inference with multiple initial guesses
+        3. Validates convergence across all conditions simultaneously
+        """
+        # Initial guesses to test robustness
+        initial_guesses = [{'Sp4': sp4} for sp4 in [0.1, 0.5, 2.5, 5.0, 10.0]]
         
-        assert inferred_sp4 > 0, f"Inferred Sp4={inferred_sp4} must be positive"
-        assert np.isfinite(inferred_sp4), f"Inferred Sp4={inferred_sp4} must be finite"
-        assert relative_error < 0.2, (  # Slightly relaxed tolerance for robustness test
-            f"Initial guess {initial_sp4}: "
-            f"Inferred Sp4={inferred_sp4:.6f} deviates {relative_error*100:.2f}% "
-            f"from ground truth {ground_truth_sp4}"
+        # Create inference instance with multiple ground truths and parameters
+        inference = Inference(
+            model_class=composed_model_flow_sp4_only,
+            ground_truths=ground_truth_flow_data_multi,  # List of 3 arrays
+            loss_fn=mse_loss_fn,
+            ext_params_list=ground_truth_ext_flow_params_multi,  # List of 3 dicts
+            sim_params_list=ground_truth_sim_params_multi,  # List of 3 dicts
+            optimizer=basinhopping_optimizer_instance,
+            optimizer_kwargs={
+                'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
+                'minimum_gradient': False,
+                'minimum_hessian': False,
+                'local_minimizer_kwargs': {
+                    'method': 'L-BFGS-B',
+                    'jac': '3-point',
+                    'options': {
+                        'disp': False,
+                        'ftol': 1e-8,
+                        'gtol': 1e-8,
+                        'eps': 1e-8,
+                        'finite_diff_rel_step': 1e-6,
+                    },
+                },
+                'global_minimizer_kwargs': {
+                    'niter': 9,
+                    'T': 0,
+                    'stepsize': 5,
+                    'tol': 1e-10,
+                }
+            },
+            n_jobs=-1,
         )
         
-        print(f"✓ Initial Sp4: {initial_sp4:>5.1f} → Inferred: {inferred_sp4:.6f} "
-            f"(error: {relative_error*100:>6.2f}%)")
+        # Run batch inference across all initial guesses
+        results = inference.infer_batch(initial_guesses)
+        
+        # Ground truth value to recover
+        ground_truth_sp4 = 1.0
+        
+        # Validate convergence for each initial guess
+        print("\n" + "=" * 70)
+        print("Robustness Test: Sp4 Recovery Across Multiple Conditions")
+        print("=" * 70)
+        
+        for initial_guess_dict, result in zip(initial_guesses, results):
+            initial_sp4 = initial_guess_dict['Sp4']
+            inferred_sp4 = result.params['Sp4']
+            relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+            
+            # Assertions
+            assert inferred_sp4 > 0, (
+                f"Inferred Sp4={inferred_sp4} must be positive"
+            )
+            assert np.isfinite(inferred_sp4), (
+                f"Inferred Sp4={inferred_sp4} must be finite"
+            )
+            assert relative_error < 0.2, (
+                f"Initial guess {initial_sp4}: "
+                f"Inferred Sp4={inferred_sp4:.6f} deviates {relative_error*100:.2f}% "
+                f"from ground truth {ground_truth_sp4}"
+            )
+            
+            print(f"✓ Initial Sp4: {initial_sp4:>5.1f} → Inferred: {inferred_sp4:.6f} "
+                f"(error: {relative_error*100:>6.2f}%, loss: {result.loss:.2e})")
+        
+        print("=" * 70)
 
 
 if __name__ == "__main__":

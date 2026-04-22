@@ -165,6 +165,13 @@ class Inference:
         """
         Convert single value or list to list.
         If single value, replicate target_len times.
+
+        # TODO: If value is not a list and target_len is None, make it a list with one element.
+        # TODO: If value is a list and target_len is None, return value.
+        # TODO: If value is a list and target_len is not None (corresponding to ext_params_list or sim_params_list)
+        #       target_len should be a multiple of len(value) and value should be multiplied to have target_len as final size.
+        #       otherwise raise an error. 
+        #       Remark: this is when assuming that ground_truths is a list made from simulation over product(ext_params_list, sim_params_list).
         """
         if isinstance(value, list):
             return value
