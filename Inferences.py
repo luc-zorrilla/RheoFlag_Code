@@ -6,6 +6,7 @@ import joblib
 from scipy.optimize import minimize, OptimizeResult
 import scipy.differentiate as sd
 from itertools import product
+from Models import compose_model
 
 # ============================================================================
 # FUNCTIONS
@@ -384,11 +385,11 @@ class Inference:
 
 class InferencePipeline:
     """
-    Sequential inference pipeline for coarse-to-fine parameter estimation.
+    Sequential inference pipeline for parameter estimation.
     
-    Implements a multi-pass strategy to avoid local minima:
-    - Pass 1: Infer low-dim subset with reduced model (coarse fit)
-    - Pass 2: Fix Pass 1 results, infer additional parameters (refinement)
+    Implements a multi-pass strategy:
+    - Pass 1: Infer low-dim subset with reduced model
+    - Pass 2: Fix Pass 1 results, infer additional parameters
     - etc.
     
     Each pass uses `compose_model` to enforce fixed parameters from prior passes.
@@ -399,10 +400,12 @@ class InferencePipeline:
         passes: List[PipelinePass],
         loss_fn: Callable,
         n_jobs_per_pass: int = -1,
+        optimizer: Callable = None, # TODO: should this be here or in a pass?
+        optimizer_kwargs: Dict[str, Any] = None, # TODO: should this be here or in a pass?
     ):
         """
         Args:
-            passes: List of PipelinePass definitions (in sequential order)
+            passes: List of PipelinePass instances (in sequential order)
             loss_fn: Shared loss function across all passes
             n_jobs_per_pass: Parallelization for initial guesses within each pass
         """
@@ -411,6 +414,8 @@ class InferencePipeline:
         self.n_jobs_per_pass = n_jobs_per_pass
         self.results: List[InferenceResult] = []
         self.parameter_trajectory: List[Dict[str, float]] = []
+        self.optimizer = optimizer, # TODO: should this be in the "passes" data?
+        self.optimizer_kwargs = optimizer_kwargs, # TODO: should this be in the "passes" data?
     
     def run(
         self,
@@ -423,7 +428,7 @@ class InferencePipeline:
         
         Args:
             initial_guesses_per_pass: List of initial guess lists, one per pass.
-                                    E.g., [[{'x': 1.0, 'y': 2.0}], [{'z': 0.5}]]
+                        E.g., [[{'x': 1.0, 'y': 2.0}], [{'z': 0.5}]]
         
         Returns:
             List of InferenceResult objects (one per pass)
@@ -442,11 +447,10 @@ class InferencePipeline:
             print(f"Fixed from prior passes: {list(accumulated_params.keys())}")
             print(f"{'='*60}")
             
-            # Build the model for this pass --> TODO Check the frame model is always the global model
-            # If there are fixed parameters, compose the model to enforce them
+            # Build the model for this pass
             model_for_pass = self._build_pass_model(
                 pass_def,
-                fixed_params=accumulated_params
+                fixed_params=accumulated_params # If there are fixed parameters, compose the model to enforce them
             )
             
             # Create Inference instance for this pass
@@ -460,14 +464,14 @@ class InferencePipeline:
                 optimizer_kwargs=self.optimizer_kwargs,                
                 n_jobs=self.n_jobs_per_pass,
             )
-            
+
             # Run inference on all initial guesses for this pass
             if verbose:
                 print(f"Running {len(initial_guesses)} inference(s) in parallel...")
-            pass_results = inference.infer_batch(initial_guesses) # TODO at worst, I can put only one guess
+            pass_results = inference.infer_batch(initial_guesses)
             
             # ===== SELECT BEST RESULT =====
-            # Choose the result with the lowest loss TODO see if this is what I want to do or not.
+            # Choose the result with the lowest loss TODO See if this is what I want to do or not.
             best_result = min(pass_results, key=lambda r: r.loss)
             
             if verbose:
@@ -488,7 +492,7 @@ class InferencePipeline:
             self.results.append(best_result)
             
             # Update accumulated parameters: add newly inferred params
-            accumulated_params.update(best_result.params)
+            accumulated_params.update(best_result.params) # TODO: Warning! In pass 1 I need to constrain viscosity to 0, but in pass 2 no.
             self.parameter_trajectory.append(accumulated_params.copy())
             
             if verbose:
@@ -529,9 +533,6 @@ class InferencePipeline:
             """
             merged = {**fixed_params, **int_params}
             return merged
-        
-        # Use compose_model to create a wrapper that enforces the fixed parameters
-        from ViscoElasticFilament_Models import compose_model
         
         composed = compose_model(
             pass_def.model_class,
