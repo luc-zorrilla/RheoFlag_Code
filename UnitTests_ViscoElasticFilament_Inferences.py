@@ -1001,80 +1001,80 @@ class TestViscoElasticFilamentSp4Inference:
         print(f"✓ Loss landscape smooth: ✓")
         print(f"{'='*70}\n")
 
-@pytest.mark.parametrize("initial_sp4", [0.1, 0.5, 2.5, 5.0, 10.0])
-def test_inference_sp4_recovery_flow_batch(
-    self,
-    initial_sp4,
-    composed_model_flow_sp4_only,
-    ground_truth_flow_data,
-    mse_loss_fn,
-    basinhopping_optimizer_instance,
-    ground_truth_ext_flow_params,
-    ground_truth_sim_params,
-):
-    """
-    Batch test: verify Sp4 recovery works across multiple initial guesses.
-    
-    Tests convergence behavior when starting far from and near the ground truth
-    using batch inference for efficiency.
-    """
-    # Create a single inference instance for batch processing
-    inference = Inference(
-        model_class=composed_model_flow_sp4_only,
-        ground_truths=ground_truth_flow_data,
-        loss_fn=mse_loss_fn,
-        ext_params_list=ground_truth_ext_flow_params,
-        sim_params_list=ground_truth_sim_params,
-        optimizer=basinhopping_optimizer_instance,
-        optimizer_kwargs={
-            'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
-            'minimum_gradient': False,
-            'minimum_hessian': False,
-            'local_minimizer_kwargs': {
-                'method': 'L-BFGS-B',
-                'jac': '3-point',
-                'options': {
-                    'disp': False,
-                    'ftol': 1e-8,
-                    'gtol': 1e-8,
-                    'eps': 1e-8,
-                    'finite_diff_rel_step': 1e-6,
+    @pytest.mark.parametrize("initial_sp4", [0.1, 0.5, 2.5, 5.0, 10.0])
+    def test_inference_sp4_recovery_flow_batch(
+        self,
+        initial_sp4,
+        composed_model_flow_sp4_only,
+        ground_truth_flow_data,
+        mse_loss_fn,
+        basinhopping_optimizer_instance,
+        ground_truth_ext_flow_params,
+        ground_truth_sim_params,
+    ):
+        """
+        Batch test: verify Sp4 recovery works across multiple initial guesses.
+        
+        Tests convergence behavior when starting far from and near the ground truth
+        using batch inference for efficiency.
+        """
+        # Create a single inference instance for batch processing
+        inference = Inference(
+            model_class=composed_model_flow_sp4_only,
+            ground_truths=ground_truth_flow_data,
+            loss_fn=mse_loss_fn,
+            ext_params_list=ground_truth_ext_flow_params,
+            sim_params_list=ground_truth_sim_params,
+            optimizer=basinhopping_optimizer_instance,
+            optimizer_kwargs={
+                'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
+                'minimum_gradient': False,
+                'minimum_hessian': False,
+                'local_minimizer_kwargs': {
+                    'method': 'L-BFGS-B',
+                    'jac': '3-point',
+                    'options': {
+                        'disp': False,
+                        'ftol': 1e-8,
+                        'gtol': 1e-8,
+                        'eps': 1e-8,
+                        'finite_diff_rel_step': 1e-6,
+                    },
                 },
+                'global_minimizer_kwargs': {
+                    'niter': 9,
+                    'T': 0,
+                    'stepsize': 5,
+                    'tol': 1e-10,
+                }
             },
-            'global_minimizer_kwargs': {
-                'niter': 9,
-                'T': 0,
-                'stepsize': 5,
-                'tol': 1e-10,
-            }
-        },
-        n_jobs=-1,
-    )
-    
-    # Create initial guesses for all parametrized values
-    initial_guesses = [{'Sp4': sp4} for sp4 in [0.1, 0.5, 2.5, 5.0, 10.0]]
-    
-    # Run batch inference
-    results = inference.infer_batch(initial_guesses)
-    
-    # Validate recovery for the specific initial guess being tested
-    result_idx = [0.1, 0.5, 2.5, 5.0, 10.0].index(initial_sp4)
-    result = results[result_idx]
-    
-    inferred_sp4 = result.params['Sp4']
-    ground_truth_sp4 = 1.0
-    relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
-    
-    assert inferred_sp4 > 0, f"Inferred Sp4={inferred_sp4} must be positive"
-    assert np.isfinite(inferred_sp4), f"Inferred Sp4={inferred_sp4} must be finite"
-    assert relative_error < 0.2, (  # Slightly relaxed tolerance for robustness test
-        f"Initial guess {initial_sp4}: "
-        f"Inferred Sp4={inferred_sp4:.6f} deviates {relative_error*100:.2f}% "
-        f"from ground truth {ground_truth_sp4}"
-    )
-    
-    print(f"✓ Initial Sp4: {initial_sp4:>5.1f} → Inferred: {inferred_sp4:.6f} "
-        f"(error: {relative_error*100:>6.2f}%)")
+            n_jobs=-1,
+        )
+        
+        # Create initial guesses for all parametrized values
+        initial_guesses = [{'Sp4': sp4} for sp4 in [0.1, 0.5, 2.5, 5.0, 10.0]]
+        
+        # Run batch inference
+        results = inference.infer_batch(initial_guesses)
+        
+        # Validate recovery for the specific initial guess being tested
+        result_idx = [0.1, 0.5, 2.5, 5.0, 10.0].index(initial_sp4)
+        result = results[result_idx]
+        
+        inferred_sp4 = result.params['Sp4']
+        ground_truth_sp4 = 1.0
+        relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+        
+        assert inferred_sp4 > 0, f"Inferred Sp4={inferred_sp4} must be positive"
+        assert np.isfinite(inferred_sp4), f"Inferred Sp4={inferred_sp4} must be finite"
+        assert relative_error < 0.2, (  # Slightly relaxed tolerance for robustness test
+            f"Initial guess {initial_sp4}: "
+            f"Inferred Sp4={inferred_sp4:.6f} deviates {relative_error*100:.2f}% "
+            f"from ground truth {ground_truth_sp4}"
+        )
+        
+        print(f"✓ Initial Sp4: {initial_sp4:>5.1f} → Inferred: {inferred_sp4:.6f} "
+            f"(error: {relative_error*100:>6.2f}%)")
 
 
 if __name__ == "__main__":

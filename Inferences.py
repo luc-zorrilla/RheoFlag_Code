@@ -284,15 +284,6 @@ class Inference:
             param_keys: Parameter names corresponding to optimization variables
         """
         n_params = len(param_keys)
-        
-        # Compute Hessian using numdifftools
-        # hessian_fn = nd.Hessian(
-        #     lambda x: self.objective(x, param_keys)
-        # )
-        # self.hessian = hessian_fn(self.result.x)
-        
-        # Compute Hessian using scipy.differentatiate
-        # This evaluates second derivatives of the objective
 
         self.hessian = sd.hessian(
                 f = Vectorize_Functional(
