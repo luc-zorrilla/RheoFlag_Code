@@ -21,7 +21,7 @@ from pathlib import Path
 # Import your modules (adjust paths as needed)
 from Models import Model, compose_model
 from ViscoElasticFilament_Models import StraightLine, ViscoElasticFilament, ViscoElasticFilament_create_params_list, ViscoElasticFilament_FlowParams, ViscoElasticFilament_FlowParams_create_params_list
-from Inferences import Inference, BatchInference
+from Inferences import Inference
 from ViscoElasticFilament_Inferences import basinhopping_optimizer
 from scipy.optimize import Bounds
 
@@ -43,10 +43,10 @@ def print_inference_summary(
         confidence_level: Confidence level for CI (default 95%)
     """
     
-    inferred_params = result['params']
-    std_errors = result['std_errors']
-    loss = result['loss']
-    iterations = result['iterations']
+    inferred_params = result.params
+    std_errors = result.std_errors
+    loss = result.loss
+    iterations = result.iterations
     
     # Compute z-score for confidence interval
     z_score = stats.norm.ppf((1 + confidence_level) / 2)
@@ -445,6 +445,8 @@ def inference_instance(
     basinhopping_optimizer_instance,
     composed_model_sp4_only,
     ground_truth_data,
+    ground_truth_ext_params,
+    ground_truth_sim_params,
     mse_loss_fn,
 ):
     """
@@ -454,8 +456,10 @@ def inference_instance(
     """
     return Inference(
         model_class=composed_model_sp4_only,
-        ground_truth=ground_truth_data,
+        ground_truths=ground_truth_data,
         loss_fn=mse_loss_fn,
+        ext_params_list = ground_truth_ext_params,
+        sim_params_list = ground_truth_sim_params,
         optimizer=basinhopping_optimizer_instance,
         optimizer_kwargs={
             # Individual arguments
@@ -483,7 +487,8 @@ def inference_instance(
                 'stepsize': 5,
                 'tol': 1e-10,
             }
-        }
+        },
+        n_jobs = -1,
     )
 
 @pytest.fixture
@@ -491,6 +496,8 @@ def inference_instance_flow(
     basinhopping_optimizer_instance,
     composed_model_flow_sp4_only,
     ground_truth_flow_data,
+    ground_truth_ext_flow_params,
+    ground_truth_sim_params,
     mse_loss_fn,
 ):
     """
@@ -504,8 +511,10 @@ def inference_instance_flow(
     """
     return Inference(
         model_class=composed_model_flow_sp4_only,
-        ground_truth=ground_truth_flow_data,
+        ground_truths=ground_truth_flow_data,
         loss_fn=mse_loss_fn,
+        ext_params_list = ground_truth_ext_flow_params,
+        sim_params_list = ground_truth_sim_params,        
         optimizer=basinhopping_optimizer_instance,
         optimizer_kwargs={
             # Basin-hopping global arguments
@@ -534,6 +543,7 @@ def inference_instance_flow(
                 'tol': 1e-10,       # Tolerance for local minimization
             }
         },
+        n_jobs = -1,
     )
 
 @pytest.fixture
@@ -662,8 +672,6 @@ class TestViscoElasticFilamentSp4Inference:
         """
         result = inference_instance.infer(
             initial_guess={'Sp4': 2.5},
-            ext_params=ground_truth_ext_params,
-            sim_params=ground_truth_sim_params
         )
         
         # Print detailed summaries
@@ -675,7 +683,7 @@ class TestViscoElasticFilamentSp4Inference:
         )
 
         # Extract results
-        inferred_sp4 = result['params']['Sp4']
+        inferred_sp4 = result.params['Sp4']
         acceptance_rate = np.mean(inference_instance.result.accept_global)
         ground_truth_sp4 = 1.0
         
@@ -692,9 +700,9 @@ class TestViscoElasticFilamentSp4Inference:
         assert acceptance_rate > 0, "No basin-hopping steps accepted"
         
         # Optional: assert on covariance/Hessian if computed
-        if result['covariance'] is not None:
-            assert result['covariance'].shape == (1, 1), "Covariance shape mismatch"
-            assert result['std_errors'][0] > 0, "Standard error must be positive"
+        if result.covariance is not None:
+            assert result.covariance.shape == (1, 1), "Covariance shape mismatch"
+            assert result.std_errors[0] > 0, "Standard error must be positive"
         
         print(f"✓ Inferred Sp4: {inferred_sp4:.6f} (ground truth: {ground_truth_sp4})")
         print(f"✓ Relative error: {relative_error*100:.2f}%")
@@ -724,8 +732,8 @@ class TestViscoElasticFilamentSp4Inference:
         # Run inference with initial guess far from ground truth
         result = inference_instance_flow.infer(
             initial_guess={'Sp4': 250},
-            ext_params=ground_truth_ext_flow_params,
-            sim_params=ground_truth_sim_params,
+            # ext_params=ground_truth_ext_flow_params,
+            # sim_params=ground_truth_sim_params,
         )
         
         # Print detailed optimization history and summary
@@ -737,7 +745,7 @@ class TestViscoElasticFilamentSp4Inference:
         )
         
         # Extract inferred results
-        inferred_sp4 = result['params']['Sp4']
+        inferred_sp4 = result.params['Sp4']
         acceptance_rate = np.mean(inference_instance_flow.result.accept_global)
         ground_truth_sp4 = 1.0
         
@@ -767,12 +775,12 @@ class TestViscoElasticFilamentSp4Inference:
         )
         
         # ===== ASSERTION 5: Covariance/uncertainty valid =====
-        if result['covariance'] is not None:
-            assert result['covariance'].shape == (1, 1), (
-                f"Covariance shape {result['covariance'].shape} != (1, 1)"
+        if result.covariance is not None:
+            assert result.covariance.shape == (1, 1), (
+                f"Covariance shape {result.covariance.shape} != (1, 1)"
             )
-            assert result['std_errors'][0] > 0, (
-                f"Standard error must be positive, got {result['std_errors'][0]}"
+            assert result.std_errors[0] > 0, (
+                f"Standard error must be positive, got {result.std_errors[0]}"
             )
         
         # ===== ASSERTION 6: External flow parameters unchanged =====
@@ -812,8 +820,10 @@ class TestViscoElasticFilamentSp4Inference:
         # Create a fresh inference instance for this initial guess
         inference = Inference(
             model_class=composed_model_flow_sp4_only,
-            ground_truth=ground_truth_flow_data,
+            ground_truths=ground_truth_flow_data,
             loss_fn=mse_loss_fn,
+            ext_params_list=ground_truth_ext_flow_params,
+            sim_params_list=ground_truth_sim_params,
             optimizer=basinhopping_optimizer_instance,
             optimizer_kwargs={
                 'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
@@ -837,17 +847,16 @@ class TestViscoElasticFilamentSp4Inference:
                     'tol': 1e-10,
                 }
             },
+            n_jobs=-1,
         )
         
         # Run inference
         result = inference.infer(
             initial_guess={'Sp4': initial_sp4},
-            ext_params=ground_truth_ext_flow_params,
-            sim_params=ground_truth_sim_params,
         )
         
         # Validate recovery
-        inferred_sp4 = result['params']['Sp4']
+        inferred_sp4 = result.params['Sp4']
         ground_truth_sp4 = 1.0
         relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
         
@@ -991,6 +1000,82 @@ class TestViscoElasticFilamentSp4Inference:
         print(f"✓ Minimum loss: {min_loss:.6e}")
         print(f"✓ Loss landscape smooth: ✓")
         print(f"{'='*70}\n")
+
+@pytest.mark.parametrize("initial_sp4", [0.1, 0.5, 2.5, 5.0, 10.0])
+def test_inference_sp4_recovery_flow_batch(
+    self,
+    initial_sp4,
+    composed_model_flow_sp4_only,
+    ground_truth_flow_data,
+    mse_loss_fn,
+    basinhopping_optimizer_instance,
+    ground_truth_ext_flow_params,
+    ground_truth_sim_params,
+):
+    """
+    Batch test: verify Sp4 recovery works across multiple initial guesses.
+    
+    Tests convergence behavior when starting far from and near the ground truth
+    using batch inference for efficiency.
+    """
+    # Create a single inference instance for batch processing
+    inference = Inference(
+        model_class=composed_model_flow_sp4_only,
+        ground_truths=ground_truth_flow_data,
+        loss_fn=mse_loss_fn,
+        ext_params_list=ground_truth_ext_flow_params,
+        sim_params_list=ground_truth_sim_params,
+        optimizer=basinhopping_optimizer_instance,
+        optimizer_kwargs={
+            'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
+            'minimum_gradient': False,
+            'minimum_hessian': False,
+            'local_minimizer_kwargs': {
+                'method': 'L-BFGS-B',
+                'jac': '3-point',
+                'options': {
+                    'disp': False,
+                    'ftol': 1e-8,
+                    'gtol': 1e-8,
+                    'eps': 1e-8,
+                    'finite_diff_rel_step': 1e-6,
+                },
+            },
+            'global_minimizer_kwargs': {
+                'niter': 9,
+                'T': 0,
+                'stepsize': 5,
+                'tol': 1e-10,
+            }
+        },
+        n_jobs=-1,
+    )
+    
+    # Create initial guesses for all parametrized values
+    initial_guesses = [{'Sp4': sp4} for sp4 in [0.1, 0.5, 2.5, 5.0, 10.0]]
+    
+    # Run batch inference
+    results = inference.infer_batch(initial_guesses)
+    
+    # Validate recovery for the specific initial guess being tested
+    result_idx = [0.1, 0.5, 2.5, 5.0, 10.0].index(initial_sp4)
+    result = results[result_idx]
+    
+    inferred_sp4 = result.params['Sp4']
+    ground_truth_sp4 = 1.0
+    relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+    
+    assert inferred_sp4 > 0, f"Inferred Sp4={inferred_sp4} must be positive"
+    assert np.isfinite(inferred_sp4), f"Inferred Sp4={inferred_sp4} must be finite"
+    assert relative_error < 0.2, (  # Slightly relaxed tolerance for robustness test
+        f"Initial guess {initial_sp4}: "
+        f"Inferred Sp4={inferred_sp4:.6f} deviates {relative_error*100:.2f}% "
+        f"from ground truth {ground_truth_sp4}"
+    )
+    
+    print(f"✓ Initial Sp4: {initial_sp4:>5.1f} → Inferred: {inferred_sp4:.6f} "
+        f"(error: {relative_error*100:>6.2f}%)")
+
 
 if __name__ == "__main__":
     
