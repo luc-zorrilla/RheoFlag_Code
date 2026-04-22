@@ -126,7 +126,7 @@ class Inference:
         sim_params_list: List[Any] | Any = None,
         optimizer: Callable = None,
         optimizer_kwargs: Dict[str, Any] = None,
-        n_jobs: int = -1,  # Parallelization across initial guesses
+        n_jobs: int = -1,  # Parallelization across initial guesses AND objective calls
     ):
         """
         Args:
@@ -148,6 +148,7 @@ class Inference:
             'options': {'ftol': 1e-8, 'maxiter': 1000}
         }
         self.n_jobs = n_jobs
+        self._objective_n_jobs = n_jobs  # Separate from batch parallelism
         self.result: Optional[OptimizeResult] = None
         self.hessian: Optional[np.ndarray] = None
         self.covariance: Optional[np.ndarray] = None
@@ -211,59 +212,89 @@ class Inference:
         sim_list = [sp for _, sp in paired_params]
         
         return gt_list, ext_list, sim_list
+
+    @staticmethod
+    def _compute_single_loss(
+        model_class: Type,
+        loss_fn: Callable,
+        int_params: Dict[str, float],
+        ext_params: Any,
+        sim_params: Any,
+        ground_truth: np.ndarray,
+    ) -> float:
+        """
+        Compute loss for a single ground truth in isolation.
+        Static method enables pickling for parallel execution.
         
+        Args:
+            model_class: Model to instantiate
+            loss_fn: Loss function
+            int_params: Internal parameters dict
+            ext_params: External parameters for this condition
+            sim_params: Simulation parameters for this condition
+            ground_truth: Target data for this condition
+        
+        Returns:
+            Scalar loss value
+        """
+        instance = model_class(int_params, ext_params, sim_params)
+        predicted = instance.simulate_single()['value']
+        loss_i = loss_fn(predicted, ground_truth)
+        return loss_i
+
     def objective(
         self,
         param_vector: np.ndarray,
         param_keys: Tuple[str, ...],
     ) -> float:
         """
-        Aggregated objective function for optimizer with multiple ground truths.
-        
-        Runs the model with the given parameters against all ground truths,
-        computes per-GT loss, and returns the sum.
-        
-        Args:
-            param_vector: Flat array of parameter values to optimize
-            param_keys: Tuple of parameter names corresponding to param_vector indices
-        
-        Returns:
-            Scalar loss value, i.e., sum of losses across all ground truths
+        Aggregated objective function with parallelized loss computation.
+        Computes losses for all ground truths in parallel, then sums.
         """
-        # Reconstruct int_params dict from flat vector
         int_params = {key: param_vector[i] for i, key in enumerate(param_keys)}
         
-        total_loss = 0.0
+        # Parallel computation of individual losses
+        losses = joblib.Parallel(n_jobs=self._objective_n_jobs, backend='loky')(
+            joblib.delayed(self._compute_single_loss)(
+                self.model_class,
+                self.loss_fn,
+                int_params,
+                ext_params,
+                sim_params,
+                gt,
+            )
+            for gt, ext_params, sim_params in zip(
+                self.ground_truths,
+                self.ext_params_list,
+                self.sim_params_list,
+            )
+        )
         
-        # Iterate over all ground truths with their corresponding params
-        for gt, ext_params, sim_params in zip(
-            self.ground_truths,
-            self.ext_params_list,
-            self.sim_params_list
-        ):
-            # Instantiate and simulate
-            instance = self.model_class(int_params, ext_params, sim_params)
-            predicted = instance.simulate_single()['value']
-            
-            # Accumulate loss
-            loss_i = self.loss_fn(predicted, gt)
-            total_loss += loss_i
-        
-        return total_loss
+        return sum(losses)    
     
     def infer(
         self,
         initial_guess: Dict[str, float],
+        objective_n_jobs: int = None,
     ) -> InferenceResult:
         """
         Run optimization to infer parameters from multiple ground truths.
         
         Args:
             initial_guess: Dict like {'x': 2.5, 'y': 1.0}
+            objective_n_jobs: Override n_jobs for loss computation within objective.
+                            If None, uses self.n_jobs. Set to 1 if combining with
+                            parallel infer_batch to avoid nested parallelism.        
         
         Returns:
             InferenceResult with inferred parameters, uncertainties, convergence info
         """
+        # Handle nested parallelism: if using infer_batch, set objective_n_jobs=1
+        if objective_n_jobs is not None:
+            self._objective_n_jobs = objective_n_jobs
+        else:
+            self._objective_n_jobs = self.n_jobs
+
         param_keys = tuple(initial_guess.keys())
         x0 = np.array([initial_guess[key] for key in param_keys])
         
@@ -295,6 +326,7 @@ class Inference:
     def infer_batch(
         self,
         initial_guesses: List[Dict[str, float]],
+        parallelize_objectives: bool = True, #
     ) -> List[InferenceResult]:
         """
         Run inference on multiple initial guesses in parallel.
@@ -304,12 +336,19 @@ class Inference:
         
         Args:
             initial_guesses: List of dicts, e.g., [{'x': 1.0}, {'x': 2.0}]
+            parallelize_objectives: If False (default), disables parallelism within
+                                each objective call to avoid nested parallelism.
+                                Set True only if each ground truth is expensive and
+                                initial_guesses is small.            
         
         Returns:
             List of InferenceResult objects (one per initial guess)
         """
-        results = joblib.Parallel(n_jobs=self.n_jobs)(
-            joblib.delayed(self.infer)(ig)
+        # Disable objective parallelism when doing batch parallelism
+        objective_n_jobs = self.n_jobs if parallelize_objectives else 1
+                
+        results = joblib.Parallel(n_jobs=self.n_jobs, backend='loky')(
+            joblib.delayed(self.infer)(ig, objective_n_jobs=objective_n_jobs)
             for ig in initial_guesses
         )
         return results

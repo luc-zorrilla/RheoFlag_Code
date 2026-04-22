@@ -339,29 +339,6 @@ def ground_truth_flow_data(ground_truth_int_params, ground_truth_ext_flow_params
 
     return output['value']
 
-# @pytest.fixture
-# def ground_truth_int_params_multi():
-#     """
-#     Internal parameters with ground truth values for inference.
-#     These will be used to generate ground truth data.
-#     """
-#     N = 10
-#     X0 = StraightLine(N)
-#     return {
-#         'Sp4': 1.0,           # Ground truth to recover
-#         'N': 10,
-#         'k0': 1e13,
-#         'bool_EI': True,
-#         'Beta': 0,
-#         'taus_b': [0] * (N - 1),
-#         'tau_s': 0,
-#         'gamma': 2,
-#         'n_L': [0, 0],
-#         'm_L': 0,
-#         'X_0': X0,
-#     }
-
-
 @pytest.fixture
 def ground_truth_ext_params_multi():
     """
@@ -438,7 +415,6 @@ def ground_truth_ext_flow_params_multi():
             "psi":np.pi/2,
         },                      
     ]    
-
 
 @pytest.fixture
 def ground_truth_sim_params_multi():
@@ -1272,7 +1248,96 @@ class TestViscoElasticFilamentSp4Inference:
         simulation parameter sets.
         
         This test:
-        1. Generates ground truth data under 3 different conditions
+        1. Generates ground truth data under different conditions
+        2. Attempts to recover Sp4 using inference with a single initial guess
+        3. Validates convergence across all conditions simultaneously
+        """
+        # Initial guesses to test robustness
+        initial_guess = {'Sp4': 2.5}
+        
+        # Create inference instance with multiple ground truths and parameters
+        inference = Inference(
+            model_class=composed_model_flow_sp4_only,
+            ground_truths=ground_truth_flow_data_multi,  # List of 3 arrays
+            loss_fn=mse_loss_fn,
+            ext_params_list=ground_truth_ext_flow_params_multi,  # List of 3 dicts
+            sim_params_list=ground_truth_sim_params_multi,  # List of 3 dicts
+            optimizer=basinhopping_optimizer_instance,
+            optimizer_kwargs={
+                'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
+                'minimum_gradient': False,
+                'minimum_hessian': False,
+                'local_minimizer_kwargs': {
+                    'method': 'L-BFGS-B',
+                    'jac': '3-point',
+                    'options': {
+                        'disp': False,
+                        'ftol': 1e-8,
+                        'gtol': 1e-8,
+                        'eps': 1e-8,
+                        'finite_diff_rel_step': 1e-6,
+                    },
+                },
+                'global_minimizer_kwargs': {
+                    'niter': 9,
+                    'T': 0,
+                    'stepsize': 5,
+                    'tol': 1e-10,
+                }
+            },
+            n_jobs=-1,
+        )
+        
+        # Run batch inference across all initial guesses
+        result = inference.infer(initial_guess)
+        
+        # Ground truth value to recover
+        ground_truth_sp4 = 1.0
+        
+        # Validate convergence for each initial guess
+        print("\n" + "=" * 70)
+        print("Robustness Test: Sp4 Recovery Across Multiple Conditions")
+        print("=" * 70)
+        
+        
+        initial_sp4 = initial_guess['Sp4']
+        inferred_sp4 = result.params['Sp4']
+        relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+        
+        # Assertions
+        assert inferred_sp4 > 0, (
+            f"Inferred Sp4={inferred_sp4} must be positive"
+        )
+        assert np.isfinite(inferred_sp4), (
+            f"Inferred Sp4={inferred_sp4} must be finite"
+        )
+        assert relative_error < 0.2, (
+            f"Initial guess {initial_sp4}: "
+            f"Inferred Sp4={inferred_sp4:.6f} deviates {relative_error*100:.2f}% "
+            f"from ground truth {ground_truth_sp4}"
+        )
+        
+        print(f"✓ Initial Sp4: {initial_sp4:>5.1f} → Inferred: {inferred_sp4:.6f} "
+            f"(error: {relative_error*100:>6.2f}%, loss: {result.loss:.2e})")
+    
+        print("=" * 70)
+
+
+    def test_inference_multi_conditions_robust_batch(
+        self,
+        composed_model_flow_sp4_only,
+        ground_truth_flow_data_multi,
+        ground_truth_ext_flow_params_multi,
+        ground_truth_sim_params_multi,
+        mse_loss_fn,
+        basinhopping_optimizer_instance,
+    ):
+        """
+        Robustness test: verify Sp4 recovery across multiple external and 
+        simulation parameter sets.
+        
+        This test:
+        1. Generates ground truth data under different conditions
         2. Attempts to recover Sp4 using batch inference with multiple initial guesses
         3. Validates convergence across all conditions simultaneously
         """
@@ -1345,7 +1410,6 @@ class TestViscoElasticFilamentSp4Inference:
                 f"(error: {relative_error*100:>6.2f}%, loss: {result.loss:.2e})")
         
         print("=" * 70)
-
 
 if __name__ == "__main__":
     
