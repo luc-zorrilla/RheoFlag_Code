@@ -326,7 +326,7 @@ class Inference:
     def infer_batch(
         self,
         initial_guesses: List[Dict[str, float]],
-        parallelize_objectives: bool = True, #
+        parallelize_objectives: bool = False,
     ) -> List[InferenceResult]:
         """
         Run inference on multiple initial guesses in parallel.
@@ -338,8 +338,8 @@ class Inference:
             initial_guesses: List of dicts, e.g., [{'x': 1.0}, {'x': 2.0}]
             parallelize_objectives: If False (default), disables parallelism within
                                 each objective call to avoid nested parallelism.
-                                Set True only if each ground truth is expensive and
-                                initial_guesses is small.            
+                                Set True if each ground truth is expensive and
+                                initial_guesses is small.
         
         Returns:
             List of InferenceResult objects (one per initial guess)
