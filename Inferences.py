@@ -420,6 +420,7 @@ class InferencePipeline:
     def run(
         self,
         initial_guesses_per_pass: List[List[Dict[str, float]]],
+        verbose = True,
     ) -> List[InferenceResult]:
         """
         Execute the pipeline sequentially: Pass 1 → Pass 2 → ...

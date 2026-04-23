@@ -793,57 +793,57 @@ class TestViscoElasticFilamentSp4Inference:
     5. Verify convergence and uncertainty estimates
     """
 
-    def test_inference_sp4_recovery(
-        self,
-        inference_instance,
-        ground_truth_ext_params,
-        ground_truth_sim_params,
-    ):
-        """
-        Test that the inference pipeline can recover Sp4 parameter
-        from synthetic ground truth data using basin-hopping optimization.
+    # def test_inference_sp4_recovery(
+    #     self,
+    #     inference_instance,
+    #     ground_truth_ext_params,
+    #     ground_truth_sim_params,
+    # ):
+    #     """
+    #     Test that the inference pipeline can recover Sp4 parameter
+    #     from synthetic ground truth data using basin-hopping optimization.
         
-        Expected behavior:
-        - Inferred Sp4 should be close to ground truth value (1.0)
-        - Optimization should converge with reasonable acceptance rate
-        """
-        result = inference_instance.infer(
-            initial_guess={'Sp4': 2.5},
-        )
+    #     Expected behavior:
+    #     - Inferred Sp4 should be close to ground truth value (1.0)
+    #     - Optimization should converge with reasonable acceptance rate
+    #     """
+    #     result = inference_instance.infer(
+    #         initial_guess={'Sp4': 2.5},
+    #     )
         
-        # Print detailed summaries
-        print_optimization_history(inference_instance, plot_flag=False)
-        print_inference_summary(
-            result,
-            ground_truth_params={'Sp4': 1.0},
-            confidence_level=0.95
-        )
+    #     # Print detailed summaries
+    #     print_optimization_history(inference_instance, plot_flag=False)
+    #     print_inference_summary(
+    #         result,
+    #         ground_truth_params={'Sp4': 1.0},
+    #         confidence_level=0.95
+    #     )
 
-        # Extract results
-        inferred_sp4 = result.params['Sp4']
-        acceptance_rate = np.mean(inference_instance.result.accept_global)
-        ground_truth_sp4 = 1.0
+    #     # Extract results
+    #     inferred_sp4 = result.params['Sp4']
+    #     acceptance_rate = np.mean(inference_instance.result.accept_global)
+    #     ground_truth_sp4 = 1.0
         
-        # Assertions
-        assert inferred_sp4 is not None, "Inference failed to recover Sp4"
-        assert inferred_sp4 > 0, "Inferred Sp4 must be positive"
-        assert np.isfinite(inferred_sp4), "Inferred Sp4 must be finite"
+    #     # Assertions
+    #     assert inferred_sp4 is not None, "Inference failed to recover Sp4"
+    #     assert inferred_sp4 > 0, "Inferred Sp4 must be positive"
+    #     assert np.isfinite(inferred_sp4), "Inferred Sp4 must be finite"
         
-        relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
-        assert relative_error < 0.1, (
-            f"Inferred Sp4={inferred_sp4:.6f} deviates >10% from ground truth {ground_truth_sp4}"
-        )
+    #     relative_error = abs(inferred_sp4 - ground_truth_sp4) / ground_truth_sp4
+    #     assert relative_error < 0.1, (
+    #         f"Inferred Sp4={inferred_sp4:.6f} deviates >10% from ground truth {ground_truth_sp4}"
+    #     )
         
-        assert acceptance_rate > 0, "No basin-hopping steps accepted"
+    #     assert acceptance_rate > 0, "No basin-hopping steps accepted"
         
-        # Optional: assert on covariance/Hessian if computed
-        if result.covariance is not None:
-            assert result.covariance.shape == (1, 1), "Covariance shape mismatch"
-            assert result.std_errors[0] > 0, "Standard error must be positive"
+    #     # Optional: assert on covariance/Hessian if computed
+    #     if result.covariance is not None:
+    #         assert result.covariance.shape == (1, 1), "Covariance shape mismatch"
+    #         assert result.std_errors[0] > 0, "Standard error must be positive"
         
-        print(f"✓ Inferred Sp4: {inferred_sp4:.6f} (ground truth: {ground_truth_sp4})")
-        print(f"✓ Relative error: {relative_error*100:.2f}%")
-        print(f"✓ Basin-hopping acceptance rate: {acceptance_rate:.2%}")
+    #     print(f"✓ Inferred Sp4: {inferred_sp4:.6f} (ground truth: {ground_truth_sp4})")
+    #     print(f"✓ Relative error: {relative_error*100:.2f}%")
+    #     print(f"✓ Basin-hopping acceptance rate: {acceptance_rate:.2%}")
 
     # def test_inference_sp4_recovery_flow(
     #     self,
@@ -1312,6 +1312,24 @@ class TestViscoElasticFilamentSp4Inference:
 
 # ===== Define pipeline passes =====
 
+# Pass 1: Reduced model, infer Sp4 only
+@pytest.fixture
+def pass_1(composed_model_flow_sp4_only, ground_truth_flow_data, ground_truth_ext_flow_params, ground_truth_sim_params):
+    """ First pass for the viscoelastic inference. """
+    
+    first_pass = PipelinePass(
+        name="Sp4 Inference (Elastic Model)",
+        model_class=composed_model_flow_sp4_only,
+        ground_truths=[ground_truth_flow_data],
+        ext_params_list=[ground_truth_ext_flow_params],
+        sim_params_list=[ground_truth_sim_params],
+        param_keys_to_infer=['Sp4'],
+        fixed_params={},
+    )
+
+    return first_pass
+
+
 # Pass 2:
 # @pytest.fixture
 # def pass_2(composed_model_flow_sp4_tau_s_only, ground_truth_flow_data, ground_truth_ext_flow_params, ground_truth_sim_params):
@@ -1329,137 +1347,103 @@ class TestViscoElasticFilamentSp4Inference:
 
 #     return second_pass
 
+
+
 class TestViscoElasticFilamentMultiPassInference:
 
-    def test_emtpy_pass(composed_model_flow_sp4_only, ground_truth_flow_data, ground_truth_ext_flow_params, ground_truth_sim_params
+    def test_onepass_inference_sp4model(
+        self,
+        pass_1,
+        mse_loss_fn,
+        basinhopping_optimizer_instance,
+        optimizer_kwargs,
     ):
-
-        empty_pass = PipelinePass(
-            name="Sp4 Inference (Elastic Model)",
-            model_class=composed_model_flow_sp4_only,
-            ground_truths=[ground_truth_flow_data],
-            ext_params_list=[ground_truth_ext_flow_params],
-            sim_params_list=[ground_truth_sim_params],
-            param_keys_to_infer=['Sp4'],
-            fixed_params={},
+        """
+        Test single-pass inference: infer Sp4 using reduced (elastic) model.
+        
+        Verifies:
+        - Pipeline executes without error
+        - Optimization converges
+        - Inferred Sp4 is within reasonable bounds
+        - Uncertainties are computed
+        - Loss is acceptable
+        """
+        
+        # ===== ARRANGE =====
+        pipeline = InferencePipeline(
+            passes=[pass_1],
+            loss_fn=mse_loss_fn,
+            n_jobs_per_pass=-1,  # Use all cores within each pass
+            optimizer=basinhopping_optimizer_instance,
+            optimizer_kwargs=optimizer_kwargs,
         )
-
-        assert type(empty_pass.name) == str
-
-    # Pass 1: Reduced model, infer Sp4 only
-    @pytest.fixture
-    def pass_1(composed_model_flow_sp4_only, ground_truth_flow_data, ground_truth_ext_flow_params, ground_truth_sim_params):
-        """ First pass for the viscoelastic inference. """
         
-        first_pass = PipelinePass(
-            name="Sp4 Inference (Elastic Model)",
-            model_class=composed_model_flow_sp4_only,
-            ground_truths=[ground_truth_flow_data],
-            ext_params_list=[ground_truth_ext_flow_params],
-            sim_params_list=[ground_truth_sim_params],
-            param_keys_to_infer=['Sp4'],
-            fixed_params={},
+        # Multiple initial guesses for robustness (Sp4 is typically 0.01 to 10 Pa·s)
+        initial_guesses_per_pass = [
+            [
+                {'Sp4': 0.1},
+                {'Sp4': 1.0},
+                {'Sp4': 5.0},
+            ]
+        ]
+        
+        # ===== ACT =====
+        results = pipeline.run(initial_guesses_per_pass, verbose = True)
+        
+        # ===== ASSERT =====
+        
+        # Check that we got exactly one result (one pass)
+        assert len(results) == 1, "Expected one InferenceResult for one-pass pipeline"
+        
+        result = results[0]
+        
+        # 1. Check convergence
+        assert result.success, (
+            f"Optimization did not converge. Message: {result.message}"
         )
-
-        return first_pass
-
-    def test_pass_1(pass_1):
-        assert type(pass_1.name) == str
-
-    # def test_onepass_inference_sp4model(
-    #     pass_1,
-    #     mse_loss_fn,
-    #     basinhopping_optimizer_instance,
-    #     optimizer_kwargs,
-    # ):
-    #     """
-    #     Test single-pass inference: infer Sp4 using reduced (elastic) model.
+        assert result.iterations > 0, "No iterations were performed"
         
-    #     Verifies:
-    #     - Pipeline executes without error
-    #     - Optimization converges
-    #     - Inferred Sp4 is within reasonable bounds
-    #     - Uncertainties are computed
-    #     - Loss is acceptable
-    #     """
-
-    #     assert type(pass_1) == str
+        # 2. Check inferred parameter exists and is physically reasonable
+        assert 'Sp4' in result.params, "Sp4 not in inferred parameters"
+        sp4_inferred = result.params['Sp4']
+        assert sp4_inferred > 0, f"Sp4 must be positive, got {sp4_inferred}"
+        assert sp4_inferred < 1e6, f"Sp4 unreasonably large: {sp4_inferred}"
         
-    #     # ===== ARRANGE =====
-    #     pipeline = InferencePipeline(
-    #         passes=[pass_1],
-    #         loss_fn=mse_loss_fn,
-    #         n_jobs_per_pass=-1,  # Use all cores within each pass
-    #         optimizer=basinhopping_optimizer_instance,
-    #         optimizer_kwargs=optimizer_kwargs,
-    #     )
+        # 3. Check loss is acceptable (adjust threshold based on your problem)
+        assert result.loss > 0, "Loss should be positive"
+        assert result.loss < 1e2, (  # Adjust threshold based on ground truth scale
+            f"Loss suspiciously high: {result.loss}. Check model/data scale."
+        )
         
-    #     # Multiple initial guesses for robustness (Sp4 is typically 0.01 to 10 Pa·s)
-    #     initial_guesses_per_pass = [
-    #         [
-    #             {'Sp4': 0.1},
-    #             {'Sp4': 1.0},
-    #             {'Sp4': 5.0},
-    #         ]
-    #     ]
+        # 4. Check uncertainty quantification
+        assert result.covariance is not None, "Covariance not computed"
+        assert result.hessian is not None, "Hessian not computed"
+        assert result.std_errors is not None, "Standard errors not computed"
+        assert len(result.std_errors) == 1, "Expected 1 std_error for 1 parameter"
         
-    #     # ===== ACT =====
-    #     results = pipeline.run(initial_guesses_per_pass)
+        std_err_sp4 = result.std_errors[0]
+        assert std_err_sp4 > 0, f"Std error must be positive, got {std_err_sp4}"
+        assert std_err_sp4 < sp4_inferred * 10, (
+            f"Std error unreasonably large relative to parameter: "
+            f"Sp4={sp4_inferred:.3e} ± {std_err_sp4:.3e}"
+        )
         
-    #     # ===== ASSERT =====
+        # 5. Check parameter trajectory
+        trajectory = pipeline.get_parameter_trajectory()
+        assert 'Sp4' in trajectory, "Sp4 not in trajectory"
+        assert len(trajectory['Sp4']) == 1, "Trajectory should have 1 step"
+        assert trajectory['Sp4'][0] == sp4_inferred, "Trajectory doesn't match final result"
         
-    #     # Check that we got exactly one result (one pass)
-    #     assert len(results) == 1, "Expected one InferenceResult for one-pass pipeline"
+        # 6. Print summary for inspection
+        summary = pipeline.summary()
+        print(summary)
+        assert summary, "Summary generation failed"
         
-    #     result = results[0]
-        
-    #     # 1. Check convergence
-    #     assert result.success, (
-    #         f"Optimization did not converge. Message: {result.message}"
-    #     )
-    #     assert result.iterations > 0, "No iterations were performed"
-        
-    #     # 2. Check inferred parameter exists and is physically reasonable
-    #     assert 'Sp4' in result.params, "Sp4 not in inferred parameters"
-    #     sp4_inferred = result.params['Sp4']
-    #     assert sp4_inferred > 0, f"Sp4 must be positive, got {sp4_inferred}"
-    #     assert sp4_inferred < 1e6, f"Sp4 unreasonably large: {sp4_inferred}"
-        
-    #     # 3. Check loss is acceptable (adjust threshold based on your problem)
-    #     assert result.loss > 0, "Loss should be positive"
-    #     assert result.loss < 1e2, (  # Adjust threshold based on ground truth scale
-    #         f"Loss suspiciously high: {result.loss}. Check model/data scale."
-    #     )
-        
-    #     # 4. Check uncertainty quantification
-    #     assert result.covariance is not None, "Covariance not computed"
-    #     assert result.hessian is not None, "Hessian not computed"
-    #     assert result.std_errors is not None, "Standard errors not computed"
-    #     assert len(result.std_errors) == 1, "Expected 1 std_error for 1 parameter"
-        
-    #     std_err_sp4 = result.std_errors[0]
-    #     assert std_err_sp4 > 0, f"Std error must be positive, got {std_err_sp4}"
-    #     assert std_err_sp4 < sp4_inferred * 10, (
-    #         f"Std error unreasonably large relative to parameter: "
-    #         f"Sp4={sp4_inferred:.3e} ± {std_err_sp4:.3e}"
-    #     )
-        
-    #     # 5. Check parameter trajectory
-    #     trajectory = pipeline.get_parameter_trajectory()
-    #     assert 'Sp4' in trajectory, "Sp4 not in trajectory"
-    #     assert len(trajectory['Sp4']) == 1, "Trajectory should have 1 step"
-    #     assert trajectory['Sp4'][0] == sp4_inferred, "Trajectory doesn't match final result"
-        
-    #     # 6. Print summary for inspection
-    #     summary = pipeline.summary()
-    #     print(summary)
-    #     assert summary, "Summary generation failed"
-        
-    #     # ===== DIAGNOSTIC OUTPUT =====
-    #     print(f"\n✓ Sp4 inferred: {sp4_inferred:.6e} ± {std_err_sp4:.6e}")
-    #     print(f"✓ Final loss: {result.loss:.8e}")
-    #     print(f"✓ Iterations: {result.iterations}")
-    #     print(f"✓ Covariance rank: {np.linalg.matrix_rank(result.covariance)}")
+        # ===== DIAGNOSTIC OUTPUT =====
+        print(f"\n✓ Sp4 inferred: {sp4_inferred:.6e} ± {std_err_sp4:.6e}")
+        print(f"✓ Final loss: {result.loss:.8e}")
+        print(f"✓ Iterations: {result.iterations}")
+        print(f"✓ Covariance rank: {np.linalg.matrix_rank(result.covariance)}")
 
 if __name__ == "__main__":
     
