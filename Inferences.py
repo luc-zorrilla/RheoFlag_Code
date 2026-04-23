@@ -178,7 +178,7 @@ class Inference:
         Normalize ground_truths, ext_params_list, and sim_params_list together.
         
         - ext_params_list and sim_params_list are independent sets
-        - ground_truths must have length = len(ext_params_list) × len(sim_params_list)
+        - ground_truths must have length = len(ext_params_list) * len(sim_params_list)
         - ext_params_list and sim_params_list are converted to Cartesian product order
         
         Args:
@@ -204,8 +204,8 @@ class Inference:
         if len(gt_list) != n_conditions:
             raise ValueError(
                 f"use_product=True: ground_truths length ({len(gt_list)}) "
-                f"must equal ext_params_list × sim_params_list "
-                f"({len(ext_list)} × {len(sim_list)} = {n_conditions})"
+                f"must equal ext_params_list * sim_params_list "
+                f"({len(ext_list)} * {len(sim_list)} = {n_conditions})"
             )
         
         # Create paired lists from product (in order)
@@ -299,7 +299,7 @@ class Inference:
 
         param_keys = tuple(initial_guess.keys())
         x0 = np.array([initial_guess[key] for key in param_keys])
-        
+
         # Run optimization
         self.result = self.optimizer(
             partial(self.objective, param_keys=param_keys),
@@ -346,6 +346,7 @@ class Inference:
         Returns:
             List of InferenceResult objects (one per initial guess)
         """
+
         # Disable objective parallelism when doing batch parallelism...
         objective_n_jobs = self.n_jobs if parallelize_objectives else 1
         # ... unless there is only one guess.
@@ -470,7 +471,7 @@ class InferencePipeline:
             if verbose:
                 print(f"Running {len(initial_guesses)} inference(s) in parallel...")
             pass_results = inference.infer_batch(initial_guesses)
-            
+
             # ===== SELECT BEST RESULT =====
             # Choose the result with the lowest loss TODO See if this is what I want to do or not.
             best_result = min(pass_results, key=lambda r: r.loss)

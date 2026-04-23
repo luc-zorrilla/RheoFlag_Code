@@ -793,7 +793,20 @@ def FlowParams_to_InterpFlow(int_params, ext_params, sim_params):
 # Define the ViscoElasticFilament_FlowParams class by composing the ViscoElasticFilament class
 ViscoElasticFilament_FlowParams = compose_model(
     ViscoElasticFilament,
-    compose_ext_params=FlowParams_to_InterpFlow
+    compose_ext_params=FlowParams_to_InterpFlow,
+)
+
+# Define the pre-determined function to transform (A, w0, psi) into InterpFlow
+def tau_b_to_taus_b(int_params, ext_params, sim_params):
+    """ Transform internal parameters (..., tau_b, ...) -> (..., taus_b, ...). """
+    new_int_params = int_params.copy()
+    new_int_params['taus_b'] = [new_int_params['tau_b']]*(new_int_params['N']-1) # Making uniform distribution of taus_b.
+    new_int_params.pop('tau_b')
+    return new_int_params
+
+ViscoElasticFilament_FlowParams_ScalarBending = compose_model(
+    ViscoElasticFilament_FlowParams,
+    compose_int_params=tau_b_to_taus_b,
 )
 
 if __name__ == "__main__":
