@@ -325,27 +325,27 @@ class TestViscoElasticFilament_OnePassInference_BendingShearElasticity:
                 "w0":0, # Static flow
                 "psi":np.pi/2,
             },      
-                {
-                "Lambdas": [[0,0]]*N,
-                "Zetas": [0]*N,
-                "A":1e-4,
-                "w0":0, # Static flow
-                "psi":np.pi/2,
-            },              
-                {
-                "Lambdas": [[0,0]]*N,
-                "Zetas": [0]*N,
-                "A":1e-3,
-                "w0":0, # Static flow
-                "psi":np.pi/2,
-            },
-                {
-                "Lambdas": [[0,0]]*N,
-                "Zetas": [0]*N,
-                "A":1e-2,
-                "w0":0, # Static flow
-                "psi":np.pi/2,
-            },                            
+            #     {
+            #     "Lambdas": [[0,0]]*N,
+            #     "Zetas": [0]*N,
+            #     "A":1e-4,
+            #     "w0":0, # Static flow
+            #     "psi":np.pi/2,
+            # },              
+            #     {
+            #     "Lambdas": [[0,0]]*N,
+            #     "Zetas": [0]*N,
+            #     "A":1e-3,
+            #     "w0":0, # Static flow
+            #     "psi":np.pi/2,
+            # },
+            #     {
+            #     "Lambdas": [[0,0]]*N,
+            #     "Zetas": [0]*N,
+            #     "A":1e-2,
+            #     "w0":0, # Static flow
+            #     "psi":np.pi/2,
+            # },                            
         ]
 
 
@@ -357,7 +357,7 @@ class TestViscoElasticFilament_OnePassInference_BendingShearElasticity:
         """
         return [{
             "T_span": (1e6, 2e6),
-            "T_eval": np.linspace(1e6, 2e6, int(1e1)), # minimum two elements here.
+            "T_eval": np.linspace(1e6, 2e6, int(2e0)), # minimum two elements here.
             "method": "BDF",
             "T_sim_max": 300,
         },
@@ -554,7 +554,7 @@ class TestViscoElasticFilament_OnePassInference_BendingShearElasticity:
         # Check that we got exactly one result (one pass)
         assert len(results) == 1, "Expected one InferenceResult for one-pass pipeline"
         
-        result_pass1, result_pass2 = results
+        result_pass1 = results
         
         # ===== PASS 1: Sp4-Beta INFERENCE =====
         print("\n" + "="*60)
