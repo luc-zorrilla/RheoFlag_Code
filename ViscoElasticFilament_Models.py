@@ -216,10 +216,10 @@ def ADS(N):
 def CreateFlowField(A = 0., w0 = 0., psi = 0., T_meas = [], filename = ""):
 
     """ Creates a non-dimensional flow field and returns a string and an array representing resp. the type and data
-    - 1. If a filename is given, import flow field from the file (PIV);
-    - 2. If filename = "" and if A = 0 or T_meas = [], there is no flow field: return 0
-    - 3. If filemame = "" and if A > 0 and if w0 = 0, returns a constant homogeneous flow
-    - 4. If filemame = "" and if A > 0 and if w0 > 0, returns [A*sin(t)] for t in T (homogeneous flow)
+    - 1. If filename = "" and if A = 0 or T_meas = [], there is no flow field: return 0
+    - 2. If filemame = "" and if A > 0 and if w0 = 0, returns a constant homogeneous flow
+    - 3. If filemame = "" and if A > 0 and if w0 > 0, returns [A*sin(t)] for t in T (homogeneous flow)
+    - 4. If a filename is given, import flow field from the file (PIV);
     Returned flow field in the 2 last cases is an array of shape (2x|T|)
     psi is the angle between the x-axis and the flow.
 
@@ -230,18 +230,18 @@ def CreateFlowField(A = 0., w0 = 0., psi = 0., T_meas = [], filename = ""):
     X_flow_field = 0
     return_string = "NO FLOW"
 
-    if filename == "": # Cases 2,3,4
-        if len(T_meas)==0 or A == 0: # Case 2
+    if filename == "": # Cases 1,2,3
+        if len(T_meas)==0 or A == 0: # Case 1
             return return_string, X_flow_field
-        else: # Cases 3,4
+        else: # Cases 2,3
             X_flow_field = np.zeros((2,len(T_meas)))
-            if w0==0: # Case 3
+            if w0==0: # Case 2
                 X_flow_field[0,:] = A*np.cos(psi)
                 X_flow_field[1,:] = A*np.sin(psi)
                 return_string = "CONSTANT FLOW: (psi, A) = (" + str(psi) + ", " + str(A) + ")"
                 return return_string, X_flow_field
 
-            else: # Case 4
+            else: # Case 3
                 for t in range(len(T_meas)):
                     X_flow_field[0,t] = A*np.sin(w0*T_meas[t])*np.cos(psi)
                     X_flow_field[1,t] = A*np.sin(w0*T_meas[t])*np.sin(psi)
@@ -249,8 +249,8 @@ def CreateFlowField(A = 0., w0 = 0., psi = 0., T_meas = [], filename = ""):
 
                 return return_string, X_flow_field
 
-    else: # Case 1
-        # Import field from filename (Change later)   
+    else: # Case 4
+        # Import field from filename (Change later) # TODO: include experimental data
         return_string = "PIV-IMPORTED from " + filename
         return return_string, X_flow_field 
 
@@ -513,7 +513,20 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
     Returns: {"value": np.ndarray, "shape": tuple} # Is shape necessary?
     """
 
-    Args = (int_params['Sp4'], int_params['k0'], int_params['bool_EI'], int_params['gamma'], int_params['taus_b'], int_params['tau_s'], int_params['gamma'], int_params['n_L'], int_params['m_L'], ext_params['Lambdas'], ext_params['Zetas'], ext_params['InterpFlow'])
+    Args = (
+        int_params['Sp4'], 
+        int_params['k0'], 
+        int_params['bool_EI'], 
+        int_params['gamma'], 
+        int_params['taus_b'], 
+        int_params['tau_s'], 
+        int_params['gamma'], 
+        int_params['n_L'], 
+        int_params['m_L'], 
+        ext_params['Lambdas'],
+        ext_params['Zetas'], 
+        ext_params['InterpFlow'],
+    )
 
     # Define the time limiter
     class StopOnTime:
@@ -529,7 +542,15 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
 
     # Run the simulation
     try:
-        sol = solve_ivp(fun = g, t_span = sim_params['T_span'], y0 = int_params['X_0'], args=Args, t_eval=sim_params['T_eval'], method = sim_params['method'], events=time_limiter.terminate_integration)
+        sol = solve_ivp(
+            fun = g, 
+            t_span = sim_params['T_span'], 
+            y0 = int_params['X_0'], 
+            args=Args, 
+            t_eval=sim_params['T_eval'], 
+            method = sim_params['method'], 
+            events=time_limiter.terminate_integration,
+        )
         T_sim = time.time() - time_limiter.start_time
 
         if sol.t_events[0].size > 0:

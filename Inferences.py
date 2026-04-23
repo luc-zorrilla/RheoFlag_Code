@@ -346,8 +346,11 @@ class Inference:
         Returns:
             List of InferenceResult objects (one per initial guess)
         """
-        # Disable objective parallelism when doing batch parallelism
+        # Disable objective parallelism when doing batch parallelism...
         objective_n_jobs = self.n_jobs if parallelize_objectives else 1
+        # ... unless there is only one guess.
+        if len(initial_guesses) == 1:
+            objective_n_jobs = self.n_jobs
                 
         results = joblib.Parallel(n_jobs=self.n_jobs, backend='loky')(
             joblib.delayed(self.infer)(ig, objective_n_jobs=objective_n_jobs)
