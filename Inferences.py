@@ -83,6 +83,8 @@ class PipelinePass:
         param_keys_to_infer: Which internal parameters to infer in this pass
         fixed_params: Dict of {param_name: value} for parameters inferred in prior passes
         compose_int_params: Composition function for int_params (via compose_model)
+        optimizer: optimizer class instance to run the inference optimisation
+        optimizer_kwargs: arguments for optimizer.
     """
     name: str
     model_class: Type
@@ -94,6 +96,8 @@ class PipelinePass:
     compose_int_params: Optional[Callable] = None
     compose_ext_params: Optional[Callable] = None
     compose_sim_params: Optional[Callable] = None
+    optimizer: Callable = None
+    optimizer_kwargs: Dict[str, Any] = None
 
 
 # ============================================================================
@@ -397,8 +401,6 @@ class InferencePipeline:
         passes: List[PipelinePass],
         loss_fn: Callable,
         n_jobs_per_pass: int = -1,
-        optimizer: Callable = None, # TODO: should this be here or in a pass?
-        optimizer_kwargs: Dict[str, Any] = None, # TODO: should this be here or in a pass?
     ):
         """
         Args:
@@ -411,8 +413,6 @@ class InferencePipeline:
         self.n_jobs_per_pass = n_jobs_per_pass
         self.results: List[InferenceResult] = []
         self.parameter_trajectory: List[Dict[str, float]] = []
-        self.optimizer = optimizer # TODO: should this be in the "passes" data?
-        self.optimizer_kwargs = optimizer_kwargs # TODO: should this be in the "passes" data?
     
     def run(
         self,
@@ -458,8 +458,8 @@ class InferencePipeline:
                 loss_fn=self.loss_fn,
                 ext_params_list=pass_def.ext_params_list,
                 sim_params_list=pass_def.sim_params_list,
-                optimizer=self.optimizer,
-                optimizer_kwargs=self.optimizer_kwargs,
+                optimizer=pass_def.optimizer,
+                optimizer_kwargs=pass_def.optimizer_kwargs,
                 n_jobs=self.n_jobs_per_pass,
             )
 
@@ -610,115 +610,3 @@ class InferencePipeline:
 # ============================================================================
 # USAGE EXAMPLE WITH YOUR BASINHOPPING OPTIMIZER ON VISCOELASTIC FILAMENT
 # ============================================================================
-
-if __name__ == "__main__":
-    """
-    Example: Two-pass inference on ViscoElasticFilament model.
-    
-    Pass 1: Infer Sp4 only (elastic filament)
-    Pass 2: Infer tau_b (viscoelastic filament with Sp4 fixed from Pass 1)
-    """
-    
-    # ===== Define ground truth data ===== # TODO: make_ground_truth(...)
-    ground_truth_data = np.array([...])  # Your measured data
-    ground_truth_ext_params = {'flow_rate': 0.5}
-    ground_truth_sim_params = {'dt': 0.01, 'duration': 10.0}
-    
-    # ===== Define MSE loss =====
-    def mse_loss(predicted, ground_truth):
-        return np.mean((predicted - ground_truth) ** 2)
-    
-    # ===== Define pipeline passes =====
-
-    # Pass 1: Reduced model, infer Sp4 only
-    pass_1 = PipelinePass(
-        name="Sp4 Inference (Elastic Model)",
-        model_class=ViscoElasticFilament_Models.ReducedModel_Sp4Only,  # Simple model # TODO: Modify this
-        ground_truths=[ground_truth_data],
-        ext_params_list=[ground_truth_ext_params],
-        sim_params_list=[ground_truth_sim_params],
-        param_keys_to_infer=['Sp4'],
-        fixed_params={},
-    )
-    
-    # Pass 2: Full model, infer tau_b (with Sp4 fixed from Pass 1)
-    pass_2 = PipelinePass(
-        name="Ka Inference (ViscoElastic Model, Elasticity fixed)",
-        model_class=ViscoElasticFilament_Models.FullModel, # TODO: modify this as it does not exist
-        ground_truths=[ground_truth_data],
-        ext_params_list=[ground_truth_ext_params],
-        sim_params_list=[ground_truth_sim_params],
-        param_keys_to_infer=['tau_b'],
-        fixed_params={},  # Will be auto-filled from Pass 1 result
-    )
-    
-    # ===== Create pipeline =====
-    pipeline = InferencePipeline(
-        passes=[pass_1, pass_2],
-        loss_fn=mse_loss,
-        optimizer=basinhopping_optimizer,
-        optimizer_kwargs={
-            'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
-            'minimum_gradient': False,
-            'minimum_hessian': False,
-            'local_minimizer_kwargs': {
-                'method': 'L-BFGS-B',
-                'jac': '3-point',
-                'options': {
-                    'disp': True,
-                    'ftol': 1e-8,
-                    'gtol': 1e-8,
-                    'eps': 1e-8,
-                    'finite_diff_rel_step': 1e-6,
-                },
-            },
-            'global_minimizer_kwargs': {
-                'niter': 9,
-                'T': 0,
-                'stepsize': 5,
-                'tol': 1e-10,
-            }
-        },
-        n_jobs_per_pass=-1,  # Use all cores within each pass
-    )
-    
-    # ===== Define initial guesses per pass =====
-    # Each initial guess is a list of dicts, one dict per initial condition to try
-    initial_guesses = [
-        # Pass 1: Try 3 different initial guesses for Sp4
-        [
-            {'Sp4': 0.5},
-            {'Sp4': 2.5},
-            {'Sp4': 5.0},
-        ],
-        # Pass 2: Try 2 initial guesses for tau_b
-        [
-            {'tau_b': 0},
-            {'tau_b': 0.1},
-            {'tau_b': 1.0},
-        ],
-    ]
-    
-    # ===== Run pipeline =====
-    results = pipeline.run(
-        initial_guesses_per_pass=initial_guesses,
-        verbose=True,
-    )
-    
-    # ===== Print summary =====
-    print(pipeline.summary())
-    
-    # ===== Extract final parameters =====
-    final_params = pipeline.parameter_trajectory[-1]
-    print(f"\nFinal inferred parameters: {final_params}")
-    
-    # ===== Get parameter trajectory =====
-    trajectory = pipeline.get_parameter_trajectory()
-    print(f"Parameter trajectory: {trajectory}")
-    
-    # ===== Access individual results =====
-    pass_1_result = pipeline.results[0]
-    pass_2_result = pipeline.results[1]
-    
-    print(f"\nPass 1 - Sp4: {pass_1_result.params['Sp4']:.6e}")
-    print(f"Pass 2 - Ka: {pass_2_result.params['tau_b']:.6e}")
