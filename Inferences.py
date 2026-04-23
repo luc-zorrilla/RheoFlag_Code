@@ -144,11 +144,8 @@ class Inference:
         self.model_class = model_class
         self.loss_fn = loss_fn
         self.optimizer = optimizer or minimize
-        self.optimizer_kwargs = optimizer_kwargs or {
-            'method': 'L-BFGS-B',
-            'options': {'ftol': 1e-8, 'maxiter': 1000}
-        }
-        self.n_jobs = n_jobs
+        self.optimizer_kwargs = optimizer_kwargs
+        self.n_jobs = n_jobs  # Separate from batch parallelism
         self._objective_n_jobs = n_jobs  # Separate from batch parallelism
         self.result: Optional[OptimizeResult] = None
         self.hessian: Optional[np.ndarray] = None
@@ -414,8 +411,8 @@ class InferencePipeline:
         self.n_jobs_per_pass = n_jobs_per_pass
         self.results: List[InferenceResult] = []
         self.parameter_trajectory: List[Dict[str, float]] = []
-        self.optimizer = optimizer, # TODO: should this be in the "passes" data?
-        self.optimizer_kwargs = optimizer_kwargs, # TODO: should this be in the "passes" data?
+        self.optimizer = optimizer # TODO: should this be in the "passes" data?
+        self.optimizer_kwargs = optimizer_kwargs # TODO: should this be in the "passes" data?
     
     def run(
         self,
@@ -462,7 +459,7 @@ class InferencePipeline:
                 ext_params_list=pass_def.ext_params_list,
                 sim_params_list=pass_def.sim_params_list,
                 optimizer=self.optimizer,
-                optimizer_kwargs=self.optimizer_kwargs,                
+                optimizer_kwargs=self.optimizer_kwargs,
                 n_jobs=self.n_jobs_per_pass,
             )
 
