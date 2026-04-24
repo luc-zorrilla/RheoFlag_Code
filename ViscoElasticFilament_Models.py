@@ -235,18 +235,16 @@ def CreateFlowField(A = 0., w0 = 0., psi = 0., T_meas = [], filename = ""):
             return return_string, X_flow_field
         else: # Cases 2,3
             
-            if w0==0: # Case 2
-                if len(T_meas) > 1: # TODO: Move this case to case 3
-                    X_flow_field = A * np.array([np.cos(psi), np.sin(psi)]).reshape((2,1)) @ np.ones((1, len(T_meas)))
-                    return_string = "CONSTANT FLOW: (psi, A, w0) = (" + str(psi) + ", " + str(A) + ", " + str(w0) + ")"
-                    return return_string, X_flow_field
-                else: # len(T_meas) == 1 # TODO: take T_meas = [0] to test
-                    X_flow_field = A * np.array([np.cos(psi), np.sin(psi)]).reshape((2,1))
-                    return_string = "CONSTANT FLOW: (psi, A) = (" + str(psi) + ", " + str(A) + ")"
-                    return return_string, X_flow_field
+            if w0==0 and len(T_meas)==1: # Case 2 # TODO: test this case
+                X_flow_field = A * np.array([np.cos(psi), np.sin(psi)]).reshape((2,1))
+                return_string = "CONSTANT FLOW: (psi, A) = (" + str(psi) + ", " + str(A) + ")"
+                return return_string, X_flow_field
 
             else: # Case 3
-                X_flow_field = A * np.array([np.cos(psi), np.sin(psi)]).reshape((2,1)) @ np.sin(w0*T_meas[:]).reshape((1,-1))
+                if w0 == 0:
+                    X_flow_field = A * np.array([np.cos(psi), np.sin(psi)]).reshape((2,1)) @ np.ones((1, len(T_meas)))
+                else:
+                    X_flow_field = A * np.array([np.cos(psi), np.sin(psi)]).reshape((2,1)) @ np.sin(w0*T_meas[:]).reshape((1,-1))
                 return_string = "SINE FLOW: (psi, A, w0) = (" + str(psi) + ", " + str(A) + ", " + str(w0) + ")"
 
                 return return_string, X_flow_field
@@ -655,11 +653,13 @@ def FlowParams_to_InterpFlow(int_params, ext_params, sim_params):
     T_eval = sim_params['T_eval']
     X_flow_field_string, X_flow_field = CreateFlowField(ext_params['A'], ext_params['w0'], ext_params['psi'], T_eval)
 
-    ## Final parameters        
-    if X_flow_field_string != "NO FLOW":
-        InterpFlow = interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
-    else:         
+    ## Final parameters # TODO: modify so that one gets an interpolated flow in time except when "CONSTANT FLOW" (len(T_eval)==1)
+    if ("NO FLOW" in X_flow_field_string):
         InterpFlow = 0
+    elif ("CONSTANT FLOW" in X_flow_field_string):
+        InterpFlow = None # TODO: To be completed
+    else:         
+        InterpFlow = interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
 
     return {'Lambdas': ext_params['Lambdas'], 'Zetas': ext_params['Zetas'], 'InterpFlow': InterpFlow}
     
