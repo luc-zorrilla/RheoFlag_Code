@@ -323,13 +323,13 @@ class TestViscoElasticFilament_OnePassInference_BendingShearElasticity:
                 "w0":0, # Static flow
                 "psi":np.pi/2,
             },      
-            #     {
-            #     "Lambdas": [[0,0]]*N,
-            #     "Zetas": [0]*N,
-            #     "A":1e-4,
-            #     "w0":0, # Static flow
-            #     "psi":np.pi/2,
-            # },              
+                {
+                "Lambdas": [[0,0]]*N,
+                "Zetas": [0]*N,
+                "A":1e-4,
+                "w0":0, # Static flow
+                "psi":np.pi/2,
+            },              
             #     {
             #     "Lambdas": [[0,0]]*N,
             #     "Zetas": [0]*N,
@@ -621,7 +621,7 @@ class TestViscoElasticFilament_OnePassInference_BendingShearElasticity:
         assert len(trajectory['Beta']) == 1, "Beta trajectory should have 1 steps"
         
         # Generate and verify summary
-        summary = viscoelastic_pipeline.summary()
+        summary = multielastic_pipeline.summary()
         print(summary)
         assert summary, "Summary generation failed"
         
