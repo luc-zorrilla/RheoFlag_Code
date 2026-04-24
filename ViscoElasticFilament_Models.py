@@ -236,7 +236,7 @@ def CreateFlowField(A = 0., w0 = 0., psi = 0., T_meas = [], filename = ""):
         else: # Cases 2,3
             
             if w0==0: # Case 2
-                if len(T_meas) > 1:
+                if len(T_meas) > 1: # TODO: Move this case to case 3
                     X_flow_field = A * np.array([np.cos(psi), np.sin(psi)]).reshape((2,1)) @ np.ones((1, len(T_meas)))
                     return_string = "CONSTANT FLOW: (psi, A, w0) = (" + str(psi) + ", " + str(A) + ", " + str(w0) + ")"
                     return return_string, X_flow_field
@@ -579,7 +579,9 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
             return 1
     time_limiter = StopOnTime(sim_params['T_sim_max'])
 
-    # Run the simulation
+    # Run the simulation # TODO: make two different algorithms depending if one wants eq solution of time-dependent solution
+    # if InterpFlow
+    
     try:
         sol = solve_ivp(
             fun = g, 
