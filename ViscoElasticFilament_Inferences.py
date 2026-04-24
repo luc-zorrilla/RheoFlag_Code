@@ -2,9 +2,7 @@ from Models import Model, compose_model
 from ViscoElasticFilament_Models import (
     StraightLine, 
     ViscoElasticFilament, 
-    ViscoElasticFilament_create_params_list, # TODO: check if necessary
     ViscoElasticFilament_FlowParams, 
-    ViscoElasticFilament_FlowParams_create_params_list, # TODO: check if necessary
     ViscoElasticFilament_FlowParams_ScalarBending,
 )
 from Inferences import Inference, InferencePipeline, PipelinePass, InferenceResult
@@ -554,7 +552,7 @@ class TestViscoElasticFilament_OnePassInference_BendingShearElasticity:
         # Check that we got exactly one result (one pass)
         assert len(results) == 1, "Expected one InferenceResult for one-pass pipeline"
         
-        result_pass1 = results
+        result_pass1 = results[0]
         
         # ===== PASS 1: Sp4-Beta INFERENCE =====
         print("\n" + "="*60)

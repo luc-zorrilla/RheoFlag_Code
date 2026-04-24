@@ -53,7 +53,6 @@ class NumpyTupleEncoder(json.JSONEncoder):
             return [NumpyTupleEncoder._mark_types(item) for item in obj]
         return obj
 
-
 class NumpyTupleDecoder(json.JSONDecoder):
     """Custom JSON decoder that recursively reconstructs numpy arrays and tuples."""
     def __init__(self, *args, **kwargs):
@@ -170,10 +169,6 @@ class Model:
             'shape': data['sim_output']['shape']   # Already a tuple from decoder
         }
 
-        # # Verify shape is a tuple
-        # assert isinstance(self.sim_output['shape'], tuple), \
-        #     f"Expected tuple, got {type(self.sim_output['shape'])}"        
-        
     def pickle_model(self, filepath):
         """Pickle entire Model instance."""
         filepath = Path(filepath)
@@ -222,23 +217,6 @@ class Square(Model):
             results.append({"value": output, "shape": output.shape})
         return results
 
-
-def Square_create_params_list(int_keys: List[str], ext_keys: List[str], sim_keys: List[str], params_list_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """ Generate all combinations of the parameter lists. 
-    Useful for parallel computations of varying model parameters. 
-    
-    Note: Could be generalised -- in this case -- to loop over all keys."""
-    
-    params_list = []
-    for x in params_list_dict["x_list"]: 
-
-        int_params = {key:eval(key) for key in int_keys}
-        ext_params = {key:eval(key) for key in ext_keys}
-        sim_params = {key:eval(key) for key in sim_keys}
-        params_list.append((int_params, ext_params, sim_params))
-
-    return params_list
-
 def compose_model(
     model_class: Type[Model],
     compose_int_params: Optional[Callable[[Any], Any]] = None,
@@ -254,11 +232,11 @@ def compose_model(
     Args:
         model_class: A Model subclass to compose.
         compose_int_params: Optional callable that transforms internal parameters.
-                           Signature: Any -> Any
+                        Signature: Any -> Any
         compose_ext_params: Optional callable that transforms external parameters.
-                           Signature: Any -> Any
+                        Signature: Any -> Any
         compose_sim_params: Optional callable that transforms simulation parameters.
-                           Signature: Any -> Any
+                        Signature: Any -> Any
 
     Returns:
         A new Model class with composed parameter behavior.
@@ -296,7 +274,7 @@ def compose_model(
             super().__init__(transformed_int_params, transformed_ext_params, transformed_sim_params)
 
     @classmethod
-    def simulate_batch(
+    def simulate_batch( # TODO: parallelize this method
         cls,
         int_params_batch: Sequence[Any],
         ext_params_batch: Sequence[Any],
@@ -346,7 +324,7 @@ def compose_model(
 # ----------------------
 # Parallel runner
 # ----------------------
-def _batch_worker(
+def _batch_worker( # TODO: Is it necessary? Also, this could be parallelized too.
     model_cls: Type[Model],
     int_params_batch: Sequence[Any],
     ext_params_batch: Sequence[Any],
@@ -368,7 +346,7 @@ def _batch_worker(
             outputs.append(m.simulate_single())
     return outputs
 
-def parallel_simulate_batch(
+def parallel_simulate_batch( # TODO: Is it necessary?
     model_cls: Type[Model],
     params_list: Iterable[Tuple[Any, Any, Any]],
     batch_size: int = 32,

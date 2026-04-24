@@ -12,7 +12,6 @@ from Models import compose_model
 # FUNCTIONS
 # ============================================================================
 
-
 def Vectorize_Functional(func, m):
     """ 
     This function vectorizes a functional with m input parameters, 
