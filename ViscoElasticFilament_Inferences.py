@@ -349,12 +349,13 @@ class TestViscoElasticFilament_OnePassInference_BendingShearElasticity:
     def ground_truth_sim_params_static_list(self):
         """
         Define simulation parameters.
-        Use BDF method for faster convergence compared to RK45.
+        Use "broyden1" or "hybr" method for root finding algorithm (fixed point). 
+        Remark: Due to the metastable status of X (clamped), "hybr" works better.
         """
         return [{
             "T_span": (1e6, 2e6),
             "T_eval": np.linspace(1e6, 2e6, int(1e0)), # minimum two elements here.
-            "method": "BDF",
+            "method": "hybr",
             "T_sim_max": 300,
         },
         ]

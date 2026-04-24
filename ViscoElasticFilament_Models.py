@@ -574,8 +574,7 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
             else:
                 sim_output = {"value": sol.y, "shape": sol.y.shape}            
         else:
-            # TODO: put method in sim_params['method']
-            sol = root(lambda x:g(0, x, *Args), int_params['X_0'], method='hybr') # method should be in ['hybr', 'lm', 'broyden1']
+            sol = root(lambda x:g(0, x, *Args), int_params['X_0'], method=sim_params["method"])
             J = approx_fprime(sol.x, lambda x: g(0, x, *Args), epsilon=1e-8)
             eigenvalues = np.linalg.eigvals(J)
             is_stable = np.all(np.real(eigenvalues) <= 0)  # (Meta-)stable if all Re(λ) <(=) 0
