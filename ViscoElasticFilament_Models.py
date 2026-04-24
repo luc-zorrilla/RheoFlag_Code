@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Sequence
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 from scipy.linalg import solve
+from scipy.optimize import root, approx_fprime
 from Models import Model, compose_model, parallel_simulate_batch
 import time
 
@@ -464,15 +465,18 @@ def g(
     A_DB = int(bool_EI) * ADB(taus_b, N)
     A_DS = tau_s * ADS(N)
 
-    # --- Flow ---
-    if InterpFlow == 0:
-        X_flow = np.array([0])
+    # --- Flow --- #
+    if callable(InterpFlow):
+        X_flow = InterpFlow(t) # Only t-dependent component
     else:
-        X_flow = InterpFlow(t)
-
+        if type(InterpFlow) == float:
+            X_flow = np.array([0])
+        elif InterpFlow.size == 2: 
+            X_flow = InterpFlow
+        
     X_dot_flow = Flow(X_3N, X_flow)
 
-    # --- BFlow (kept consistent with same idea) ---
+    # --- BFlow ---
     B_flow = np.zeros((N+2, 1))
 
     for j in range(N):
@@ -506,40 +510,11 @@ def g(
     except np.linalg.LinAlgError:
         X_dot = (np.linalg.pinv(A_tilde) @ B).ravel()
 
-    # --- Enforce base constraints ---
+    # --- Enforce base constraints: this is necessary to avoid error propagation. ---
     X_dot[0] = 0
     X_dot[1] = 0
 
     return X_dot
-
-# TODO: check this function better, 
-# and add the root-finding algorithm in the Simulate function (right below this one)
-def ViscoElasticFilament_EqFinding(int_params, ext_params, sim_params):
-    """ Run root-finding algorithm for a single instance of the viscoelastic filament. 
-    This method should ..."""
-
-    # 1. Find roots of f(X)
-    # from scipy.optimize import fsolve, root
-    
-    # Initial guess for equilibrium
-    # X0_guess = np.array([...])
-
-    # Root finding algorithm: method in ['hybr', 'lm', ...]
-    # result = root(g, X0_guess, args=(params,), method='hybr')
-    # X_eq = result.x
-
-    # 2. Verify stable equilibrium
-    # from scipy.optimize import approx_fprime
-
-    # def jacobian(X, params):
-    #     """Numerical Jacobian of f"""
-    #     return approx_fprime(X, lambda x: f(x, params), eps=1e-8)
-
-    # J = jacobian(X_eq, params)
-    # eigenvalues = np.linalg.eigvals(J)
-    # is_stable = np.all(np.real(eigenvalues) < 0)  # Stable if all Re(λ) < 0
-
-    return
 
 def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
     """
@@ -550,15 +525,15 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
 
     Args = (
         # Internal parameters
-        int_params['Sp4'], 
-        int_params['k0'], 
-        int_params['bool_EI'], 
+        int_params['Sp4'],
+        int_params['k0'],
+        int_params['bool_EI'],
         int_params['Beta'],
-        int_params['taus_b'], 
-        int_params['tau_s'], 
-        int_params['gamma'], 
-        int_params['n_L'], 
-        int_params['m_L'], 
+        int_params['taus_b'],
+        int_params['tau_s'],
+        int_params['gamma'],
+        int_params['n_L'],
+        int_params['m_L'],
         # External parameters
         ext_params['Lambdas'],
         ext_params['Zetas'], 
@@ -577,28 +552,35 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
             return 1
     time_limiter = StopOnTime(sim_params['T_sim_max'])
 
-    # Run the simulation # TODO: make two different algorithms depending if one wants eq solution of time-dependent solution
-    # if InterpFlow
-    
+    # Run the simulation
     try:
-        sol = solve_ivp(
-            fun = g, 
-            t_span = sim_params['T_span'], 
-            y0 = int_params['X_0'], 
-            args=Args, 
-            t_eval=sim_params['T_eval'], 
-            method = sim_params['method'], 
-            events=time_limiter.terminate_integration,
-        )
-        T_sim = time.time() - time_limiter.start_time
+        if callable(ext_params["InterpFlow"]):
+            sol = solve_ivp(
+                fun = g, 
+                t_span = sim_params['T_span'], 
+                y0 = int_params['X_0'],
+                args=Args, 
+                t_eval=sim_params['T_eval'], 
+                method = sim_params['method'], 
+                events=time_limiter.terminate_integration,
+            )
 
-        if sol.t_events[0].size > 0:
-            T_sim = np.inf
-            mistake = np.array(["Solving aborted: too long."])
-            print(mistake)
-            sim_output = {"value": None, "shape": None}
+            T_sim = time.time() - time_limiter.start_time
+            if sol.t_events[0].size > 0:
+                T_sim = np.inf
+                mistake = np.array(["Solving aborted: too long."])
+                print(mistake)
+                sim_output = {"value": None, "shape": None}
+            else:
+                sim_output = {"value": sol.y, "shape": sol.y.shape}            
         else:
-            sim_output = {"value": sol.y, "shape": sol.y.shape}
+            # TODO: put method in sim_params['method']
+            sol = root(lambda x:g(0, x, *Args), int_params['X_0'], method='hybr') # method should be in ['hybr', 'lm', 'broyden1']
+            J = approx_fprime(sol.x, lambda x: g(0, x, *Args), epsilon=1e-8)
+            eigenvalues = np.linalg.eigvals(J)
+            is_stable = np.all(np.real(eigenvalues) <= 0)  # (Meta-)stable if all Re(λ) <(=) 0
+            assert is_stable, f"Not meta-stable equilibrium: np.real(eigenvalues) <= 0 {np.real(eigenvalues)}"
+            sim_output = {"value": sol.x, "shape": sol.x.shape}   
 
     except Exception as ex:
         T_sim = np.inf
@@ -657,7 +639,7 @@ def FlowParams_to_InterpFlow(int_params, ext_params, sim_params):
     if ("NO FLOW" in X_flow_field_string):
         InterpFlow = 0
     elif ("CONSTANT FLOW" in X_flow_field_string):
-        InterpFlow = None # TODO: To be completed
+        InterpFlow = X_flow_field # TODO: To be completed
     else:         
         InterpFlow = interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
 
