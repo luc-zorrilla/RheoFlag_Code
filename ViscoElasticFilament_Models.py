@@ -411,9 +411,15 @@ def ActiveBending(X):
 
 ## --- Differential system AQX_dot = B --- ##
 
-def g(t, X, Sp4, k0, bool_EI, Beta, taus_b, tau_s=0,
-        gamma=2, n_L=[0,0], m_L=0,
-        Lambdas=0, Zetas=0, InterpFlow=0):
+def g(
+    t, 
+    X, 
+    Sp4, k0, bool_EI, Beta, 
+    taus_b, tau_s=0,
+    gamma=2, 
+    n_L=[0,0], m_L=0,
+    Lambdas=0, Zetas=0, InterpFlow=0
+):
 
     # --- Setup ---
     N = X.shape[0] - 2
@@ -517,7 +523,7 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
         int_params['Sp4'], 
         int_params['k0'], 
         int_params['bool_EI'], 
-        int_params['gamma'], 
+        int_params['Beta'],
         int_params['taus_b'], 
         int_params['tau_s'], 
         int_params['gamma'], 

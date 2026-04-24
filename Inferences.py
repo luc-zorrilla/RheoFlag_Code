@@ -369,7 +369,7 @@ class Inference:
         n_params = len(param_keys)
 
         self.hessian = sd.hessian(
-                f = Vectorize_Functional(
+                f = Vectorize_Functional( # TODO: can't I vectorize it always?? This could speed up computation.
                     lambda x: self.objective(x, param_keys), 
                     m = n_params,
                 ), 
@@ -439,7 +439,7 @@ class InferencePipeline:
         
         accumulated_params = {}  # Parameters inferred so far
         
-        for pass_idx, (pass_def, initial_guesses) in enumerate(
+        for pass_idx, (pass_def, initial_guesses) in enumerate( # This has to be computed sequentially.
             zip(self.passes, initial_guesses_per_pass)
         ):
             print(f"\n{'='*60}")
@@ -493,7 +493,7 @@ class InferencePipeline:
             self.results.append(best_result)
             
             # Update accumulated parameters: add newly inferred params
-            accumulated_params.update(best_result.params) # TODO: Warning! In pass 1 I need to constrain viscosity to 0, but in pass 2 no.
+            accumulated_params.update(best_result.params)
             self.parameter_trajectory.append(accumulated_params.copy())
             
             if verbose:
