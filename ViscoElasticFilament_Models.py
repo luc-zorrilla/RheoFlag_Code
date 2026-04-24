@@ -512,6 +512,35 @@ def g(
 
     return X_dot
 
+# TODO: check this function better, 
+# and add the root-finding algorithm in the Simulate function (right below this one)
+def ViscoElasticFilament_EqFinding(int_params, ext_params, sim_params):
+    """ Run root-finding algorithm for a single instance of the viscoelastic filament. 
+    This method should ..."""
+
+    # 1. Find roots of f(X)
+    # from scipy.optimize import fsolve, root
+    
+    # Initial guess for equilibrium
+    # X0_guess = np.array([...])
+
+    # Root finding algorithm: method in ['hybr', 'lm', ...]
+    # result = root(g, X0_guess, args=(params,), method='hybr')
+    # X_eq = result.x
+
+    # 2. Verify stable equilibrium
+    # from scipy.optimize import approx_fprime
+
+    # def jacobian(X, params):
+    #     """Numerical Jacobian of f"""
+    #     return approx_fprime(X, lambda x: f(x, params), eps=1e-8)
+
+    # J = jacobian(X_eq, params)
+    # eigenvalues = np.linalg.eigvals(J)
+    # is_stable = np.all(np.real(eigenvalues) < 0)  # Stable if all Re(λ) < 0
+
+    return
+
 def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
     """
     Run forward simulation for a single instance of the viscoelastic filament.
@@ -520,6 +549,7 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
     """
 
     Args = (
+        # Internal parameters
         int_params['Sp4'], 
         int_params['k0'], 
         int_params['bool_EI'], 
@@ -529,6 +559,7 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
         int_params['gamma'], 
         int_params['n_L'], 
         int_params['m_L'], 
+        # External parameters
         ext_params['Lambdas'],
         ext_params['Zetas'], 
         ext_params['InterpFlow'],
