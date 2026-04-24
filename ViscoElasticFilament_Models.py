@@ -574,6 +574,7 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
             else:
                 sim_output = {"value": sol.y, "shape": sol.y.shape}            
         else:
+            # Method "hybr" seems to be the only one that works, because it handles metastable eigenvalues (i.e., lambda = 0)
             sol = root(lambda x:g(0, x, *Args), int_params['X_0'], method=sim_params["method"])
             J = approx_fprime(sol.x, lambda x: g(0, x, *Args), epsilon=1e-8)
             eigenvalues = np.linalg.eigvals(J)
