@@ -79,11 +79,13 @@ class PipelinePass:
         ground_truths: List of ground truth arrays (or single array)
         ext_params_list: List of external params per ground truth (or single dict)
         sim_params_list: List of simulation params per ground truth (or single dict)
+        product_or_zip: whether or not to do a cartesian product of ext_params_list and sim_params_list
         param_keys_to_infer: Which internal parameters to infer in this pass
         fixed_params: Dict of {param_name: value} for parameters inferred in prior passes
         compose_int_params: Composition function for int_params (via compose_model)
         optimizer: optimizer class instance to run the inference optimisation
-        optimizer_kwargs: arguments for optimizer.
+        optimizer_kwargs: arguments for optimizer
+        
     """
     name: str
     model_class: Type
@@ -92,6 +94,7 @@ class PipelinePass:
     sim_params_list: List[Dict[str, Any]]
     param_keys_to_infer: List[str]
     fixed_params: Dict[str, float] = field(default_factory=dict)
+    product_or_zip: str = "product"
     compose_int_params: Optional[Callable] = None
     compose_ext_params: Optional[Callable] = None
     compose_sim_params: Optional[Callable] = None
@@ -131,6 +134,7 @@ class Inference:
         optimizer: Callable = None,
         optimizer_kwargs: Dict[str, Any] = None,
         n_jobs: int = -1,  # Parallelization across initial guesses AND objective calls
+        product_or_zip: str = "product",
     ):
         """
         Args:
@@ -159,6 +163,7 @@ class Inference:
             ground_truths,
             ext_params_list,
             sim_params_list,
+            product_or_zip,
         )
 
         # Verify consistency
@@ -172,14 +177,18 @@ class Inference:
         ground_truths: List[np.ndarray] | np.ndarray,
         ext_params_list: List[Any] | Any,
         sim_params_list: List[Any] | Any,
+        product_or_zip: str = "product",
     ) -> tuple:
         """
         Normalize ground_truths, ext_params_list, and sim_params_list together.
         
         - ext_params_list and sim_params_list are independent sets
-        - ground_truths must have length = len(ext_params_list) * len(sim_params_list)
-        - ext_params_list and sim_params_list are converted to Cartesian product order
-        
+        - ground_truths must have length:
+            -  len(ext_params_list) * len(sim_params_list) if product, 
+            - len(ext_params_list) == len(sim_params_list) if zip.
+        - ext_params_list and sim_params_list are converted to Cartesian product order, or a zip
+        - product_or_zip: "zip" or "product". Makes a product or a zip from ext_params_list, sim_params_list
+
         Args:
             ground_truths: Single array or list of arrays
             ext_params_list: Single dict or list of dicts
@@ -197,18 +206,28 @@ class Inference:
         sim_list = sim_params_list if isinstance(sim_params_list, list) else [sim_params_list]
         
         # ext_list and sim_list are independent; generate all combinations
-        n_conditions = len(ext_list) * len(sim_list)
+        if "product" in product_or_zip:
+            n_conditions = len(ext_list) * len(sim_list)
+        elif "zip" in product_or_zip:
+            if abs(len(sim_list) - len(ext_list)) > 0:
+                raise ValueError("sim_list and ext_list do not have the same length.")
+            n_conditions = len(ext_list)
+        else:
+            raise ValueError("product_or_zip should either be 'zip' or 'product'")
         
         # Verify ground_truths count matches
         if len(gt_list) != n_conditions:
             raise ValueError(
-                f"use_product=True: ground_truths length ({len(gt_list)}) "
-                f"must equal ext_params_list * sim_params_list "
-                f"({len(ext_list)} * {len(sim_list)} = {n_conditions})"
+                f"ground_truths length ({len(gt_list)}) "
+                f"must equal ext_params_list * sim_params_list (product) or ext_params_list (zip)"
+                f"({len(gt_list)} = {n_conditions})"
             )
         
-        # Create paired lists from product (in order)
-        paired_params = list(product(ext_list, sim_list))
+        # Create paired lists (in order)
+        if "product" in product_or_zip:
+            paired_params = list(product(ext_list, sim_list))
+        elif "zip" in product_or_zip:
+            paired_params = list(zip(ext_list, sim_list))
         ext_list = [ep for ep, _ in paired_params]
         sim_list = [sp for _, sp in paired_params]
         
@@ -464,6 +483,7 @@ class InferencePipeline:
                 optimizer=pass_def.optimizer,
                 optimizer_kwargs=pass_def.optimizer_kwargs,
                 n_jobs=self.n_jobs_per_pass,
+                product_or_zip=pass_def.product_or_zip,
             )
 
             # Run inference on all initial guesses for this pass

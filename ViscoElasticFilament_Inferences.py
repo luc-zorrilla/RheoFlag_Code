@@ -655,7 +655,7 @@ class TestViscoElasticFilament_OnePassInference_BendingShearViscosity:
             'bool_EI': True,      
             'Beta': 1e0,           
             'tau_b': 1e0,       # Ground truth to recover    
-            'tau_s': 1e0,       # Ground truth to recover
+            'tau_s': 1e3,       # Ground truth to recover
             'gamma': 2,         
             'n_L': [0,0],            
             'm_L': 0,             
@@ -677,7 +677,7 @@ class TestViscoElasticFilament_OnePassInference_BendingShearViscosity:
                 "Lambdas": [[0,0]]*N,
                 "Zetas": [0]*N,
                 "A":1e-6,
-                "w0":1e-1, # Dynamic flow
+                "w0":1e-3, # Dynamic flow
                 "psi":np.pi/2,
             },            
             #     {
@@ -702,6 +702,12 @@ class TestViscoElasticFilament_OnePassInference_BendingShearViscosity:
             "method": "BDF",
             "T_sim_max": 300,
         },
+        {
+            "T_span": (1e4, 2e4),
+            "T_eval": np.linspace(1e4, 2e4, int(1e1)), # minimum two elements here.
+            "method": "BDF",
+            "T_sim_max": 300,
+        },        
         ]
 
     @pytest.fixture
@@ -720,7 +726,7 @@ class TestViscoElasticFilament_OnePassInference_BendingShearViscosity:
         """
         ground_truths = []
         
-        for ext_params, sim_params in product(
+        for ext_params, sim_params in zip( # In this specific case, replace by zip because we have multiple sim_params which resp. correspond to ext_params
             ground_truth_ext_flow_params_dynamic_list,
             ground_truth_sim_params_dynamic_list
         ):
@@ -849,6 +855,7 @@ class TestViscoElasticFilament_OnePassInference_BendingShearViscosity:
             ground_truths=ground_truth_flow_data_dynamic_list,
             ext_params_list=ground_truth_ext_flow_params_dynamic_list,
             sim_params_list=ground_truth_sim_params_dynamic_list,
+            product_or_zip="zip",
             param_keys_to_infer=['tau_b', 'tau_s'],
             fixed_params={},
             optimizer=basinhopping_optimizer_instance,
@@ -957,14 +964,14 @@ class TestViscoElasticFilament_OnePassInference_BendingShearViscosity:
         print("="*60)
         
         # Check parameter trajectory
-        trajectory = multielastic_pipeline.get_parameter_trajectory()
+        trajectory = multiviscous_pipeline.get_parameter_trajectory()
         assert 'tau_b' in trajectory, "tau_b not in trajectory"
         assert 'tau_s' in trajectory, "tau_s not in trajectory"
         assert len(trajectory['tau_b']) == 1, "tau_b trajectory should have 1 steps"
         assert len(trajectory['tau_s']) == 1, "tau_s trajectory should have 1 steps"
         
         # Generate and verify summary
-        summary = multielastic_pipeline.summary()
+        summary = multiviscous_pipeline.summary()
         print(summary)
         assert summary, "Summary generation failed"
         
