@@ -11,6 +11,198 @@ from Models import compose_model
 # ============================================================================
 # FUNCTIONS
 # ============================================================================
+def transform_to_unbounded(t, bounds):
+    """
+    Transform unbounded R^n to bounded/semi-bounded domain.
+    
+    For each dimension:
+    - Fully bounded [a, b]: sigmoid transform x = a + (b-a) / (1 + exp(-t))
+    - Lower bounded [a, ∞): exponential transform x = a + exp(t)
+    - Upper bounded (-∞, b]: negative exponential x = b - exp(t)
+    - Unbounded (-∞, ∞): identity transform x = t
+    
+    Parameters:
+        t: ndarray of shape (n,) - unbounded variables
+        bounds: object with .lb and .ub attributes (arrays or None elements)
+    
+    Returns:
+        x: ndarray of shape (n,) - transformed variables
+    """
+    bounds_low = np.asarray(bounds.lb, dtype=object)
+    bounds_high = np.asarray(bounds.ub, dtype=object)
+    
+    x = np.zeros_like(t, dtype=float)
+    
+    for i in range(len(t)):
+        lower = bounds_low[i]
+        upper = bounds_high[i]
+        
+        lower_finite = lower is not None and np.isfinite(float(lower))
+        upper_finite = upper is not None and np.isfinite(float(upper))
+        
+        if lower_finite and upper_finite:
+            # Fully bounded [a, b]: sigmoid
+            lower_f = float(lower)
+            upper_f = float(upper)
+            sigmoid = 1.0 / (1.0 + np.exp(-t[i]))
+            x[i] = lower_f + (upper_f - lower_f) * sigmoid
+            
+        elif lower_finite and not upper_finite:
+            # Lower bounded [a, ∞): exponential
+            lower_f = float(lower)
+            x[i] = lower_f + np.exp(t[i])
+            
+        elif not lower_finite and upper_finite:
+            # Upper bounded (-∞, b]: negative exponential
+            upper_f = float(upper)
+            x[i] = upper_f - np.exp(t[i])
+            
+        else:
+            # Unbounded (-∞, ∞): identity
+            x[i] = t[i]
+    
+    return x
+
+def jacobian_diagonal(t, bounds):
+    """
+    Compute diagonal of Jacobian matrix for transformation.
+    
+    For each dimension:
+    - Fully bounded [a, b]: J_ii = (b-a) * sigmoid(t_i) * (1 - sigmoid(t_i))
+    - Lower bounded [a, ∞): J_ii = exp(t_i)
+    - Upper bounded (-∞, b]: J_ii = -exp(t_i)
+    - Unbounded (-∞, ∞): J_ii = 1.0
+    
+    Parameters:
+        t: ndarray of shape (n,) - unbounded variables
+        bounds: object with .lb and .ub attributes
+    
+    Returns:
+        diag_J: ndarray of shape (n,) - diagonal elements of Jacobian
+    """
+    bounds_low = np.asarray(bounds.lb, dtype=object)
+    bounds_high = np.asarray(bounds.ub, dtype=object)
+    
+    diag_J = np.zeros_like(t, dtype=float)
+    
+    for i in range(len(t)):
+        lower = bounds_low[i]
+        upper = bounds_high[i]
+        
+        lower_finite = lower is not None and np.isfinite(float(lower))
+        upper_finite = upper is not None and np.isfinite(float(upper))
+        
+        if lower_finite and upper_finite:
+            # Fully bounded [a, b]
+            lower_f = float(lower)
+            upper_f = float(upper)
+            sigmoid = 1.0 / (1.0 + np.exp(-t[i]))
+            diag_J[i] = (upper_f - lower_f) * sigmoid * (1.0 - sigmoid)
+            
+        elif lower_finite and not upper_finite:
+            # Lower bounded [a, ∞)
+            diag_J[i] = np.exp(t[i])
+            
+        elif not lower_finite and upper_finite:
+            # Upper bounded (-∞, b]
+            diag_J[i] = -np.exp(t[i])
+            
+        else:
+            # Unbounded (-∞, ∞)
+            diag_J[i] = 1.0
+    
+    return diag_J
+
+def inverse_transform(x, bounds):
+    """
+    Inverse of transform_to_unbounded: map from bounded space to parameter space.
+    
+    Used to find t0 that corresponds to a given x0.
+    
+    Parameters:
+        x: ndarray of shape (n,) - point in bounded domain
+        bounds: object with .lb and .ub attributes
+    
+    Returns:
+        t: ndarray of shape (n,) - corresponding unbounded parameter
+    """
+    bounds_low = np.asarray(bounds.lb, dtype=object)
+    bounds_high = np.asarray(bounds.ub, dtype=object)
+    
+    t = np.zeros_like(x, dtype=float)
+    
+    for i in range(len(x)):
+        lower = bounds_low[i]
+        upper = bounds_high[i]
+        
+        lower_finite = lower is not None and np.isfinite(float(lower))
+        upper_finite = upper is not None and np.isfinite(float(upper))
+        
+        if lower_finite and upper_finite:
+            # Fully bounded [a, b]: invert sigmoid
+            lower_f = float(lower)
+            upper_f = float(upper)
+            x_normalized = (x[i] - lower_f) / (upper_f - lower_f)
+            # Clip to avoid log(0) or log(inf)
+            x_normalized = np.clip(x_normalized, 1e-15, 1 - 1e-15)
+            t[i] = np.log(x_normalized / (1.0 - x_normalized))
+            
+        elif lower_finite and not upper_finite:
+            # Lower bounded [a, ∞): invert exponential
+            lower_f = float(lower)
+            t[i] = np.log(np.maximum(x[i] - lower_f, 1e-15))
+            
+        elif not lower_finite and upper_finite:
+            # Upper bounded (-∞, b]: invert negative exponential
+            upper_f = float(upper)
+            t[i] = np.log(np.maximum(upper_f - x[i], 1e-15))
+            
+        else:
+            # Unbounded (-∞, ∞): identity
+            t[i] = x[i]
+    
+    return t
+
+def compute_hessian_bounded(f, x0, bounds, **hessian_kwargs):
+    """
+    Compute Hessian of f with respect to bounded/semi-bounded variables.
+    
+    The function f operates on variables x in a potentially bounded domain.
+    We transform to unbounded space, compute the Hessian there, and transform back.
+    
+    Transformation: x = transform_to_unbounded(t, bounds)
+    Chain rule: H_x = J^T @ H_t @ J  (where J is diagonal Jacobian matrix)
+    
+    Parameters:
+        f: callable(x) - function on bounded domain
+        x0: ndarray of shape (n,) - point to evaluate Hessian (in bounded space)
+        bounds: object with .lb and .ub attributes
+            Each element can be a float or None (for unbounded sides)
+        **hessian_kwargs: passed to scipy.differentiate.hessian
+            (tolerances, maxiter, order, initial_step, step_factor)
+    
+    Returns:
+        H: ndarray of shape (n, n) - Hessian in bounded space at x0
+    """
+    # Find t0 that maps to x0
+    t0 = inverse_transform(x0, bounds)
+    
+    # Define wrapped function in unbounded space
+    def unbounded_function(t):
+        x = transform_to_unbounded(t, bounds)
+        return f(x)
+    
+    # Compute Hessian in unbounded space
+    H_unbounded = sd.hessian(unbounded_function, t0, **hessian_kwargs).ddf
+
+    # Compute Jacobian diagonal at t0
+    J_diag = jacobian_diagonal(t0, bounds)
+    J = np.diag(J_diag)
+    
+    # Transform back to bounded space: H_bounded = J @ H_unbounded @ J
+    H_bounded = J @ H_unbounded @ J
+    
+    return H_bounded
 
 def Vectorize_Functional(func, m):
     """ 
@@ -377,7 +569,7 @@ class Inference:
         )
         return results
     
-    def _compute_hessian(self, param_keys: Tuple[str, ...]):
+    def _compute_hessian(self, param_keys: Tuple[str, ...]): # TODO: add bounds
         """
         Compute Hessian numerically via finite differences.
         Invert to estimate parameter covariance (inverse of Fisher information).
@@ -386,13 +578,23 @@ class Inference:
             param_keys: Parameter names corresponding to optimization variables
         """
         n_params = len(param_keys)
+        vec_func = Vectorize_Functional( # TODO: can't I vectorize it always?? This could speed up computation.
+                lambda x: self.objective(x, param_keys), 
+                m = n_params,
+            )
 
-        self.hessian = sd.hessian(
-                f = Vectorize_Functional( # TODO: can't I vectorize it always?? This could speed up computation.
-                    lambda x: self.objective(x, param_keys), 
-                    m = n_params,
-                ), 
-                x = self.result.x).ddf
+        if "bounds" in self.optimizer_kwargs.keys():
+            self.hessian = compute_hessian_bounded(
+                f = vec_func, 
+                x0 = self.result.x, 
+                bounds = self.optimizer_kwargs['bounds'],
+            )
+
+        else:
+            self.hessian = sd.hessian(
+                f = vec_func,
+                x = self.result.x,
+            ).ddf
         
 
         # Invert Hessian to get covariance (approximation of parameter uncertainty)
@@ -493,7 +695,11 @@ class InferencePipeline:
 
             # ===== SELECT BEST RESULT =====
             # Choose the result with the lowest loss TODO See if this is what I want to do or not.
-            best_result = min(pass_results, key=lambda r: r.loss)
+
+            best_result = min(
+                pass_results, 
+                key=lambda r: np.inf if np.isfinite(r.loss) else r.loss,
+                )
             
             if verbose:
                 print(f"\nPass {pass_idx + 1} Results:")

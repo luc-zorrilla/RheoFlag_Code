@@ -18,9 +18,9 @@ import copy
 
 ### Optimization schemes
 
-class RandomDisplacementBounds(object):
+class RandomDisplacementBounds:
     """random displacement with bounds:  see: https://stackoverflow.com/a/21967888/2320035
-        Modified! (dropped acceptance-rejection sampling for a more specialized approach)
+        Modified: dropped acceptance-rejection sampling
     """
     def __init__(self, bounds, stepsize=0.5):
         self.bounds = bounds
@@ -42,8 +42,6 @@ def basinhopping_optimizer(
     objective,
     x0,
     bounds=None,
-    minimum_gradient=False,
-    minimum_hessian=True,
     local_minimizer_kwargs: Dict[str, Any] = None,
     global_minimizer_kwargs: Dict[str, Any] = None,
 ):
@@ -57,8 +55,6 @@ def basinhopping_optimizer(
         objective: Callable(flat_array) -> scalar loss
         x0: Initial guess (flat array)
         bounds: Bounds object (scipy.optimize.Bounds or custom with .residual() method), shared between global and local optimizers
-        minimum_gradient: Compute Jacobian at optimum (default False)
-        minimum_hessian: Compute Hessian at optimum (default True)
     
     Args (Local Minimizer):
         local_minimizer_kwargs: Dict with L-BFGS-B configuration by default:
@@ -66,7 +62,6 @@ def basinhopping_optimizer(
                 'method': 'L-BFGS-B', # Local optimization method
                 'jac': '3-point',  # Jacobian specification
                 'options':{
-                    'disp': True ,
                     'ftol':1e-8, 
                     'gtol':1e-8, 
                     'eps': 1e-8, 
@@ -81,8 +76,7 @@ def basinhopping_optimizer(
                 'niter': 9,  # Basin-hopping iterations
                 'stepsize': 5,  # Maximum step size for perturbations
                 'T': 0,  # Temperature for Metropolis acceptance
-                'tol': 1e-10,  # Early stopping tolerance
-                ... (other basin-hopping options)
+                'tol': 1e-10,  # Early stopping tolerance --> Not in basinhopping function
             }
     
     Returns:
@@ -91,8 +85,6 @@ def basinhopping_optimizer(
         - fun: Final loss value
         - success: Convergence success flag
         - nit: Number of basin-hopping iterations
-        - jacobian: Gradient at optimum (if minimum_gradient=True)
-        - hessian: Hessian at optimum (if minimum_hessian=True)
         - X_local, F_local: Local optimization trajectories
         - X_global, F_global, accept_global: Global search trajectory
     """
@@ -102,7 +94,6 @@ def basinhopping_optimizer(
         'method': 'L-BFGS-B', # Local optimization method
         'jac': '3-point',  # Jacobian specification
         'options':{
-            'disp': True , # ?
             'ftol':1e-8,  # Functional tolerance for local minimizer
             'gtol':1e-8,  # Gradient tolerance for local minimizer
             'eps': 1e-8,  # ?
@@ -128,7 +119,6 @@ def basinhopping_optimizer(
     jac = local_minimizer_kwargs.pop('jac', '3-point')
     options = local_minimizer_kwargs.pop(
         'options', {
-            'disp': True ,
             'ftol':1e-8, 
             'gtol':1e-8, 
             'eps': 1e-8, 
@@ -146,16 +136,20 @@ def basinhopping_optimizer(
                         hessp=None, bounds=None, constraints=(), tol=None, 
                         callback=None, options=None):
         """Wrapper to capture starting point of each local minimization."""
+        
         x = copy.deepcopy(x0)
         f = fun(x)
         X_local.append([x])
         F_local.append([f])
         
-        return minimize(
+        result_minimize = minimize(
             fun, x0, args=args, method=method, jac=jac, hess=hess, hessp=hessp,
             bounds=bounds, constraints=constraints, tol=tol, callback=callback,
-            options=options
+            options=options,
         )
+
+        print(result_minimize)
+        return result_minimize
     
     # --- Callback for local minimizer (L-BFGS-B) ---
     def local_callback_function(*, intermediate_result):
@@ -180,14 +174,20 @@ def basinhopping_optimizer(
     # --- Local minimizer full configuration ---
 
     local_minimizer_kwargs.update({
+        'method':method,
+        'jac':jac,
+        'options': options,        
         "bounds": bounds,
         "callback": local_callback_function,
     })
     
     # --- Global minimizer full configuration ---
-    bounded_step = RandomDisplacementBounds(bounds, stepsize=stepsize)
-    
+    bounded_step = RandomDisplacementBounds(bounds = bounds, stepsize=stepsize)
+
     global_minimizer_kwargs.update({
+        'niter': niter,
+        'stepsize':stepsize,
+        'T':T,
         'callback': global_callback_function,
         'minimize_wrapper': wrapped_minimize,
         'take_step': bounded_step,
@@ -201,41 +201,6 @@ def basinhopping_optimizer(
     )
     
     x_final = ret.x
-    
-    # --- Compute gradient/Hessian at convergence ---
-    if minimum_gradient or minimum_hessian:
-        m = x0.shape[0]
-        
-        if minimum_gradient:
-            if ret.success:
-                vec_func = Vectorize_Functional(objective, m)
-                # Determine step direction based on boundary proximity
-                sl, sb = bounds.residual(x_final)
-                if np.all(sl == 0):
-                    step_direction = 1
-                elif np.all(sb == 0):
-                    step_direction = -1
-                elif np.all(sl >= 0) & np.all(sb >= 0):
-                    step_direction = 0
-                else:
-                    step_direction = np.inf
-                
-                g = sd.jacobian(f=vec_func, x=x_final, step_direction=step_direction).df
-                ret.setdefault('jacobian', g)
-            else:
-                ret.setdefault('jacobian', np.ones(m) * np.inf)
-        
-        if minimum_hessian:
-            if ret.success:
-                vec_func = Vectorize_Functional(objective, m)
-                hess_result = sd.hessian(f=vec_func, x=x_final)
-                if hess_result.success:
-                    h = hess_result.ddf
-                else:
-                    h = np.zeros((m, m))
-                ret.setdefault('hessian', h)
-            else:
-                ret.setdefault('hessian', np.zeros((m, m)))
     
     # --- Attach optimization history ---
     ret.X_local = X_local
@@ -3201,14 +3166,11 @@ def model_params_only_flow(
     return ComposedModel
 
 def make_optimizer_kwargs(
-    bounds = Bounds(lb=[1e-6], ub=[np.inf]),
-    minimum_gradient = False,
-    minimum_hessian = False,
+    bounds = Bounds(lb=1e-6, ub=np.inf),
     local_minimizer_kwargs = {
         'method': 'L-BFGS-B',
         'jac': '3-point',
         'options': {
-            'disp': True,
             'ftol': 1e-8,
             'gtol': 1e-8,
             'eps': 1e-8,
@@ -3224,8 +3186,6 @@ def make_optimizer_kwargs(
 ):
     return {
         'bounds': bounds,
-        'minimum_gradient': minimum_gradient,
-        'minimum_hessian': minimum_hessian,
         'local_minimizer_kwargs': local_minimizer_kwargs,
         'global_minimizer_kwargs': global_minimizer_kwargs,
     }
@@ -3246,6 +3206,7 @@ if __name__ == "__main__":
 
     # Infer elasticities
     ## Bending elasticity (Sp4 = 1, Beta = 0)
+    ### Loop through A
     ## Shear elasticity (Sp4 = 0?, Beta = 1) --> Try and otherwise think of a potential transformation of (Sp4, Beta) -> ?
 
     # ====================
@@ -3260,91 +3221,132 @@ if __name__ == "__main__":
 
     ground_truth_int_params = make_ground_truth_int_params()
 
-    ground_truth_ext_params_list = [make_ground_truth_ext_params()]
-    # ground_truth_ext_params_list = make_ground_truth_ext_params_list()
-
-    ground_truth_sim_params_list = [make_ground_truth_sim_params()]
-    # ground_truth_sim_params_list = make_ground_truth_sim_params_list()
-
-    product_or_zip = "product"
-    ground_truth_data_list = make_ground_truth_data_list(
-        ground_truth_int_params,
-        ground_truth_ext_params_list,
-        ground_truth_sim_params_list,
-        product_or_zip,
-    )
-
-    # ======================
-    # ======= Models =======
-    # ======================
+    A_vec = np.pow(10, np.linspace(start = -6, stop = -2, num = 50))
     
-    params_keys_to_infer = ['Sp4']
-    BendingElasticModel = model_params_only_flow(
-        ground_truth_int_params,
-        params_keys_to_infer,        
-    )
+    # === Loop Inference through A === # TODO: could loop recursively on A and [A_0], [A_0, A_1], ...
+    results = []
+    results_cumul = []
+    for k in range(A_vec.shape[0]):
 
-    # ==========================
-    # ======= Optimizers =======
-    # ==========================
+        A = A_vec[k]
+        print("A", A)
 
-    optimizer = basinhopping_optimizer
-    bounds = Bounds(lb=[1e-6], ub=[np.inf])
-    optimizer_kwargs = make_optimizer_kwargs(bounds = bounds)
+        ground_truth_ext_params_list = [make_ground_truth_ext_params(A = A)]
+        ground_truth_ext_params_list_cumul = [make_ground_truth_ext_params(A = A) for A in A_vec[:k+1]]
 
-    # ==========================
-    # ========= Passes =========
-    # ==========================    
+        ground_truth_sim_params_list = [make_ground_truth_sim_params()]
 
-    # Pass 1: Reduced model, infer elasticities only
-
-    passes = [
-        PipelinePass(
-            name="Sp4 Inference (Elastic Model)",
-            model_class=BendingElasticModel,
-            ground_truths=ground_truth_data_list,
-            ext_params_list=ground_truth_ext_params_list,
-            sim_params_list=ground_truth_sim_params_list,
-            param_keys_to_infer=params_keys_to_infer,
-            fixed_params={},
-            optimizer=optimizer,
-            optimizer_kwargs=optimizer_kwargs,
-        ),
-    ]
-
-    # ============================
-    # ========= Pipeline =========
-    # ============================
-
-    n_jobs_per_pass = -1 # Use all cores within each pass
-    pipeline = InferencePipeline(
-            passes=passes,
-            loss_fn=loss_fn,
-            n_jobs_per_pass=n_jobs_per_pass,  
+        product_or_zip = "product"
+        ground_truth_data_list = make_ground_truth_data_list(
+            ground_truth_int_params,
+            ground_truth_ext_params_list,
+            ground_truth_sim_params_list,
+            product_or_zip,
+        )
+        ground_truth_data_list_cumul = make_ground_truth_data_list(
+            ground_truth_int_params,
+            ground_truth_ext_params_list_cumul,
+            ground_truth_sim_params_list,
+            product_or_zip,
         )
 
-    # ============================
-    # =========== Guess ==========
-    # ============================
+        # ======================
+        # ======= Models =======
+        # ======================
+        
+        params_keys_to_infer = ['Sp4']
+        BendingElasticModel = model_params_only_flow(
+            ground_truth_int_params,
+            params_keys_to_infer,        
+        )
 
-    initial_guesses_per_pass = [
-        [
-            {'Sp4': 1e-1},
-            # {'Sp4': 1e1},
-            # {'Sp4': 1e2},
-        ],
-    ]
+        # ==========================
+        # ======= Optimizers =======
+        # ==========================
 
-    # ============================
-    # =========== Run ============
-    # ============================    
+        optimizer = basinhopping_optimizer
+        bounds = Bounds(lb=[1e-6], ub=[np.inf])
+        optimizer_kwargs = make_optimizer_kwargs(bounds = bounds)
 
-    results = pipeline.run(initial_guesses_per_pass, verbose=True)
+        # ==========================
+        # ========= Passes =========
+        # ==========================    
 
-    print("results", results)
-    exit()
+        # Pass 1: Reduced model, infer elasticities only
+
+        passes = [
+            PipelinePass(
+                name="Sp4 Inference (Elastic Model)",
+                model_class=BendingElasticModel,
+                ground_truths=ground_truth_data_list,
+                ext_params_list=ground_truth_ext_params_list,
+                sim_params_list=ground_truth_sim_params_list,
+                param_keys_to_infer=params_keys_to_infer,
+                fixed_params={},
+                optimizer=optimizer,
+                optimizer_kwargs=optimizer_kwargs,
+            ),
+        ]
+
+
+        passes_cumul = [
+            PipelinePass(
+                name="Sp4 Inference (Elastic Model)",
+                model_class=BendingElasticModel,
+                ground_truths=ground_truth_data_list_cumul,
+                ext_params_list=ground_truth_ext_params_list_cumul,
+                sim_params_list=ground_truth_sim_params_list,
+                param_keys_to_infer=params_keys_to_infer,
+                fixed_params={},
+                optimizer=optimizer,
+                optimizer_kwargs=optimizer_kwargs,
+            ),
+        ]
+
+        # ============================
+        # ========= Pipeline =========
+        # ============================
+
+        n_jobs_per_pass = -1 # Use all cores within each pass
+        pipeline = InferencePipeline(
+                passes=passes,
+                loss_fn=loss_fn,
+                n_jobs_per_pass=n_jobs_per_pass,  
+            )
+        pipeline_cumul = InferencePipeline(
+                passes=passes_cumul,
+                loss_fn=loss_fn,
+                n_jobs_per_pass=n_jobs_per_pass,  
+            )
+
+        # ============================
+        # =========== Guess ==========
+        # ============================
+
+        initial_guesses_per_pass = [
+            [
+                {'Sp4': 1e-1},
+                # {'Sp4': 1e1},
+                # {'Sp4': 1e2},
+            ],
+        ]
+
+        # ============================
+        # =========== Run ============
+        # ============================    
+
+        result = pipeline.run(initial_guesses_per_pass, verbose=True)
+        results.append(result)
+        print("")
+
+        result_cumul = pipeline_cumul.run(initial_guesses_per_pass, verbose=True)
+        results_cumul.append(result_cumul)
+        print("")
 
     # ============================
     # =========== Save ===========
-    # ============================  
+    # ============================
+
+    print("results:", results)
+    print("results_cumul:", results_cumul)
                 

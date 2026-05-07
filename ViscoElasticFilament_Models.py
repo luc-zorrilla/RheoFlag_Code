@@ -421,6 +421,7 @@ def g(
     n_L=[0,0], m_L=0, # Boundary conditions (at the tip)
     Lambdas=0, Zetas=0, InterpFlow=0, # External forcings: resp. force at node, torque at node, flow
 ):
+    """ TODO: Missing description. """
 
     # --- Setup ---
     N = X.shape[0] - 2
@@ -431,7 +432,7 @@ def g(
     theta = X_3N[2*N:, 0]
 
     # --- Boundary conditions ---
-    n_0 = n_L
+    n_0 = n_L # This is later turned into a no-translation condition at the base, to avoid error propagation.
     m_0 = k0 * X[2]
 
     # --- Precompute GG ---
@@ -510,11 +511,35 @@ def g(
     except np.linalg.LinAlgError:
         X_dot = (np.linalg.pinv(A_tilde) @ B).ravel()
 
-    # --- Enforce base constraints: this is necessary to avoid error propagation. ---
+    # --- Enforce no-translation at the base (and not rotation at base): this is necessary to avoid error propagation.
     X_dot[0] = 0
     X_dot[1] = 0
+    # --- Warning:  Those will translate into 0 eigenvalues when using a fixed-point search algorithm.
 
     return X_dot
+
+def make_g_no_basal_translation( # TODO start using it in ViscoElasticFilament_Simulate
+    t, 
+    reduced_X, 
+    Sp4, k0, bool_EI, Beta, # Hydrodynamic-Elasticity timescales
+    taus_b, tau_s=0, # Internal Viscosity-Elasticity timescales
+    gamma=2, # Drag ratio (RFT)
+    n_L=[0,0], m_L=0, # Boundary conditions (at the tip)
+    Lambdas=0, Zetas=0, InterpFlow=0, # External forcings: resp. force at node, torque at node, flow
+    ):
+        """ Compute g but get rid of unnecessary fixed variables (X_0, Y_0) = (0, 0). """
+        augmented_X = np.hstack(([0,0], reduced_X)).reshape(-1,)
+        g_computed = g(    
+            t, 
+            augmented_X, 
+            Sp4, k0, bool_EI, Beta, # Hydrodynamic-Elasticity timescales
+            taus_b, tau_s=0, # Internal Viscosity-Elasticity timescales
+            gamma=2, # Drag ratio (RFT)
+            n_L=[0,0], m_L=0, # Boundary conditions (at the tip)
+            Lambdas=0, Zetas=0, InterpFlow=0, # External forcings: resp. force at node, torque at node, flow)
+        )
+
+        return g_computed[2:]
 
 def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
     """
@@ -554,7 +579,7 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
 
     # Run the simulation
     try:
-        if callable(ext_params["InterpFlow"]):
+        if callable(ext_params["InterpFlow"]): # Solve ODE by integrating in time
             sol = solve_ivp(
                 fun = g, 
                 t_span = sim_params['T_span'], 
@@ -572,21 +597,34 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
                 print(mistake)
                 sim_output = {"value": None, "shape": None}
             else:
-                sim_output = {"value": sol.y, "shape": sol.y.shape}            
-        else:
+                sim_output = {"value": sol.y, "shape": sol.y.shape}  
+
+        else: # Root finding algorithm
+            
+            # Warning: excluded the first two coordinates because they are numerically fixed to 0 to avoid error propagation # TODO: use g_no_basal_translation instead
+
             # Method "hybr" seems to be the only one that works, because it handles metastable eigenvalues (i.e., lambda = 0)
-            sol = root(lambda x:g(0, x, *Args), int_params['X_0'], method=sim_params["method"])
-            J = approx_fprime(sol.x, lambda x: g(0, x, *Args), epsilon=1e-8)
+            sol = root(lambda x:g(0, np.hstack(([0,0], x)).reshape(int_params['N']+2,), *Args)[2:], int_params['X_0'][2:], method=sim_params["method"]) 
+            
+            # Stability analysis
+            ## Jacobian
+            epsilon = np.sqrt(np.finfo(float).eps) * (1 + np.abs(sol.x))
+            J = approx_fprime(sol.x, lambda x: g(0, np.hstack(([0,0], x)).reshape(int_params['N']+2,), *Args)[2:], epsilon=epsilon)
             eigenvalues = np.linalg.eigvals(J)
-            is_stable = np.all(np.real(eigenvalues) <= 0)  # (Meta-)stable if all Re(λ) <(=) 0
-            assert is_stable, f"Not meta-stable equilibrium: np.real(eigenvalues) <= 0 {np.real(eigenvalues)}"
-            sim_output = {"value": sol.x, "shape": sol.x.shape}   
+
+            ## Sign of eigenvalues
+            tol = 1e-6 # Tolerance for numerical precision (before, we had tol = 0)
+            is_stable = np.all(np.real(eigenvalues) <= tol) # (Meta-)stable if all Re(λ) <(=) 0. Equality means meta-stable.        
+            assert is_stable, f"NOT Meta-stable equilibrium: np.real(eigenvalues) {np.real(eigenvalues)} <= 0"# and Sp4 = {int_params['Sp4']}" #, {np.real(eigenvalues) <= 0}, {is_stable}"
+            
+            sol.x = np.hstack(([0,0], sol.x)).reshape(int_params['N']+2,)
+            sim_output = {"value": sol.x, "shape": sol.x.shape}
 
     except Exception as ex:
         T_sim = np.inf
         mistake = np.array([str(ex)])
-        print(mistake)
-        sim_output = {"value": None, "shape": None}
+        # print(mistake)
+        sim_output = {"value": np.nan, "shape": np.nan}
 
     return sim_output
 
