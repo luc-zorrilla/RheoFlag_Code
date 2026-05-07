@@ -415,11 +415,11 @@ def ActiveBending(X):
 def g(
     t, 
     X, 
-    Sp4, k0, bool_EI, Beta, 
-    taus_b, tau_s=0,
-    gamma=2, 
-    n_L=[0,0], m_L=0,
-    Lambdas=0, Zetas=0, InterpFlow=0,
+    Sp4, k0, bool_EI, Beta, # Hydrodynamic-Elasticity timescales
+    taus_b, tau_s=0, # Internal Viscosity-Elasticity timescales
+    gamma=2, # Drag ratio (RFT)
+    n_L=[0,0], m_L=0, # Boundary conditions (at the tip)
+    Lambdas=0, Zetas=0, InterpFlow=0, # External forcings: resp. force at node, torque at node, flow
 ):
 
     # --- Setup ---
