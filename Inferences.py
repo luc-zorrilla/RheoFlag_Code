@@ -7,6 +7,8 @@ from scipy.optimize import minimize, OptimizeResult
 import scipy.differentiate as sd
 from itertools import product
 from Models import compose_model
+import dill as pickle
+from pathlib import Path
 
 # ============================================================================
 # FUNCTIONS
@@ -258,7 +260,18 @@ class InferenceResult:
     iterations: int = 0
     success: bool = False
     message: str = ""
+    optimizer_result: Optional[OptimizeResult] = None
 
+    def save(self, filepath: str) -> None:
+        """Save to disk using dill."""
+        with open(filepath, 'wb') as f:
+            pickle.dump(self, f)
+    
+    @staticmethod
+    def load(filepath: str) -> 'InferenceResult':
+        """Load from disk using dill."""
+        with open(filepath, 'rb') as f:
+            return pickle.load(f)
 
 @dataclass
 class PipelinePass:
@@ -532,7 +545,7 @@ class Inference:
             iterations=self.result.nit,
             success=self.result.success,
             message=self.result.message,
-            # TODO: add optimizer result directly?
+            optimizer_result = self.result,
         )
     
     def infer_batch(
@@ -569,7 +582,7 @@ class Inference:
         )
         return results
     
-    def _compute_hessian(self, param_keys: Tuple[str, ...]): # TODO: add bounds
+    def _compute_hessian(self, param_keys: Tuple[str, ...]):
         """
         Compute Hessian numerically via finite differences.
         Invert to estimate parameter covariance (inverse of Fisher information).

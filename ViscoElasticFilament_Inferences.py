@@ -11,6 +11,9 @@ from scipy.optimize import minimize, Bounds
 from _basinhopping_mod import *
 import numpy as np
 from itertools import product
+from pathlib import Path
+writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_BendingElasticity' / 'VaryingA')
+writing_path.mkdir(parents=True, exist_ok=True)
 
 from typing import Dict, Any, Callable
 import pytest
@@ -3043,22 +3046,6 @@ def make_ground_truth_ext_params(
         "w0":w0,
         "psi":psi,            
     }
-    
-# def make_ground_truth_ext_params_list( # TODO: not sure if necessary
-#     Lambdas = [[0,0]]*10,
-#     Zetas = [0]*10,
-#     A = 1e-6,
-#     w0 = 0, # Static flow
-#     psi = np.pi/2,    
-# ):
-#     assert abs(len(Lambdas) - len(Zetas)) == 0, f"{abs(len(Lambdas) - len(Zetas))} != 0"
-#     return [{
-#         "Lambdas": Lambdas,
-#         "Zetas": Zetas,
-#         "A":A,
-#         "w0":w0,
-#         "psi":psi,            
-#     }]
 
 def make_ground_truth_sim_params(
     T_span = (1e6, 2e6),
@@ -3072,19 +3059,6 @@ def make_ground_truth_sim_params(
         "method": method,
         "T_sim_max": T_sim_max,            
     }
-
-# def make_ground_truth_sim_params_list( # TODO: not sure if necessary
-#     T_span = (1e6, 2e6),
-#     T_eval = np.linspace(1e6, 2e6, int(1e0)),
-#     method = "hybr",
-#     T_sim_max = 300,
-# ):
-#     return [{
-#         "T_span": T_span,
-#         "T_eval": T_eval,
-#         "method": method,
-#         "T_sim_max": T_sim_max,            
-#     }]
 
 def make_ground_truth_data_list(
     ground_truth_int_params,
@@ -3223,9 +3197,8 @@ if __name__ == "__main__":
 
     A_vec = np.pow(10, np.linspace(start = -6, stop = -2, num = 50))
     
-    # === Loop Inference through A === # TODO: could loop recursively on A and [A_0], [A_0, A_1], ...
-    results = []
-    results_cumul = []
+    # === Loop Inference through A ===
+
     for k in range(A_vec.shape[0]):
 
         A = A_vec[k]
@@ -3335,18 +3308,25 @@ if __name__ == "__main__":
         # =========== Run ============
         # ============================    
 
-        result = pipeline.run(initial_guesses_per_pass, verbose=True)
-        results.append(result)
+        
+        result = pipeline.run(initial_guesses_per_pass, verbose=True)[0] # First pass result
+        print("result:", result)
         print("")
 
-        result_cumul = pipeline_cumul.run(initial_guesses_per_pass, verbose=True)
-        results_cumul.append(result_cumul)
+        result_cumul = pipeline_cumul.run(initial_guesses_per_pass, verbose=True)[0] # First pass result
+        print("result_cumul:", result_cumul)
         print("")
 
-    # ============================
-    # =========== Save ===========
-    # ============================
+        # ============================
+        # =========== Save ===========
+        # ============================
 
-    print("results:", results)
-    print("results_cumul:", results_cumul)
+        base_id = f"A={A}"
+        filename = str((writing_path / ("result_" + base_id + ".pkl")).resolve())
+        result.save(filename)
+
+        base_id = f"A_min={A_vec[0]}_A_max={A}"
+        filename = str((writing_path / ("result_cumul_" + base_id + ".pkl")).resolve())
+        result_cumul.save(filename)
+
                 
