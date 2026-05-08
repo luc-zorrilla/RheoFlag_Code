@@ -3321,11 +3321,11 @@ if __name__ == "__main__":
         # =========== Save ===========
         # ============================
 
-        base_id = f"A={A}"
+        base_id = f"k={k}"
         filename = str((writing_path / ("result_" + base_id + ".pkl")).resolve())
         result.save(filename)
 
-        base_id = f"A_min={A_vec[0]}_A_max={A}"
+        base_id = f"k_min={0}_k_max={k}"
         filename = str((writing_path / ("result_cumul_" + base_id + ".pkl")).resolve())
         result_cumul.save(filename)
 
