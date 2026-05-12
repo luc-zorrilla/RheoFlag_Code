@@ -12,8 +12,6 @@ from _basinhopping_mod import *
 import numpy as np
 from itertools import product
 from pathlib import Path
-writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_BendingElasticity' / 'VaryingA')
-writing_path.mkdir(parents=True, exist_ok=True)
 
 from typing import Dict, Any, Callable
 import pytest
@@ -3179,154 +3177,316 @@ if __name__ == "__main__":
     """ Main """
 
     # Infer elasticities
+
     ## Bending elasticity (Sp4 = 1, Beta = 0)
     ### Loop through A
-    ## Shear elasticity (Sp4 = 0?, Beta = 1) --> Try and otherwise think of a potential transformation of (Sp4, Beta) -> ?
 
-    # ====================
-    # ======= Loss =======
-    # ====================
+    if False:
 
-    loss_fn = rel_mse_loss_fn()
+        # ====================
+        # ======= Path =======
+        # ====================
 
-    # ======================
-    # ==== Ground Truth ====
-    # ======================
+        writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_BendingElasticity' / 'VaryingA')
+        writing_path.mkdir(parents=True, exist_ok=True)
 
-    ground_truth_int_params = make_ground_truth_int_params()
+        # ====================
+        # ======= Loss =======
+        # ====================
 
-    A_vec = np.pow(10, np.linspace(start = -6, stop = -2, num = 100))
+        loss_fn = rel_mse_loss_fn()
+
+        # ======================
+        # ==== Ground Truth ====
+        # ======================
+
+        ground_truth_int_params = make_ground_truth_int_params()
+
+        A_vec = np.pow(10, np.linspace(start = -6, stop = -2, num = 100))
+        
+        # === Loop Inference through A ===
+
+        for k in range(A_vec.shape[0]):
+
+            A = A_vec[k]
+            print("A", A)
+
+            ground_truth_ext_params_list = [make_ground_truth_ext_params(A = A)]
+            ground_truth_ext_params_list_cumul = [make_ground_truth_ext_params(A = A) for A in A_vec[:k+1]]
+
+            ground_truth_sim_params_list = [make_ground_truth_sim_params()]
+
+            product_or_zip = "product"
+            ground_truth_data_list = make_ground_truth_data_list(
+                ground_truth_int_params,
+                ground_truth_ext_params_list,
+                ground_truth_sim_params_list,
+                product_or_zip,
+            )
+            ground_truth_data_list_cumul = make_ground_truth_data_list(
+                ground_truth_int_params,
+                ground_truth_ext_params_list_cumul,
+                ground_truth_sim_params_list,
+                product_or_zip,
+            )
+
+            # ======================
+            # ======= Models =======
+            # ======================
+            
+            params_keys_to_infer = ['Sp4']
+            BendingElasticModel = model_params_only_flow(
+                ground_truth_int_params,
+                params_keys_to_infer,        
+            )
+
+            # ==========================
+            # ======= Optimizers =======
+            # ==========================
+
+            optimizer = basinhopping_optimizer
+            bounds = Bounds(lb=[1e-6], ub=[np.inf])
+            optimizer_kwargs = make_optimizer_kwargs(bounds = bounds)
+
+            # ==========================
+            # ========= Passes =========
+            # ==========================    
+
+            # Pass 1: Reduced model, infer elasticities only
+
+            passes = [
+                PipelinePass(
+                    name="Sp4 Inference (Elastic Model)",
+                    model_class=BendingElasticModel,
+                    ground_truths=ground_truth_data_list,
+                    ext_params_list=ground_truth_ext_params_list,
+                    sim_params_list=ground_truth_sim_params_list,
+                    param_keys_to_infer=params_keys_to_infer,
+                    fixed_params={},
+                    optimizer=optimizer,
+                    optimizer_kwargs=optimizer_kwargs,
+                ),
+            ]
+
+
+            passes_cumul = [
+                PipelinePass(
+                    name="Sp4 Inference (Elastic Model)",
+                    model_class=BendingElasticModel,
+                    ground_truths=ground_truth_data_list_cumul,
+                    ext_params_list=ground_truth_ext_params_list_cumul,
+                    sim_params_list=ground_truth_sim_params_list,
+                    param_keys_to_infer=params_keys_to_infer,
+                    fixed_params={},
+                    optimizer=optimizer,
+                    optimizer_kwargs=optimizer_kwargs,
+                ),
+            ]
+
+            # ============================
+            # ========= Pipeline =========
+            # ============================
+
+            n_jobs_per_pass = -1 # Use all cores within each pass
+            pipeline = InferencePipeline(
+                    passes=passes,
+                    loss_fn=loss_fn,
+                    n_jobs_per_pass=n_jobs_per_pass,  
+                )
+            pipeline_cumul = InferencePipeline(
+                    passes=passes_cumul,
+                    loss_fn=loss_fn,
+                    n_jobs_per_pass=n_jobs_per_pass,  
+                )
+
+            # ============================
+            # =========== Guess ==========
+            # ============================
+
+            initial_guesses_per_pass = [
+                [
+                    {'Sp4': 1e-1},
+                    # {'Sp4': 1e1},
+                    # {'Sp4': 1e2},
+                ],
+            ]
+
+            # ============================
+            # =========== Run ============
+            # ============================    
+
+            
+            result = pipeline.run(initial_guesses_per_pass, verbose=True)[0] # First pass result
+            print("result:", result)
+            print("")
+
+            result_cumul = pipeline_cumul.run(initial_guesses_per_pass, verbose=True)[0] # First pass result
+            print("result_cumul:", result_cumul)
+            print("")
+
+            # ============================
+            # =========== Save ===========
+            # ============================
+
+            base_id = f"k={k}"
+            filename = str((writing_path / ("result_" + base_id + ".pkl")).resolve())
+            result.save(filename)
+
+            base_id = f"k_min={0}_k_max={k}"
+            filename = str((writing_path / ("result_cumul_" + base_id + ".pkl")).resolve())
+            result_cumul.save(filename)
+
+    ## Shear elasticity (Sp4 = 1e-6, Beta = 1)
+    ### Loop through A    
     
-    # === Loop Inference through A ===
+    if True:
 
-    for k in range(A_vec.shape[0]):
+        # ====================
+        # ======= Path =======
+        # ====================
 
-        A = A_vec[k]
-        print("A", A)
+        writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_ShearElasticity' / 'VaryingA')
+        writing_path.mkdir(parents=True, exist_ok=True)
 
-        ground_truth_ext_params_list = [make_ground_truth_ext_params(A = A)]
-        ground_truth_ext_params_list_cumul = [make_ground_truth_ext_params(A = A) for A in A_vec[:k+1]]
+        # ====================
+        # ======= Loss =======
+        # ====================
 
-        ground_truth_sim_params_list = [make_ground_truth_sim_params()]
-
-        product_or_zip = "product"
-        ground_truth_data_list = make_ground_truth_data_list(
-            ground_truth_int_params,
-            ground_truth_ext_params_list,
-            ground_truth_sim_params_list,
-            product_or_zip,
-        )
-        ground_truth_data_list_cumul = make_ground_truth_data_list(
-            ground_truth_int_params,
-            ground_truth_ext_params_list_cumul,
-            ground_truth_sim_params_list,
-            product_or_zip,
-        )
+        loss_fn = rel_mse_loss_fn()
 
         # ======================
-        # ======= Models =======
+        # ==== Ground Truth ====
         # ======================
+
+        ground_truth_int_params = make_ground_truth_int_params(Sp4 = 1, Beta = 1)
+
+        A_vec = np.pow(10, np.linspace(start = -4, stop = 0, num = 100))
         
-        params_keys_to_infer = ['Sp4']
-        BendingElasticModel = model_params_only_flow(
-            ground_truth_int_params,
-            params_keys_to_infer,        
-        )
+        # === Loop Inference through A ===
 
-        # ==========================
-        # ======= Optimizers =======
-        # ==========================
+        for k in range(A_vec.shape[0]):
 
-        optimizer = basinhopping_optimizer
-        bounds = Bounds(lb=[1e-6], ub=[np.inf])
-        optimizer_kwargs = make_optimizer_kwargs(bounds = bounds)
+            A = A_vec[k]
+            print("A", A)
 
-        # ==========================
-        # ========= Passes =========
-        # ==========================    
+            ground_truth_ext_params_list = [make_ground_truth_ext_params(A = A)]
+            ground_truth_ext_params_list_cumul = [make_ground_truth_ext_params(A = A) for A in A_vec[:k+1]]
 
-        # Pass 1: Reduced model, infer elasticities only
+            ground_truth_sim_params_list = [make_ground_truth_sim_params()]
 
-        passes = [
-            PipelinePass(
-                name="Sp4 Inference (Elastic Model)",
-                model_class=BendingElasticModel,
-                ground_truths=ground_truth_data_list,
-                ext_params_list=ground_truth_ext_params_list,
-                sim_params_list=ground_truth_sim_params_list,
-                param_keys_to_infer=params_keys_to_infer,
-                fixed_params={},
-                optimizer=optimizer,
-                optimizer_kwargs=optimizer_kwargs,
-            ),
-        ]
-
-
-        passes_cumul = [
-            PipelinePass(
-                name="Sp4 Inference (Elastic Model)",
-                model_class=BendingElasticModel,
-                ground_truths=ground_truth_data_list_cumul,
-                ext_params_list=ground_truth_ext_params_list_cumul,
-                sim_params_list=ground_truth_sim_params_list,
-                param_keys_to_infer=params_keys_to_infer,
-                fixed_params={},
-                optimizer=optimizer,
-                optimizer_kwargs=optimizer_kwargs,
-            ),
-        ]
-
-        # ============================
-        # ========= Pipeline =========
-        # ============================
-
-        n_jobs_per_pass = -1 # Use all cores within each pass
-        pipeline = InferencePipeline(
-                passes=passes,
-                loss_fn=loss_fn,
-                n_jobs_per_pass=n_jobs_per_pass,  
+            product_or_zip = "product"
+            ground_truth_data_list = make_ground_truth_data_list(
+                ground_truth_int_params,
+                ground_truth_ext_params_list,
+                ground_truth_sim_params_list,
+                product_or_zip,
             )
-        pipeline_cumul = InferencePipeline(
-                passes=passes_cumul,
-                loss_fn=loss_fn,
-                n_jobs_per_pass=n_jobs_per_pass,  
+            ground_truth_data_list_cumul = make_ground_truth_data_list(
+                ground_truth_int_params,
+                ground_truth_ext_params_list_cumul,
+                ground_truth_sim_params_list,
+                product_or_zip,
             )
 
-        # ============================
-        # =========== Guess ==========
-        # ============================
+            # ======================
+            # ======= Models =======
+            # ======================
+            
+            params_keys_to_infer = ['Beta']
+            ShearElasticModel = model_params_only_flow(
+                ground_truth_int_params,
+                params_keys_to_infer,        
+            )
 
-        initial_guesses_per_pass = [
-            [
-                {'Sp4': 1e-1},
-                # {'Sp4': 1e1},
-                # {'Sp4': 1e2},
-            ],
-        ]
+            # ==========================
+            # ======= Optimizers =======
+            # ==========================
 
-        # ============================
-        # =========== Run ============
-        # ============================    
+            optimizer = basinhopping_optimizer
+            bounds = Bounds(lb=[1e-6], ub=[np.inf]) # TODO: Check if boundaries are correct when Sp4 = 0
+            optimizer_kwargs = make_optimizer_kwargs(bounds = bounds)
 
-        
-        result = pipeline.run(initial_guesses_per_pass, verbose=True)[0] # First pass result
-        print("result:", result)
-        print("")
+            # ==========================
+            # ========= Passes =========
+            # ==========================    
 
-        result_cumul = pipeline_cumul.run(initial_guesses_per_pass, verbose=True)[0] # First pass result
-        print("result_cumul:", result_cumul)
-        print("")
+            # Pass 1: Reduced model, infer elasticities only
 
-        # ============================
-        # =========== Save ===========
-        # ============================
+            passes = [
+                PipelinePass(
+                    name="Beta Inference (Elastic Model)",
+                    model_class=ShearElasticModel,
+                    ground_truths=ground_truth_data_list,
+                    ext_params_list=ground_truth_ext_params_list,
+                    sim_params_list=ground_truth_sim_params_list,
+                    param_keys_to_infer=params_keys_to_infer,
+                    fixed_params={},
+                    optimizer=optimizer,
+                    optimizer_kwargs=optimizer_kwargs,
+                ),
+            ]
 
-        base_id = f"k={k}"
-        filename = str((writing_path / ("result_" + base_id + ".pkl")).resolve())
-        result.save(filename)
+            passes_cumul = [
+                PipelinePass(
+                    name="Beta Inference (Elastic Model)",
+                    model_class=ShearElasticModel,
+                    ground_truths=ground_truth_data_list_cumul,
+                    ext_params_list=ground_truth_ext_params_list_cumul,
+                    sim_params_list=ground_truth_sim_params_list,
+                    param_keys_to_infer=params_keys_to_infer,
+                    fixed_params={},
+                    optimizer=optimizer,
+                    optimizer_kwargs=optimizer_kwargs,
+                ),
+            ]
 
-        base_id = f"k_min={0}_k_max={k}"
-        filename = str((writing_path / ("result_cumul_" + base_id + ".pkl")).resolve())
-        result_cumul.save(filename)
+            # ============================
+            # ========= Pipeline =========
+            # ============================
 
-                
+            n_jobs_per_pass = -1 # Use all cores within each pass
+            pipeline = InferencePipeline(
+                    passes=passes,
+                    loss_fn=loss_fn,
+                    n_jobs_per_pass=n_jobs_per_pass,  
+                )
+            pipeline_cumul = InferencePipeline(
+                    passes=passes_cumul,
+                    loss_fn=loss_fn,
+                    n_jobs_per_pass=n_jobs_per_pass,  
+                )
+
+            # ============================
+            # =========== Guess ==========
+            # ============================
+
+            initial_guesses_per_pass = [
+                [
+                    {'Beta': 1e-1},
+                ],
+            ]
+
+            # ============================
+            # =========== Run ============
+            # ============================    
+
+            
+            result = pipeline.run(initial_guesses_per_pass, verbose=True)[0] # First pass result
+            print("result:", result)
+            print("")
+
+            result_cumul = pipeline_cumul.run(initial_guesses_per_pass, verbose=True)[0] # First pass result
+            print("result_cumul:", result_cumul)
+            print("")
+
+            # ============================
+            # =========== Save ===========
+            # ============================
+
+            base_id = f"k={k}"
+            filename = str((writing_path / ("result_" + base_id + ".pkl")).resolve())
+            result.save(filename)
+
+            base_id = f"k_min={0}_k_max={k}"
+            filename = str((writing_path / ("result_cumul_" + base_id + ".pkl")).resolve())
+            result_cumul.save(filename)        

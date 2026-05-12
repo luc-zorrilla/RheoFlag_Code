@@ -505,7 +505,7 @@ def g(
     # --- System matrix ---
     A_tilde = (Sp4 * A - Beta * A_DS) @ Q - A_DB
 
-    # --- Solve ---
+    # --- Solve A_tilde @ X_dot = B => X_dot = inv(A_tilde) @ B ---
     try:
         X_dot = np.linalg.solve(A_tilde, B).ravel()
     except np.linalg.LinAlgError:
@@ -600,7 +600,7 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
                 sim_output = {"value": sol.y, "shape": sol.y.shape}  
 
         else: # Root finding algorithm
-            
+
             # Warning: excluded the first two coordinates because they are numerically fixed to 0 to avoid error propagation # TODO: use g_no_basal_translation instead
 
             # Method "hybr" seems to be the only one that works, because it handles metastable eigenvalues (i.e., lambda = 0)
