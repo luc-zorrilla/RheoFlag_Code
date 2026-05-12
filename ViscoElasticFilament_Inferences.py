@@ -3195,7 +3195,7 @@ if __name__ == "__main__":
 
     ground_truth_int_params = make_ground_truth_int_params()
 
-    A_vec = np.pow(10, np.linspace(start = -6, stop = -2, num = 50))
+    A_vec = np.pow(10, np.linspace(start = -6, stop = -2, num = 100))
     
     # === Loop Inference through A ===
 
