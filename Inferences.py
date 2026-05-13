@@ -495,7 +495,12 @@ class Inference:
             )
         )
         
-        return sum(losses)    
+        # return sum(losses)
+
+        valid_losses = [loss for loss in losses if np.isfinite(loss)]
+        if not valid_losses:
+            return np.inf  # Penalize if all losses are NaN
+        return sum(valid_losses)
     
     def infer(
         self,

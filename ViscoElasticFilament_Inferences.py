@@ -13,7 +13,9 @@ import numpy as np
 from itertools import product
 from pathlib import Path
 
-from typing import Dict, Any, Callable
+import json
+from dataclasses import asdict, dataclass
+from typing import Optional, List, Dict, Any, Callable
 import pytest
 import copy
 
@@ -212,2775 +214,6 @@ def basinhopping_optimizer(
     
     return ret
 
-# # ====================
-# # ======= Loss =======
-# # ====================
-
-# @pytest.fixture
-# def mse_loss_fn() -> Callable:
-#     """
-#     Define Mean Square Error loss function.
-#     Returns np.inf if prediction is None (failed simulation).
-#     """
-#     def loss_fn(predicted: np.ndarray, ground_truth: np.ndarray) -> float:
-#         if predicted is None:
-#             return np.inf
-#         # Flatten arrays
-#         pred_flat = np.asarray(predicted).flatten()
-#         truth_flat = np.asarray(ground_truth).flatten()
-        
-#         # Truncate to match lengths
-#         min_len = min(len(pred_flat), len(truth_flat))
-#         return np.linalg.norm(pred_flat[:min_len] - truth_flat[:min_len])**2 / np.linalg.norm(truth_flat[:min_len])**2
-    
-#     return loss_fn
-
-# class TestViscoElasticFilament_OnePassInference_BendingShearElasticity:
-#     """ Infer Sp4 and Beta in a one-pass inference, with 
-#         - static experimental data in the first pass, with varying flow amplitude
-
-#     Parameters to be inferred:
-#         - Sp4
-#         - Beta
-#     """
-
-#     # ======================
-#     # ==== Ground Truth ====
-#     # ======================
-
-#     @pytest.fixture
-#     def ground_truth_int_params(self):
-#         """
-#         Define internal parameters with a known Sp4 ground truth value.
-#         All other parameters are fixed for inference.
-#         """
-#         N = 10
-#         X0 = StraightLine(N)
-#         return {
-#             'Sp4': 1e0,           # Ground truth to recover
-#             'N': 10,            
-#             'k0': 1e13,            
-#             'bool_EI': True,      
-#             'Beta': 1e0,           # Ground truth to recover
-#             'tau_b': 0,           
-#             'tau_s': 0,       
-#             'gamma': 2,         
-#             'n_L': [0,0],            
-#             'm_L': 0,             
-#             'X_0': X0,  # Initial state
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_ext_flow_params_static_list(self):
-#         """Define external parameters for static response (fixed during inference)."""
-#         N = 10
-#         return [{
-#                 "Lambdas": [[0,0]]*N,
-#                 "Zetas": [0]*N,
-#                 "A":1e-6,
-#                 "w0":0, # Static flow
-#                 "psi":np.pi/2,
-#             },
-#                 {
-#                 "Lambdas": [[0,0]]*N,
-#                 "Zetas": [0]*N,
-#                 "A":2e-6,
-#                 "w0":0, # Static flow
-#                 "psi":np.pi/2,
-#             },      
-#             #     {
-#             #     "Lambdas": [[0,0]]*N,
-#             #     "Zetas": [0]*N,
-#             #     "A":3e-6,
-#             #     "w0":0, # Static flow
-#             #     "psi":np.pi/2,
-#             # },              
-#             #     {
-#             #     "Lambdas": [[0,0]]*N,
-#             #     "Zetas": [0]*N,
-#             #     "A":4e-6,
-#             #     "w0":0, # Static flow
-#             #     "psi":np.pi/2,
-#             # },
-#             #     {
-#             #     "Lambdas": [[0,0]]*N,
-#             #     "Zetas": [0]*N,
-#             #     "A":5e-6,
-#             #     "w0":0, # Static flow
-#             #     "psi":np.pi/2,
-#             # },                            
-#         ]
-
-#     @pytest.fixture
-#     def ground_truth_sim_params_static_list(self):
-#         """
-#         Define simulation parameters.
-#         Use "broyden1" or "hybr" method for root finding algorithm (fixed point). 
-#         Remark: Due to the metastable status of X (clamped), "hybr" works better.
-#         """
-#         return [{
-#             "T_span": (1e6, 2e6),
-#             "T_eval": np.linspace(1e6, 2e6, int(1e0)), # minimum two elements here.
-#             "method": "hybr",
-#             "T_sim_max": 300,
-#         },
-#         ]
-
-#     @pytest.fixture
-#     def ground_truth_flow_data_static_list(
-#         self,
-#         ground_truth_int_params,
-#         ground_truth_ext_flow_params_static_list,
-#         ground_truth_sim_params_static_list,
-#     ):
-#         """
-#         Generate ground truth data using the 
-#         ViscoElasticFilament_FlowParams_ScalarBending model with known parameters
-#         across multiple external and simulation parameter sets.
-        
-#         Returns a list of ground truth arrays (one per condition).
-#         """
-#         ground_truths = []
-        
-#         for ext_params, sim_params in product(
-#             ground_truth_ext_flow_params_static_list,
-#             ground_truth_sim_params_static_list
-#         ):
-#             # Instantiate model with ground truth internal parameters
-#             instance = ViscoElasticFilament_FlowParams_ScalarBending( 
-#                 ground_truth_int_params,
-#                 ext_params,
-#                 sim_params
-#             )
-            
-#             # Simulate to generate ground truth
-#             sim_result = instance.simulate_single()
-#             gt_data = sim_result['value']
-            
-#             ground_truths.append(gt_data)
-        
-#         return ground_truths
-    
-#     # ======================
-#     # ======= Models =======
-#     # ======================
-
-#     @pytest.fixture
-#     def elastic_model_flow_sp4_beta_only(
-#         self,
-#         ground_truth_int_params
-#     ):
-#         """
-#         Create a composed model for ViscoElasticFilament_FlowParams that
-#             - only varies Sp4 and Beta
-        
-#         The embedding function accepts a reduced parameter dict {'Sp4': value, 'Beta': value}
-#         and embeds it into the full internal parameters, keeping all others fixed.
-#         """
-#         fixed_params = ground_truth_int_params.copy()
-        
-#         def embed_sp4_beta_flow(
-#             reduced_int_params: Dict[str, float],
-#             ext_params: Any,
-#             sim_params: Any,
-#         ) -> Dict[str, Any]:
-#             """
-#             Transform reduced internal parameters into full int_params dict.
-            
-#             Args:
-#                 reduced_int_params: Dict containing {'Sp4': inferred_value, 'Beta': inferred_value}
-#                 ext_params: Passed through unchanged (not modified here)
-#                 sim_params: Passed through unchanged (not modified here)
-            
-#             Returns:
-#                 Full int_params dict with Sp4 and Beta updated, all other values fixed.
-#             """
-#             full_params = fixed_params.copy()
-            
-#             # Update only Sp4 and Beta; all other parameters remain fixed
-#             if 'Sp4' in reduced_int_params:
-#                 full_params['Sp4'] = reduced_int_params['Sp4']
-#             if 'Beta' in reduced_int_params:
-#                 full_params['Beta'] = reduced_int_params['Beta']                
-            
-#             return full_params
-        
-#         # Create composed model with the embedding function
-#         MultiElasticModel = compose_model(
-#             ViscoElasticFilament_FlowParams_ScalarBending,
-#             compose_int_params=embed_sp4_beta_flow,
-#         )
-#         return MultiElasticModel
-
-#     # ==========================
-#     # ======= Optimizers =======
-#     # ==========================
-
-#     @pytest.fixture
-#     def basinhopping_optimizer_instance(self):
-#         """
-#         Return the basinhopping optimizer function with standard configuration.
-#         """
-#         return basinhopping_optimizer        
-
-#     @pytest.fixture
-#     def optimizer_kwargs_sp4_beta(self):
-#         return {
-#             'bounds': Bounds(lb=[1e-6, 0], ub=[np.inf, np.inf]),
-#             'minimum_gradient': False,
-#             'minimum_hessian': False,
-#             'local_minimizer_kwargs': {
-#                 'method': 'L-BFGS-B',
-#                 'jac': '3-point',
-#                 'options': {
-#                     'disp': True,
-#                     'ftol': 1e-8,
-#                     'gtol': 1e-8,
-#                     'eps': 1e-8,
-#                     'finite_diff_rel_step': 1e-6,
-#                 },
-#             },
-#             'global_minimizer_kwargs': {
-#                 'niter': 9,
-#                 'T': 0,
-#                 'stepsize': 5,
-#                 'tol': 1e-10,
-#             }
-#         }
-
-#     # ==========================
-#     # ========= Passes =========
-#     # ==========================
-
-#     # Pass 1: Reduced model, infer Sp4 and Beta only
-#     @pytest.fixture
-#     def pass_1(
-#         self,
-#         elastic_model_flow_sp4_beta_only,
-#         ground_truth_ext_flow_params_static_list,
-#         ground_truth_sim_params_static_list,
-#         ground_truth_flow_data_static_list,
-#         basinhopping_optimizer_instance,
-#         optimizer_kwargs_sp4_beta,
-#     ):
-#         """ First pass for the viscoelastic inference. """
-        
-#         first_pass = PipelinePass(
-#             name="Sp4-Beta Inference (MultiElastic Model)",
-#             model_class=elastic_model_flow_sp4_beta_only,
-#             ground_truths=ground_truth_flow_data_static_list,
-#             ext_params_list=ground_truth_ext_flow_params_static_list,
-#             sim_params_list=ground_truth_sim_params_static_list,
-#             param_keys_to_infer=['Sp4', 'Beta'],
-#             fixed_params={},
-#             optimizer=basinhopping_optimizer_instance,
-#             optimizer_kwargs=optimizer_kwargs_sp4_beta,
-#         )
-
-#         return first_pass
-
-#     # ============================
-#     # ========= Pipeline =========
-#     # ============================
-#     @pytest.fixture
-#     def multielastic_pipeline(self, pass_1, mse_loss_fn):
-
-#         pipeline = InferencePipeline(
-#             passes=[pass_1],
-#             loss_fn=mse_loss_fn,
-#             n_jobs_per_pass=-1,  # Use all cores within each pass
-#         )
-#         return pipeline
-
-#     # ============================
-#     # ========= Tests =========
-#     # ============================
-#     def test_multielastic_inference(
-#         self,
-#         multielastic_pipeline,
-#     ):
-        
-#         # Multiple initial guesses: Pass 1 for Sp4, Pass 2 for tau_b
-#         initial_guesses_per_pass = [
-#             [
-#                 {'Sp4': 10.0, 'Beta':0.0},
-#                 # {'Sp4': 0.1, 'Beta':1.0},
-#                 # {'Sp4': 1.0, 'Beta':0.0},
-#             ],
-#         ]
-        
-#         # ===== ACT =====
-#         results = multielastic_pipeline.run(initial_guesses_per_pass, verbose=True)
-        
-#         # ===== ASSERT =====
-        
-#         # Check that we got exactly one result (one pass)
-#         assert len(results) == 1, "Expected one InferenceResult for one-pass pipeline"
-        
-#         result_pass1 = results[0]
-        
-#         # ===== PASS 1: Sp4-Beta INFERENCE =====
-#         print("\n" + "="*60)
-#         print("PASS 1 ASSERTIONS (Sp4-Beta inference)")
-#         print("="*60)
-        
-#         # 1. Check Pass 1 convergence
-#         assert result_pass1.success, (
-#             f"Pass 1 optimization did not converge. Message: {result_pass1.message}"
-#         )
-#         assert result_pass1.iterations > 0, "Pass 1: No iterations were performed"
-        
-#         # 2. Check Sp4 exists and is physically reasonable
-#         assert 'Sp4' in result_pass1.params, "Sp4 not in Pass 1 inferred parameters"
-#         sp4_inferred = result_pass1.params['Sp4']
-#         assert sp4_inferred > 0, f"Sp4 must be positive, got {sp4_inferred}"
-#         assert sp4_inferred < 1e6, f"Sp4 unreasonably large: {sp4_inferred}"
-
-#         # 3. Check Beta exists and is physically reasonable
-#         assert 'Beta' in result_pass1.params, "Beta not in Pass 1 inferred parameters"
-#         Beta_inferred = result_pass1.params['Beta']
-#         assert Beta_inferred >= 0, f"Beta must be positive, got {Beta_inferred}"
-#         assert Beta_inferred < 1e6, f"Beta unreasonably large: {Beta_inferred}"
-        
-#         # 4. Check Pass 1 loss
-#         assert result_pass1.loss > 0, "Pass 1 loss should be positive"
-#         assert result_pass1.loss < 1e2, (
-#             f"Pass 1 loss suspiciously high: {result_pass1.loss}. Check model/data scale."
-#         )
-        
-#         # 5. Check Pass 1 uncertainty quantification
-#         assert result_pass1.covariance is not None, "Pass 1: Covariance not computed"
-#         assert result_pass1.hessian is not None, "Pass 1: Hessian not computed"
-#         assert result_pass1.std_errors is not None, "Pass 1: Standard errors not computed"
-#         assert len(result_pass1.std_errors) == 2, "Pass 1: Expected 2 std_error for 2 parameter (Sp4, Beta)"
-        
-#         std_err_sp4 = result_pass1.std_errors[0]
-#         assert std_err_sp4 > 0, f"Pass 1: Sp4 std error must be positive, got {std_err_sp4}"
-#         assert std_err_sp4 < sp4_inferred * 10, (
-#             f"Pass 1: Std error unreasonably large relative to Sp4: "
-#             f"Sp4={sp4_inferred:.3e} ± {std_err_sp4:.3e}"
-#         )
-        
-#         std_err_Beta = result_pass1.std_errors[1]
-#         assert std_err_Beta > 0, f"Pass 1: Beta std error must be positive, got {std_err_Beta}"
-#         assert std_err_Beta < Beta_inferred * 10, (
-#             f"Pass 1: Std error unreasonably large relative to Beta: "
-#             f"Sp4={Beta_inferred:.3e} ± {std_err_Beta:.3e}"
-#         )
-
-#         print(f"✓ Pass 1 - Sp4 inferred: {sp4_inferred:.6e} ± {std_err_sp4:.6e}")
-#         print(f"✓ Pass 1 - Beta inferred: {Beta_inferred:.6e} ± {std_err_Beta:.6e}")
-#         print(f"✓ Pass 1 - Final loss: {result_pass1.loss:.8e}")
-#         print(f"✓ Pass 1 - Iterations: {result_pass1.iterations}")
-        
-#         # ===== PIPELINE-LEVEL ASSERTIONS =====
-#         print("\n" + "="*60)
-#         print("PIPELINE-LEVEL ASSERTIONS")
-#         print("="*60)
-        
-#         # Check parameter trajectory
-#         trajectory = multielastic_pipeline.get_parameter_trajectory()
-#         assert 'Sp4' in trajectory, "Sp4 not in trajectory"
-#         assert 'Beta' in trajectory, "Beta not in trajectory"
-#         assert len(trajectory['Sp4']) == 1, "Sp4 trajectory should have 1 steps"
-#         assert len(trajectory['Beta']) == 1, "Beta trajectory should have 1 steps"
-        
-#         # Generate and verify summary
-#         summary = multielastic_pipeline.summary()
-#         print(summary)
-#         assert summary, "Summary generation failed"
-        
-#         print("\n✓ ALl one-pass inference tests passed!")
-
-# class TestViscoElasticFilament_OnePassInference_BendingShearViscosity:
-#     """ Infer tau_b and tau_s in a one-pass inference, with 
-#         - fixed Sp4 = 1, Beta = 1
-#         - dynamic experimental data in the first pass, with varying ?? # TODO: think about this
-
-#     Parameters to be inferred:
-#         - tau_b
-#         - tau_s
-#     """
-
-#     # ======================
-#     # ==== Ground Truth ====
-#     # ======================
-
-#     @pytest.fixture
-#     def ground_truth_int_params(self):
-#         """
-#         Define internal parameters with known tau_b and tau_s ground truth value.
-#         All other parameters are fixed for inference.
-#         """
-#         N = 10
-#         X0 = StraightLine(N)
-#         return {
-#             'Sp4': 1e0,          
-#             'N': 10,            
-#             'k0': 1e13,            
-#             'bool_EI': True,      
-#             'Beta': 1e0,           
-#             'tau_b': 1e0,       # Ground truth to recover    
-#             'tau_s': 1e0,       # Ground truth to recover
-#             'gamma': 2,         
-#             'n_L': [0,0],            
-#             'm_L': 0,             
-#             'X_0': X0,  # Initial state
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_ext_flow_params_dynamic_list(self):
-#         """Define external parameters for dynamic response (fixed during inference)."""
-#         N = 10
-#         return [{
-#                 "Lambdas": [[0,0]]*N,
-#                 "Zetas": [0]*N,
-#                 "A":1e-6,
-#                 "w0":1e0, # Dynamic flow
-#                 "psi":np.pi/2,
-#             },
-#             {
-#                 "Lambdas": [[0,0]]*N,
-#                 "Zetas": [0]*N,
-#                 "A":1e-6,
-#                 "w0":1e1, # Dynamic flow
-#                 "psi":np.pi/2,
-#             },            
-#                 {
-#                 "Lambdas": [[0,0]]*N,
-#                 "Zetas": [0]*N,
-#                 "A":2e-6,
-#                 "w0":1e-1, # Static flow
-#                 "psi":np.pi/2,
-#             },               
-#         ]
-
-
-#     @pytest.fixture
-#     def ground_truth_sim_params_dynamic_list(self):
-#         """
-#         Define simulation parameters.
-#         Use BDF method for faster convergence compared to RK45.
-#         """
-#         return [{
-#             "T_span": (1e1, 2e1),
-#             "T_eval": np.linspace(1e1, 2e1, int(1e2)), # minimum two elements here.
-#             "method": "BDF",
-#             "T_sim_max": 300,
-#         },
-#         {
-#             "T_span": (1e0, 2e0),
-#             "T_eval": np.linspace(1e0, 2e0, int(1e2)), # minimum two elements here.
-#             "method": "BDF",
-#             "T_sim_max": 300,
-#         },        
-#         {
-#             "T_span": (1e2, 2e2),
-#             "T_eval": np.linspace(1e2, 2e2, int(1e2)), # minimum two elements here.
-#             "method": "BDF",
-#             "T_sim_max": 300,
-#         },
-#         ]
-
-#     @pytest.fixture
-#     def ground_truth_flow_data_dynamic_list(
-#         self,
-#         ground_truth_int_params,
-#         ground_truth_ext_flow_params_dynamic_list,
-#         ground_truth_sim_params_dynamic_list,
-#     ):
-#         """
-#         Generate ground truth data using the 
-#         ViscoElasticFilament_FlowParams_ScalarBending model with known parameters
-#         across multiple external and simulation parameter sets.
-        
-#         Returns a list of ground truth arrays (one per condition).
-#         """
-#         ground_truths = []
-        
-#         for ext_params, sim_params in zip( # Decide here: zip or product
-#             ground_truth_ext_flow_params_dynamic_list,
-#             ground_truth_sim_params_dynamic_list
-#         ):
-#             # Instantiate model with ground truth internal parameters
-#             instance = ViscoElasticFilament_FlowParams_ScalarBending( 
-#                 ground_truth_int_params,
-#                 ext_params,
-#                 sim_params
-#             )
-            
-#             # Simulate to generate ground truth
-#             sim_result = instance.simulate_single()
-#             gt_data = sim_result['value']
-            
-#             ground_truths.append(gt_data)
-        
-#         return ground_truths
-    
-#     # ======================
-#     # ======= Models =======
-#     # ======================
-
-#     @pytest.fixture
-#     def viscous_model_flow_tau_b_tau_s_only(
-#         self,
-#         ground_truth_int_params
-#     ):
-#         """
-#         Create a composed model for ViscoElasticFilament_FlowParams that
-#             - only varies tau_b and tau_s
-        
-#         The embedding function accepts a reduced parameter dict {'tau_b': value, 'tau_s': value}
-#         and embeds it into the full internal parameters, keeping all others fixed.
-#         """
-#         fixed_params = ground_truth_int_params.copy()
-        
-#         def embed_tau_b_tau_s_flow(
-#             reduced_int_params: Dict[str, float],
-#             ext_params: Any,
-#             sim_params: Any,
-#         ) -> Dict[str, Any]:
-#             """
-#             Transform reduced internal parameters into full int_params dict.
-            
-#             Args:
-#                 reduced_int_params: Dict containing {'tau_b': inferred_value, 'tau_s': inferred_value}
-#                 ext_params: Passed through unchanged (not modified here)
-#                 sim_params: Passed through unchanged (not modified here)
-            
-#             Returns:
-#                 Full int_params dict with tau_b and tau_s updated, all other values fixed.
-#             """
-#             full_params = fixed_params.copy()
-            
-#             # Update only Sp4 and Beta; all other parameters remain fixed
-#             if 'tau_b' in reduced_int_params:
-#                 full_params['tau_b'] = reduced_int_params['tau_b']
-#             if 'tau_s' in reduced_int_params:
-#                 full_params['tau_s'] = reduced_int_params['tau_s']                
-            
-#             return full_params
-        
-#         # Create composed model with the embedding function
-#         MultiViscousModel = compose_model(
-#             ViscoElasticFilament_FlowParams_ScalarBending,
-#             compose_int_params=embed_tau_b_tau_s_flow,
-#         )
-#         return MultiViscousModel
-
-#     # ==========================
-#     # ======= Optimizers =======
-#     # ==========================
-
-#     @pytest.fixture
-#     def basinhopping_optimizer_instance(self):
-#         """
-#         Return the basinhopping optimizer function with standard configuration.
-#         """
-#         return basinhopping_optimizer        
-
-#     @pytest.fixture
-#     def optimizer_kwargs_tau_b_tau_s(self):
-#         return {
-#             'bounds': Bounds(lb=[0, 0], ub=[np.inf, np.inf]),
-#             'minimum_gradient': False,
-#             'minimum_hessian': False,
-#             'local_minimizer_kwargs': {
-#                 'method': 'L-BFGS-B',
-#                 'jac': '3-point',
-#                 'options': {
-#                     'disp': True,
-#                     'ftol': 1e-8,
-#                     'gtol': 1e-8,
-#                     'eps': 1e-8,
-#                     'finite_diff_rel_step': 1e-6,
-#                 },
-#             },
-#             'global_minimizer_kwargs': {
-#                 'niter': 9,
-#                 'T': 0,
-#                 'stepsize': 5,
-#                 'tol': 1e-10,
-#             }
-#         }
-
-#     # ==========================
-#     # ========= Passes =========
-#     # ==========================
-
-#     # Pass 1: Reduced model, infer tau_b and tau_s only
-#     @pytest.fixture
-#     def pass_1(
-#         self,
-#         viscous_model_flow_tau_b_tau_s_only,
-#         ground_truth_ext_flow_params_dynamic_list,
-#         ground_truth_sim_params_dynamic_list,
-#         ground_truth_flow_data_dynamic_list,
-#         basinhopping_optimizer_instance,
-#         optimizer_kwargs_tau_b_tau_s,
-#     ):
-#         """ First pass for the viscoelastic inference. """
-        
-#         first_pass = PipelinePass(
-#             name="tau_b-tau_s Inference (MultiViscous Model)",
-#             model_class=viscous_model_flow_tau_b_tau_s_only,
-#             ground_truths=ground_truth_flow_data_dynamic_list,
-#             ext_params_list=ground_truth_ext_flow_params_dynamic_list,
-#             sim_params_list=ground_truth_sim_params_dynamic_list,
-#             product_or_zip="zip",
-#             param_keys_to_infer=['tau_b', 'tau_s'],
-#             fixed_params={},
-#             optimizer=basinhopping_optimizer_instance,
-#             optimizer_kwargs=optimizer_kwargs_tau_b_tau_s,
-#         )
-
-#         return first_pass
-
-#     # ============================
-#     # ========= Pipeline =========
-#     # ============================
-#     @pytest.fixture
-#     def multiviscous_pipeline(self, pass_1, mse_loss_fn):
-
-#         pipeline = InferencePipeline(
-#             passes=[pass_1],
-#             loss_fn=mse_loss_fn,
-#             n_jobs_per_pass=-1,  # Use all cores within each pass
-#         )
-#         return pipeline
-
-#     # ============================
-#     # ========= Tests =========
-#     # ============================
-#     def test_multiviscous_inference(
-#         self,
-#         multiviscous_pipeline,
-#     ):
-        
-#         # Multiple initial guesses: Pass 1 for tau_b
-#         initial_guesses_per_pass = [
-#             [
-#                 {'tau_b': 0.0, 'tau_s':0.0},
-#                 {'tau_b': 0.0, 'tau_s':0.0},
-#                 {'tau_b': 0.0, 'tau_s':0.0},
-#                 {'tau_b': 0.0, 'tau_s':0.0},
-#             ],
-#         ]
-        
-#         # ===== ACT =====
-#         results = multiviscous_pipeline.run(initial_guesses_per_pass, verbose=True)
-        
-#         # ===== ASSERT =====
-        
-#         # Check that we got exactly one result (one pass)
-#         assert len(results) == 1, "Expected one InferenceResult for one-pass pipeline"
-        
-#         result_pass1 = results[0]
-        
-#         # ===== PASS 1: Sp4-Beta INFERENCE =====
-#         print("\n" + "="*60)
-#         print("PASS 1 ASSERTIONS (tau_b-tau_s inference)")
-#         print("="*60)
-        
-#         # 1. Check Pass 1 convergence
-#         assert result_pass1.success, (
-#             f"Pass 1 optimization did not converge. Message: {result_pass1.message}"
-#         )
-#         assert result_pass1.iterations > 0, "Pass 1: No iterations were performed"
-        
-#         # 2. Check tau_b exists and is physically reasonable
-#         assert 'tau_b' in result_pass1.params, "tau_b not in Pass 1 inferred parameters"
-#         tau_b_inferred = result_pass1.params['tau_b']
-#         assert tau_b_inferred >= 0, f"tau_b must be positive, got {tau_b_inferred}"
-#         assert tau_b_inferred < 1e6, f"tau_b unreasonably large: {tau_b_inferred}"
-
-#         # 3. Check tau_s exists and is physically reasonable
-#         assert 'tau_s' in result_pass1.params, "tau_s not in Pass 1 inferred parameters"
-#         tau_s_inferred = result_pass1.params['tau_s']
-#         assert tau_s_inferred >= 0, f"tau_s must be positive, got {tau_s_inferred}"
-#         assert tau_s_inferred < 1e6, f"tau_s unreasonably large: {tau_s_inferred}"
-        
-#         # 4. Check Pass 1 loss
-#         assert result_pass1.loss > 0, "Pass 1 loss should be positive"
-#         assert result_pass1.loss < 1e2, (
-#             f"Pass 1 loss suspiciously high: {result_pass1.loss}. Check model/data scale."
-#         )
-        
-#         # 5. Check Pass 1 uncertainty quantification
-#         assert result_pass1.covariance is not None, "Pass 1: Covariance not computed"
-#         assert result_pass1.hessian is not None, "Pass 1: Hessian not computed"
-#         assert result_pass1.std_errors is not None, "Pass 1: Standard errors not computed"
-#         assert len(result_pass1.std_errors) == 2, "Pass 1: Expected 2 std_error for 2 parameter (tau_b, tau_s)"
-        
-#         std_err_tau_b = result_pass1.std_errors[0]
-#         assert std_err_tau_b > 0, f"Pass 1: tau_b std error must be positive, got {std_err_tau_b}"
-#         assert std_err_tau_b < tau_b_inferred * 10, (
-#             f"Pass 1: Std error unreasonably large relative to tau_b: "
-#             f"tau_b={tau_b_inferred:.3e} ± {std_err_tau_b:.3e}"
-#         )
-        
-#         std_err_tau_s = result_pass1.std_errors[1]
-#         assert std_err_tau_s > 0, f"Pass 1: tau_s std error must be positive, got {std_err_tau_s}"
-#         assert std_err_tau_s < tau_s_inferred * 10, (
-#             f"Pass 1: Std error unreasonably large relative to tau_s: "
-#             f"tau_b={tau_s_inferred:.3e} ± {std_err_tau_s:.3e}"
-#         )
-
-#         print(f"✓ Pass 1 - tau_b inferred: {tau_b_inferred:.6e} ± {std_err_tau_b:.6e}")
-#         print(f"✓ Pass 1 - tau_s inferred: {tau_s_inferred:.6e} ± {std_err_tau_s:.6e}")
-#         print(f"✓ Pass 1 - Final loss: {result_pass1.loss:.8e}")
-#         print(f"✓ Pass 1 - Iterations: {result_pass1.iterations}")
-        
-#         # ===== PIPELINE-LEVEL ASSERTIONS =====
-#         print("\n" + "="*60)
-#         print("PIPELINE-LEVEL ASSERTIONS")
-#         print("="*60)
-        
-#         # Check parameter trajectory
-#         trajectory = multiviscous_pipeline.get_parameter_trajectory()
-#         assert 'tau_b' in trajectory, "tau_b not in trajectory"
-#         assert 'tau_s' in trajectory, "tau_s not in trajectory"
-#         assert len(trajectory['tau_b']) == 1, "tau_b trajectory should have 1 steps"
-#         assert len(trajectory['tau_s']) == 1, "tau_s trajectory should have 1 steps"
-        
-#         # Generate and verify summary
-#         summary = multiviscous_pipeline.summary()
-#         print(summary)
-#         assert summary, "Summary generation failed"
-        
-#         print("\n✓ ALl one-pass inference tests passed!")
-
-# class TestViscoElasticFilament_TwoPassInference_BendingElasticityShearViscosity:
-#     """ Infer Sp4 and tau_s in a two-pass inference, with 
-#         - static experimental data in the first pass,
-#         - dynamic experimental data in the second pass.
-
-#     Parameters to be inferred:
-#         - Sp4: 1.0
-#         - tau_s: 1e6
-#     """
-
-#     # ======================
-#     # ==== Ground Truth ====
-#     # ======================
-
-#     @pytest.fixture
-#     def ground_truth_int_params(self):
-#         """
-#         Define internal parameters with a known Sp4 ground truth value.
-#         All other parameters are fixed for inference.
-#         """
-#         N = 10
-#         X0 = StraightLine(N)
-#         return {
-#             'Sp4': 1.0,           # Ground truth to recover
-#             'N': 10,            
-#             'k0': 1e13,            
-#             'bool_EI': True,      
-#             'Beta':0,        
-#             'taus_b': [0]*(N-1),  
-#             'tau_s': 1e6,        # Ground truth to recover
-#             'gamma': 2,         
-#             'n_L': [0,0],            
-#             'm_L': 0,             
-#             'X_0': X0,  # Initial state
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_ext_flow_params_static(self):
-#         """Define external parameters for static response (fixed during inference)."""
-#         N = 10
-#         return {
-#             "Lambdas": [[0,0]]*N,
-#             "Zetas": [0]*N,
-#             "A":1e-6,
-#             "w0":0, # Static
-#             "psi":np.pi/2,
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_ext_flow_params_dynamic(self):
-#         """Define external parameters for static response (fixed during inference)."""
-#         N = 10
-#         return {
-#             "Lambdas": [[0,0]]*N,
-#             "Zetas": [0]*N,
-#             "A":1e-6,
-#             "w0":1e-6, # Dynamic
-#             "psi":np.pi/2,
-#         }        
-
-#     @pytest.fixture
-#     def ground_truth_sim_params_static(self):
-#         """
-#         Define simulation parameters.
-#         Use BDF method for faster convergence compared to RK45.
-#         """
-#         return {
-#             "T_span": (1e9, 2e9),
-#             "T_eval": np.linspace(1e9, 2e9, int(2e0)), # minimum two elements here.
-#             "method": "BDF",
-#             "T_sim_max": 300,
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_sim_params_dynamic(self):
-#         """
-#         Define simulation parameters.
-#         Use BDF method for faster convergence compared to RK45.
-#         """
-#         return {
-#             "T_span": (1e7, 2e7),
-#             "T_eval": np.linspace(1e7, 2e7, int(1e1)),
-#             "method": "BDF",
-#             "T_sim_max": 300,
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_flow_data_static(
-#         self, 
-#         ground_truth_int_params, 
-#         ground_truth_ext_flow_params_static, 
-#         ground_truth_sim_params_static,
-#     ):
-#         """
-#         Generate ground truth synthetic data by simulating ViscoElasticFilament
-#         with known parameters.
-        
-#         Returns:
-#             np.ndarray: Simulated trajectory (shape depends on model)
-#         """
-#         model = ViscoElasticFilament_FlowParams(
-#             int_params=ground_truth_int_params,
-#             ext_params=ground_truth_ext_flow_params_static,
-#             sim_params=ground_truth_sim_params_static
-#         )
-#         output = model.simulate_single()
-        
-#         assert output['value'] is not None, (
-#             f"Ground truth simulation failed. Full output: {output}"
-#         )
-
-#         return output['value']
-
-
-#     @pytest.fixture
-#     def ground_truth_flow_data_dynamic(
-#         self,
-#         ground_truth_int_params, 
-#         ground_truth_ext_flow_params_dynamic, 
-#         ground_truth_sim_params_dynamic,
-#     ):
-#         """
-#         Generate ground truth synthetic data by simulating ViscoElasticFilament
-#         with known parameters.
-        
-#         Returns:
-#             np.ndarray: Simulated trajectory (shape depends on model)
-#         """
-#         model = ViscoElasticFilament_FlowParams(
-#             int_params=ground_truth_int_params,
-#             ext_params=ground_truth_ext_flow_params_dynamic,
-#             sim_params=ground_truth_sim_params_dynamic,
-#         )
-#         output = model.simulate_single()
-        
-#         assert output['value'] is not None, (
-#             f"Ground truth simulation failed. Full output: {output}"
-#         )
-
-#         return output['value']
-    
-#     # ======================
-#     # ======= Models =======
-#     # ======================
-
-#     @pytest.fixture
-#     def elastic_model_flow_sp4_only(
-#         self,
-#         ground_truth_int_params
-#     ):
-#         """
-#         Create a composed model for ViscoElasticFilament_FlowParams that
-#             - only varies Sp4
-#             - sets tau_s to zero (elastic model)
-        
-#         The embedding function accepts a reduced parameter dict {'Sp4': value}
-#         and embeds it into the full internal parameters, keeping all others fixed.
-#         """
-#         fixed_params = ground_truth_int_params.copy()
-#         fixed_params['tau_s'] = 0 # Set dynamic parameters to 0.
-        
-#         def embed_sp4_flow(
-#             reduced_int_params: Dict[str, float],
-#             ext_params: Any,
-#             sim_params: Any,
-#         ) -> Dict[str, Any]:
-#             """
-#             Transform reduced internal parameters into full int_params dict.
-            
-#             Args:
-#                 reduced_int_params: Dict containing {'Sp4': inferred_value}
-#                 ext_params: Passed through unchanged (not modified here)
-#                 sim_params: Passed through unchanged (not modified here)
-            
-#             Returns:
-#                 Full int_params dict with Sp4 updated, all other values fixed.
-#             """
-#             full_params = fixed_params.copy()
-            
-#             # Update only Sp4; all other parameters remain fixed
-#             if 'Sp4' in reduced_int_params:
-#                 full_params['Sp4'] = reduced_int_params['Sp4']
-            
-#             return full_params
-        
-#         # Create composed model with the embedding function
-#         ElasticModel = compose_model(
-#             ViscoElasticFilament_FlowParams,
-#             compose_int_params=embed_sp4_flow,
-#         )
-#         return ElasticModel
-
-#     @pytest.fixture
-#     def viscoelastic_model_flow_sp4_tau_s_only(
-#         self,
-#         ground_truth_int_params,
-#     ):
-#         """
-#         Create a composed model for ViscoElasticFilament_FlowParams that only varies Sp4 and tau_s.
-        
-#         The embedding function accepts a reduced parameter dict {'Sp4': value, 'tau_s': value}
-#         and embeds it into the full internal parameters, keeping all others fixed.
-#         """
-#         fixed_params = ground_truth_int_params.copy()
-        
-#         def embed_sp4_tau_s_flow(
-#             reduced_int_params: Dict[str, float],
-#             ext_params: Any,
-#             sim_params: Any,
-#         ) -> Dict[str, Any]:
-#             """
-#             Transform reduced internal parameters into full int_params dict.
-            
-#             Args:
-#                 reduced_int_params: Dict containing {'Sp4': inferred_value, 'tau_s': inferred_value}
-#                 ext_params: Passed through unchanged (not modified here)
-#                 sim_params: Passed through unchanged (not modified here)
-            
-#             Returns:
-#                 Full int_params dict with Sp4 and tau_s updated, all other values fixed.
-#             """
-#             full_params = fixed_params.copy()
-            
-#             # Update only Sp4; all other parameters remain fixed
-#             if 'Sp4' in reduced_int_params:
-#                 full_params['Sp4'] = reduced_int_params['Sp4']
-
-#             if 'tau_s' in reduced_int_params:
-#                 full_params['tau_s'] = reduced_int_params['tau_s']
-            
-#             return full_params
-        
-#         # Create composed model with the embedding function
-#         ViscoElasticModel = compose_model(
-#             ViscoElasticFilament_FlowParams,
-#             compose_int_params=embed_sp4_tau_s_flow,
-#         )
-#         return ViscoElasticModel
-
-#     # ==========================
-#     # ======= Optimizers =======
-#     # ==========================
-
-#     @pytest.fixture
-#     def basinhopping_optimizer_instance(self):
-#         """
-#         Return the basinhopping optimizer function with standard configuration.
-#         """
-#         return basinhopping_optimizer        
-
-#     @pytest.fixture
-#     def optimizer_kwargs_sp4(self):
-#         return {
-#             'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
-#             'minimum_gradient': False,
-#             'minimum_hessian': False,
-#             'local_minimizer_kwargs': {
-#                 'method': 'L-BFGS-B',
-#                 'jac': '3-point',
-#                 'options': {
-#                     'disp': True,
-#                     'ftol': 1e-8,
-#                     'gtol': 1e-8,
-#                     'eps': 1e-8,
-#                     'finite_diff_rel_step': 1e-6,
-#                 },
-#             },
-#             'global_minimizer_kwargs': {
-#                 'niter': 9,
-#                 'T': 0,
-#                 'stepsize': 5,
-#                 'tol': 1e-10,
-#             }
-#         }
-
-#     @pytest.fixture
-#     def optimizer_kwargs_tau_s(self, optimizer_kwargs_sp4):
-#         optimizer_kwargs = optimizer_kwargs_sp4
-#         optimizer_kwargs['bounds'] = Bounds(lb=[0], ub=[np.inf])
-#         return optimizer_kwargs
-
-#     # ==========================
-#     # ========= Passes =========
-#     # ==========================
-
-#     # Pass 1: Reduced model, infer Sp4 only
-#     @pytest.fixture
-#     def pass_1(
-#         self,
-#         elastic_model_flow_sp4_only,
-#         ground_truth_ext_flow_params_static,
-#         ground_truth_sim_params_static,
-#         ground_truth_flow_data_static,
-#         basinhopping_optimizer_instance,
-#         optimizer_kwargs_sp4,
-#     ):
-#         """ First pass for the viscoelastic inference. """
-        
-#         first_pass = PipelinePass(
-#             name="Sp4 Inference (Elastic Model)",
-#             model_class=elastic_model_flow_sp4_only,
-#             ground_truths=[ground_truth_flow_data_static],
-#             ext_params_list=[ground_truth_ext_flow_params_static],
-#             sim_params_list=[ground_truth_sim_params_static],
-#             param_keys_to_infer=['Sp4'],
-#             fixed_params={},
-#             optimizer=basinhopping_optimizer_instance,
-#             optimizer_kwargs=optimizer_kwargs_sp4,
-#         )
-
-#         return first_pass
-
-#     # Pass 2:
-#     @pytest.fixture
-#     def pass_2(
-#         self,
-#         viscoelastic_model_flow_sp4_tau_s_only,
-#         ground_truth_ext_flow_params_dynamic,
-#         ground_truth_sim_params_dynamic,
-#         ground_truth_flow_data_dynamic,
-#         basinhopping_optimizer_instance,
-#         optimizer_kwargs_tau_s,
-#     ):
-#         """ Second pass for the viscoelastic inference. """
-        
-#         second_pass = PipelinePass(
-#             name="tau_s Inference (ViscoElastic Model)",
-#             model_class=viscoelastic_model_flow_sp4_tau_s_only,
-#             ground_truths=[ground_truth_flow_data_dynamic],
-#             ext_params_list=[ground_truth_ext_flow_params_dynamic],
-#             sim_params_list=[ground_truth_sim_params_dynamic],
-#             param_keys_to_infer=['tau_s'],
-#             fixed_params={},
-#             optimizer=basinhopping_optimizer_instance,
-#             optimizer_kwargs=optimizer_kwargs_tau_s,
-#         )
-
-#         return second_pass
-
-#     # ============================
-#     # ========= Pipeline =========
-#     # ============================
-#     @pytest.fixture
-#     def viscoelastic_pipeline(self, pass_1, pass_2, mse_loss_fn):
-
-#         pipeline = InferencePipeline(
-#             passes=[pass_1, pass_2],
-#             loss_fn=mse_loss_fn,
-#             n_jobs_per_pass=-1,  # Use all cores within each pass
-#         )
-#         return pipeline
-
-#     # ============================
-#     # ========= Tests =========
-#     # ============================
-#     def test_viscoelastic_inference(
-#         self,
-#         viscoelastic_pipeline,
-#     ):
-
-#         # Multiple initial guesses: Pass 1 for Sp4, Pass 2 for tau_s
-#         initial_guesses_per_pass = [
-#             [
-#                 # {'Sp4': 0.1},
-#                 {'Sp4': 10.0},
-#             ],
-#             [
-#                 {'tau_s': 0},
-#                 # {'tau_s': 10.0},
-#             ],
-#         ]
-        
-#         # ===== ACT =====
-#         results = viscoelastic_pipeline.run(initial_guesses_per_pass, verbose=True)
-        
-#         # ===== ASSERT =====
-        
-#         # Check that we got exactly two results (two passes)
-#         assert len(results) == 2, "Expected two InferenceResult for two-pass pipeline"
-        
-#         result_pass1, result_pass2 = results
-        
-#         # ===== PASS 1: Sp4 INFERENCE =====
-#         print("\n" + "="*60)
-#         print("PASS 1 ASSERTIONS (Sp4 inference)")
-#         print("="*60)
-        
-#         # 1. Check Pass 1 convergence
-#         assert result_pass1.success, (
-#             f"Pass 1 optimization did not converge. Message: {result_pass1.message}"
-#         )
-#         assert result_pass1.iterations > 0, "Pass 1: No iterations were performed"
-        
-#         # 2. Check Sp4 exists and is physically reasonable
-#         assert 'Sp4' in result_pass1.params, "Sp4 not in Pass 1 inferred parameters"
-#         sp4_inferred = result_pass1.params['Sp4']
-#         assert sp4_inferred > 0, f"Sp4 must be positive, got {sp4_inferred}"
-#         assert sp4_inferred < 1e6, f"Sp4 unreasonably large: {sp4_inferred}"
-        
-#         # 3. Check Pass 1 loss
-#         assert result_pass1.loss > 0, "Pass 1 loss should be positive"
-#         assert result_pass1.loss < 1e2, (
-#             f"Pass 1 loss suspiciously high: {result_pass1.loss}. Check model/data scale."
-#         )
-        
-#         # 4. Check Pass 1 uncertainty quantification
-#         assert result_pass1.covariance is not None, "Pass 1: Covariance not computed"
-#         assert result_pass1.hessian is not None, "Pass 1: Hessian not computed"
-#         assert result_pass1.std_errors is not None, "Pass 1: Standard errors not computed"
-#         assert len(result_pass1.std_errors) == 1, "Pass 1: Expected 1 std_error for 1 parameter (Sp4)"
-        
-#         std_err_sp4 = result_pass1.std_errors[0]
-#         assert std_err_sp4 > 0, f"Pass 1: Sp4 std error must be positive, got {std_err_sp4}"
-#         assert std_err_sp4 < sp4_inferred * 10, (
-#             f"Pass 1: Std error unreasonably large relative to Sp4: "
-#             f"Sp4={sp4_inferred:.3e} ± {std_err_sp4:.3e}"
-#         )
-        
-#         print(f"✓ Pass 1 - Sp4 inferred: {sp4_inferred:.6e} ± {std_err_sp4:.6e}")
-#         print(f"✓ Pass 1 - Final loss: {result_pass1.loss:.8e}")
-#         print(f"✓ Pass 1 - Iterations: {result_pass1.iterations}")
-        
-#         # ===== PASS 2: tau_s INFERENCE (Sp4 FIXED) =====
-#         print("\n" + "="*60)
-#         print("PASS 2 ASSERTIONS (tau_s inference with Sp4 fixed)")
-#         print("="*60)
-        
-#         # 1. Check Pass 2 convergence
-#         assert result_pass2.success, (
-#             f"Pass 2 optimization did not converge. Message: {result_pass2.message}"
-#         )
-#         assert result_pass2.iterations > 0, "Pass 2: No iterations were performed"
-        
-#         # 2. Check tau_s exists and is physically reasonable
-#         assert 'tau_s' in result_pass2.params, "tau_s not in Pass 2 inferred parameters"
-#         tau_s_inferred = result_pass2.params['tau_s']
-#         assert tau_s_inferred >= 0, f"tau_s must be non-negative, got {tau_s_inferred}"
-#         assert tau_s_inferred < 1e4, f"tau_s unreasonably large: {tau_s_inferred}"
-        
-#         # 3. Check Pass 2 loss
-#         assert result_pass2.loss > 0, "Pass 2 loss should be positive"
-#         assert result_pass2.loss < 1e2, (
-#             f"Pass 2 loss suspiciously high: {result_pass2.loss}. Check model/data scale."
-#         )
-        
-#         # 4. Check Pass 2 uncertainty quantification (only for tau_s, not Sp4)
-#         assert result_pass2.covariance is not None, "Pass 2: Covariance not computed"
-#         assert result_pass2.hessian is not None, "Pass 2: Hessian not computed"
-#         assert result_pass2.std_errors is not None, "Pass 2: Standard errors not computed"
-#         assert len(result_pass2.std_errors) == 1, "Pass 2: Expected 1 std_error for 1 inferred parameter (tau_s)"
-        
-#         std_err_tau_s = result_pass2.std_errors[0]
-#         assert std_err_tau_s > 0, f"Pass 2: tau_s std error must be positive, got {std_err_tau_s}"
-#         assert std_err_tau_s < tau_s_inferred * 10, (
-#             f"Pass 2: Std error unreasonably large relative to tau_s: "
-#             f"tau_s={tau_s_inferred:.3e} ± {std_err_tau_s:.3e}"
-#         )
-        
-#         print(f"✓ Pass 2 - tau_s inferred: {tau_s_inferred:.6e} ± {std_err_tau_s:.6e}")
-#         print(f"✓ Pass 2 - Sp4 fixed (from Pass 1): {result_pass1.params['Sp4']:.6e}")
-#         print(f"✓ Pass 2 - Final loss: {result_pass2.loss:.8e}")
-#         print(f"✓ Pass 2 - Iterations: {result_pass2.iterations}")
-        
-#         # ===== PIPELINE-LEVEL ASSERTIONS =====
-#         print("\n" + "="*60)
-#         print("PIPELINE-LEVEL ASSERTIONS")
-#         print("="*60)
-        
-#         # Check parameter trajectory
-#         trajectory = viscoelastic_pipeline.get_parameter_trajectory()
-#         assert 'Sp4' in trajectory, "Sp4 not in trajectory"
-#         assert 'tau_s' in trajectory, "tau_s not in trajectory"
-#         assert len(trajectory['Sp4']) == 2, "Sp4 trajectory should have 2 steps"
-#         assert len(trajectory['tau_s']) == 2, "tau_s trajectory should have 2 steps"
-        
-#         # Sp4 should stay constant (inferred in Pass 1, fixed in Pass 2)
-#         assert trajectory['Sp4'][0] == trajectory['Sp4'][1], (
-#             f"Sp4 should be constant across passes. "
-#             f"Pass1={trajectory['Sp4'][0]}, Pass2={trajectory['Sp4'][1]}"
-#         )
-        
-#         # tau_s should appear in Pass 2 (None or absent in Pass 1)
-#         assert trajectory['tau_s'][1] == tau_s_inferred, (
-#             f"tau_s trajectory doesn't match Pass 2 result"
-#         )
-        
-#         # Generate and verify summary
-#         summary = pipeline.summary()
-#         print(summary)
-#         assert summary, "Summary generation failed"
-        
-#         print("\n✓ All two-pass inference tests passed!")
-
-# class TestViscoElasticFilament_TwoPassInference_BendingElasticityBendingViscosity:
-#     """ Infer Sp4 and tau_b in a two-pass inference, with 
-#         - static experimental data in the first pass,
-#         - dynamic experimental data in the second pass.
-
-#     Parameters to be inferred:
-#         - Sp4: 1.0
-#         - tau_b: 1e6 
-#     """
-
-#     # ======================
-#     # ==== Ground Truth ====
-#     # ======================
-
-#     @pytest.fixture
-#     def ground_truth_int_params(self):
-#         """
-#         Define internal parameters with a known Sp4 ground truth value.
-#         All other parameters are fixed for inference.
-#         """
-#         N = 10
-#         X0 = StraightLine(N)
-#         return {
-#             'Sp4': 1.0,           # Ground truth to recover
-#             'N': 10,            
-#             'k0': 1e13,            
-#             'bool_EI': True,      
-#             'Beta':0,        
-#             'tau_b': 1e0,           # Ground truth to recover
-#             'tau_s': 0,       
-#             'gamma': 2,         
-#             'n_L': [0,0],            
-#             'm_L': 0,             
-#             'X_0': X0,  # Initial state
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_ext_flow_params_static(self):
-#         """Define external parameters for static response (fixed during inference)."""
-#         N = 10
-#         return {
-#             "Lambdas": [[0,0]]*N,
-#             "Zetas": [0]*N,
-#             "A":1e-6,
-#             "w0":0, # Static flow
-#             "psi":np.pi/2,
-#         }
-
-
-#     @pytest.fixture
-#     def ground_truth_sim_params_static(self):
-#         """
-#         Define simulation parameters.
-#         Use BDF method for faster convergence compared to RK45.
-#         """
-#         return {
-#             "T_span": (1e6, 2e6),
-#             "T_eval": np.linspace(1e6, 2e6, int(2e0)), # minimum two elements here.
-#             "method": "BDF",
-#             "T_sim_max": 300,
-#         }
-
-
-#     @pytest.fixture
-#     def ground_truth_flow_data_static(
-#         self, 
-#         ground_truth_int_params, 
-#         ground_truth_ext_flow_params_static, 
-#         ground_truth_sim_params_static,
-#     ):
-#         """
-#         Generate ground truth synthetic data by simulating ViscoElasticFilament
-#         with known parameters.
-        
-#         Returns:
-#             np.ndarray: Simulated trajectory (shape depends on model)
-#         """
-#         model = ViscoElasticFilament_FlowParams_ScalarBending(
-#             int_params=ground_truth_int_params,
-#             ext_params=ground_truth_ext_flow_params_static,
-#             sim_params=ground_truth_sim_params_static
-#         )
-#         output = model.simulate_single()
-        
-#         assert output['value'] is not None, (
-#             f"Ground truth simulation failed. Full output: {output}"
-#         )
-
-#         return output['value']
-
-#     @pytest.fixture
-#     def ground_truth_ext_flow_params_dynamic(self):
-#         """Define external parameters for static response (fixed during inference)."""
-#         N = 10
-#         return {
-#             "Lambdas": [[0,0]]*N,
-#             "Zetas": [0]*N,
-#             "A":1e-6,
-#             "w0":1e0, # Dynamic flow
-#             "psi":np.pi/2,
-#         }        
-
-#     @pytest.fixture
-#     def ground_truth_sim_params_dynamic(self):
-#         """
-#         Define simulation parameters.
-#         Use BDF method for faster convergence compared to RK45.
-#         """
-#         return {
-#             "T_span": (1e1, 2e1),
-#             "T_eval": np.linspace(1e1, 2e1, int(1e1)),
-#             "method": "BDF",
-#             "T_sim_max": 300,
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_flow_data_dynamic(
-#         self,
-#         ground_truth_int_params, 
-#         ground_truth_ext_flow_params_dynamic, 
-#         ground_truth_sim_params_dynamic,
-#     ):
-#         """
-#         Generate ground truth synthetic data by simulating ViscoElasticFilament
-#         with known parameters.
-        
-#         Returns:
-#             np.ndarray: Simulated trajectory (shape depends on model)
-#         """
-#         model = ViscoElasticFilament_FlowParams_ScalarBending(
-#             int_params=ground_truth_int_params,
-#             ext_params=ground_truth_ext_flow_params_dynamic,
-#             sim_params=ground_truth_sim_params_dynamic,
-#         )
-#         output = model.simulate_single()
-        
-#         assert output['value'] is not None, (
-#             f"Ground truth simulation failed. Full output: {output}"
-#         )
-
-#         return output['value']
-    
-#     # ======================
-#     # ======= Models =======
-#     # ======================
-
-#     @pytest.fixture
-#     def elastic_model_flow_sp4_only(
-#         self,
-#         ground_truth_int_params
-#     ):
-#         """
-#         Create a composed model for ViscoElasticFilament_FlowParams that
-#             - only varies Sp4
-#             - sets tau_s to zero (elastic model)
-        
-#         The embedding function accepts a reduced parameter dict {'Sp4': value}
-#         and embeds it into the full internal parameters, keeping all others fixed.
-#         """
-#         fixed_params = ground_truth_int_params.copy()
-#         fixed_params['tau_b'] = 0 # Set dynamic parameters to 0.
-        
-#         def embed_sp4_flow(
-#             reduced_int_params: Dict[str, float],
-#             ext_params: Any,
-#             sim_params: Any,
-#         ) -> Dict[str, Any]:
-#             """
-#             Transform reduced internal parameters into full int_params dict.
-            
-#             Args:
-#                 reduced_int_params: Dict containing {'Sp4': inferred_value}
-#                 ext_params: Passed through unchanged (not modified here)
-#                 sim_params: Passed through unchanged (not modified here)
-            
-#             Returns:
-#                 Full int_params dict with Sp4 updated, all other values fixed.
-#             """
-#             full_params = fixed_params.copy()
-            
-#             # Update only Sp4; all other parameters remain fixed
-#             if 'Sp4' in reduced_int_params:
-#                 full_params['Sp4'] = reduced_int_params['Sp4']
-            
-#             return full_params
-        
-#         # Create composed model with the embedding function
-#         ElasticModel = compose_model(
-#             ViscoElasticFilament_FlowParams_ScalarBending,
-#             compose_int_params=embed_sp4_flow,
-#         )
-#         return ElasticModel
-
-#     @pytest.fixture
-#     def viscoelastic_model_flow_sp4_tau_b_only(
-#         self,
-#         ground_truth_int_params,
-#     ):
-#         """
-#         Create a composed model for ViscoElasticFilament_FlowParams that only varies Sp4 and tau_b.
-        
-#         The embedding function accepts a reduced parameter dict {'Sp4': value, 'tau_b': value}
-#         and embeds it into the full internal parameters, keeping all others fixed.
-#         """
-#         fixed_params = ground_truth_int_params.copy()
-        
-#         def embed_sp4_tau_b_flow(
-#             reduced_int_params: Dict[str, float],
-#             ext_params: Any,
-#             sim_params: Any,
-#         ) -> Dict[str, Any]:
-#             """
-#             Transform reduced internal parameters into full int_params dict.
-            
-#             Args:
-#                 reduced_int_params: Dict containing {'Sp4': inferred_value, 'tau_b': inferred_value}
-#                 ext_params: Passed through unchanged (not modified here)
-#                 sim_params: Passed through unchanged (not modified here)
-            
-#             Returns:
-#                 Full int_params dict with Sp4 and tau_b updated, all other values fixed.
-#             """
-#             full_params = fixed_params.copy()
-            
-#             # Update only Sp4; all other parameters remain fixed
-#             if 'Sp4' in reduced_int_params:
-#                 full_params['Sp4'] = reduced_int_params['Sp4']
-
-#             if 'tau_b' in reduced_int_params:
-#                 full_params['tau_b'] = reduced_int_params['tau_b']
-            
-#             return full_params
-        
-#         # Create composed model with the embedding function
-#         ViscoElasticModel = compose_model(
-#             ViscoElasticFilament_FlowParams_ScalarBending,
-#             compose_int_params=embed_sp4_tau_b_flow,
-#         )
-#         return ViscoElasticModel
-
-#     # ==========================
-#     # ======= Optimizers =======
-#     # ==========================
-
-#     @pytest.fixture
-#     def basinhopping_optimizer_instance(self):
-#         """
-#         Return the basinhopping optimizer function with standard configuration.
-#         """
-#         return basinhopping_optimizer        
-
-#     @pytest.fixture
-#     def optimizer_kwargs_sp4(self):
-#         return {
-#             'bounds': Bounds(lb=[1e-6], ub=[np.inf]),
-#             'minimum_gradient': False,
-#             'minimum_hessian': False,
-#             'local_minimizer_kwargs': {
-#                 'method': 'L-BFGS-B',
-#                 'jac': '3-point',
-#                 'options': {
-#                     'disp': True,
-#                     'ftol': 1e-8,
-#                     'gtol': 1e-8,
-#                     'eps': 1e-8,
-#                     'finite_diff_rel_step': 1e-6,
-#                 },
-#             },
-#             'global_minimizer_kwargs': {
-#                 'niter': 9,
-#                 'T': 0,
-#                 'stepsize': 5,
-#                 'tol': 1e-10,
-#             }
-#         }
-
-#     @pytest.fixture
-#     def optimizer_kwargs_tau_b(self, optimizer_kwargs_sp4):
-#         optimizer_kwargs = optimizer_kwargs_sp4
-#         optimizer_kwargs['bounds'] = Bounds(lb=[0], ub=[np.inf])
-#         return optimizer_kwargs
-
-#     # ==========================
-#     # ========= Passes =========
-#     # ==========================
-
-#     # Pass 1: Reduced model, infer Sp4 only
-#     @pytest.fixture
-#     def pass_1(
-#         self,
-#         elastic_model_flow_sp4_only,
-#         ground_truth_ext_flow_params_static,
-#         ground_truth_sim_params_static,
-#         ground_truth_flow_data_static,
-#         basinhopping_optimizer_instance,
-#         optimizer_kwargs_sp4,
-#     ):
-#         """ First pass for the viscoelastic inference. """
-        
-#         first_pass = PipelinePass(
-#             name="Sp4 Inference (Elastic Model)",
-#             model_class=elastic_model_flow_sp4_only,
-#             ground_truths=[ground_truth_flow_data_static],
-#             ext_params_list=[ground_truth_ext_flow_params_static],
-#             sim_params_list=[ground_truth_sim_params_static],
-#             param_keys_to_infer=['Sp4'],
-#             fixed_params={},
-#             optimizer=basinhopping_optimizer_instance,
-#             optimizer_kwargs=optimizer_kwargs_sp4,
-#         )
-
-#         return first_pass
-
-#     # Pass 2:
-#     @pytest.fixture
-#     def pass_2(
-#         self,
-#         viscoelastic_model_flow_sp4_tau_b_only,
-#         ground_truth_ext_flow_params_dynamic,
-#         ground_truth_sim_params_dynamic,
-#         ground_truth_flow_data_dynamic,
-#         basinhopping_optimizer_instance,
-#         optimizer_kwargs_tau_b,
-#     ):
-#         """ Second pass for the viscoelastic inference. """
-        
-#         second_pass = PipelinePass(
-#             name="tau_b Inference (ViscoElastic Model)",
-#             model_class=viscoelastic_model_flow_sp4_tau_b_only,
-#             ground_truths=[ground_truth_flow_data_dynamic],
-#             ext_params_list=[ground_truth_ext_flow_params_dynamic],
-#             sim_params_list=[ground_truth_sim_params_dynamic],
-#             param_keys_to_infer=['tau_b'],
-#             fixed_params={},
-#             optimizer=basinhopping_optimizer_instance,
-#             optimizer_kwargs=optimizer_kwargs_tau_b,
-#         )
-
-#         return second_pass
-
-#     # ============================
-#     # ========= Pipeline =========
-#     # ============================
-#     @pytest.fixture
-#     def viscoelastic_pipeline(self, pass_1, pass_2, mse_loss_fn):
-
-#         pipeline = InferencePipeline(
-#             passes=[pass_1, pass_2],
-#             loss_fn=mse_loss_fn,
-#             n_jobs_per_pass=-1,  # Use all cores within each pass
-#         )
-#         return pipeline
-
-#     # ============================
-#     # ========= Tests =========
-#     # ============================
-#     def test_viscoelastic_inference(
-#         self,
-#         viscoelastic_pipeline,
-#     ):
-
-#         # Multiple initial guesses: Pass 1 for Sp4, Pass 2 for tau_b
-#         initial_guesses_per_pass = [
-#             [
-#                 # {'Sp4': 0.1},
-#                 {'Sp4': 10.0},
-#             ],
-#             [
-#                 {'tau_b': 0},
-#                 # {'tau_b': 10.0},
-#             ],
-#         ]
-        
-#         # ===== ACT =====
-#         results = viscoelastic_pipeline.run(initial_guesses_per_pass, verbose=True)
-        
-#         # ===== ASSERT =====
-        
-#         # Check that we got exactly two results (two passes)
-#         assert len(results) == 2, "Expected two InferenceResult for two-pass pipeline"
-        
-#         result_pass1, result_pass2 = results
-        
-#         # ===== PASS 1: Sp4 INFERENCE =====
-#         print("\n" + "="*60)
-#         print("PASS 1 ASSERTIONS (Sp4 inference)")
-#         print("="*60)
-        
-#         # 1. Check Pass 1 convergence
-#         assert result_pass1.success, (
-#             f"Pass 1 optimization did not converge. Message: {result_pass1.message}"
-#         )
-#         assert result_pass1.iterations > 0, "Pass 1: No iterations were performed"
-        
-#         # 2. Check Sp4 exists and is physically reasonable
-#         assert 'Sp4' in result_pass1.params, "Sp4 not in Pass 1 inferred parameters"
-#         sp4_inferred = result_pass1.params['Sp4']
-#         assert sp4_inferred > 0, f"Sp4 must be positive, got {sp4_inferred}"
-#         assert sp4_inferred < 1e6, f"Sp4 unreasonably large: {sp4_inferred}"
-        
-#         # 3. Check Pass 1 loss
-#         assert result_pass1.loss > 0, "Pass 1 loss should be positive"
-#         assert result_pass1.loss < 1e2, (
-#             f"Pass 1 loss suspiciously high: {result_pass1.loss}. Check model/data scale."
-#         )
-        
-#         # 4. Check Pass 1 uncertainty quantification
-#         assert result_pass1.covariance is not None, "Pass 1: Covariance not computed"
-#         assert result_pass1.hessian is not None, "Pass 1: Hessian not computed"
-#         assert result_pass1.std_errors is not None, "Pass 1: Standard errors not computed"
-#         assert len(result_pass1.std_errors) == 1, "Pass 1: Expected 1 std_error for 1 parameter (Sp4)"
-        
-#         std_err_sp4 = result_pass1.std_errors[0]
-#         assert std_err_sp4 > 0, f"Pass 1: Sp4 std error must be positive, got {std_err_sp4}"
-#         assert std_err_sp4 < sp4_inferred * 10, (
-#             f"Pass 1: Std error unreasonably large relative to Sp4: "
-#             f"Sp4={sp4_inferred:.3e} ± {std_err_sp4:.3e}"
-#         )
-        
-#         print(f"✓ Pass 1 - Sp4 inferred: {sp4_inferred:.6e} ± {std_err_sp4:.6e}")
-#         print(f"✓ Pass 1 - Final loss: {result_pass1.loss:.8e}")
-#         print(f"✓ Pass 1 - Iterations: {result_pass1.iterations}")
-        
-#         # ===== PASS 2: tau_b INFERENCE (Sp4 FIXED) =====
-#         print("\n" + "="*60)
-#         print("PASS 2 ASSERTIONS (tau_b inference with Sp4 fixed)")
-#         print("="*60)
-        
-#         # 1. Check Pass 2 convergence
-#         assert result_pass2.success, (
-#             f"Pass 2 optimization did not converge. Message: {result_pass2.message}"
-#         )
-#         assert result_pass2.iterations > 0, "Pass 2: No iterations were performed"
-        
-#         # 2. Check tau_s exists and is physically reasonable
-#         assert 'tau_b' in result_pass2.params, "tau_b not in Pass 2 inferred parameters"
-#         tau_b_inferred = result_pass2.params['tau_b']
-#         assert tau_b_inferred >= 0, f"tau_b must be non-negative, got {tau_b_inferred}"
-#         assert tau_b_inferred < 1e4, f"tau_s unreasonably large: {tau_b_inferred}"
-        
-#         # 3. Check Pass 2 loss
-#         assert result_pass2.loss > 0, "Pass 2 loss should be positive"
-#         assert result_pass2.loss < 1e2, (
-#             f"Pass 2 loss suspiciously high: {result_pass2.loss}. Check model/data scale."
-#         )
-
-#         # 4. Check Pass 2 uncertainty quantification (only for tau_s, not Sp4)
-#         assert result_pass2.covariance is not None, "Pass 2: Covariance not computed"
-#         assert result_pass2.hessian is not None, "Pass 2: Hessian not computed"
-#         assert result_pass2.std_errors is not None, "Pass 2: Standard errors not computed"
-#         assert len(result_pass2.std_errors) == 1, "Pass 2: Expected 1 std_error for 1 inferred parameter (tau_s)"
-        
-#         std_err_tau_b = result_pass2.std_errors[0]
-#         assert std_err_tau_b > 0, f"Pass 2: tau_b std error must be positive, got {std_err_tau_b}"
-#         assert std_err_tau_b < tau_b_inferred * 10, (
-#             f"Pass 2: Std error unreasonably large relative to tau_s: "
-#             f"tau_s={tau_b_inferred:.3e} ± {std_err_tau_b:.3e}"
-#         )
-        
-#         print(f"✓ Pass 2 - tau_b inferred: {tau_b_inferred:.6e} ± {std_err_tau_b:.6e}")
-#         print(f"✓ Pass 2 - Sp4 fixed (from Pass 1): {result_pass1.params['Sp4']:.6e}")
-#         print(f"✓ Pass 2 - Final loss: {result_pass2.loss:.8e}")
-#         print(f"✓ Pass 2 - Iterations: {result_pass2.iterations}")
-        
-#         # ===== PIPELINE-LEVEL ASSERTIONS =====
-#         print("\n" + "="*60)
-#         print("PIPELINE-LEVEL ASSERTIONS")
-#         print("="*60)
-        
-#         # Check parameter trajectory
-#         trajectory = viscoelastic_pipeline.get_parameter_trajectory()
-#         assert 'Sp4' in trajectory, "Sp4 not in trajectory"
-#         assert 'tau_b' in trajectory, "tau_b not in trajectory"
-#         assert len(trajectory['Sp4']) == 2, "Sp4 trajectory should have 2 steps"
-#         assert len(trajectory['tau_b']) == 2, "tau_b trajectory should have 2 steps"
-        
-#         # Sp4 should stay constant (inferred in Pass 1, fixed in Pass 2)
-#         assert trajectory['Sp4'][0] == trajectory['Sp4'][1], (
-#             f"Sp4 should be constant across passes. "
-#             f"Pass1={trajectory['Sp4'][0]}, Pass2={trajectory['Sp4'][1]}"
-#         )
-        
-#         # tau_s should appear in Pass 2 (None or absent in Pass 1)
-#         assert trajectory['tau_b'][1] == tau_b_inferred, (
-#             f"tau_b trajectory doesn't match Pass 2 result"
-#         )
-        
-#         # Generate and verify summary
-#         summary = viscoelastic_pipeline.summary()
-#         print(summary)
-#         assert summary, "Summary generation failed"
-        
-#         print("\n✓ All two-pass inference tests passed!")
-
-# class TestViscoElasticFilament_TwoPassInference_BendingShearElasticityBendingViscosity:
-#     """ Infer Sp4 and tau_b in a two-pass inference, with 
-#         - static experimental data in the first pass,
-#         - dynamic experimental data in the second pass.
-
-#     Parameters to be inferred:
-#         - Sp4
-#         - Beta
-#         - tau_b
-#     """
-
-#     # ======================
-#     # ==== Ground Truth ====
-#     # ======================
-
-#     @pytest.fixture
-#     def ground_truth_int_params(self):
-#         """
-#         Define internal parameters with known Sp4, Beta, tau_b ground truth values.
-#         All other parameters are fixed for inference.
-#         """
-#         N = 10
-#         X0 = StraightLine(N)
-#         return {
-#             'Sp4': 1e0,           # Ground truth to recover
-#             'N': 10,            
-#             'k0': 1e13,            
-#             'bool_EI': True,      
-#             'Beta': 1e0,              # Ground truth to recover
-#             'tau_b': 1e0,           # Ground truth to recover
-#             'tau_s': 0,       
-#             'gamma': 2,         
-#             'n_L': [0,0],            
-#             'm_L': 0,             
-#             'X_0': X0,  # Initial state
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_ext_flow_params_static(self):
-#         """Define external parameters for static response (fixed during inference)."""
-#         N = 10
-#         return {
-#             "Lambdas": [[0,0]]*N,
-#             "Zetas": [0]*N,
-#             "A":1e-6,
-#             "w0":0, # Static flow
-#             "psi":np.pi/2,
-#         }  
-
-#     @pytest.fixture
-#     def ground_truth_sim_params_static(self):
-#         """
-#         Define simulation parameters.
-#         Use BDF method for faster convergence compared to RK45.
-#         """
-#         return {
-#             "T_span": (1e6, 2e6),
-#             "T_eval": np.linspace(1e6, 2e6, int(2e0)), # minimum two elements here.
-#             "method": "BDF",
-#             "T_sim_max": 300,
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_flow_data_static(
-#         self, 
-#         ground_truth_int_params, 
-#         ground_truth_ext_flow_params_static, 
-#         ground_truth_sim_params_static,
-#     ):
-#         """
-#         Generate ground truth synthetic data by simulating ViscoElasticFilament
-#         with known parameters.
-        
-#         Returns:
-#             np.ndarray: Simulated trajectory (shape depends on model)
-#         """
-#         model = ViscoElasticFilament_FlowParams_ScalarBending(
-#             int_params=ground_truth_int_params,
-#             ext_params=ground_truth_ext_flow_params_static,
-#             sim_params=ground_truth_sim_params_static
-#         )
-#         output = model.simulate_single()
-        
-#         assert output['value'] is not None, (
-#             f"Ground truth simulation failed. Full output: {output}"
-#         )
-
-#         return output['value']
-
-#     @pytest.fixture
-#     def ground_truth_ext_flow_params_dynamic(self):
-#         """Define external parameters for static response (fixed during inference)."""
-#         N = 10
-#         return {
-#             "Lambdas": [[0,0]]*N,
-#             "Zetas": [0]*N,
-#             "A":1e-6,
-#             "w0":1e0, # Dynamic flow
-#             "psi":np.pi/2,
-#         }        
-
-#     @pytest.fixture
-#     def ground_truth_sim_params_dynamic(self):
-#         """
-#         Define simulation parameters.
-#         Use BDF method for faster convergence compared to RK45.
-#         """
-#         return {
-#             "T_span": (1e1, 2e1),
-#             "T_eval": np.linspace(1e1, 2e1, int(1e1)),
-#             "method": "BDF",
-#             "T_sim_max": 300,
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_flow_data_dynamic(
-#         self,
-#         ground_truth_int_params, 
-#         ground_truth_ext_flow_params_dynamic, 
-#         ground_truth_sim_params_dynamic,
-#     ):
-#         """
-#         Generate ground truth synthetic data by simulating ViscoElasticFilament
-#         with known parameters.
-        
-#         Returns:
-#             np.ndarray: Simulated trajectory (shape depends on model)
-#         """
-#         model = ViscoElasticFilament_FlowParams_ScalarBending(
-#             int_params=ground_truth_int_params,
-#             ext_params=ground_truth_ext_flow_params_dynamic,
-#             sim_params=ground_truth_sim_params_dynamic,
-#         )
-#         output = model.simulate_single()
-        
-#         assert output['value'] is not None, (
-#             f"Ground truth simulation failed. Full output: {output}"
-#         )
-
-#         return output['value']
-    
-#     # ======================
-#     # ======= Models =======
-#     # ======================
-
-#     @pytest.fixture
-#     def multielastic_model_flow_sp4_beta_only(
-#         self,
-#         ground_truth_int_params
-#     ):
-#         """
-#         Create a composed model for ViscoElasticFilament_FlowParams that
-#             - only varies Sp4 and Beta
-#             - sets tau_s to zero (elastic model)
-        
-#         The embedding function accepts a reduced parameter dict {'Sp4': value, 'Beta':value}
-#         and embeds it into the full internal parameters, keeping all others fixed.
-#         """
-#         fixed_params = ground_truth_int_params.copy()
-#         fixed_params['tau_b'] = 0 # Set dynamic parameters to 0.
-        
-#         def embed_sp4_beta_flow(
-#             reduced_int_params: Dict[str, float],
-#             ext_params: Any,
-#             sim_params: Any,
-#         ) -> Dict[str, Any]:
-#             """
-#             Transform reduced internal parameters into full int_params dict.
-            
-#             Args:
-#                 reduced_int_params: Dict containing {'Sp4': inferred_value, 'Beta':inferred_value}
-#                 ext_params: Passed through unchanged (not modified here)
-#                 sim_params: Passed through unchanged (not modified here)
-            
-#             Returns:
-#                 Full int_params dict with Sp4 and Beta updated, all other values fixed.
-#             """
-#             full_params = fixed_params.copy()
-            
-#             # Update only Sp4 and Beta; all other parameters remain fixed
-#             if 'Sp4' in reduced_int_params:
-#                 full_params['Sp4'] = reduced_int_params['Sp4']
-#             if 'Beta' in reduced_int_params:
-#                 full_params['Beta'] = reduced_int_params['Beta']
-            
-#             return full_params
-        
-#         # Create composed model with the embedding function
-#         MultiElasticModel = compose_model(
-#             ViscoElasticFilament_FlowParams_ScalarBending,
-#             compose_int_params=embed_sp4_beta_flow,
-#         )
-#         return MultiElasticModel
-
-#     @pytest.fixture
-#     def viscoelastic_model_flow_sp4_beta_tau_b_only(
-#         self,
-#         ground_truth_int_params,
-#     ):
-#         """
-#         Create a composed model for ViscoElasticFilament_FlowParams that only varies Sp4, Beta and tau_b.
-        
-#         The embedding function accepts a reduced parameter dict {'Sp4': value, 'Beta': value, 'tau_b': value}
-#         and embeds it into the full internal parameters, keeping all others fixed.
-#         """
-#         fixed_params = ground_truth_int_params.copy()
-        
-#         def embed_sp4_beta_tau_b_flow(
-#             reduced_int_params: Dict[str, float],
-#             ext_params: Any,
-#             sim_params: Any,
-#         ) -> Dict[str, Any]:
-#             """
-#             Transform reduced internal parameters into full int_params dict.
-            
-#             Args:
-#                 reduced_int_params: Dict containing {'Sp4': inferred_value, 'Beta': inferred_value, 'tau_b': inferred_value}
-#                 ext_params: Passed through unchanged (not modified here)
-#                 sim_params: Passed through unchanged (not modified here)
-            
-#             Returns:
-#                 Full int_params dict with Sp4 and tau_b updated, all other values fixed.
-#             """
-#             full_params = fixed_params.copy()
-            
-#             # Update only Sp4, Beta and tau_b; all other parameters remain fixed
-#             if 'Sp4' in reduced_int_params:
-#                 full_params['Sp4'] = reduced_int_params['Sp4']
-
-#             if 'Beta' in reduced_int_params:
-#                 full_params['Beta'] = reduced_int_params['Beta']
-
-#             if 'tau_b' in reduced_int_params:
-#                 full_params['tau_b'] = reduced_int_params['tau_b']
-            
-#             return full_params
-        
-#         # Create composed model with the embedding function
-#         ViscoElasticModel = compose_model(
-#             ViscoElasticFilament_FlowParams_ScalarBending,
-#             compose_int_params=embed_sp4_beta_tau_b_flow,
-#         )
-#         return ViscoElasticModel
-
-#     # ==========================
-#     # ======= Optimizers =======
-#     # ==========================
-
-#     @pytest.fixture
-#     def basinhopping_optimizer_instance(self):
-#         """
-#         Return the basinhopping optimizer function with standard configuration.
-#         """
-#         return basinhopping_optimizer        
-
-#     @pytest.fixture
-#     def optimizer_kwargs_sp4_beta(self):
-#         return {
-#             'bounds': Bounds(lb=[1e-6, 0], ub=[np.inf, np.inf]),
-#             'minimum_gradient': False,
-#             'minimum_hessian': False,
-#             'local_minimizer_kwargs': {
-#                 'method': 'L-BFGS-B',
-#                 'jac': '3-point',
-#                 'options': {
-#                     'disp': True,
-#                     'ftol': 1e-8,
-#                     'gtol': 1e-8,
-#                     'eps': 1e-8,
-#                     'finite_diff_rel_step': 1e-6,
-#                 },
-#             },
-#             'global_minimizer_kwargs': {
-#                 'niter': 9,
-#                 'T': 0,
-#                 'stepsize': 5,
-#                 'tol': 1e-10,
-#             }
-#         }
-
-#     @pytest.fixture
-#     def optimizer_kwargs_tau_b(self, optimizer_kwargs_sp4_beta):
-#         optimizer_kwargs = optimizer_kwargs_sp4_beta
-#         optimizer_kwargs['bounds'] = Bounds(lb=[0], ub=[np.inf])
-#         return optimizer_kwargs
-
-#     # ==========================
-#     # ========= Passes =========
-#     # ==========================
-
-#     # Pass 1: Reduced model, infer Sp4 and Beta only
-#     @pytest.fixture
-#     def pass_1(
-#         self,
-#         multielastic_model_flow_sp4_beta_only,
-#         ground_truth_ext_flow_params_static,
-#         ground_truth_sim_params_static,
-#         ground_truth_flow_data_static,
-#         basinhopping_optimizer_instance,
-#         optimizer_kwargs_sp4_beta,
-#     ):
-#         """ First pass for the viscoelastic inference. """
-        
-#         first_pass = PipelinePass(
-#             name="Sp4-Beta Inference (MultiElastic Model)",
-#             model_class=multielastic_model_flow_sp4_beta_only,
-#             ground_truths=[ground_truth_flow_data_static],
-#             ext_params_list=[ground_truth_ext_flow_params_static],
-#             sim_params_list=[ground_truth_sim_params_static],
-#             param_keys_to_infer=['Sp4', 'Beta'],
-#             fixed_params={},
-#             optimizer=basinhopping_optimizer_instance,
-#             optimizer_kwargs=optimizer_kwargs_sp4_beta,
-#         )
-
-#         return first_pass
-
-#     # Pass 2:
-#     @pytest.fixture
-#     def pass_2(
-#         self,
-#         viscoelastic_model_flow_sp4_beta_tau_b_only,
-#         ground_truth_ext_flow_params_dynamic,
-#         ground_truth_sim_params_dynamic,
-#         ground_truth_flow_data_dynamic,
-#         basinhopping_optimizer_instance,
-#         optimizer_kwargs_tau_b,
-#     ):
-#         """ Second pass for the viscoelastic inference. """
-        
-#         second_pass = PipelinePass(
-#             name="tau_b Inference (ViscoElastic Model)",
-#             model_class=viscoelastic_model_flow_sp4_beta_tau_b_only,
-#             ground_truths=[ground_truth_flow_data_dynamic],
-#             ext_params_list=[ground_truth_ext_flow_params_dynamic],
-#             sim_params_list=[ground_truth_sim_params_dynamic],
-#             param_keys_to_infer=['tau_b'],
-#             fixed_params={},
-#             optimizer=basinhopping_optimizer_instance,
-#             optimizer_kwargs=optimizer_kwargs_tau_b,
-#         )
-
-#         return second_pass
-
-#     # ============================
-#     # ========= Pipeline =========
-#     # ============================
-#     @pytest.fixture
-#     def viscoelastic_pipeline(self, pass_1, pass_2, mse_loss_fn):
-
-#         pipeline = InferencePipeline(
-#             passes=[pass_1, pass_2],
-#             loss_fn=mse_loss_fn,
-#             n_jobs_per_pass=-1,  # Use all cores within each pass
-#         )
-#         return pipeline
-
-#     # ============================
-#     # ========= Tests =========
-#     # ============================
-#     def test_viscoelastic_inference(
-#         self,
-#         viscoelastic_pipeline,
-#     ):
-
-#         # Multiple initial guesses: Pass 1 for Sp4-Beta, Pass 2 for tau_b
-#         initial_guesses_per_pass = [
-#             [
-#                 # {'Sp4': 1e0, 'Beta':0},
-#                 # {'Sp4': 1e-1, 'Beta':1e0},
-#                 {'Sp4': 10, 'Beta':0},
-#             ],
-#             [
-#                 {'tau_b': 0},
-#                 # {'tau_b': 10.0},
-#             ],
-#         ]
-        
-#         # ===== ACT =====
-#         results = viscoelastic_pipeline.run(initial_guesses_per_pass, verbose=True)
-        
-#         # ===== ASSERT =====
-        
-#         # Check that we got exactly two results (two passes)
-#         assert len(results) == 2, "Expected two InferenceResult for two-pass pipeline"
-        
-#         result_pass1, result_pass2 = results
-        
-#         # ===== PASS 1: Sp4 INFERENCE =====
-#         print("\n" + "="*60)
-#         print("PASS 1 ASSERTIONS (Sp4 inference)")
-#         print("="*60)
-        
-#         # 1. Check Pass 1 convergence
-#         assert result_pass1.success, (
-#             f"Pass 1 optimization did not converge. Message: {result_pass1.message}"
-#         )
-#         assert result_pass1.iterations > 0, "Pass 1: No iterations were performed"
-        
-#         # 2. Check Sp4 and Beta exist and are physically reasonable
-
-#         assert 'Sp4' in result_pass1.params, "Sp4 not in Pass 1 inferred parameters"
-#         sp4_inferred = result_pass1.params['Sp4']
-#         assert sp4_inferred > 0, f"Sp4 must be positive, got {sp4_inferred}"
-#         assert sp4_inferred < 1e6, f"Sp4 unreasonably large: {sp4_inferred}"
-
-#         assert 'Beta' in result_pass1.params, "Beta not in Pass 1 inferred parameters"
-#         beta_inferred = result_pass1.params['Beta']
-#         assert beta_inferred >= 0, f"Beta must be non-negative, got {beta_inferred}"
-#         assert beta_inferred < 1e6, f"Beta unreasonably large: {beta_inferred}"      
-
-#         # 3. Check Pass 1 loss
-#         assert result_pass1.loss > 0, "Pass 1 loss should be positive"
-#         assert result_pass1.loss < 1e2, (
-#             f"Pass 1 loss suspiciously high: {result_pass1.loss}. Check model/data scale."
-#         )
-        
-#         # 4. Check Pass 1 uncertainty quantification
-#         assert result_pass1.covariance is not None, "Pass 1: Covariance not computed"
-#         assert result_pass1.hessian is not None, "Pass 1: Hessian not computed"
-#         assert result_pass1.std_errors is not None, "Pass 1: Standard errors not computed"
-#         assert len(result_pass1.std_errors) == 2, "Pass 1: Expected 1 std_error for 2 parameter (Sp4, Beta)"
-        
-#         std_err_sp4 = result_pass1.std_errors[0]
-#         assert std_err_sp4 > 0, f"Pass 1: Sp4 std error must be positive, got {std_err_sp4}"
-#         assert std_err_sp4 < sp4_inferred * 10, (
-#             f"Pass 1: Std error unreasonably large relative to Sp4: "
-#             f"Sp4={sp4_inferred:.3e} ± {std_err_sp4:.3e}"
-#         )
-#         std_err_beta = result_pass1.std_errors[1]
-#         assert std_err_beta > 0, f"Pass 1: Beta std error must be positive, got {std_err_beta}"
-#         assert std_err_beta < beta_inferred * 10, (
-#             f"Pass 1: Std error unreasonably large relative to Beta: "
-#             f"Beta={beta_inferred:.3e} ± {std_err_beta:.3e}"
-#         )
-        
-#         print(f"✓ Pass 1 - Sp4 inferred: {sp4_inferred:.6e} ± {std_err_sp4:.6e}")
-#         print(f"✓ Pass 1 - Beta inferred: {beta_inferred:.6e} ± {std_err_beta:.6e}")
-#         print(f"✓ Pass 1 - Final loss: {result_pass1.loss:.8e}")
-#         print(f"✓ Pass 1 - Iterations: {result_pass1.iterations}")
-        
-#         # ===== PASS 2: tau_b INFERENCE (Sp4 and Beta FIXED) =====
-#         print("\n" + "="*60)
-#         print("PASS 2 ASSERTIONS (tau_b inference with Sp4 and Beta fixed)")
-#         print("="*60)
-        
-#         # 1. Check Pass 2 convergence
-#         assert result_pass2.success, (
-#             f"Pass 2 optimization did not converge. Message: {result_pass2.message}"
-#         )
-#         assert result_pass2.iterations > 0, "Pass 2: No iterations were performed"
-        
-#         # 2. Check tau_s exists and is physically reasonable
-#         assert 'tau_b' in result_pass2.params, "tau_b not in Pass 2 inferred parameters"
-#         tau_b_inferred = result_pass2.params['tau_b']
-#         assert tau_b_inferred >= 0, f"tau_b must be non-negative, got {tau_b_inferred}"
-#         assert tau_b_inferred < 1e4, f"tau_s unreasonably large: {tau_b_inferred}"
-        
-#         # 3. Check Pass 2 loss
-#         assert result_pass2.loss > 0, "Pass 2 loss should be positive"
-#         assert result_pass2.loss < 1e2, (
-#             f"Pass 2 loss suspiciously high: {result_pass2.loss}. Check model/data scale."
-#         )
-
-#         # 4. Check Pass 2 uncertainty quantification (only for tau_s, not Sp4)
-#         assert result_pass2.covariance is not None, "Pass 2: Covariance not computed"
-#         assert result_pass2.hessian is not None, "Pass 2: Hessian not computed"
-#         assert result_pass2.std_errors is not None, "Pass 2: Standard errors not computed"
-#         assert len(result_pass2.std_errors) == 1, "Pass 2: Expected 1 std_error for 1 inferred parameter (tau_s)"
-        
-#         std_err_tau_b = result_pass2.std_errors[0]
-#         assert std_err_tau_b > 0, f"Pass 2: tau_b std error must be positive, got {std_err_tau_b}"
-#         assert std_err_tau_b < tau_b_inferred * 10, (
-#             f"Pass 2: Std error unreasonably large relative to tau_s: "
-#             f"tau_s={tau_b_inferred:.3e} ± {std_err_tau_b:.3e}"
-#         )
-        
-#         print(f"✓ Pass 2 - tau_b inferred: {tau_b_inferred:.6e} ± {std_err_tau_b:.6e}")
-#         print(f"✓ Pass 2 - Sp4 fixed (from Pass 1): {result_pass1.params['Sp4']:.6e}")
-#         print(f"✓ Pass 2 - Beta fixed (from Pass 1): {result_pass1.params['Beta']:.6e}")
-#         print(f"✓ Pass 2 - Final loss: {result_pass2.loss:.8e}")
-#         print(f"✓ Pass 2 - Iterations: {result_pass2.iterations}")
-        
-#         # ===== PIPELINE-LEVEL ASSERTIONS =====
-#         print("\n" + "="*60)
-#         print("PIPELINE-LEVEL ASSERTIONS")
-#         print("="*60)
-        
-#         # Check parameter trajectory
-#         trajectory = viscoelastic_pipeline.get_parameter_trajectory()
-#         assert 'Sp4' in trajectory, "Sp4 not in trajectory"
-#         assert 'Beta' in trajectory, "Beta not in trajectory"
-#         assert 'tau_b' in trajectory, "tau_b not in trajectory"
-#         assert len(trajectory['Sp4']) == 2, "Sp4 trajectory should have 2 steps"
-#         assert len(trajectory['Beta']) == 2, "Beta trajectory should have 2 steps"
-#         assert len(trajectory['tau_b']) == 2, "tau_b trajectory should have 2 steps"
-        
-#         # Sp4 should stay constant (inferred in Pass 1, fixed in Pass 2)
-#         assert trajectory['Sp4'][0] == trajectory['Sp4'][1], (
-#             f"Sp4 should be constant across passes. "
-#             f"Pass1={trajectory['Sp4'][0]}, Pass2={trajectory['Sp4'][1]}"
-#         )
-
-#         # Beta should stay constant (inferred in Pass 1, fixed in Pass 2)
-#         assert trajectory['Beta'][0] == trajectory['Beta'][1], (
-#             f"Beta should be constant across passes. "
-#             f"Pass1={trajectory['Beta'][0]}, Pass2={trajectory['Beta'][1]}"
-#         )
-        
-#         # tau_s should appear in Pass 2 (None or absent in Pass 1)
-#         assert trajectory['tau_b'][1] == tau_b_inferred, (
-#             f"tau_b trajectory doesn't match Pass 2 result"
-#         )
-        
-#         # Generate and verify summary
-#         summary = viscoelastic_pipeline.summary()
-#         print(summary)
-#         assert summary, "Summary generation failed"
-        
-#         print("\n✓ All two-pass inference tests passed!")
-
-# class TestViscoElasticFilament_TwoPassInference_BendingShearElasticityShearViscosity:
-#     """ Infer Sp4, Beta and tau_s in a two-pass inference, with 
-#         - static experimental data in the first pass,
-#         - dynamic experimental data in the second pass.
-
-#     Parameters to be inferred:
-#         - Sp4
-#         - Beta
-#         - tau_s
-#     """
-
-#     # ======================
-#     # ==== Ground Truth ====
-#     # ======================
-
-#     @pytest.fixture
-#     def ground_truth_int_params(self):
-#         """
-#         Define internal parameters with known Sp4, Beta, tau_b ground truth values.
-#         All other parameters are fixed for inference.
-#         """
-#         N = 10
-#         X0 = StraightLine(N)
-#         return {
-#             'Sp4': 1e0,           # Ground truth to recover
-#             'N': 10,            
-#             'k0': 1e13,            
-#             'bool_EI': True,      
-#             'Beta': 1e0,              # Ground truth to recover
-#             'tau_b': 0,           
-#             'tau_s': 1e0,       # Ground truth to recover
-#             'gamma': 2,         
-#             'n_L': [0,0],            
-#             'm_L': 0,             
-#             'X_0': X0,  # Initial state
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_ext_flow_params_static(self):
-#         """Define external parameters for static response (fixed during inference)."""
-#         N = 10
-#         return {
-#             "Lambdas": [[0,0]]*N,
-#             "Zetas": [0]*N,
-#             "A":1e-6,
-#             "w0":0, # Static flow
-#             "psi":np.pi/2,
-#         }  
-
-#     @pytest.fixture
-#     def ground_truth_sim_params_static(self):
-#         """
-#         Define simulation parameters.
-#         Use BDF method for faster convergence compared to RK45.
-#         """
-#         return {
-#             "T_span": (1e6, 2e6),
-#             "T_eval": np.linspace(1e6, 2e6, int(2e0)), # minimum two elements here.
-#             "method": "BDF",
-#             "T_sim_max": 300,
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_flow_data_static(
-#         self, 
-#         ground_truth_int_params, 
-#         ground_truth_ext_flow_params_static, 
-#         ground_truth_sim_params_static,
-#     ):
-#         """
-#         Generate ground truth synthetic data by simulating ViscoElasticFilament
-#         with known parameters.
-        
-#         Returns:
-#             np.ndarray: Simulated trajectory (shape depends on model)
-#         """
-#         model = ViscoElasticFilament_FlowParams_ScalarBending(
-#             int_params=ground_truth_int_params,
-#             ext_params=ground_truth_ext_flow_params_static,
-#             sim_params=ground_truth_sim_params_static
-#         )
-#         output = model.simulate_single()
-        
-#         assert output['value'] is not None, (
-#             f"Ground truth simulation failed. Full output: {output}"
-#         )
-
-#         return output['value']
-
-#     @pytest.fixture
-#     def ground_truth_ext_flow_params_dynamic(self):
-#         """Define external parameters for static response (fixed during inference)."""
-#         N = 10
-#         return {
-#             "Lambdas": [[0,0]]*N,
-#             "Zetas": [0]*N,
-#             "A":1e-6,
-#             "w0":1e0, # Dynamic flow
-#             "psi":np.pi/2,
-#         }        
-
-#     @pytest.fixture
-#     def ground_truth_sim_params_dynamic(self):
-#         """
-#         Define simulation parameters.
-#         Use BDF method for faster convergence compared to RK45.
-#         """
-#         return {
-#             "T_span": (1e1, 2e1),
-#             "T_eval": np.linspace(1e1, 2e1, int(1e1)),
-#             "method": "BDF",
-#             "T_sim_max": 300,
-#         }
-
-#     @pytest.fixture
-#     def ground_truth_flow_data_dynamic(
-#         self,
-#         ground_truth_int_params, 
-#         ground_truth_ext_flow_params_dynamic, 
-#         ground_truth_sim_params_dynamic,
-#     ):
-#         """
-#         Generate ground truth synthetic data by simulating ViscoElasticFilament
-#         with known parameters.
-        
-#         Returns:
-#             np.ndarray: Simulated trajectory (shape depends on model)
-#         """
-#         model = ViscoElasticFilament_FlowParams_ScalarBending(
-#             int_params=ground_truth_int_params,
-#             ext_params=ground_truth_ext_flow_params_dynamic,
-#             sim_params=ground_truth_sim_params_dynamic,
-#         )
-#         output = model.simulate_single()
-        
-#         assert output['value'] is not None, (
-#             f"Ground truth simulation failed. Full output: {output}"
-#         )
-
-#         return output['value']
-    
-#     # ======================
-#     # ======= Models =======
-#     # ======================
-
-#     @pytest.fixture
-#     def multielastic_model_flow_sp4_beta_only(
-#         self,
-#         ground_truth_int_params
-#     ):
-#         """
-#         Create a composed model for ViscoElasticFilament_FlowParams that
-#             - only varies Sp4 and Beta
-#             - sets tau_s to zero (elastic model)
-        
-#         The embedding function accepts a reduced parameter dict {'Sp4': value, 'Beta':value}
-#         and embeds it into the full internal parameters, keeping all others fixed.
-#         """
-#         fixed_params = ground_truth_int_params.copy()
-#         fixed_params['tau_s'] = 0 # Set dynamic parameters to 0.
-        
-#         def embed_sp4_beta_flow(
-#             reduced_int_params: Dict[str, float],
-#             ext_params: Any,
-#             sim_params: Any,
-#         ) -> Dict[str, Any]:
-#             """
-#             Transform reduced internal parameters into full int_params dict.
-            
-#             Args:
-#                 reduced_int_params: Dict containing {'Sp4': inferred_value, 'Beta':inferred_value}
-#                 ext_params: Passed through unchanged (not modified here)
-#                 sim_params: Passed through unchanged (not modified here)
-            
-#             Returns:
-#                 Full int_params dict with Sp4 and Beta updated, all other values fixed.
-#             """
-#             full_params = fixed_params.copy()
-            
-#             # Update only Sp4 and Beta; all other parameters remain fixed
-#             if 'Sp4' in reduced_int_params:
-#                 full_params['Sp4'] = reduced_int_params['Sp4']
-#             if 'Beta' in reduced_int_params:
-#                 full_params['Beta'] = reduced_int_params['Beta']
-            
-#             return full_params
-        
-#         # Create composed model with the embedding function
-#         MultiElasticModel = compose_model(
-#             ViscoElasticFilament_FlowParams_ScalarBending,
-#             compose_int_params=embed_sp4_beta_flow,
-#         )
-#         return MultiElasticModel
-
-#     @pytest.fixture
-#     def viscoelastic_model_flow_sp4_beta_tau_s_only(
-#         self,
-#         ground_truth_int_params,
-#     ):
-#         """
-#         Create a composed model for ViscoElasticFilament_FlowParams that only varies Sp4, Beta and tau_s.
-        
-#         The embedding function accepts a reduced parameter dict {'Sp4': value, 'Beta': value, 'tau_s': value}
-#         and embeds it into the full internal parameters, keeping all others fixed.
-#         """
-#         fixed_params = ground_truth_int_params.copy()
-        
-#         def embed_sp4_beta_tau_s_flow(
-#             reduced_int_params: Dict[str, float],
-#             ext_params: Any,
-#             sim_params: Any,
-#         ) -> Dict[str, Any]:
-#             """
-#             Transform reduced internal parameters into full int_params dict.
-            
-#             Args:
-#                 reduced_int_params: Dict containing {'Sp4': inferred_value, 'Beta': inferred_value, 'tau_s': inferred_value}
-#                 ext_params: Passed through unchanged (not modified here)
-#                 sim_params: Passed through unchanged (not modified here)
-            
-#             Returns:
-#                 Full int_params dict with Sp4 and tau_s updated, all other values fixed.
-#             """
-#             full_params = fixed_params.copy()
-            
-#             # Update only Sp4, Beta and tau_b; all other parameters remain fixed
-#             if 'Sp4' in reduced_int_params:
-#                 full_params['Sp4'] = reduced_int_params['Sp4']
-
-#             if 'Beta' in reduced_int_params:
-#                 full_params['Beta'] = reduced_int_params['Beta']
-
-#             if 'tau_s' in reduced_int_params:
-#                 full_params['tau_s'] = reduced_int_params['tau_s']
-            
-#             return full_params
-        
-#         # Create composed model with the embedding function
-#         ViscoElasticModel = compose_model(
-#             ViscoElasticFilament_FlowParams_ScalarBending,
-#             compose_int_params=embed_sp4_beta_tau_s_flow,
-#         )
-#         return ViscoElasticModel
-
-#     # ==========================
-#     # ======= Optimizers =======
-#     # ==========================
-
-#     @pytest.fixture
-#     def basinhopping_optimizer_instance(self):
-#         """
-#         Return the basinhopping optimizer function with standard configuration.
-#         """
-#         return basinhopping_optimizer        
-
-#     @pytest.fixture
-#     def optimizer_kwargs_sp4_beta(self):
-#         return {
-#             'bounds': Bounds(lb=[1e-6, 0], ub=[np.inf, np.inf]),
-#             'minimum_gradient': False,
-#             'minimum_hessian': False,
-#             'local_minimizer_kwargs': {
-#                 'method': 'L-BFGS-B',
-#                 'jac': '3-point',
-#                 'options': {
-#                     'disp': True,
-#                     'ftol': 1e-8,
-#                     'gtol': 1e-8,
-#                     'eps': 1e-8,
-#                     'finite_diff_rel_step': 1e-6,
-#                 },
-#             },
-#             'global_minimizer_kwargs': {
-#                 'niter': 9,
-#                 'T': 0,
-#                 'stepsize': 5,
-#                 'tol': 1e-10,
-#             }
-#         }
-
-#     @pytest.fixture
-#     def optimizer_kwargs_tau_s(self, optimizer_kwargs_sp4_beta):
-#         optimizer_kwargs = optimizer_kwargs_sp4_beta
-#         optimizer_kwargs['bounds'] = Bounds(lb=[0], ub=[np.inf])
-#         return optimizer_kwargs
-
-#     # ==========================
-#     # ========= Passes =========
-#     # ==========================
-
-#     # Pass 1: Reduced model, infer Sp4 and Beta only
-#     @pytest.fixture
-#     def pass_1(
-#         self,
-#         multielastic_model_flow_sp4_beta_only,
-#         ground_truth_ext_flow_params_static,
-#         ground_truth_sim_params_static,
-#         ground_truth_flow_data_static,
-#         basinhopping_optimizer_instance,
-#         optimizer_kwargs_sp4_beta,
-#     ):
-#         """ First pass for the viscoelastic inference. """
-        
-#         first_pass = PipelinePass(
-#             name="Sp4-Beta Inference (MultiElastic Model)",
-#             model_class=multielastic_model_flow_sp4_beta_only,
-#             ground_truths=[ground_truth_flow_data_static],
-#             ext_params_list=[ground_truth_ext_flow_params_static],
-#             sim_params_list=[ground_truth_sim_params_static],
-#             param_keys_to_infer=['Sp4', 'Beta'],
-#             fixed_params={},
-#             optimizer=basinhopping_optimizer_instance,
-#             optimizer_kwargs=optimizer_kwargs_sp4_beta,
-#         )
-
-#         return first_pass
-
-#     # Pass 2:
-#     @pytest.fixture
-#     def pass_2(
-#         self,
-#         viscoelastic_model_flow_sp4_beta_tau_s_only,
-#         ground_truth_ext_flow_params_dynamic,
-#         ground_truth_sim_params_dynamic,
-#         ground_truth_flow_data_dynamic,
-#         basinhopping_optimizer_instance,
-#         optimizer_kwargs_tau_s,
-#     ):
-#         """ Second pass for the viscoelastic inference. """
-        
-#         second_pass = PipelinePass(
-#             name="tau_s Inference (ViscoElastic Model)",
-#             model_class=viscoelastic_model_flow_sp4_beta_tau_s_only,
-#             ground_truths=[ground_truth_flow_data_dynamic],
-#             ext_params_list=[ground_truth_ext_flow_params_dynamic],
-#             sim_params_list=[ground_truth_sim_params_dynamic],
-#             param_keys_to_infer=['tau_s'],
-#             fixed_params={},
-#             optimizer=basinhopping_optimizer_instance,
-#             optimizer_kwargs=optimizer_kwargs_tau_s,
-#         )
-
-#         return second_pass
-
-#     # ============================
-#     # ========= Pipeline =========
-#     # ============================
-#     @pytest.fixture
-#     def viscoelastic_pipeline(self, pass_1, pass_2, mse_loss_fn):
-
-#         pipeline = InferencePipeline(
-#             passes=[pass_1, pass_2],
-#             loss_fn=mse_loss_fn,
-#             n_jobs_per_pass=-1,  # Use all cores within each pass
-#         )
-#         return pipeline
-
-#     # ============================
-#     # ========= Tests =========
-#     # ============================
-#     def test_viscoelastic_inference(
-#         self,
-#         viscoelastic_pipeline,
-#     ):
-
-#         # Multiple initial guesses: Pass 1 for Sp4-Beta, Pass 2 for tau_s
-#         initial_guesses_per_pass = [
-#             [
-#                 # {'Sp4': 1e0, 'Beta':0},
-#                 # {'Sp4': 1e-1, 'Beta':1e0},
-#                 {'Sp4': 10, 'Beta':0},
-#             ],
-#             [
-#                 {'tau_s': 0},
-#                 # {'tau_b': 10.0},
-#             ],
-#         ]
-        
-#         # ===== ACT =====
-#         results = viscoelastic_pipeline.run(initial_guesses_per_pass, verbose=True)
-        
-#         # ===== ASSERT =====
-        
-#         # Check that we got exactly two results (two passes)
-#         assert len(results) == 2, "Expected two InferenceResult for two-pass pipeline"
-        
-#         result_pass1, result_pass2 = results
-        
-#         # ===== PASS 1: Sp4 INFERENCE =====
-#         print("\n" + "="*60)
-#         print("PASS 1 ASSERTIONS (Sp4 inference)")
-#         print("="*60)
-        
-#         # 1. Check Pass 1 convergence
-#         assert result_pass1.success, (
-#             f"Pass 1 optimization did not converge. Message: {result_pass1.message}"
-#         )
-#         assert result_pass1.iterations > 0, "Pass 1: No iterations were performed"
-        
-#         # 2. Check Sp4 and Beta exist and are physically reasonable
-
-#         assert 'Sp4' in result_pass1.params, "Sp4 not in Pass 1 inferred parameters"
-#         sp4_inferred = result_pass1.params['Sp4']
-#         assert sp4_inferred > 0, f"Sp4 must be positive, got {sp4_inferred}"
-#         assert sp4_inferred < 1e6, f"Sp4 unreasonably large: {sp4_inferred}"
-
-#         assert 'Beta' in result_pass1.params, "Beta not in Pass 1 inferred parameters"
-#         beta_inferred = result_pass1.params['Beta']
-#         assert beta_inferred >= 0, f"Beta must be non-negative, got {beta_inferred}"
-#         assert beta_inferred < 1e6, f"Beta unreasonably large: {beta_inferred}"      
-
-#         # 3. Check Pass 1 loss
-#         assert result_pass1.loss > 0, "Pass 1 loss should be positive"
-#         assert result_pass1.loss < 1e2, (
-#             f"Pass 1 loss suspiciously high: {result_pass1.loss}. Check model/data scale."
-#         )
-        
-#         # 4. Check Pass 1 uncertainty quantification
-#         assert result_pass1.covariance is not None, "Pass 1: Covariance not computed"
-#         assert result_pass1.hessian is not None, "Pass 1: Hessian not computed"
-#         assert result_pass1.std_errors is not None, "Pass 1: Standard errors not computed"
-#         assert len(result_pass1.std_errors) == 2, "Pass 1: Expected 1 std_error for 2 parameter (Sp4, Beta)"
-        
-#         std_err_sp4 = result_pass1.std_errors[0]
-#         assert std_err_sp4 > 0, f"Pass 1: Sp4 std error must be positive, got {std_err_sp4}"
-#         assert std_err_sp4 < sp4_inferred * 10, (
-#             f"Pass 1: Std error unreasonably large relative to Sp4: "
-#             f"Sp4={sp4_inferred:.3e} ± {std_err_sp4:.3e}"
-#         )
-#         std_err_beta = result_pass1.std_errors[1]
-#         assert std_err_beta > 0, f"Pass 1: Beta std error must be positive, got {std_err_beta}"
-#         assert std_err_beta < beta_inferred * 10, (
-#             f"Pass 1: Std error unreasonably large relative to Beta: "
-#             f"Beta={beta_inferred:.3e} ± {std_err_beta:.3e}"
-#         )
-        
-#         print(f"✓ Pass 1 - Sp4 inferred: {sp4_inferred:.6e} ± {std_err_sp4:.6e}")
-#         print(f"✓ Pass 1 - Beta inferred: {beta_inferred:.6e} ± {std_err_beta:.6e}")
-#         print(f"✓ Pass 1 - Final loss: {result_pass1.loss:.8e}")
-#         print(f"✓ Pass 1 - Iterations: {result_pass1.iterations}")
-        
-#         # ===== PASS 2: tau_s INFERENCE (Sp4 and Beta FIXED) =====
-#         print("\n" + "="*60)
-#         print("PASS 2 ASSERTIONS (tau_s inference with Sp4 and Beta fixed)")
-#         print("="*60)
-        
-#         # 1. Check Pass 2 convergence
-#         assert result_pass2.success, (
-#             f"Pass 2 optimization did not converge. Message: {result_pass2.message}"
-#         )
-#         assert result_pass2.iterations > 0, "Pass 2: No iterations were performed"
-        
-#         # 2. Check tau_s exists and is physically reasonable
-#         assert 'tau_s' in result_pass2.params, "tau_s not in Pass 2 inferred parameters"
-#         tau_s_inferred = result_pass2.params['tau_s']
-#         assert tau_s_inferred >= 0, f"tau_s must be non-negative, got {tau_s_inferred}"
-#         assert tau_s_inferred < 1e4, f"tau_s unreasonably large: {tau_s_inferred}"
-        
-#         # 3. Check Pass 2 loss
-#         assert result_pass2.loss > 0, "Pass 2 loss should be positive"
-#         assert result_pass2.loss < 1e2, (
-#             f"Pass 2 loss suspiciously high: {result_pass2.loss}. Check model/data scale."
-#         )
-
-#         # 4. Check Pass 2 uncertainty quantification (only for tau_s, not Sp4)
-#         assert result_pass2.covariance is not None, "Pass 2: Covariance not computed"
-#         assert result_pass2.hessian is not None, "Pass 2: Hessian not computed"
-#         assert result_pass2.std_errors is not None, "Pass 2: Standard errors not computed"
-#         assert len(result_pass2.std_errors) == 1, "Pass 2: Expected 1 std_error for 1 inferred parameter (tau_s)"
-        
-#         std_err_tau_s = result_pass2.std_errors[0]
-#         assert std_err_tau_s > 0, f"Pass 2: tau_s std error must be positive, got {std_err_tau_s}"
-#         assert std_err_tau_s < tau_s_inferred * 10, (
-#             f"Pass 2: Std error unreasonably large relative to tau_s: "
-#             f"tau_s={tau_s_inferred:.3e} ± {std_err_tau_s:.3e}"
-#         )
-        
-#         print(f"✓ Pass 2 - tau_s inferred: {tau_s_inferred:.6e} ± {std_err_tau_s:.6e}")
-#         print(f"✓ Pass 2 - Sp4 fixed (from Pass 1): {result_pass1.params['Sp4']:.6e}")
-#         print(f"✓ Pass 2 - Beta fixed (from Pass 1): {result_pass1.params['Beta']:.6e}")
-#         print(f"✓ Pass 2 - Final loss: {result_pass2.loss:.8e}")
-#         print(f"✓ Pass 2 - Iterations: {result_pass2.iterations}")
-        
-#         # ===== PIPELINE-LEVEL ASSERTIONS =====
-#         print("\n" + "="*60)
-#         print("PIPELINE-LEVEL ASSERTIONS")
-#         print("="*60)
-        
-#         # Check parameter trajectory
-#         trajectory = viscoelastic_pipeline.get_parameter_trajectory()
-#         assert 'Sp4' in trajectory, "Sp4 not in trajectory"
-#         assert 'Beta' in trajectory, "Beta not in trajectory"
-#         assert 'tau_s' in trajectory, "tau_s not in trajectory"
-#         assert len(trajectory['Sp4']) == 2, "Sp4 trajectory should have 2 steps"
-#         assert len(trajectory['Beta']) == 2, "Beta trajectory should have 2 steps"
-#         assert len(trajectory['tau_s']) == 2, "tau_s trajectory should have 2 steps"
-        
-#         # Sp4 should stay constant (inferred in Pass 1, fixed in Pass 2)
-#         assert trajectory['Sp4'][0] == trajectory['Sp4'][1], (
-#             f"Sp4 should be constant across passes. "
-#             f"Pass1={trajectory['Sp4'][0]}, Pass2={trajectory['Sp4'][1]}"
-#         )
-
-#         # Beta should stay constant (inferred in Pass 1, fixed in Pass 2)
-#         assert trajectory['Beta'][0] == trajectory['Beta'][1], (
-#             f"Beta should be constant across passes. "
-#             f"Pass1={trajectory['Beta'][0]}, Pass2={trajectory['Beta'][1]}"
-#         )
-        
-#         # tau_s should appear in Pass 2 (None or absent in Pass 1)
-#         assert trajectory['tau_s'][1] == tau_s_inferred, (
-#             f"tau_s trajectory doesn't match Pass 2 result"
-#         )
-        
-#         # Generate and verify summary
-#         summary = viscoelastic_pipeline.summary()
-#         print(summary)
-#         assert summary, "Summary generation failed"
-        
-#         print("\n✓ All two-pass inference tests passed!")
-
-
-
 def rel_mse_loss_fn() -> Callable:
     """
     Define Relative Mean Square Error loss function.
@@ -3027,7 +260,6 @@ def make_ground_truth_int_params(
         'm_L': m_L,             
         'X_0': X_0,  # Initial state
     }
-
 
 def make_ground_truth_ext_params(
     Lambdas = [[0,0]]*10,
@@ -3094,11 +326,11 @@ def make_ground_truth_data_list(
 
 def model_params_only_flow(
     ground_truth_int_params,
-    params_keys_to_infer,
+    param_keys_to_infer,
 ):
     """
     Create a composed model for ViscoElasticFilament_FlowParams that
-    only varies params in params_keys_to_infer
+    only varies params in param_keys_to_infer
     
     The embedding function accepts a reduced parameter dict {key: value, ...}
     and embeds it into the full internal parameters, keeping all others fixed.
@@ -3124,7 +356,7 @@ def model_params_only_flow(
         full_params = fixed_params.copy()
         
         # Update only params from keys; all other parameters remain fixed
-        for key in params_keys_to_infer:
+        for key in param_keys_to_infer:
             if key in reduced_int_params:
                 full_params[key] = reduced_int_params[key]           
             
@@ -3162,6 +394,935 @@ def make_optimizer_kwargs(
         'global_minimizer_kwargs': global_minimizer_kwargs,
     }
 
+# def create_parameter_mappings(int_param_range, ext_param_range):
+#     """Create index mappings for individual parameters."""
+#     mappings = {}
+    
+#     for param_name, param_values in int_param_range.items():
+#         mappings[param_name] = {
+#             'type': 'internal',
+#             'values': {i: float(val) for i, val in enumerate(param_values)}
+#         }
+    
+#     for param_name, param_values in ext_param_range.items():
+#         mappings[param_name] = {
+#             'type': 'external',
+#             'values': {i: float(val) for i, val in enumerate(param_values)}
+#         }
+    
+#     return mappings
+
+# def create_cumulative_mappings(int_param_range, ext_param_range, cumul_param_indices):
+#     """Create cumulative mappings for external parameters.
+    
+#     cumul_param_indices: dict mapping parameter names to (start_idx, end_idx) tuples.
+#                         Example: {'A': (0, 10), 'w0': (5, 15)}
+#                         Parameters not in this dict use their full range.
+    
+#     Internal parameters are included as fixed mappings (not cumulated).
+#     External parameters are included as lists for each cumulation step.
+#     """
+#     if not cumul_param_indices:
+#         return []
+    
+#     cumulative_mappings = []
+    
+#     # Build cumulation ranges for each external parameter
+#     cumul_ranges = {}
+#     for param_name in ext_param_range.keys():
+#         if param_name in cumul_param_indices:
+#             start_idx, end_idx = cumul_param_indices[param_name]
+#             cumul_ranges[param_name] = (start_idx, end_idx)
+#         else:
+#             # Parameters not specified use their full range
+#             cumul_ranges[param_name] = (0, len(ext_param_range[param_name]) - 1)
+    
+#     # Generate all combinations of cumulation steps
+#     param_names = list(ext_param_range.keys())
+#     index_ranges = [range(cumul_ranges[name][0], cumul_ranges[name][1] + 1) for name in param_names]
+    
+#     for index_combo in product(*index_ranges):
+#         cumul_mapping = {}
+#         cumul_indices = {param_names[i]: index_combo[i] for i in range(len(param_names))}
+        
+#         # Add internal parameters (fixed, not cumulated)
+#         for param_name, param_values in int_param_range.items():
+#             cumul_mapping[param_name] = {
+#                 'type': 'internal',
+#                 'values': {i: float(val) for i, val in enumerate(param_values)}
+#             }
+        
+#         # Add external parameters (cumulated lists)
+#         for param_name, param_values in ext_param_range.items():
+#             start_idx, end_idx = cumul_ranges[param_name]
+#             current_idx = cumul_indices[param_name]
+            
+#             # Cumulated list from start_idx to current_idx
+#             cumul_mapping[param_name] = {
+#                 'type': 'external',
+#                 'indices': {'start': start_idx, 'end': current_idx},
+#                 'values': [float(param_values[i]) for i in range(start_idx, current_idx + 1)]
+#             }
+        
+#         cumulative_mappings.append(cumul_mapping)
+    
+#     return cumulative_mappings
+
+# def save_parameter_mappings(base_path, int_param_range, ext_param_range):
+#     """Save parameter mappings to JSON files."""
+#     base_path.mkdir(parents=True, exist_ok=True)
+    
+#     # Save individual parameter mappings
+#     all_mappings = create_parameter_mappings(int_param_range, ext_param_range)
+#     with open(base_path / 'parameter_index_mapping.json', 'w') as f:
+#         json.dump(all_mappings, f, indent=2)
+
+# def save_cumulative_mappings(base_path, int_param_range, ext_param_range, cumul_param_indices):
+#     """Save parameter mappings to JSON files."""
+#     base_path.mkdir(parents=True, exist_ok=True)
+    
+#     # Save cumulative parameter mappings
+#     cumul_mappings = create_cumulative_mappings(int_param_range, ext_param_range, cumul_param_indices)
+#     with open(base_path / 'cumul_parameter_index_mapping.json', 'w') as f:
+#         json.dump(cumul_mappings, f, indent=2)
+
+# def save_all_mappings(base_path, int_param_range, ext_param_range, ext_param_indices):
+#     """Save parameter mappings to JSON files."""
+#     base_path.mkdir(parents=True, exist_ok=True)
+    
+#     # Save individual parameter mappings
+#     all_mappings = create_parameter_mappings(int_param_range, ext_param_range)
+#     with open(base_path / 'parameter_index_mapping.json', 'w') as f:
+#         json.dump(all_mappings, f, indent=2)
+    
+#     # Save cumulative parameter mappings
+#     cumul_mappings = create_cumulative_mappings(int_param_range, ext_param_range, ext_param_indices)
+#     with open(base_path / 'cumul_parameter_index_mapping.json', 'w') as f:
+#         json.dump(cumul_mappings, f, indent=2)
+
+# def load_parameter_mappings(base_path):
+#     """Load individual parameter mappings from JSON file."""
+#     with open(base_path / 'parameter_index_mapping.json', 'r') as f:
+#         mappings = json.load(f)
+    
+#     # Separate into internal and external parameters
+#     int_mappings = {}
+#     ext_mappings = {}
+    
+#     for param_name, param_data in mappings.items():
+#         param_type = param_data['type']
+#         values = {int(k): v for k, v in param_data['values'].items()}
+        
+#         if param_type == 'internal':
+#             int_mappings[param_name] = values
+#         elif param_type == 'external':
+#             ext_mappings[param_name] = values
+    
+#     return int_mappings, ext_mappings
+
+# def load_cumulative_mappings(base_path):
+#     """Load cumulative parameter mappings from JSON file.
+    
+#     Internal parameters are loaded as index mappings (dict).
+#     External parameters are loaded as lists of values with their index ranges.
+#     """
+#     with open(base_path / 'cumul_parameter_index_mapping.json', 'r') as f:
+#         cumul_mappings = json.load(f)
+    
+#     # Process cumulative mappings to restore proper structure
+#     processed_cumul_mappings = []
+    
+#     for cumul_step in cumul_mappings:
+#         step_data = {}
+#         for param_name, param_data in cumul_step.items():
+#             param_type = param_data['type']
+            
+#             if param_type == 'internal':
+#                 # Internal parameters: restore as index mapping (dict)
+#                 values = {int(k): v for k, v in param_data['values'].items()}
+#                 step_data[param_name] = {
+#                     'type': param_type,
+#                     'values': values
+#                 }
+#             else:  # param_type == 'external'
+#                 # External parameters: keep as list with index metadata
+#                 step_data[param_name] = {
+#                     'type': param_type,
+#                     'indices': param_data['indices'],  # {'start': int, 'end': int}
+#                     'values': param_data['values']
+#                 }
+        
+#         processed_cumul_mappings.append(step_data)
+    
+#     return processed_cumul_mappings
+
+# def load_all_mappings(base_path):
+#     """Load individual parameter mappings from JSON file."""
+    
+#     parameter_mappings = load_parameter_mappings(base_path)
+#     cumulative_mappings = load_cumulative_mappings(base_path)
+    
+#     return parameter_mappings, cumulative_mappings
+
+def _convert_to_serializable(obj):
+    """Recursively convert NumPy and other non-serializable types to JSON-compatible types."""
+    if isinstance(obj, dict):
+        return {k: _convert_to_serializable(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_convert_to_serializable(item) for item in obj]
+    elif isinstance(obj, (np.integer, np.int64, np.int32)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    else:
+        return obj
+
+@dataclass
+class ResultManifestEntry:
+    """Single entry in the results manifest."""
+    int_params: Dict[str, float]
+    ext_params: Optional[Dict[str, float]]
+    result_file: str
+    mode: str
+    pass_idx: Optional[int] = None
+    cumul_indices: Optional[Dict[str, tuple]] = None
+
+class ResultsManifest:
+    """Centralized registry of all inference results."""
+    
+    def __init__(self, base_path):
+        self.base_path = Path(base_path)
+        self.entries: List[ResultManifestEntry] = []
+    
+    def add_single_result(self, int_params, ext_params, result_file):
+        """Register a single-mode inference result."""
+        # Convert NumPy types to Python native types
+        int_params = _convert_to_serializable(int_params)
+        ext_params = _convert_to_serializable(ext_params)
+        
+        entry = ResultManifestEntry(
+            int_params=int_params,
+            ext_params=ext_params,
+            result_file=str(result_file.relative_to(self.base_path)),
+            mode='single',
+        )
+        self.entries.append(entry)
+    
+    def add_cumulative_result(self, int_params, result_file, pass_idx, cumul_indices):
+        """Register a cumulative-mode pass result."""
+        # Convert NumPy types to Python native types
+        int_params = _convert_to_serializable(int_params)
+        cumul_indices = _convert_to_serializable(cumul_indices)
+        
+        entry = ResultManifestEntry(
+            int_params=int_params,
+            ext_params=None,
+            result_file=str(result_file.relative_to(self.base_path)),
+            mode='cumulative_pass',
+            pass_idx=pass_idx,
+            cumul_indices=cumul_indices,
+        )
+        self.entries.append(entry)
+    
+    def save(self):
+        """Write manifest to JSON with proper type conversion."""
+        manifest_file = self.base_path / 'results_manifest.json'
+        
+        # Convert all entries to dicts and ensure JSON serializability
+        manifest_data = {
+            'entries': [_convert_to_serializable(asdict(entry)) for entry in self.entries]
+        }
+        
+        with open(manifest_file, 'w') as f:
+            json.dump(manifest_data, f, indent=2)
+        
+        print(f"Manifest saved: {manifest_file}")
+    
+    def query_by_params(self, **kwargs) -> List[ResultManifestEntry]:
+        """Find results matching parameter values."""
+        results = []
+        for entry in self.entries:
+            match = True
+            for key, value in kwargs.items():
+                if key not in entry.int_params or entry.int_params[key] != value:
+                    match = False
+                    break
+            if match:
+                results.append(entry)
+        return results
+
+def load_results_manifest(base_path):
+    """Load the results manifest from a completed inference run."""
+    manifest_file = base_path / 'results_manifest.json'
+    with open(manifest_file, 'r') as f:
+        return json.load(f)
+
+def load_parameter_reference(base_path):
+    """Load the parameter reference file."""
+    ref_file = base_path / 'parameter_reference.json'
+    with open(ref_file, 'r') as f:
+        return json.load(f)
+
+def load_result_file(base_path, result_file_path):
+    """Load a pickled result file."""
+    full_path = base_path / result_file_path
+    with open(full_path, 'rb') as f:
+        return pickle.load(f)
+
+def _make_optimizer_bounds(param_keys_to_infer):
+    """Create optimizer bounds for given parameter keys."""
+    lb = [
+        0 if ('Beta' in param_key or 'tau_b' in param_key or 'tau_s' in param_key) 
+        else (1 if 'Sp4' in param_key else 0) 
+        for param_key in param_keys_to_infer
+    ]
+    ub = [np.inf] * len(param_keys_to_infer)
+    return Bounds(lb=lb, ub=ub)
+
+def _build_cumulative_ext_params(
+    ext_param_range,
+    ground_truth_fixed_ext_params,
+    ext_param_dict,
+    ext_param_indices,
+    cumul_param_indices,
+):
+    """Build cumulative external parameter list.
+    
+    Args:
+        ext_param_range: Dict of external parameter ranges
+        ground_truth_fixed_ext_params: Fixed external parameters
+        ext_param_dict: Current external parameter values
+        ext_param_indices: Current iteration indices
+        cumul_param_indices: Dict mapping params to (start_idx, end_idx)
+    
+    Returns:
+        List of cumulative external parameter dicts
+    """
+    ext_param_names = list(ext_param_range.keys())
+    ground_truth_ext_params_list_cumul = []
+    
+    # Build cumulation ranges
+    cumul_ranges = {}
+    for param_name in ext_param_range.keys():
+        if param_name in cumul_param_indices:
+            start_idx, end_idx = cumul_param_indices[param_name]
+            cumul_ranges[param_name] = (start_idx, end_idx)
+        else:
+            cumul_ranges[param_name] = (0, len(ext_param_range[param_name]) - 1)
+    
+    # Generate all combinations within cumulation ranges
+    index_ranges = [
+        range(cumul_ranges[name][0], cumul_ranges[name][1] + 1) 
+        for name in ext_param_names
+    ]
+    
+    for index_combo in product(*index_ranges):
+        cumul_ext_params = {
+            **ground_truth_fixed_ext_params,
+        }
+        
+        for param_name, idx in zip(ext_param_names, index_combo):
+            cumul_ext_params[param_name] = ext_param_range[param_name][idx]
+        
+        ground_truth_ext_params_list_cumul.append(
+            make_ground_truth_ext_params(**cumul_ext_params)
+        )
+    
+    return ground_truth_ext_params_list_cumul
+
+def _determine_inference_passes(param_keys_to_infer, elastic_params_list, viscous_params_list, min_w0):
+    """Determine number of passes and split parameters based on min_w0.
+    
+    Returns:
+        (n_passes, list of pass_configs)
+        where each pass_config = {
+            'name': str,
+            'param_keys': list,
+            'w0_filter': callable or None,
+        }
+    """
+    
+    elastic_keys = [k for k in param_keys_to_infer if k in elastic_params_list]
+    viscous_keys = [k for k in param_keys_to_infer if k in viscous_params_list]
+    unknown_keys = [k for k in param_keys_to_infer if k not in elastic_params_list and k not in viscous_params_list]
+    
+    if unknown_keys:
+        raise ValueError(f"Unknown parameters for inference: {unknown_keys}. # TODO: full inference")
+    
+    if elastic_keys and viscous_keys:
+        # Two passes
+        return 2, [
+            {
+                'name': 'Elastic Inference',
+                'param_keys': elastic_keys,
+                'w0_filter': lambda w0: w0 == min_w0,
+            },
+            {
+                'name': 'Viscous Inference',
+                'param_keys': viscous_keys,
+                'w0_filter': lambda w0: w0 > 0,
+            },
+        ]
+    elif elastic_keys:
+        # One pass: elastic only
+        return 1, [
+            {
+                'name': 'Elastic Inference',
+                'param_keys': elastic_keys,
+                'w0_filter': lambda w0: w0 == min_w0,
+            },
+        ]
+    else:
+        # One pass: viscous only
+        return 1, [
+            {
+                'name': 'Viscous Inference',
+                'param_keys': viscous_keys,
+                'w0_filter': lambda w0: w0 > 0,
+            },
+        ]
+
+def _filter_ext_params_by_w0(ext_params_list, w0_filter):
+    """Filter external parameters by w0 value.
+    
+    Args:
+        ext_params_list: List of external parameter dicts
+        w0_filter: Function that takes w0 value and returns bool
+    
+    Returns:
+        Filtered list of external parameter dicts
+    """
+    return [
+        ext_params for ext_params in ext_params_list
+        if w0_filter(ext_params.get('w0', 0))
+    ]
+
+def run_single_ext_param_inference(
+    int_params,
+    ext_params,
+    sim_params,
+    param_keys_to_infer,
+    initial_guesses,
+    loss_fn=None,
+    n_jobs=-1,
+    optimizer=None,
+    optimizer_kwargs=None,
+):
+    """Run single inference pass with fixed internal/external/sim parameters.
+    
+    No phase-splitting: all param_keys_to_infer are inferred in one pass.
+    
+    Args:
+        int_params: Dict of internal parameters (fully specified)
+        ext_params: Dict of external parameters (fully specified)
+        sim_params: Dict of simulation parameters (fully specified)
+        param_keys_to_infer: List of parameter keys to infer
+        initial_guesses: List of initial guess dicts
+        loss_fn: Loss function (default: rel_mse_loss_fn())
+        n_jobs: Number of parallel jobs
+        optimizer: Optimizer function (default: basinhopping_optimizer)
+        optimizer_kwargs: Dict of optimizer kwargs
+    
+    Returns:
+        InferenceResult object
+    """
+    
+    if loss_fn is None:
+        loss_fn = rel_mse_loss_fn()
+    
+    if optimizer is None:
+        optimizer = basinhopping_optimizer
+    
+    if optimizer_kwargs is None:
+        bounds = _make_optimizer_bounds(param_keys_to_infer)
+        optimizer_kwargs = make_optimizer_kwargs(bounds=bounds)
+    
+    # Create ground truth objects
+    ground_truth_int_params = make_ground_truth_int_params(**int_params)
+    ground_truth_ext_params = make_ground_truth_ext_params(**ext_params)
+    ground_truth_sim_params = make_ground_truth_sim_params(**sim_params)
+    
+    # Create model with only parameters to infer
+    model_class = model_params_only_flow(
+        ground_truth_int_params,
+        param_keys_to_infer,
+    )
+    
+    # Create ground truth data list
+    ground_truth_data_list = make_ground_truth_data_list(
+        ground_truth_int_params,
+        [ground_truth_ext_params],
+        [ground_truth_sim_params],
+        "product",
+    )
+    
+    # Create single pass
+    pass_obj = PipelinePass(
+        name='Single Inference',
+        model_class=model_class,
+        ground_truths=ground_truth_data_list,
+        ext_params_list=[ground_truth_ext_params],
+        sim_params_list=[ground_truth_sim_params],
+        param_keys_to_infer=param_keys_to_infer,
+        fixed_params={},
+        optimizer=optimizer,
+        optimizer_kwargs=optimizer_kwargs,
+    )
+    
+    # Create and run pipeline
+    pipeline = InferencePipeline(
+        passes=[pass_obj],
+        loss_fn=loss_fn,
+        n_jobs_per_pass=n_jobs,
+    )
+    
+    pass_initial_guesses = [[g for g in initial_guesses]]
+    result = pipeline.run(pass_initial_guesses, verbose=True)[0]
+    
+    return result
+
+def run_cumulative_inference(
+    int_params,
+    ext_param_range,
+    ground_truth_fixed_ext_params,
+    sim_params,
+    param_keys_to_infer,
+    initial_guesses,
+    cumul_param_indices,
+    loss_fn=None,
+    n_jobs=-1,
+    elastic_params_list=None,
+    viscous_params_list=None,
+):
+    """Run cumulative inference with phase-splitting over external parameter range.
+    
+    Implements two-pass inference (elastic and viscous) over a range of external
+    parameters specified by cumul_param_indices.
+    
+    Args:
+        int_params: Dict of internal parameters (fully specified)
+        ext_param_range: Dict of external parameter ranges (full ranges)
+        ground_truth_fixed_ext_params: Dict of fixed external parameters
+        sim_params: Dict of simulation parameters (fully specified)
+        param_keys_to_infer: List of parameter keys to infer
+        initial_guesses: List of initial guess dicts
+        cumul_param_indices: Dict mapping ext param names to (start_idx, end_idx)
+        loss_fn: Loss function
+        n_jobs: Number of parallel jobs
+        elastic_params_list: Parameters in elastic pass
+        viscous_params_list: Parameters in viscous pass
+    
+    Returns:
+        List of (pass_idx, result) tuples
+    """
+    
+    if elastic_params_list is None:
+        elastic_params_list = ['Sp4', 'Beta']
+    if viscous_params_list is None:
+        viscous_params_list = ['tau_b', 'tau_s']
+    if loss_fn is None:
+        loss_fn = rel_mse_loss_fn()
+    
+    # Compute min_w0
+    w0_values = []
+    if 'w0' in ground_truth_fixed_ext_params:
+        w0_values.append(ground_truth_fixed_ext_params['w0'])
+    if 'w0' in ext_param_range:
+        w0_values.extend(ext_param_range['w0'])
+    min_w0 = min(w0_values) if w0_values else 0
+    
+    # Build cumulative external parameters list
+    ext_param_names = list(ext_param_range.keys())
+    cumul_ranges = {}
+    for param_name in ext_param_range.keys():
+        if param_name in cumul_param_indices:
+            start_idx, end_idx = cumul_param_indices[param_name]
+            cumul_ranges[param_name] = (start_idx, end_idx)
+        else:
+            cumul_ranges[param_name] = (0, len(ext_param_range[param_name]) - 1)
+    
+    # Generate all combinations within cumulation ranges
+    index_ranges = [
+        range(cumul_ranges[name][0], cumul_ranges[name][1] + 1)
+        for name in ext_param_names
+    ]
+    
+    ext_params_list_cumul = []
+    for index_combo in product(*index_ranges):
+        cumul_ext_params = {
+            **ground_truth_fixed_ext_params,
+        }
+        for param_name, idx in zip(ext_param_names, index_combo):
+            cumul_ext_params[param_name] = ext_param_range[param_name][idx]
+        
+        ext_params_list_cumul.append(cumul_ext_params)
+    
+    # Create ground truth objects
+    ground_truth_int_params = make_ground_truth_int_params(**int_params)
+    ground_truth_ext_params_list_cumul = [
+        make_ground_truth_ext_params(**ext_params) for ext_params in ext_params_list_cumul
+    ]
+    ground_truth_sim_params = make_ground_truth_sim_params(**sim_params)
+    
+    # Determine passes
+    n_passes, pass_configs = _determine_inference_passes(
+        param_keys_to_infer,
+        elastic_params_list,
+        viscous_params_list,
+        min_w0,
+    )
+    
+    # Create ground truth data list for all cumulative external params
+    ground_truth_data_list_cumul = make_ground_truth_data_list(
+        ground_truth_int_params,
+        ground_truth_ext_params_list_cumul,
+        [ground_truth_sim_params],
+        "product",
+    )
+    
+    # Run passes
+    passes_results = []
+    for pass_idx, pass_config in enumerate(pass_configs):
+        param_keys_to_infer_per_pass = pass_config['param_keys']
+        
+        # Create model with only parameters for this pass
+        model_class = model_params_only_flow(
+            ground_truth_int_params,
+            param_keys_to_infer_per_pass,
+        )
+        
+        # Create bounds for this pass
+        bounds = _make_optimizer_bounds(param_keys_to_infer_per_pass)
+        optimizer_kwargs = make_optimizer_kwargs(bounds=bounds)
+        
+        # Filter external parameters by w0
+        filtered_ext_params_list = _filter_ext_params_by_w0(
+            ground_truth_ext_params_list_cumul,
+            pass_config['w0_filter'],
+        )
+        
+        if not filtered_ext_params_list:
+            print(f"  Cumulative Pass {pass_idx}: No external parameters suited for {pass_config['name']}")
+            passes_results.append(None)
+            continue
+        
+        # Create corresponding data list
+        filtered_ground_truth_data_list = make_ground_truth_data_list(
+            ground_truth_int_params,
+            filtered_ext_params_list,
+            [ground_truth_sim_params],
+            "product",
+        )
+        
+        # Create pass
+        pass_obj = PipelinePass(
+            name=f"{pass_config['name']} - Cumulative",
+            model_class=model_class,
+            ground_truths=filtered_ground_truth_data_list,
+            ext_params_list=filtered_ext_params_list,
+            sim_params_list=[ground_truth_sim_params],
+            param_keys_to_infer=param_keys_to_infer_per_pass,
+            fixed_params={},
+            optimizer=basinhopping_optimizer,
+            optimizer_kwargs=optimizer_kwargs,
+        )
+        
+        # Run pipeline
+        pipeline = InferencePipeline(
+            passes=[pass_obj],
+            loss_fn=loss_fn,
+            n_jobs_per_pass=n_jobs,
+        )
+        
+        # Filter initial guesses for this pass
+        pass_initial_guesses = [
+            [
+                {k: v for k, v in guess.items() if k in param_keys_to_infer_per_pass}
+                for guess in initial_guesses
+            ]
+        ]
+        
+        result = pipeline.run(pass_initial_guesses, verbose=True)[0]
+        passes_results.append((pass_idx, result))
+    
+    return passes_results
+
+def _run_single_mode(base_path, manifest, ground_truth_int_params, int_param_dict, 
+                     int_param_names, int_param_indices, ext_param_range, ext_param_names,
+                     ground_truth_fixed_ext_params, sim_param_dict, param_keys_to_infer,
+                     initial_guesses, loss_fn, n_jobs):
+    """Run single-mode inference and register results."""
+    
+    ext_param_indices_iter = product(
+        *[range(len(ext_param_range[name])) for name in ext_param_names]
+    )
+    
+    for ext_param_indices in ext_param_indices_iter:
+        ext_param_dict = {}
+        for param_name, idx in zip(ext_param_names, ext_param_indices):
+            ext_param_dict[param_name] = ext_param_range[param_name][idx]
+        
+        ground_truth_ext_params = {
+            **ground_truth_fixed_ext_params,
+            **ext_param_dict,
+        }
+        
+        # Build result folder with cleaner naming
+        result_folder = _build_result_folder_path(
+            base_path, 'single', int_param_dict, ext_param_dict
+        )
+        result_folder.mkdir(parents=True, exist_ok=True)
+        
+        print(f"Processing: {result_folder.name}")
+        
+        result = run_single_ext_param_inference(
+            int_params=ground_truth_int_params,
+            ext_params=ground_truth_ext_params,
+            sim_params=sim_param_dict,
+            param_keys_to_infer=param_keys_to_infer,
+            initial_guesses=initial_guesses,
+            loss_fn=loss_fn,
+            n_jobs=n_jobs,
+        )
+        
+        result_file = result_folder / 'result.pkl'
+        result.save(str(result_file.resolve()))
+        
+        # Register in manifest
+        manifest.add_single_result(
+            int_params=ground_truth_int_params,
+            ext_params=ground_truth_ext_params,
+            result_file=result_file,
+        )
+
+        manifest.save()
+        print(f"\nResults manifest saved to {base_path / 'results_manifest.json'}")  
+
+def _run_cumulative_mode(base_path, manifest, ground_truth_int_params, int_param_dict,
+                         int_param_names, int_param_indices, ext_param_range,
+                         ground_truth_fixed_ext_params, sim_param_dict, param_keys_to_infer,
+                         initial_guesses, cumul_param_indices_list, loss_fn, n_jobs,
+                         elastic_params_list, viscous_params_list):
+    """Run cumulative-mode inference and register results."""
+
+    # Loop through each cumulative parameter index configuration
+    for cumul_config_idx, cumul_param_indices in enumerate(cumul_param_indices_list):
+        ext_params_summary = {}
+        ext_params_summary.update(ground_truth_fixed_ext_params)
+
+        if cumul_param_indices:
+            for param_name, (start_idx, end_idx) in cumul_param_indices.items():
+                if param_name in ext_param_range:
+                    start_val = ext_param_range[param_name][start_idx]
+                    end_val = ext_param_range[param_name][end_idx]
+                    ext_params_summary[param_name] = f"{start_val:.4g}_to_{end_val:.4g}"
+
+        result_folder_base = _build_result_folder_path_cumulative(
+            base_path, int_param_dict, ext_params_summary
+        )
+        result_folder_base.parent.mkdir(parents=True, exist_ok=True)
+        result_folder_base.mkdir(parents=True, exist_ok=True)
+
+        print(f"Processing cumulative (config {cumul_config_idx}): {result_folder_base.name}")
+
+        passes_results = run_cumulative_inference(
+            int_params=ground_truth_int_params,
+            ext_param_range=ext_param_range,
+            ground_truth_fixed_ext_params=ground_truth_fixed_ext_params,
+            sim_params=sim_param_dict,
+            param_keys_to_infer=param_keys_to_infer,
+            initial_guesses=initial_guesses,
+            cumul_param_indices=cumul_param_indices,
+            loss_fn=loss_fn,
+            n_jobs=n_jobs,
+            elastic_params_list=elastic_params_list,
+            viscous_params_list=viscous_params_list,
+        )
+
+        for pass_idx, result in passes_results:
+            if result is not None:
+                result_file = result_folder_base / f'pass_{pass_idx:02d}.pkl'
+                result.save(str(result_file.resolve()))
+
+                manifest.add_cumulative_result(
+                    int_params=ground_truth_int_params,
+                    result_file=result_file,
+                    pass_idx=pass_idx,
+                    cumul_indices=cumul_param_indices,
+                )
+
+        # Save manifest after each cumulative configuration
+        manifest.save()
+        print(f"Manifest saved after config {cumul_config_idx}")                
+
+def _build_result_folder_path(base_path, mode, int_params, ext_params):
+    """Build result folder path with readable naming."""
+    parts = []
+    
+    # Internal parameters
+    for name, value in sorted(int_params.items()):
+        parts.append(f"{name}={value:.4g}".replace(' ', ''))
+    
+    # External parameters (include for both single and cumulative)
+    if ext_params:
+        for name, value in sorted(ext_params.items()):
+            parts.append(f"{name}={value:.4g}".replace(' ', ''))
+    
+    folder_name = '__'.join(parts) if parts else 'results'
+    return base_path / folder_name
+
+def _build_result_folder_path_cumulative(base_path, int_params, ext_params_summary):
+    """Build cumulative result folder path with readable naming including ext param ranges."""
+    parts = []
+    
+    # Internal parameters
+    for name, value in sorted(int_params.items()):
+        parts.append(f"{name}={value:.4g}".replace(' ', ''))
+    
+    # External parameters (including ranges for cumulative)
+    for name, value in sorted(ext_params_summary.items()):
+        if isinstance(value, str):
+            # For range values like "1e-4_to_1e-2"
+            parts.append(f"{name}={value}")
+        else:
+            parts.append(f"{name}={value:.4g}".replace(' ', ''))
+    
+    folder_name = '__'.join(parts) if parts else 'results'
+    return base_path / folder_name
+
+def _save_parameter_reference(base_path, int_param_range, ext_param_range, cumul_param_indices):
+    """Save parameter ranges as reference (static lookup)."""
+    reference = {
+        'internal_parameters': {
+            name: {i: float(val) for i, val in enumerate(values)}
+            for name, values in int_param_range.items()
+        },
+        'external_parameters': {
+            name: {i: float(val) for i, val in enumerate(values)}
+            for name, values in ext_param_range.items()
+        },
+        'cumulative_indices': _convert_to_serializable(cumul_param_indices or {}),
+    }
+    
+    with open(base_path / 'parameter_reference.json', 'w') as f:
+        json.dump(reference, f, indent=2)
+    
+    print(f"Parameter reference saved: {base_path / 'parameter_reference.json'}") 
+def run_inference_pipeline(
+    base_path,
+    int_param_range,
+    ground_truth_fixed_int_params,
+    ext_param_range,
+    ground_truth_fixed_ext_params,
+    sim_param_dict,
+    param_keys_to_infer,
+    initial_guesses,
+    mode='single',
+    cumul_param_indices=None,
+    loss_fn=None,
+    n_jobs=-1,
+    elastic_params_list=None,
+    viscous_params_list=None,
+):
+    """Orchestrator: loop through internal parameters and run inference.
+
+    Args:
+        base_path: Root directory for results
+        int_param_range: Dict of internal parameter ranges
+        ground_truth_fixed_int_params: Fixed internal parameters
+        ext_param_range: Dict of external parameter ranges
+        ground_truth_fixed_ext_params: Fixed external parameters
+        sim_param_dict: Dict of simulation parameters
+        param_keys_to_infer: List of parameters to infer
+        initial_guesses: List of initial guess dicts
+        mode: 'single' (loop ext params) or 'cumulative' (bulk ext params)
+        cumul_param_indices: For cumulative mode, list of dicts, each dict containing 
+                            (start, end) indices per ext param
+        loss_fn: Loss function
+        n_jobs: Number of parallel jobs
+        elastic_params_list: For cumulative mode
+        viscous_params_list: For cumulative mode
+    """
+
+    if elastic_params_list is None:
+        elastic_params_list = ['Sp4', 'Beta']
+    if viscous_params_list is None:
+        viscous_params_list = ['tau_b', 'tau_s']
+    if loss_fn is None:
+        loss_fn = rel_mse_loss_fn()
+
+    base_path = Path(base_path)
+    base_path.mkdir(parents=True, exist_ok=True)
+
+    manifest = ResultsManifest(base_path)
+
+    _save_parameter_reference(base_path, int_param_range, ext_param_range, cumul_param_indices)
+
+    int_param_names = list(int_param_range.keys())
+    ext_param_names = list(ext_param_range.keys())
+
+    int_param_indices_iter = product(
+        *[range(len(int_param_range[name])) for name in int_param_names]
+    )
+
+    for int_param_indices in int_param_indices_iter:
+        int_param_dict = {}
+        folder_name_parts_int = []
+
+        for param_name, idx in zip(int_param_names, int_param_indices):
+            value = int_param_range[param_name][idx]
+            int_param_dict[param_name] = value
+            folder_name_parts_int.append(f'{param_name}_{idx:03d}')
+
+        ground_truth_int_params = {
+            **ground_truth_fixed_int_params,
+            **int_param_dict,
+        }
+
+        if mode == 'single':
+
+            _run_single_mode(
+                base_path,
+                manifest,
+                ground_truth_int_params,
+                int_param_dict,
+                int_param_names,
+                int_param_indices,
+                ext_param_range,
+                ext_param_names,
+                ground_truth_fixed_ext_params,
+                sim_param_dict,
+                param_keys_to_infer,
+                initial_guesses,
+                loss_fn,
+                n_jobs,
+            )          
+
+        elif mode == 'cumulative':
+            # Ensure cumul_param_indices is a list; wrap single dict in list if needed
+            cumul_indices_list = cumul_param_indices if isinstance(cumul_param_indices, list) else [cumul_param_indices]
+            
+            _run_cumulative_mode(
+                base_path,
+                manifest,
+                ground_truth_int_params,
+                int_param_dict,
+                int_param_names,
+                int_param_indices,
+                ext_param_range,
+                ground_truth_fixed_ext_params,
+                sim_param_dict,
+                param_keys_to_infer,
+                initial_guesses,
+                cumul_indices_list,
+                loss_fn,
+                n_jobs,
+                elastic_params_list,
+                viscous_params_list,
+            )
+
 
 if __name__ == "__main__":
     
@@ -3179,314 +1340,123 @@ if __name__ == "__main__":
     # Infer elasticities
 
     ## Bending elasticity (Sp4 = 1, Beta = 0)
-    ### Loop through A
 
-    if False:
+    if True:
+        base_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_BendingElasticity'
+    
+        int_param_range = {
+            'Sp4': np.pow(10, np.linspace(start=-3, stop=3, num=70)),
+        }
+        ground_truth_fixed_int_params = {}
 
-        # ====================
-        # ======= Path =======
-        # ====================
+        A_vec = np.pow(10, np.linspace(start=-4, stop=0, num=50))
+        ext_param_range = {
+            'A': A_vec,
+        }
+        ground_truth_fixed_ext_params = {}
 
-        writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_BendingElasticity' / 'VaryingA')
-        writing_path.mkdir(parents=True, exist_ok=True)
+        initial_guesses = [
+            {'Sp4': 1e-1},
+        ]
+        param_keys_to_infer = list(initial_guesses[0].keys())
 
-        # ====================
-        # ======= Loss =======
-        # ====================
+        sim_param_dict = {}
 
-        loss_fn = rel_mse_loss_fn()
+        cumul_param_indices = [{'A':(0, k)} for k in range(A_vec.shape[0])]
 
-        # ======================
-        # ==== Ground Truth ====
-        # ======================
 
-        ground_truth_int_params = make_ground_truth_int_params()
-
-        A_vec = np.pow(10, np.linspace(start = -6, stop = -2, num = 100))
+        # ========== RUN INFERENCES ==========
         
-        # === Loop Inference through A ===
+        # Test 1: Single external parameter inference
+        print("=" * 80)
+        print("TEST 1: Single External Parameter Inference Mode")
+        print("=" * 80)
+        run_inference_pipeline(
+            base_path=base_path / 'SingleExtParams',
+            int_param_range=int_param_range,
+            ground_truth_fixed_int_params=ground_truth_fixed_int_params,
+            ext_param_range=ext_param_range,
+            ground_truth_fixed_ext_params=ground_truth_fixed_ext_params,
+            sim_param_dict=sim_param_dict,
+            param_keys_to_infer=param_keys_to_infer,
+            initial_guesses=initial_guesses,
+            mode='single',
+        )
 
-        for k in range(A_vec.shape[0]):
-
-            A = A_vec[k]
-            print("A", A)
-
-            ground_truth_ext_params_list = [make_ground_truth_ext_params(A = A)]
-            ground_truth_ext_params_list_cumul = [make_ground_truth_ext_params(A = A) for A in A_vec[:k+1]]
-
-            ground_truth_sim_params_list = [make_ground_truth_sim_params()]
-
-            product_or_zip = "product"
-            ground_truth_data_list = make_ground_truth_data_list(
-                ground_truth_int_params,
-                ground_truth_ext_params_list,
-                ground_truth_sim_params_list,
-                product_or_zip,
-            )
-            ground_truth_data_list_cumul = make_ground_truth_data_list(
-                ground_truth_int_params,
-                ground_truth_ext_params_list_cumul,
-                ground_truth_sim_params_list,
-                product_or_zip,
-            )
-
-            # ======================
-            # ======= Models =======
-            # ======================
-            
-            params_keys_to_infer = ['Sp4']
-            BendingElasticModel = model_params_only_flow(
-                ground_truth_int_params,
-                params_keys_to_infer,        
-            )
-
-            # ==========================
-            # ======= Optimizers =======
-            # ==========================
-
-            optimizer = basinhopping_optimizer
-            bounds = Bounds(lb=[1e-6], ub=[np.inf])
-            optimizer_kwargs = make_optimizer_kwargs(bounds = bounds)
-
-            # ==========================
-            # ========= Passes =========
-            # ==========================    
-
-            # Pass 1: Reduced model, infer elasticities only
-
-            passes = [
-                PipelinePass(
-                    name="Sp4 Inference (Elastic Model)",
-                    model_class=BendingElasticModel,
-                    ground_truths=ground_truth_data_list,
-                    ext_params_list=ground_truth_ext_params_list,
-                    sim_params_list=ground_truth_sim_params_list,
-                    param_keys_to_infer=params_keys_to_infer,
-                    fixed_params={},
-                    optimizer=optimizer,
-                    optimizer_kwargs=optimizer_kwargs,
-                ),
-            ]
+        # Test 2: Cumulative inference
+        print("\n" + "=" * 80)
+        print("TEST 2: Cumulative Inference Mode")
+        print("=" * 80)
+        run_inference_pipeline(
+            base_path=base_path / 'CumulativeExtParams',
+            int_param_range=int_param_range,
+            ground_truth_fixed_int_params=ground_truth_fixed_int_params,
+            ext_param_range=ext_param_range,
+            ground_truth_fixed_ext_params=ground_truth_fixed_ext_params,
+            sim_param_dict=sim_param_dict,
+            param_keys_to_infer=param_keys_to_infer,
+            initial_guesses=initial_guesses,
+            mode='cumulative',
+            cumul_param_indices=cumul_param_indices,
+        )
 
 
-            passes_cumul = [
-                PipelinePass(
-                    name="Sp4 Inference (Elastic Model)",
-                    model_class=BendingElasticModel,
-                    ground_truths=ground_truth_data_list_cumul,
-                    ext_params_list=ground_truth_ext_params_list_cumul,
-                    sim_params_list=ground_truth_sim_params_list,
-                    param_keys_to_infer=params_keys_to_infer,
-                    fixed_params={},
-                    optimizer=optimizer,
-                    optimizer_kwargs=optimizer_kwargs,
-                ),
-            ]
-
-            # ============================
-            # ========= Pipeline =========
-            # ============================
-
-            n_jobs_per_pass = -1 # Use all cores within each pass
-            pipeline = InferencePipeline(
-                    passes=passes,
-                    loss_fn=loss_fn,
-                    n_jobs_per_pass=n_jobs_per_pass,  
-                )
-            pipeline_cumul = InferencePipeline(
-                    passes=passes_cumul,
-                    loss_fn=loss_fn,
-                    n_jobs_per_pass=n_jobs_per_pass,  
-                )
-
-            # ============================
-            # =========== Guess ==========
-            # ============================
-
-            initial_guesses_per_pass = [
-                [
-                    {'Sp4': 1e-1},
-                    # {'Sp4': 1e1},
-                    # {'Sp4': 1e2},
-                ],
-            ]
-
-            # ============================
-            # =========== Run ============
-            # ============================    
-
-            
-            result = pipeline.run(initial_guesses_per_pass, verbose=True)[0] # First pass result
-            print("result:", result)
-            print("")
-
-            result_cumul = pipeline_cumul.run(initial_guesses_per_pass, verbose=True)[0] # First pass result
-            print("result_cumul:", result_cumul)
-            print("")
-
-            # ============================
-            # =========== Save ===========
-            # ============================
-
-            base_id = f"k={k}"
-            filename = str((writing_path / ("result_" + base_id + ".pkl")).resolve())
-            result.save(filename)
-
-            base_id = f"k_min={0}_k_max={k}"
-            filename = str((writing_path / ("result_cumul_" + base_id + ".pkl")).resolve())
-            result_cumul.save(filename)
-
-    ## Shear elasticity (Sp4 = 1e-6, Beta = 1)
-    ### Loop through A    
+    ## Shear elasticity (Sp4 = 1, Beta = 1e-3->1e3) 
     
     if True:
+        base_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_ShearElasticity'
 
-        # ====================
-        # ======= Path =======
-        # ====================
+        int_param_range = {
+            'Beta': np.pow(10, np.linspace(start=-3, stop=3, num=70)),
+        }
+        ground_truth_fixed_int_params = {}
 
-        writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_ShearElasticity' / 'VaryingA')
-        writing_path.mkdir(parents=True, exist_ok=True)
+        A_vec = np.pow(10, np.linspace(start=-4, stop=0, num=50))
+        ext_param_range = {
+            'A': A_vec,
+        }
+        ground_truth_fixed_ext_params = {}
 
-        # ====================
-        # ======= Loss =======
-        # ====================
+        initial_guesses = [
+            {'Beta': 0},
+        ]
+        param_keys_to_infer = (initial_guesses[0].keys())
 
-        loss_fn = rel_mse_loss_fn()
+        sim_param_dict = {}
 
-        # ======================
-        # ==== Ground Truth ====
-        # ======================
+        cumul_param_indices = [{'A':(0, k)} for k in range(A_vec.shape[0])]
 
-        ground_truth_int_params = make_ground_truth_int_params(Sp4 = 1, Beta = 1)
-
-        A_vec = np.pow(10, np.linspace(start = -4, stop = 0, num = 100))
+        # ========== RUN INFERENCES ==========
         
-        # === Loop Inference through A ===
+        # Test 1: Single external parameter inference
+        print("=" * 80)
+        print("TEST 1: Single External Parameter Inference Mode")
+        print("=" * 80)
+        run_inference_pipeline(
+            base_path=base_path / 'SingleExtParams',
+            int_param_range=int_param_range,
+            ground_truth_fixed_int_params=ground_truth_fixed_int_params,
+            ext_param_range=ext_param_range,
+            ground_truth_fixed_ext_params=ground_truth_fixed_ext_params,
+            sim_param_dict=sim_param_dict,
+            param_keys_to_infer=param_keys_to_infer,
+            initial_guesses=initial_guesses,
+            mode='single',
+        )
 
-        for k in range(A_vec.shape[0]):
-
-            A = A_vec[k]
-            print("A", A)
-
-            ground_truth_ext_params_list = [make_ground_truth_ext_params(A = A)]
-            ground_truth_ext_params_list_cumul = [make_ground_truth_ext_params(A = A) for A in A_vec[:k+1]]
-
-            ground_truth_sim_params_list = [make_ground_truth_sim_params()]
-
-            product_or_zip = "product"
-            ground_truth_data_list = make_ground_truth_data_list(
-                ground_truth_int_params,
-                ground_truth_ext_params_list,
-                ground_truth_sim_params_list,
-                product_or_zip,
-            )
-            ground_truth_data_list_cumul = make_ground_truth_data_list(
-                ground_truth_int_params,
-                ground_truth_ext_params_list_cumul,
-                ground_truth_sim_params_list,
-                product_or_zip,
-            )
-
-            # ======================
-            # ======= Models =======
-            # ======================
-            
-            params_keys_to_infer = ['Beta']
-            ShearElasticModel = model_params_only_flow(
-                ground_truth_int_params,
-                params_keys_to_infer,        
-            )
-
-            # ==========================
-            # ======= Optimizers =======
-            # ==========================
-
-            optimizer = basinhopping_optimizer
-            bounds = Bounds(lb=[1e-6], ub=[np.inf]) # TODO: Check if boundaries are correct when Sp4 = 0
-            optimizer_kwargs = make_optimizer_kwargs(bounds = bounds)
-
-            # ==========================
-            # ========= Passes =========
-            # ==========================    
-
-            # Pass 1: Reduced model, infer elasticities only
-
-            passes = [
-                PipelinePass(
-                    name="Beta Inference (Elastic Model)",
-                    model_class=ShearElasticModel,
-                    ground_truths=ground_truth_data_list,
-                    ext_params_list=ground_truth_ext_params_list,
-                    sim_params_list=ground_truth_sim_params_list,
-                    param_keys_to_infer=params_keys_to_infer,
-                    fixed_params={},
-                    optimizer=optimizer,
-                    optimizer_kwargs=optimizer_kwargs,
-                ),
-            ]
-
-            passes_cumul = [
-                PipelinePass(
-                    name="Beta Inference (Elastic Model)",
-                    model_class=ShearElasticModel,
-                    ground_truths=ground_truth_data_list_cumul,
-                    ext_params_list=ground_truth_ext_params_list_cumul,
-                    sim_params_list=ground_truth_sim_params_list,
-                    param_keys_to_infer=params_keys_to_infer,
-                    fixed_params={},
-                    optimizer=optimizer,
-                    optimizer_kwargs=optimizer_kwargs,
-                ),
-            ]
-
-            # ============================
-            # ========= Pipeline =========
-            # ============================
-
-            n_jobs_per_pass = -1 # Use all cores within each pass
-            pipeline = InferencePipeline(
-                    passes=passes,
-                    loss_fn=loss_fn,
-                    n_jobs_per_pass=n_jobs_per_pass,  
-                )
-            pipeline_cumul = InferencePipeline(
-                    passes=passes_cumul,
-                    loss_fn=loss_fn,
-                    n_jobs_per_pass=n_jobs_per_pass,  
-                )
-
-            # ============================
-            # =========== Guess ==========
-            # ============================
-
-            initial_guesses_per_pass = [
-                [
-                    {'Beta': 1e-1},
-                ],
-            ]
-
-            # ============================
-            # =========== Run ============
-            # ============================    
-
-            
-            result = pipeline.run(initial_guesses_per_pass, verbose=True)[0] # First pass result
-            print("result:", result)
-            print("")
-
-            result_cumul = pipeline_cumul.run(initial_guesses_per_pass, verbose=True)[0] # First pass result
-            print("result_cumul:", result_cumul)
-            print("")
-
-            # ============================
-            # =========== Save ===========
-            # ============================
-
-            base_id = f"k={k}"
-            filename = str((writing_path / ("result_" + base_id + ".pkl")).resolve())
-            result.save(filename)
-
-            base_id = f"k_min={0}_k_max={k}"
-            filename = str((writing_path / ("result_cumul_" + base_id + ".pkl")).resolve())
-            result_cumul.save(filename)        
+        # Test 2: Cumulative inference
+        print("\n" + "=" * 80)
+        print("TEST 2: Cumulative Inference Mode")
+        print("=" * 80)
+        run_inference_pipeline(
+            base_path=base_path / 'CumulativeExtParams',
+            int_param_range=int_param_range,
+            ground_truth_fixed_int_params=ground_truth_fixed_int_params,
+            ext_param_range=ext_param_range,
+            ground_truth_fixed_ext_params=ground_truth_fixed_ext_params,
+            sim_param_dict=sim_param_dict,
+            param_keys_to_infer=param_keys_to_infer,
+            initial_guesses=initial_guesses,
+            mode='cumulative',
+            cumul_param_indices=cumul_param_indices,
+        )

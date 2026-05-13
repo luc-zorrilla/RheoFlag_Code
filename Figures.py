@@ -61,6 +61,8 @@ def extract_data(results_dict: Dict) -> Tuple[List, Dict, Dict, Dict]:
 
 if __name__ == "__main__":
 
+    """ Elastic Inference: Bending Filament (Sp4) """
+
     # Define your paths and parameters
     writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_BendingElasticity' / 'VaryingA')
     A_vec = np.pow(10, np.linspace(start = -6, stop = -2, num = 100))
