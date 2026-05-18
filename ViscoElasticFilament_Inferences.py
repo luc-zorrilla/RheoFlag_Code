@@ -394,176 +394,6 @@ def make_optimizer_kwargs(
         'global_minimizer_kwargs': global_minimizer_kwargs,
     }
 
-# def create_parameter_mappings(int_param_range, ext_param_range):
-#     """Create index mappings for individual parameters."""
-#     mappings = {}
-    
-#     for param_name, param_values in int_param_range.items():
-#         mappings[param_name] = {
-#             'type': 'internal',
-#             'values': {i: float(val) for i, val in enumerate(param_values)}
-#         }
-    
-#     for param_name, param_values in ext_param_range.items():
-#         mappings[param_name] = {
-#             'type': 'external',
-#             'values': {i: float(val) for i, val in enumerate(param_values)}
-#         }
-    
-#     return mappings
-
-# def create_cumulative_mappings(int_param_range, ext_param_range, cumul_param_indices):
-#     """Create cumulative mappings for external parameters.
-    
-#     cumul_param_indices: dict mapping parameter names to (start_idx, end_idx) tuples.
-#                         Example: {'A': (0, 10), 'w0': (5, 15)}
-#                         Parameters not in this dict use their full range.
-    
-#     Internal parameters are included as fixed mappings (not cumulated).
-#     External parameters are included as lists for each cumulation step.
-#     """
-#     if not cumul_param_indices:
-#         return []
-    
-#     cumulative_mappings = []
-    
-#     # Build cumulation ranges for each external parameter
-#     cumul_ranges = {}
-#     for param_name in ext_param_range.keys():
-#         if param_name in cumul_param_indices:
-#             start_idx, end_idx = cumul_param_indices[param_name]
-#             cumul_ranges[param_name] = (start_idx, end_idx)
-#         else:
-#             # Parameters not specified use their full range
-#             cumul_ranges[param_name] = (0, len(ext_param_range[param_name]) - 1)
-    
-#     # Generate all combinations of cumulation steps
-#     param_names = list(ext_param_range.keys())
-#     index_ranges = [range(cumul_ranges[name][0], cumul_ranges[name][1] + 1) for name in param_names]
-    
-#     for index_combo in product(*index_ranges):
-#         cumul_mapping = {}
-#         cumul_indices = {param_names[i]: index_combo[i] for i in range(len(param_names))}
-        
-#         # Add internal parameters (fixed, not cumulated)
-#         for param_name, param_values in int_param_range.items():
-#             cumul_mapping[param_name] = {
-#                 'type': 'internal',
-#                 'values': {i: float(val) for i, val in enumerate(param_values)}
-#             }
-        
-#         # Add external parameters (cumulated lists)
-#         for param_name, param_values in ext_param_range.items():
-#             start_idx, end_idx = cumul_ranges[param_name]
-#             current_idx = cumul_indices[param_name]
-            
-#             # Cumulated list from start_idx to current_idx
-#             cumul_mapping[param_name] = {
-#                 'type': 'external',
-#                 'indices': {'start': start_idx, 'end': current_idx},
-#                 'values': [float(param_values[i]) for i in range(start_idx, current_idx + 1)]
-#             }
-        
-#         cumulative_mappings.append(cumul_mapping)
-    
-#     return cumulative_mappings
-
-# def save_parameter_mappings(base_path, int_param_range, ext_param_range):
-#     """Save parameter mappings to JSON files."""
-#     base_path.mkdir(parents=True, exist_ok=True)
-    
-#     # Save individual parameter mappings
-#     all_mappings = create_parameter_mappings(int_param_range, ext_param_range)
-#     with open(base_path / 'parameter_index_mapping.json', 'w') as f:
-#         json.dump(all_mappings, f, indent=2)
-
-# def save_cumulative_mappings(base_path, int_param_range, ext_param_range, cumul_param_indices):
-#     """Save parameter mappings to JSON files."""
-#     base_path.mkdir(parents=True, exist_ok=True)
-    
-#     # Save cumulative parameter mappings
-#     cumul_mappings = create_cumulative_mappings(int_param_range, ext_param_range, cumul_param_indices)
-#     with open(base_path / 'cumul_parameter_index_mapping.json', 'w') as f:
-#         json.dump(cumul_mappings, f, indent=2)
-
-# def save_all_mappings(base_path, int_param_range, ext_param_range, ext_param_indices):
-#     """Save parameter mappings to JSON files."""
-#     base_path.mkdir(parents=True, exist_ok=True)
-    
-#     # Save individual parameter mappings
-#     all_mappings = create_parameter_mappings(int_param_range, ext_param_range)
-#     with open(base_path / 'parameter_index_mapping.json', 'w') as f:
-#         json.dump(all_mappings, f, indent=2)
-    
-#     # Save cumulative parameter mappings
-#     cumul_mappings = create_cumulative_mappings(int_param_range, ext_param_range, ext_param_indices)
-#     with open(base_path / 'cumul_parameter_index_mapping.json', 'w') as f:
-#         json.dump(cumul_mappings, f, indent=2)
-
-# def load_parameter_mappings(base_path):
-#     """Load individual parameter mappings from JSON file."""
-#     with open(base_path / 'parameter_index_mapping.json', 'r') as f:
-#         mappings = json.load(f)
-    
-#     # Separate into internal and external parameters
-#     int_mappings = {}
-#     ext_mappings = {}
-    
-#     for param_name, param_data in mappings.items():
-#         param_type = param_data['type']
-#         values = {int(k): v for k, v in param_data['values'].items()}
-        
-#         if param_type == 'internal':
-#             int_mappings[param_name] = values
-#         elif param_type == 'external':
-#             ext_mappings[param_name] = values
-    
-#     return int_mappings, ext_mappings
-
-# def load_cumulative_mappings(base_path):
-#     """Load cumulative parameter mappings from JSON file.
-    
-#     Internal parameters are loaded as index mappings (dict).
-#     External parameters are loaded as lists of values with their index ranges.
-#     """
-#     with open(base_path / 'cumul_parameter_index_mapping.json', 'r') as f:
-#         cumul_mappings = json.load(f)
-    
-#     # Process cumulative mappings to restore proper structure
-#     processed_cumul_mappings = []
-    
-#     for cumul_step in cumul_mappings:
-#         step_data = {}
-#         for param_name, param_data in cumul_step.items():
-#             param_type = param_data['type']
-            
-#             if param_type == 'internal':
-#                 # Internal parameters: restore as index mapping (dict)
-#                 values = {int(k): v for k, v in param_data['values'].items()}
-#                 step_data[param_name] = {
-#                     'type': param_type,
-#                     'values': values
-#                 }
-#             else:  # param_type == 'external'
-#                 # External parameters: keep as list with index metadata
-#                 step_data[param_name] = {
-#                     'type': param_type,
-#                     'indices': param_data['indices'],  # {'start': int, 'end': int}
-#                     'values': param_data['values']
-#                 }
-        
-#         processed_cumul_mappings.append(step_data)
-    
-#     return processed_cumul_mappings
-
-# def load_all_mappings(base_path):
-#     """Load individual parameter mappings from JSON file."""
-    
-#     parameter_mappings = load_parameter_mappings(base_path)
-#     cumulative_mappings = load_cumulative_mappings(base_path)
-    
-#     return parameter_mappings, cumulative_mappings
-
 def _convert_to_serializable(obj):
     """Recursively convert NumPy and other non-serializable types to JSON-compatible types."""
     if isinstance(obj, dict):
@@ -675,7 +505,7 @@ def _make_optimizer_bounds(param_keys_to_infer):
     """Create optimizer bounds for given parameter keys."""
     lb = [
         0 if ('Beta' in param_key or 'tau_b' in param_key or 'tau_s' in param_key) 
-        else (1 if 'Sp4' in param_key else 0) 
+        else (1e-6 if 'Sp4' in param_key else 0) 
         for param_key in param_keys_to_infer
     ]
     ub = [np.inf] * len(param_keys_to_infer)
@@ -1050,9 +880,9 @@ def run_cumulative_inference(
     return passes_results
 
 def _run_single_mode(base_path, manifest, ground_truth_int_params, int_param_dict, 
-                     int_param_names, int_param_indices, ext_param_range, ext_param_names,
-                     ground_truth_fixed_ext_params, sim_param_dict, param_keys_to_infer,
-                     initial_guesses, loss_fn, n_jobs):
+                    int_param_names, int_param_indices, ext_param_range, ext_param_names,
+                    ground_truth_fixed_ext_params, sim_param_dict, param_keys_to_infer,
+                    initial_guesses, loss_fn, n_jobs):
     """Run single-mode inference and register results."""
     
     ext_param_indices_iter = product(
@@ -1339,17 +1169,17 @@ if __name__ == "__main__":
 
     # Infer elasticities
 
-    ## Bending elasticity (Sp4 = 1, Beta = 0)
+    ## Bending elasticity (Sp4 = 1e-3->1e3, Beta = 0)
 
     if True:
         base_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_BendingElasticity'
     
         int_param_range = {
-            'Sp4': np.pow(10, np.linspace(start=-3, stop=3, num=70)),
+            'Sp4': np.pow(10, np.linspace(start=-3, stop=3, num=3)),
         }
         ground_truth_fixed_int_params = {}
 
-        A_vec = np.pow(10, np.linspace(start=-4, stop=0, num=50))
+        A_vec = np.pow(10, np.linspace(start=-6, stop=-2, num=50))
         ext_param_range = {
             'A': A_vec,
         }
@@ -1407,11 +1237,11 @@ if __name__ == "__main__":
         base_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_ShearElasticity'
 
         int_param_range = {
-            'Beta': np.pow(10, np.linspace(start=-3, stop=3, num=70)),
+            'Beta': np.pow(10, np.linspace(start=-3, stop=3, num=3)),
         }
         ground_truth_fixed_int_params = {}
 
-        A_vec = np.pow(10, np.linspace(start=-4, stop=0, num=50))
+        A_vec = np.pow(10, np.linspace(start=-6, stop=-2, num=50))
         ext_param_range = {
             'A': A_vec,
         }
@@ -1421,6 +1251,67 @@ if __name__ == "__main__":
             {'Beta': 0},
         ]
         param_keys_to_infer = (initial_guesses[0].keys())
+
+        sim_param_dict = {}
+
+        cumul_param_indices = [{'A':(0, k)} for k in range(A_vec.shape[0])]
+
+        # ========== RUN INFERENCES ==========
+        
+        # Test 1: Single external parameter inference
+        print("=" * 80)
+        print("TEST 1: Single External Parameter Inference Mode")
+        print("=" * 80)
+        run_inference_pipeline(
+            base_path=base_path / 'SingleExtParams',
+            int_param_range=int_param_range,
+            ground_truth_fixed_int_params=ground_truth_fixed_int_params,
+            ext_param_range=ext_param_range,
+            ground_truth_fixed_ext_params=ground_truth_fixed_ext_params,
+            sim_param_dict=sim_param_dict,
+            param_keys_to_infer=param_keys_to_infer,
+            initial_guesses=initial_guesses,
+            mode='single',
+        )
+
+        # Test 2: Cumulative inference
+        print("\n" + "=" * 80)
+        print("TEST 2: Cumulative Inference Mode")
+        print("=" * 80)
+        run_inference_pipeline(
+            base_path=base_path / 'CumulativeExtParams',
+            int_param_range=int_param_range,
+            ground_truth_fixed_int_params=ground_truth_fixed_int_params,
+            ext_param_range=ext_param_range,
+            ground_truth_fixed_ext_params=ground_truth_fixed_ext_params,
+            sim_param_dict=sim_param_dict,
+            param_keys_to_infer=param_keys_to_infer,
+            initial_guesses=initial_guesses,
+            mode='cumulative',
+            cumul_param_indices=cumul_param_indices,
+        )
+
+    ## Bending + Shear elasticities (Sp4 = 1:1e-3->1e3, Beta = 1e-3->1e3)
+
+    if True:
+        base_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_BendingShearElasticity'
+    
+        int_param_range = {
+            'Sp4': np.pow(10, np.linspace(start=-3, stop=3, num=3)),
+            'Beta': np.pow(10, np.linspace(start=-3, stop=3, num=3)),
+        }
+        ground_truth_fixed_int_params = {}
+
+        A_vec = np.pow(10, np.linspace(start=-6, stop=-2, num=50))
+        ext_param_range = {
+            'A': A_vec,
+        }
+        ground_truth_fixed_ext_params = {}
+
+        initial_guesses = [
+            {'Sp4': 1e-1, 'Beta': 0},
+        ]
+        param_keys_to_infer = list(initial_guesses[0].keys())
 
         sim_param_dict = {}
 

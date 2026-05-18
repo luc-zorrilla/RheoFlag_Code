@@ -1,275 +1,385 @@
-from pathlib import Path
+"""
+Figures.py - Visualization of inference results across different elasticity modes.
+"""
+
+import json
 import dill as pickle
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional
 import numpy as np
-from typing import Dict, List, Tuple
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
 
-# Load results
-def load_results(writing_path: Path, k_max: int) -> Tuple[Dict, Dict]:
-    """Load all result and result_cumul files."""
-    results = {}
-    results_cumul = {}
+class InferenceResultsVisualizer:
+    """Generalized visualizer for inference results."""
     
-    for k in range(k_max + 1):
-        # Load result_k
-        filename = str((writing_path / f"result_k={k}.pkl").resolve())
-        try:
-            with open(filename, 'rb') as f:
-                results[k] = pickle.load(f)
-        except FileNotFoundError:
-            print(f"Warning: {filename} not found")
+    def __init__(self, mode_path: Path):
+        """
+        Initialize visualizer with path to a specific inference mode (SingleExtParams or CumulativeExtParams).
         
-        # Load result_cumul_k
-        filename = str((writing_path / f"result_cumul_k_min=0_k_max={k}.pkl").resolve())
-        try:
-            with open(filename, 'rb') as f:
-                results_cumul[k] = pickle.load(f)
-        except FileNotFoundError:
-            print(f"Warning: {filename} not found")
+        Args:
+            mode_path: Path to SingleExtParams or CumulativeExtParams directory
+        """
+        self.mode_path = Path(mode_path)
+        self.mode = self.mode_path.name  # 'SingleExtParams' or 'CumulativeExtParams'
+        self.manifest = self._load_manifest()
+        self.param_ref = self._load_param_reference()
     
-    return results, results_cumul
-
-# Extract data for plotting
-def extract_data(results_dict: Dict) -> Tuple[List, Dict, Dict, Dict]:
-    """Extract k values, params, loss, and std_errors from results dict."""
-    k_values = sorted(results_dict.keys())
+    def _load_manifest(self) -> Dict:
+        """Load results manifest."""
+        manifest_file = self.mode_path / 'results_manifest.json'
+        if not manifest_file.exists():
+            raise FileNotFoundError(f"Manifest not found: {manifest_file}")
+        with open(manifest_file, 'r') as f:
+            return json.load(f)
     
-    # Initialize param names from first result
-    first_result = results_dict[k_values[0]]
-    param_names = list(first_result.params.keys())
+    def _load_param_reference(self) -> Dict:
+        """Load parameter reference file."""
+        ref_file = self.mode_path / 'parameter_reference.json'
+        if not ref_file.exists():
+            raise FileNotFoundError(f"Parameter reference not found: {ref_file}")
+        with open(ref_file, 'r') as f:
+            return json.load(f)
     
-    # Initialize storage
-    params_data = {name: [] for name in param_names}
-    loss_data = []
-    std_errors_data = {name: [] for name in param_names}
+    def _load_result_file(self, result_file_path: str):
+        """Load an InferenceResult object from pickle."""
+        full_path = self.mode_path / result_file_path
+        with open(full_path, 'rb') as f:
+            return pickle.load(f)
     
-    # Populate data
-    for k in k_values:
-        result = results_dict[k]
-        loss_data.append(result.loss)
+    def _extract_results_single_mode(self) -> Tuple[Dict, Dict, Dict, Dict]:
+        """
+        Extract and organize single-mode results.
         
-        for name in param_names:
-            params_data[name].append(result.params[name])
+        Returns:
+            Tuple of (int_params_dict, ext_params_dict, uncertainties_dict, loss_dict)
+            where dicts map: {param_name: {entry_key: values}}
+        """
+        int_params_dict = {}
+        ext_params_dict = {}
+        uncertainties_dict = {}
+        loss_dict = {}
+        
+        for entry in self.manifest['entries']:
+            result = self._load_result_file(entry['result_file'])
+            
+            # Create a hashable key from ground truth int_params
+            entry_key = tuple(sorted(entry['int_params'].items()))
+            ext_key = tuple(sorted(entry['ext_params'].items())) if entry['ext_params'] else None
+            
+            # Store inferred internal parameters
+            for param_name, param_value in result.params.items():
+                if param_name not in int_params_dict:
+                    int_params_dict[param_name] = {}
+                int_params_dict[param_name][entry_key] = param_value
+            
+            # Store external parameters
+            if entry['ext_params']:
+                for param_name, param_value in entry['ext_params'].items():
+                    if param_name not in ext_params_dict:
+                        ext_params_dict[param_name] = {}
+                    ext_params_dict[param_name][entry_key] = param_value
+            
+            # Store uncertainties (standard errors)
             if result.std_errors is not None:
-                # Map param name to std_error index if needed
-                param_idx = list(result.params.keys()).index(name)
-                std_errors_data[name].append(result.std_errors[param_idx])
+                for i, param_name in enumerate(result.params.keys()):
+                    if param_name not in uncertainties_dict:
+                        uncertainties_dict[param_name] = {}
+                    uncertainties_dict[param_name][entry_key] = result.std_errors[i]
+            
+            # Store loss
+            loss_dict[entry_key] = result.loss
+        
+        return int_params_dict, ext_params_dict, uncertainties_dict, loss_dict
     
-    return k_values, params_data, loss_data, std_errors_data
+    def _extract_results_cumulative_mode(self) -> Tuple[Dict, Dict, Dict, Dict]:
+        """
+        Extract and organize cumulative-mode results.
+        
+        Returns:
+            Tuple of (int_params_dict, ext_params_dict, uncertainties_dict, cumul_indices_dict)
+        """
+        int_params_dict = {}
+        ext_params_dict = {}
+        uncertainties_dict = {}
+        cumul_indices_dict = {}
+        
+        for entry in self.manifest['entries']:
+            result = self._load_result_file(entry['result_file'])
+            
+            # Create a hashable key from ground truth int_params
+            entry_key = tuple(sorted(entry['int_params'].items()))
+            pass_idx = entry['pass_idx']
+            
+            # Store inferred internal parameters
+            for param_name, param_value in result.params.items():
+                if param_name not in int_params_dict:
+                    int_params_dict[param_name] = {}
+                int_params_dict[param_name][entry_key] = param_value
+            
+            # Store uncertainties
+            if result.std_errors is not None:
+                for i, param_name in enumerate(result.params.keys()):
+                    if param_name not in uncertainties_dict:
+                        uncertainties_dict[param_name] = {}
+                    uncertainties_dict[param_name][entry_key] = result.std_errors[i]
+            
+            # Store cumul_indices for reference
+            cumul_indices_dict[entry_key] = entry['cumul_indices']
+        
+        return int_params_dict, ext_params_dict, uncertainties_dict, cumul_indices_dict
+    
+    def _get_inferred_params(self) -> List[str]:
+        """Identify which parameters were inferred."""
+        if not self.manifest['entries']:
+            return []
+        
+        first_entry = self.manifest['entries'][0]
+        result = self._load_result_file(first_entry['result_file'])
+        return list(result.params.keys())
+    
+    def _get_external_params(self) -> List[str]:
+        """Identify external parameters."""
+        if not self.manifest['entries']:
+            return []
+        first_entry = self.manifest['entries'][0]
+        return list(first_entry['ext_params'].keys()) if first_entry['ext_params'] else []
+    
+    def _sort_by_external_param(self, ext_param: str, 
+                                data_dict: Dict) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
+        """
+        Sort data by a specific external parameter value.
+        
+        Args:
+            ext_param: Name of external parameter to sort by
+            data_dict: Dictionary mapping entry_key -> values for multiple parameters
+        
+        Returns:
+            Tuple of (sorted_ext_values, {param_name: sorted_values})
+        """
+        # Extract external param values and organize by entry_key
+        ext_values = {}
+        for entry in self.manifest['entries']:
+            entry_key = tuple(sorted(entry['int_params'].items()))
+            if entry['ext_params'] and ext_param in entry['ext_params']:
+                ext_values[entry_key] = entry['ext_params'][ext_param]
+        
+        # Sort by external parameter value
+        sorted_keys = sorted(ext_values.keys(), key=lambda k: ext_values[k])
+        sorted_ext_values = np.array([ext_values[k] for k in sorted_keys])
+        
+        sorted_data = {}
+        for param_name, value_dict in data_dict.items():
+            sorted_data[param_name] = np.array([value_dict[k] if np.isfinite(value_dict[k]) else np.inf for k in sorted_keys])
+        
+        return sorted_ext_values, sorted_data
+    
+    def plot_single_mode(self, inference_name: str, figsize: Tuple[int, int] = (16, 10)):
+        """
+        Plot single-mode inference results.
+        
+        Creates one figure per inferred parameter, showing:
+        - Panel 1: Inferred value vs external parameter
+        - Panel 2: Uncertainty vs external parameter
+        """
+        try:
+            int_params_dict, ext_params_dict, uncertainties_dict, loss_dict = \
+                self._extract_results_single_mode()
+        except Exception as e:
+            print(f"Error extracting single-mode results: {e}")
+            return
+        
+        inferred_params = self._get_inferred_params()
+        external_params = self._get_external_params()
+        
+        if not inferred_params or not external_params:
+            print(f"Warning: No results found for {inference_name} (single mode)")
+            return
+        
+        # Use primary external parameter (usually A or the first one)
+        ext_param = external_params[0]
+        
+        for inferred_param in inferred_params:
+            if inferred_param not in int_params_dict:
+                continue
+            
+            fig = plt.figure(figsize=figsize)
+            gs = GridSpec(1, 2, figure=fig, hspace=0.3, wspace=0.3)
+            
+            # Prepare data
+            data_dict = {
+                inferred_param: int_params_dict[inferred_param],
+            }
+            if inferred_param in uncertainties_dict:
+                data_dict['sigma'] = uncertainties_dict[inferred_param]
+            
+            # Sort by external parameter
+            ext_values, sorted_data = self._sort_by_external_param(ext_param, data_dict)
+            inferred_values = sorted_data[inferred_param]
+            sigmas = sorted_data.get('sigma', np.full_like(inferred_values, np.nan))
+            
+            # Panel 1: Inferred parameter vs external parameter
+            ax1 = fig.add_subplot(gs[0, 0])
+            ax1.loglog(ext_values, inferred_values, 'o-', linewidth=2, markersize=8, label='Inferred value')
+            ax1.set_xlabel(f'{ext_param}', fontsize=12, fontweight='bold')
+            ax1.set_ylabel(f'{inferred_param}', fontsize=12, fontweight='bold')
+            ax1.set_title(f'{inferred_param} vs {ext_param}', fontsize=13, fontweight='bold')
+            ax1.grid(True, alpha=0.3, which='both')
+            ax1.legend(fontsize=10)
+            
+            # Panel 2: Uncertainty vs external parameter
+            ax2 = fig.add_subplot(gs[0, 1])
+            ax2.loglog(ext_values, sigmas, 's-', linewidth=2, markersize=8, color='red', label='σ')
+            ax2.set_xlabel(f'{ext_param}', fontsize=12, fontweight='bold')
+            ax2.set_ylabel(f'σ({inferred_param})', fontsize=12, fontweight='bold')
+            ax2.set_title(f'Uncertainty vs {ext_param}', fontsize=13, fontweight='bold')
+            ax2.grid(True, alpha=0.3, which='both')
+            ax2.legend(fontsize=10)
+            
+            fig.suptitle(f'{inference_name} - Single Mode', fontsize=14, fontweight='bold', y=0.995)
+            
+            # Save figure
+            output_path = self.mode_path / f'Fig_single_{inferred_param}.png'
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            print(f"Saved: {output_path}")
+            plt.close(fig)
+    
+    def plot_cumulative_mode(self, inference_name: str, figsize: Tuple[int, int] = (16, 10)):
+        """
+        Plot cumulative-mode inference results.
+        
+        Creates one figure per inferred parameter, showing:
+        - Panel 1: Inferred value vs number of cumulated external parameters
+        - Panel 2: Uncertainty vs number of cumulated external parameters
+        """
+        try:
+            int_params_dict, ext_params_dict, uncertainties_dict, cumul_indices_dict = \
+                self._extract_results_cumulative_mode()
+        except Exception as e:
+            print(f"Error extracting cumulative-mode results: {e}")
+            return
+        
+        inferred_params = self._get_inferred_params()
+        external_params = self._get_external_params()
+        
+        if not inferred_params or not external_params:
+            print(f"Warning: No results found for {inference_name} (cumulative mode)")
+            return
+        
+        ext_param = external_params[0]
+        
+        for inferred_param in inferred_params:
+            if inferred_param not in int_params_dict:
+                continue
+            
+            fig = plt.figure(figsize=figsize)
+            gs = GridSpec(1, 2, figure=fig, hspace=0.3, wspace=0.3)
+            
+            # Prepare data: organize by number of cumulated parameters
+            cumul_counts = {}
+            cumul_inferred = {}
+            cumul_sigmas = {}
+            
+            for entry_key in int_params_dict[inferred_param]:
+                if entry_key not in cumul_indices_dict:
+                    continue
+                
+                cumul_indices = cumul_indices_dict[entry_key]
+                
+                if ext_param in cumul_indices:
+                    start, end = cumul_indices[ext_param]
+                    num_params = end + 1  # end is inclusive
+                    
+                    inferred_val = int_params_dict[inferred_param][entry_key]
+                    sigma = uncertainties_dict[inferred_param].get(entry_key, np.nan)
+                    
+                    if num_params not in cumul_counts:
+                        cumul_counts[num_params] = []
+                        cumul_inferred[num_params] = []
+                        cumul_sigmas[num_params] = []
+                    
+                    cumul_counts[num_params].append(entry_key)
+                    cumul_inferred[num_params].append(inferred_val)
+                    cumul_sigmas[num_params].append(sigma)
+            
+            if not cumul_counts:
+                print(f"Warning: No cumulative data for {inferred_param}")
+                continue
+            
+            # Aggregate by averaging over multiple int_param combinations
+            num_params_sorted = sorted(cumul_counts.keys())
+            avg_inferred = [np.mean(cumul_inferred[n]) for n in num_params_sorted]
+            std_inferred = [np.std(cumul_inferred[n]) for n in num_params_sorted]
+            avg_sigmas = [np.mean(cumul_sigmas[n]) for n in num_params_sorted]
+            std_sigmas = [np.std(cumul_sigmas[n]) for n in num_params_sorted]
+            
+            # Panel 1: Inferred parameter vs number of cumulated parameters
+            ax1 = fig.add_subplot(gs[0, 0])
+            ax1.errorbar(num_params_sorted, avg_inferred, yerr=std_inferred, 
+                         fmt='o-', linewidth=2, markersize=8, capsize=5, label='Inferred value')
+            ax1.set_xlabel(f'# Cumulated {ext_param}', fontsize=12, fontweight='bold')
+            ax1.set_ylabel(f'{inferred_param}', fontsize=12, fontweight='bold')
+            ax1.set_title(f'{inferred_param} vs # Cumulated {ext_param}', fontsize=13, fontweight='bold')
+            ax1.grid(True, alpha=0.3)
+            ax1.legend(fontsize=10)
+            
+            # Panel 2: Uncertainty vs number of cumulated parameters
+            ax2 = fig.add_subplot(gs[0, 1])
+            ax2.errorbar(num_params_sorted, avg_sigmas, yerr=std_sigmas, 
+                         fmt='s-', linewidth=2, markersize=8, capsize=5, color='red', label='σ')
+            ax2.set_xlabel(f'# Cumulated {ext_param}', fontsize=12, fontweight='bold')
+            ax2.set_ylabel(f'σ({inferred_param})', fontsize=12, fontweight='bold')
+            ax2.set_title(f'Uncertainty vs # Cumulated {ext_param}', fontsize=13, fontweight='bold')
+            ax2.grid(True, alpha=0.3)
+            ax2.legend(fontsize=10)
+            
+            fig.suptitle(f'{inference_name} - Cumulative Mode', fontsize=14, fontweight='bold', y=0.995)
+            
+            # Save figure
+            output_path = self.mode_path / f'Fig_cumulative_{inferred_param}.png'
+            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            print(f"Saved: {output_path}")
+            plt.close(fig)
+    
+    def plot_all(self, inference_name: str):
+        """Generate all plots for this inference."""
+        print(f"\nGenerating plots for {inference_name}...")
+        self.plot_single_mode(inference_name)
+        self.plot_cumulative_mode(inference_name)
+
+
+def main():
+    """Main execution: Generate plots for all inferences."""
+    
+    base_inference_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData'
+    
+    inferences = [
+        ('BendingElasticity', 'ElasticInference_BendingElasticity'),
+        # ('ShearElasticity', 'ElasticInference_ShearElasticity'),
+        # ('BendingShearElasticity', 'ElasticInference_BendingShearElasticity'),
+    ]
+    
+    for inference_name, dir_name in inferences:
+
+        for mode in ['SingleExtParams', 'CumulativeExtParams']:
+            inference_path = base_inference_path / dir_name / mode
+            
+            if not inference_path.exists():
+                print(f"Warning: Path not found: {inference_path}")
+                continue
+            
+            try:
+                visualizer = InferenceResultsVisualizer(inference_path)
+                if 'SingleExtParams' in mode:
+                    visualizer.plot_single_mode(inference_name)
+                elif 'CumulativeExtParams' in mode:
+                    visualizer.plot_cumulative_mode(inference_name)
+                    
+            except Exception as e:
+                print(f"Error processing {inference_name}: {e}")
+                import traceback
+                traceback.print_exc()
 
 
 if __name__ == "__main__":
-
-    """ Elastic Inference: Bending Filament (Sp4) """
-
-    # Define your paths and parameters
-    writing_path = (Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_BendingElasticity' / 'VaryingA')
-    A_vec = np.pow(10, np.linspace(start = -6, stop = -2, num = 100))
-    true_params = {'Sp4':1}
-    k_max_overall = 99 # 50 - 1
-
-    # Load data
-    results, results_cumul = load_results(writing_path, k_max_overall)
-    k_values, params, losses, std_errors = extract_data(results)
-    k_values_cumul, params_cumul, losses_cumul, std_errors_cumul = extract_data(results_cumul)
-
-    # Create subplots
-    fig = make_subplots(
-        rows=1, cols=2,
-        subplot_titles=(
-            "Result: Centered and Normalized Parameters vs A",
-            "Result_cumul: Centered and Normalized Parameters vs (k_max - k_min)"
-        )
-    )
-
-    # Colors for differentiation
-    colors_list = [
-        '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-        '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
-    ]
-
-    def hex_to_rgba(hex_color, alpha):
-        """Convert hex color to rgba string."""
-        hex_color = hex_color.lstrip('#')
-        r, g, b = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-        return f'rgba({r}, {g}, {b}, {alpha})'
-
-    # 1. Result: params vs A (with log scale on x, Centered and Normalized, transparent error bands)
-    A_values = A_vec[np.array(k_values)]
-
-    for idx, (param_name, param_vals) in enumerate(params.items()):
-        param_array = np.array(param_vals)
-        std_err_array = np.array(std_errors[param_name])
-        
-        # Center and normalize to true param
-        cent_norm_params = (param_array - true_params[param_name]) / true_params[param_name]
-        std_norm_params = std_err_array / true_params[param_name]
-
-        # Calculate error bounds
-        upper_bound = cent_norm_params + std_norm_params
-        lower_bound = cent_norm_params - std_norm_params
-        
-        color = colors_list[idx % len(colors_list)]
-        color_rgba = hex_to_rgba(color, 0.3)  # 30% opacity
-        
-        # Add shaded error band
-        fig.add_trace(
-            go.Scatter(
-                x=np.concatenate([A_values, A_values[::-1]]),
-                y=np.concatenate([upper_bound, lower_bound[::-1]]),
-                fill='toself',
-                fillcolor=color_rgba,
-                line=dict(color='rgba(255,255,255,0)'),
-                showlegend=False,
-                hoverinfo='skip',
-                name=param_name
-            ),
-            row=1, col=1
-        )
-        
-        # Add main line
-        fig.add_trace(
-            go.Scatter(
-                x=A_values,
-                y=cent_norm_params,
-                mode='lines+markers',
-                name=param_name,
-                line=dict(color=color, width=2),
-                marker=dict(size=8),
-                legendgroup='result',
-                hovertemplate=f'{param_name}: %{{y:.6f}}<br>A: %{{x:.6f}}<br>Error: ±%{{customdata:.6f}}<extra></extra>',
-                customdata=std_norm_params
-            ),
-            row=1, col=1
-        )
-
-    # 2. Result_cumul: params vs (k_max - k_min) (centered and normalized, transparent error bands)
-    k_ranges = np.array(k_values_cumul)
-
-    for idx, (param_name, param_vals) in enumerate(params_cumul.items()):
-        param_array = np.array(param_vals)
-        std_err_array = np.array(std_errors_cumul[param_name])
-
-        # Center and normalize to true param
-        cent_norm_params = (param_array - true_params[param_name]) / true_params[param_name]
-        std_norm_params = std_err_array / true_params[param_name]        
-        
-        # Calculate error bounds
-        upper_bound = cent_norm_params + std_norm_params
-        lower_bound = cent_norm_params - std_norm_params
-        
-        color = colors_list[idx % len(colors_list)]
-        color_rgba = hex_to_rgba(color, 0.3)  # 30% opacity
-        
-        # Add shaded error band
-        fig.add_trace(
-            go.Scatter(
-                x=np.concatenate([k_ranges, k_ranges[::-1]]),
-                y=np.concatenate([upper_bound, lower_bound[::-1]]),
-                fill='toself',
-                fillcolor=color_rgba,
-                line=dict(color='rgba(255,255,255,0)'),
-                showlegend=False,
-                hoverinfo='skip',
-                name=param_name
-            ),
-            row=1, col=2
-        )
-        
-        # Add main line
-        fig.add_trace(
-            go.Scatter(
-                x=k_ranges,
-                y=cent_norm_params,
-                mode='lines+markers',
-                name=param_name,
-                line=dict(color=color, width=2),
-                marker=dict(size=8),
-                legendgroup='result_cumul',
-                showlegend=False,
-                hovertemplate=f'{param_name}: %{{y:.6f}}<br>k_range: %{{x}}<br>Error: ±%{{customdata:.6f}}<extra></extra>',
-                customdata=std_norm_params
-            ),
-            row=1, col=2
-        )
-
-
-        # Add main line
-        fig.add_trace(
-            go.Scatter(
-                x=k_ranges,
-                y=std_norm_params[0]/np.sqrt(k_ranges + 1),
-                mode='lines',
-                name=param_name,
-                line=dict(color="red", width=2),
-                legendgroup='uncertainty_line',
-                showlegend=True,
-            ),
-            row=1, col=2
-        )
-
-        # Update x-axes (log scale for A, linear for k_range)
-        fig.update_xaxes(
-            title_text="A (log scale)",
-            type='log',
-            row=1, col=1
-        )
-        fig.update_xaxes(
-            title_text="k_max - k_min",
-            row=1, col=2
-        )
-
-        # Update y-axes
-        fig.update_yaxes(
-            title_text="Centered and Normalized Parameter Value",
-            row=1, col=1,
-        )
-        fig.update_yaxes(
-            title_text="Centered and Normalized Parameter Value",
-            row=1, col=2,
-        )
-
-        # Update layout
-        fig.update_layout(
-            title_text="Parameter Inference Analysis (Normalized Error Bands)",
-            height=600,
-            width=1600,
-            showlegend=True,
-            hovermode='closest',
-            font=dict(size=12),
-            legend=dict(
-                x=1.02,
-                y=1,
-                xanchor='left',
-                yanchor='top'
-            )
-        )
-
-        # Save and show
-        fig.write_html('analysis_results.html')
-        fig.show()
-
-        print("Analysis complete. Interactive plot saved to 'analysis_results.html'")
-
-exit()
-
-
-fig_nbr = 1
-panel_nbr = 0
-
-##############################
-# Model chapter ------------ #
-##############################
-
-# TODO: complete it from file D01_RF_plots.py
-
-##############################
-# Inference chapter -------- #
-##############################
-
-## Figure 1: 
-## Figure 2:
-
-if __name__ == '__main__':
-    print("")
+    main()

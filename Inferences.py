@@ -173,7 +173,7 @@ def compute_hessian_bounded(f, x0, bounds, **hessian_kwargs):
     We transform to unbounded space, compute the Hessian there, and transform back.
     
     Transformation: x = transform_to_unbounded(t, bounds)
-    Chain rule: H_x = J^T @ H_t @ J  (where J is diagonal Jacobian matrix)
+    Chain rule: C_x = J_x^T @ C_t @ J_x --> H_x = J_x⁻¹ @ H_t @ (J_x^T)⁻¹  (where J_x is diagonal Jacobian matrix)
     
     Parameters:
         f: callable(x) - function on bounded domain
@@ -198,11 +198,11 @@ def compute_hessian_bounded(f, x0, bounds, **hessian_kwargs):
     H_unbounded = sd.hessian(unbounded_function, t0, **hessian_kwargs).ddf
 
     # Compute Jacobian diagonal at t0
-    J_diag = jacobian_diagonal(t0, bounds)
-    J = np.diag(J_diag)
+    Jm1_diag = 1./jacobian_diagonal(t0, bounds)
+    Jm1 = np.diag(Jm1_diag)
     
-    # Transform back to bounded space: H_bounded = J @ H_unbounded @ J
-    H_bounded = J @ H_unbounded @ J
+    # Transform back to bounded space: H_bounded = J⁻¹ @ H_unbounded @ J⁻¹
+    H_bounded = Jm1 @ H_unbounded @ Jm1
     
     return H_bounded
 
@@ -535,9 +535,13 @@ class Inference:
             **self.optimizer_kwargs
         )
         
-        # Compute Hessian and covariance
-        self._compute_hessian(param_keys)
-        
+        # Compute Hessian and Covariance if optimisation succeeded
+        if self.result.success:
+            self._compute_hessian(param_keys)
+        else: 
+            self.hessian = np.zeros(len(param_keys))
+            self.covariance = np.ones(len(param_keys)) * np.inf
+
         # Reconstruct optimal parameters
         optimal_params = {key: self.result.x[i] for i, key in enumerate(param_keys)}
         
@@ -620,7 +624,7 @@ class Inference:
             self.covariance = np.linalg.inv(self.hessian)
         except np.linalg.LinAlgError:
             print(f"Warning: Hessian singular at optimum for {param_keys}, covariance unavailable.")
-            self.covariance = None
+            self.covariance = np.ones_like(self.hessian) * np.inf
 
 # ============================================================================
 # MULTI-PASS INFERENCE PIPELINE
