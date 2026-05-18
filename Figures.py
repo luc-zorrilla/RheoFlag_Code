@@ -7,26 +7,17 @@ import dill as pickle
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
-
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 class InferenceResultsVisualizer:
-    """Generalized visualizer for inference results."""
     
     def __init__(self, mode_path: Path):
-        """
-        Initialize visualizer with path to a specific inference mode (SingleExtParams or CumulativeExtParams).
-        
-        Args:
-            mode_path: Path to SingleExtParams or CumulativeExtParams directory
-        """
         self.mode_path = Path(mode_path)
         self.mode = self.mode_path.name  # 'SingleExtParams' or 'CumulativeExtParams'
         self.manifest = self._load_manifest()
         self.param_ref = self._load_param_reference()
     
     def _load_manifest(self) -> Dict:
-        """Load results manifest."""
         manifest_file = self.mode_path / 'results_manifest.json'
         if not manifest_file.exists():
             raise FileNotFoundError(f"Manifest not found: {manifest_file}")
@@ -34,7 +25,6 @@ class InferenceResultsVisualizer:
             return json.load(f)
     
     def _load_param_reference(self) -> Dict:
-        """Load parameter reference file."""
         ref_file = self.mode_path / 'parameter_reference.json'
         if not ref_file.exists():
             raise FileNotFoundError(f"Parameter reference not found: {ref_file}")
@@ -42,19 +32,11 @@ class InferenceResultsVisualizer:
             return json.load(f)
     
     def _load_result_file(self, result_file_path: str):
-        """Load an InferenceResult object from pickle."""
         full_path = self.mode_path / result_file_path
         with open(full_path, 'rb') as f:
             return pickle.load(f)
-    
+
     def _extract_results_single_mode(self) -> Tuple[Dict, Dict, Dict, Dict]:
-        """
-        Extract and organize single-mode results.
-        
-        Returns:
-            Tuple of (int_params_dict, ext_params_dict, uncertainties_dict, loss_dict)
-            where dicts map: {param_name: {entry_key: values}}
-        """
         int_params_dict = {}
         ext_params_dict = {}
         uncertainties_dict = {}
@@ -65,40 +47,61 @@ class InferenceResultsVisualizer:
             
             # Create a hashable key from ground truth int_params
             entry_key = tuple(sorted(entry['int_params'].items()))
-            ext_key = tuple(sorted(entry['ext_params'].items())) if entry['ext_params'] else None
             
-            # Store inferred internal parameters
+            # Initialize nested dicts for this ground truth combo if needed
             for param_name, param_value in result.params.items():
                 if param_name not in int_params_dict:
                     int_params_dict[param_name] = {}
-                int_params_dict[param_name][entry_key] = param_value
+                if entry_key not in int_params_dict[param_name]:
+                    int_params_dict[param_name][entry_key] = {}
+                
+                # Use external parameter value as the secondary key
+                ext_param_key = None
+                if entry['ext_params']:
+                    # Assuming single external parameter; adjust if multiple
+                    ext_param = self._get_external_params()[0]
+                    ext_param_key = entry['ext_params'].get(ext_param)
+                
+                int_params_dict[param_name][entry_key][ext_param_key] = param_value
             
             # Store external parameters
             if entry['ext_params']:
                 for param_name, param_value in entry['ext_params'].items():
                     if param_name not in ext_params_dict:
                         ext_params_dict[param_name] = {}
-                    ext_params_dict[param_name][entry_key] = param_value
+                    if entry_key not in ext_params_dict[param_name]:
+                        ext_params_dict[param_name][entry_key] = {}
+                    
+                    ext_param_key = entry['ext_params'].get(self._get_external_params()[0])
+                    ext_params_dict[param_name][entry_key][ext_param_key] = param_value
             
             # Store uncertainties (standard errors)
             if result.std_errors is not None:
                 for i, param_name in enumerate(result.params.keys()):
                     if param_name not in uncertainties_dict:
                         uncertainties_dict[param_name] = {}
-                    uncertainties_dict[param_name][entry_key] = result.std_errors[i]
+                    if entry_key not in uncertainties_dict[param_name]:
+                        uncertainties_dict[param_name][entry_key] = {}
+                    
+                    ext_param_key = None
+                    if entry['ext_params']:
+                        ext_param = self._get_external_params()[0]
+                        ext_param_key = entry['ext_params'].get(ext_param)
+                    
+                    uncertainties_dict[param_name][entry_key][ext_param_key] = result.std_errors[i]
             
             # Store loss
-            loss_dict[entry_key] = result.loss
+            if entry_key not in loss_dict:
+                loss_dict[entry_key] = {}
+            ext_param_key = None
+            if entry['ext_params']:
+                ext_param = self._get_external_params()[0]
+                ext_param_key = entry['ext_params'].get(ext_param)
+            loss_dict[entry_key][ext_param_key] = result.loss
         
         return int_params_dict, ext_params_dict, uncertainties_dict, loss_dict
-    
+
     def _extract_results_cumulative_mode(self) -> Tuple[Dict, Dict, Dict, Dict]:
-        """
-        Extract and organize cumulative-mode results.
-        
-        Returns:
-            Tuple of (int_params_dict, ext_params_dict, uncertainties_dict, cumul_indices_dict)
-        """
         int_params_dict = {}
         ext_params_dict = {}
         uncertainties_dict = {}
@@ -109,26 +112,66 @@ class InferenceResultsVisualizer:
             
             # Create a hashable key from ground truth int_params
             entry_key = tuple(sorted(entry['int_params'].items()))
-            pass_idx = entry['pass_idx']
             
-            # Store inferred internal parameters
+            # Initialize nested dicts for this ground truth combo if needed
             for param_name, param_value in result.params.items():
                 if param_name not in int_params_dict:
                     int_params_dict[param_name] = {}
-                int_params_dict[param_name][entry_key] = param_value
+                if entry_key not in int_params_dict[param_name]:
+                    int_params_dict[param_name][entry_key] = {}
+                
+                # Use cumulative index as the secondary key
+                cumul_index_key = None
+                if entry['cumul_indices']:
+                    ext_param = self._get_external_params()[0]
+                    if ext_param in entry['cumul_indices']:
+                        start, end = entry['cumul_indices'][ext_param]
+                        cumul_index_key = end + 1  # end is inclusive, so num_params = end + 1
+                
+                int_params_dict[param_name][entry_key][cumul_index_key] = param_value
             
-            # Store uncertainties
+            # Store external parameters
+            if entry['ext_params']:
+                for param_name, param_value in entry['ext_params'].items():
+                    if param_name not in ext_params_dict:
+                        ext_params_dict[param_name] = {}
+                    if entry_key not in ext_params_dict[param_name]:
+                        ext_params_dict[param_name][entry_key] = {}
+                    
+                    cumul_index_key = None
+                    if entry['cumul_indices']:
+                        ext_param = self._get_external_params()[0]
+                        if ext_param in entry['cumul_indices']:
+                            start, end = entry['cumul_indices'][ext_param]
+                            cumul_index_key = end + 1
+                    
+                    ext_params_dict[param_name][entry_key][cumul_index_key] = param_value
+            
+            # Store uncertainties (standard errors)
             if result.std_errors is not None:
                 for i, param_name in enumerate(result.params.keys()):
                     if param_name not in uncertainties_dict:
                         uncertainties_dict[param_name] = {}
-                    uncertainties_dict[param_name][entry_key] = result.std_errors[i]
+                    if entry_key not in uncertainties_dict[param_name]:
+                        uncertainties_dict[param_name][entry_key] = {}
+                    
+                    cumul_index_key = None
+                    if entry['cumul_indices']:
+                        ext_param = self._get_external_params()[0]
+                        if ext_param in entry['cumul_indices']:
+                            start, end = entry['cumul_indices'][ext_param]
+                            cumul_index_key = end + 1
+                    
+                    uncertainties_dict[param_name][entry_key][cumul_index_key] = result.std_errors[i]
             
-            # Store cumul_indices for reference
-            cumul_indices_dict[entry_key] = entry['cumul_indices']
+            # Store cumulative indices
+            if entry['cumul_indices']:
+                if entry_key not in cumul_indices_dict:
+                    cumul_indices_dict[entry_key] = {}
+                cumul_indices_dict[entry_key] = entry['cumul_indices']
         
         return int_params_dict, ext_params_dict, uncertainties_dict, cumul_indices_dict
-    
+
     def _get_inferred_params(self) -> List[str]:
         """Identify which parameters were inferred."""
         if not self.manifest['entries']:
@@ -142,45 +185,41 @@ class InferenceResultsVisualizer:
         """Identify external parameters."""
         if not self.manifest['entries']:
             return []
+        
+        # For cumulative mode, extract external params from cumul_indices
+        if self.mode == 'CumulativeExtParams':
+            first_entry = self.manifest['entries'][0]
+            if 'cumul_indices' in first_entry and first_entry['cumul_indices']:
+                return list(first_entry['cumul_indices'].keys())
+            return []
+        
+        # For single mode, get them from ext_params
         first_entry = self.manifest['entries'][0]
         return list(first_entry['ext_params'].keys()) if first_entry['ext_params'] else []
     
-    def _sort_by_external_param(self, ext_param: str, 
-                                data_dict: Dict) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
+    def _get_ground_truth_combinations(self, inferred_param: str) -> Dict:
         """
-        Sort data by a specific external parameter value.
-        
-        Args:
-            ext_param: Name of external parameter to sort by
-            data_dict: Dictionary mapping entry_key -> values for multiple parameters
-        
-        Returns:
-            Tuple of (sorted_ext_values, {param_name: sorted_values})
+        Get all unique ground truth int_params combinations and their display names.
+        Returns dict: {entry_key -> {param_name: value, ...}}
         """
-        # Extract external param values and organize by entry_key
-        ext_values = {}
+        combinations = {}
         for entry in self.manifest['entries']:
             entry_key = tuple(sorted(entry['int_params'].items()))
-            if entry['ext_params'] and ext_param in entry['ext_params']:
-                ext_values[entry_key] = entry['ext_params'][ext_param]
-        
-        # Sort by external parameter value
-        sorted_keys = sorted(ext_values.keys(), key=lambda k: ext_values[k])
-        sorted_ext_values = np.array([ext_values[k] for k in sorted_keys])
-        
-        sorted_data = {}
-        for param_name, value_dict in data_dict.items():
-            sorted_data[param_name] = np.array([value_dict[k] if np.isfinite(value_dict[k]) else np.inf for k in sorted_keys])
-        
-        return sorted_ext_values, sorted_data
+            if entry_key not in combinations:
+                combinations[entry_key] = dict(entry['int_params'])
+        return combinations
     
-    def plot_single_mode(self, inference_name: str, figsize: Tuple[int, int] = (16, 10)):
+    def _format_ground_truth_label(self, int_params_dict: Dict) -> str:
+        """Format ground truth parameters as a readable label."""
+        parts = [f"{k}={v}" for k, v in sorted(int_params_dict.items())]
+        return ", ".join(parts)
+
+    def plot_single_mode(self, inference_name: str):
         """
-        Plot single-mode inference results.
-        
-        Creates one figure per inferred parameter, showing:
-        - Panel 1: Inferred value vs external parameter
-        - Panel 2: Uncertainty vs external parameter
+        Plot single-mode inference results using Plotly.
+        Creates separate traces for each ground truth int_params combination.
+        Each trace has multiple points (one per external parameter value).
+        Inferred values are centered and normalized by their ground truth value.
         """
         try:
             int_params_dict, ext_params_dict, uncertainties_dict, loss_dict = \
@@ -196,61 +235,127 @@ class InferenceResultsVisualizer:
             print(f"Warning: No results found for {inference_name} (single mode)")
             return
         
-        # Use primary external parameter (usually A or the first one)
         ext_param = external_params[0]
         
         for inferred_param in inferred_params:
             if inferred_param not in int_params_dict:
                 continue
             
-            fig = plt.figure(figsize=figsize)
-            gs = GridSpec(1, 2, figure=fig, hspace=0.3, wspace=0.3)
+            # Create subplots
+            fig = make_subplots(
+                rows=1, cols=2,
+                subplot_titles=(
+                    f'({inferred_param} - GT) / GT vs {ext_param}',
+                    f'σ / GT vs {ext_param}'
+                ),
+                specs=[[{'type': 'scatter'}, {'type': 'scatter'}]]
+            )
             
-            # Prepare data
-            data_dict = {
-                inferred_param: int_params_dict[inferred_param],
-            }
-            if inferred_param in uncertainties_dict:
-                data_dict['sigma'] = uncertainties_dict[inferred_param]
+            # Plot each ground truth combination
+            colors = [
+                '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+                '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+            ]
             
-            # Sort by external parameter
-            ext_values, sorted_data = self._sort_by_external_param(ext_param, data_dict)
-            inferred_values = sorted_data[inferred_param]
-            sigmas = sorted_data.get('sigma', np.full_like(inferred_values, np.nan))
+            for idx, (entry_key, ext_param_data) in enumerate(sorted(int_params_dict[inferred_param].items())):
+                color = colors[idx % len(colors)]
+                
+                # entry_key is the ground truth int_params
+                int_params = dict(entry_key)
+                gt_value = int_params.get(inferred_param)
+                label = self._format_ground_truth_label(int_params)
+                
+                # Skip normalization if ground truth is zero
+                if gt_value is None or gt_value == 0:
+                    print(f"Warning: Skipping normalization for {label} (GT value is {gt_value})")
+                    continue
+                
+                # ext_param_data is {ext_param_value: inferred_value, ...}
+                ext_vals = []
+                normalized_inferred_vals = []
+                normalized_sigma_vals = []
+                
+                for ext_val in sorted(ext_param_data.keys()):
+                    inferred_val = ext_param_data[ext_val]
+                    ext_vals.append(ext_val)
+                    
+                    # Normalize: (inferred - GT) / GT
+                    normalized_val = (inferred_val - gt_value) / gt_value
+                    normalized_inferred_vals.append(float(normalized_val))
+                    
+                    # Get uncertainty and normalize by GT
+                    if inferred_param in uncertainties_dict and entry_key in uncertainties_dict[inferred_param]:
+                        sigma = uncertainties_dict[inferred_param][entry_key].get(ext_val, np.nan)
+                        if np.isfinite(sigma).all():
+                            normalized_sigma = sigma / gt_value
+                            normalized_sigma_vals.append(float(normalized_sigma))
+                        else:
+                            normalized_sigma_vals.append(np.nan)
+                    else:
+                        normalized_sigma_vals.append(np.nan)
+                
+                ext_vals = np.array(ext_vals)
+                normalized_inferred_vals = np.array(normalized_inferred_vals)
+                normalized_sigma_vals = np.array(normalized_sigma_vals)
+                
+                # Panel 1: Normalized inferred value
+                fig.add_trace(
+                    go.Scatter(
+                        x=ext_vals,
+                        y=normalized_inferred_vals,
+                        mode='lines+markers',
+                        name=label,
+                        line=dict(color=color, width=2),
+                        marker=dict(size=8),
+                        legendgroup=label,
+                        showlegend=True
+                    ),
+                    row=1, col=1
+                )
+                
+                # Panel 2: Normalized uncertainty
+                valid_indices = [i for i, s in enumerate(normalized_sigma_vals) if np.isfinite(s)]
+                if valid_indices:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=ext_vals[valid_indices],
+                            y=normalized_sigma_vals[valid_indices],
+                            mode='lines+markers',
+                            name=label,
+                            line=dict(color=color, width=2, dash='dash'),
+                            marker=dict(size=8, symbol='square'),
+                            legendgroup=label,
+                            showlegend=False
+                        ),
+                        row=1, col=2
+                    )
             
-            # Panel 1: Inferred parameter vs external parameter
-            ax1 = fig.add_subplot(gs[0, 0])
-            ax1.loglog(ext_values, inferred_values, 'o-', linewidth=2, markersize=8, label='Inferred value')
-            ax1.set_xlabel(f'{ext_param}', fontsize=12, fontweight='bold')
-            ax1.set_ylabel(f'{inferred_param}', fontsize=12, fontweight='bold')
-            ax1.set_title(f'{inferred_param} vs {ext_param}', fontsize=13, fontweight='bold')
-            ax1.grid(True, alpha=0.3, which='both')
-            ax1.legend(fontsize=10)
+            # Update axes with log scale for x-axis
+            fig.update_xaxes(type='log', title_text=ext_param, row=1, col=1)
+            fig.update_yaxes(title_text=f'({inferred_param} - GT) / GT', row=1, col=1)
+            fig.update_xaxes(type='log', title_text=ext_param, row=1, col=2)
+            fig.update_yaxes(type='log', title_text=f'σ / GT', row=1, col=2)
             
-            # Panel 2: Uncertainty vs external parameter
-            ax2 = fig.add_subplot(gs[0, 1])
-            ax2.loglog(ext_values, sigmas, 's-', linewidth=2, markersize=8, color='red', label='σ')
-            ax2.set_xlabel(f'{ext_param}', fontsize=12, fontweight='bold')
-            ax2.set_ylabel(f'σ({inferred_param})', fontsize=12, fontweight='bold')
-            ax2.set_title(f'Uncertainty vs {ext_param}', fontsize=13, fontweight='bold')
-            ax2.grid(True, alpha=0.3, which='both')
-            ax2.legend(fontsize=10)
+            fig.update_layout(
+                title_text=f'{inference_name} - Single Mode (Normalized by GT)',
+                height=600,
+                width=1400,
+                hovermode='x unified',
+                template='plotly_white'
+            )
             
-            fig.suptitle(f'{inference_name} - Single Mode', fontsize=14, fontweight='bold', y=0.995)
-            
-            # Save figure
-            output_path = self.mode_path / f'Fig_single_{inferred_param}.png'
-            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            # Save as HTML
+            output_path = self.mode_path / f'Fig_single_{inferred_param}.html'
+            fig.write_html(str(output_path))
             print(f"Saved: {output_path}")
-            plt.close(fig)
-    
-    def plot_cumulative_mode(self, inference_name: str, figsize: Tuple[int, int] = (16, 10)):
+
+
+    def plot_cumulative_mode(self, inference_name: str):
         """
-        Plot cumulative-mode inference results.
-        
-        Creates one figure per inferred parameter, showing:
-        - Panel 1: Inferred value vs number of cumulated external parameters
-        - Panel 2: Uncertainty vs number of cumulated external parameters
+        Plot cumulative-mode inference results using Plotly.
+        Creates separate traces for each ground truth int_params combination.
+        Each trace has multiple points (one per cumulative index).
+        Inferred values are centered and normalized by their ground truth value.
         """
         try:
             int_params_dict, ext_params_dict, uncertainties_dict, cumul_indices_dict = \
@@ -272,113 +377,152 @@ class InferenceResultsVisualizer:
             if inferred_param not in int_params_dict:
                 continue
             
-            fig = plt.figure(figsize=figsize)
-            gs = GridSpec(1, 2, figure=fig, hspace=0.3, wspace=0.3)
+            # Create subplots
+            fig = make_subplots(
+                rows=1, cols=2,
+                subplot_titles=(
+                    f'({inferred_param} - GT) / GT vs # Cumulated {ext_param}',
+                    f'σ / GT vs # Cumulated {ext_param}'
+                ),
+                specs=[[{'type': 'scatter'}, {'type': 'scatter'}]]
+            )
             
-            # Prepare data: organize by number of cumulated parameters
-            cumul_counts = {}
-            cumul_inferred = {}
-            cumul_sigmas = {}
+            # Plot each ground truth combination
+            colors = [
+                '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+                '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+            ]
             
-            for entry_key in int_params_dict[inferred_param]:
-                if entry_key not in cumul_indices_dict:
+            for idx, (entry_key, cumul_index_data) in enumerate(sorted(int_params_dict[inferred_param].items())):
+                color = colors[idx % len(colors)]
+                
+                # entry_key is the ground truth int_params
+                int_params = dict(entry_key)
+                gt_value = int_params.get(inferred_param)
+                label = self._format_ground_truth_label(int_params)
+                
+                # Skip normalization if ground truth is zero
+                if gt_value is None or gt_value == 0:
+                    print(f"Warning: Skipping normalization for {label} (GT value is {gt_value})")
                     continue
                 
-                cumul_indices = cumul_indices_dict[entry_key]
+                # cumul_index_data is {num_params: inferred_value, ...}
+                num_params_list = []
+                normalized_inferred_vals = []
+                normalized_sigma_vals = []
                 
-                if ext_param in cumul_indices:
-                    start, end = cumul_indices[ext_param]
-                    num_params = end + 1  # end is inclusive
+                for num_params in sorted(cumul_index_data.keys()):
+                    inferred_val = cumul_index_data[num_params]
+                    num_params_list.append(num_params)
                     
-                    inferred_val = int_params_dict[inferred_param][entry_key]
-                    sigma = uncertainties_dict[inferred_param].get(entry_key, np.nan)
+                    # Normalize: (inferred - GT) / GT
+                    normalized_val = (inferred_val - gt_value) / gt_value
+                    normalized_inferred_vals.append(float(normalized_val))
                     
-                    if num_params not in cumul_counts:
-                        cumul_counts[num_params] = []
-                        cumul_inferred[num_params] = []
-                        cumul_sigmas[num_params] = []
-                    
-                    cumul_counts[num_params].append(entry_key)
-                    cumul_inferred[num_params].append(inferred_val)
-                    cumul_sigmas[num_params].append(sigma)
+                    # Get uncertainty and normalize by GT
+                    if inferred_param in uncertainties_dict and entry_key in uncertainties_dict[inferred_param]:
+                        sigma = uncertainties_dict[inferred_param][entry_key].get(num_params, np.nan)
+                        if np.isfinite(sigma):
+                            normalized_sigma = sigma / gt_value
+                            normalized_sigma_vals.append(float(normalized_sigma))
+                        else:
+                            normalized_sigma_vals.append(np.nan)
+                    else:
+                        normalized_sigma_vals.append(np.nan)
+                
+                num_params_list = np.array(num_params_list)
+                normalized_inferred_vals = np.array(normalized_inferred_vals)
+                normalized_sigma_vals = np.array(normalized_sigma_vals)
+                
+                # Panel 1: Normalized inferred value
+                fig.add_trace(
+                    go.Scatter(
+                        x=num_params_list,
+                        y=normalized_inferred_vals,
+                        mode='lines+markers',
+                        name=label,
+                        line=dict(color=color, width=2),
+                        marker=dict(size=8),
+                        legendgroup=label,
+                        showlegend=True
+                    ),
+                    row=1, col=1
+                )
+                
+                # Panel 2: Normalized uncertainty
+                valid_indices = [i for i, s in enumerate(normalized_sigma_vals) if np.isfinite(s)]
+                if valid_indices:
+                    fig.add_trace(
+                        go.Scatter(
+                            x=num_params_list[valid_indices],
+                            y=normalized_sigma_vals[valid_indices],
+                            mode='lines+markers',
+                            name=label,
+                            line=dict(color=color, width=2, dash='dash'),
+                            marker=dict(size=8, symbol='square'),
+                            legendgroup=label,
+                            showlegend=False
+                        ),
+                        row=1, col=2
+                    )
             
-            if not cumul_counts:
-                print(f"Warning: No cumulative data for {inferred_param}")
-                continue
+            # Update axes
+            fig.update_xaxes(title_text=f'# Cumulated {ext_param}', row=1, col=1)
+            fig.update_yaxes(title_text=f'({inferred_param} - GT) / GT', row=1, col=1)
+            fig.update_xaxes(title_text=f'# Cumulated {ext_param}', row=1, col=2)
+            fig.update_yaxes(type='log', title_text=f'σ / GT', row=1, col=2)
             
-            # Aggregate by averaging over multiple int_param combinations
-            num_params_sorted = sorted(cumul_counts.keys())
-            avg_inferred = [np.mean(cumul_inferred[n]) for n in num_params_sorted]
-            std_inferred = [np.std(cumul_inferred[n]) for n in num_params_sorted]
-            avg_sigmas = [np.mean(cumul_sigmas[n]) for n in num_params_sorted]
-            std_sigmas = [np.std(cumul_sigmas[n]) for n in num_params_sorted]
+            fig.update_layout(
+                title_text=f'{inference_name} - Cumulative Mode (Normalized by GT)',
+                height=600,
+                width=1400,
+                hovermode='x unified',
+                template='plotly_white'
+            )
             
-            # Panel 1: Inferred parameter vs number of cumulated parameters
-            ax1 = fig.add_subplot(gs[0, 0])
-            ax1.errorbar(num_params_sorted, avg_inferred, yerr=std_inferred, 
-                         fmt='o-', linewidth=2, markersize=8, capsize=5, label='Inferred value')
-            ax1.set_xlabel(f'# Cumulated {ext_param}', fontsize=12, fontweight='bold')
-            ax1.set_ylabel(f'{inferred_param}', fontsize=12, fontweight='bold')
-            ax1.set_title(f'{inferred_param} vs # Cumulated {ext_param}', fontsize=13, fontweight='bold')
-            ax1.grid(True, alpha=0.3)
-            ax1.legend(fontsize=10)
-            
-            # Panel 2: Uncertainty vs number of cumulated parameters
-            ax2 = fig.add_subplot(gs[0, 1])
-            ax2.errorbar(num_params_sorted, avg_sigmas, yerr=std_sigmas, 
-                         fmt='s-', linewidth=2, markersize=8, capsize=5, color='red', label='σ')
-            ax2.set_xlabel(f'# Cumulated {ext_param}', fontsize=12, fontweight='bold')
-            ax2.set_ylabel(f'σ({inferred_param})', fontsize=12, fontweight='bold')
-            ax2.set_title(f'Uncertainty vs # Cumulated {ext_param}', fontsize=13, fontweight='bold')
-            ax2.grid(True, alpha=0.3)
-            ax2.legend(fontsize=10)
-            
-            fig.suptitle(f'{inference_name} - Cumulative Mode', fontsize=14, fontweight='bold', y=0.995)
-            
-            # Save figure
-            output_path = self.mode_path / f'Fig_cumulative_{inferred_param}.png'
-            plt.savefig(output_path, dpi=300, bbox_inches='tight')
+            # Save as HTML
+            output_path = self.mode_path / f'Fig_cumulative_{inferred_param}.html'
+            fig.write_html(str(output_path))
             print(f"Saved: {output_path}")
-            plt.close(fig)
-    
+
+
     def plot_all(self, inference_name: str):
         """Generate all plots for this inference."""
         print(f"\nGenerating plots for {inference_name}...")
         self.plot_single_mode(inference_name)
         self.plot_cumulative_mode(inference_name)
 
-
 def main():
-    """Main execution: Generate plots for all inferences."""
-    
     base_inference_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData'
     
     inferences = [
         ('BendingElasticity', 'ElasticInference_BendingElasticity'),
-        # ('ShearElasticity', 'ElasticInference_ShearElasticity'),
-        # ('BendingShearElasticity', 'ElasticInference_BendingShearElasticity'),
+        ('ShearElasticity', 'ElasticInference_ShearElasticity'),
+        ('BendingShearElasticity', 'ElasticInference_BendingShearElasticity'),
     ]
     
     for inference_name, dir_name in inferences:
-
+        inference_base_path = base_inference_path / dir_name
+        
         for mode in ['SingleExtParams', 'CumulativeExtParams']:
-            inference_path = base_inference_path / dir_name / mode
+            # Navigate to the mode subdirectory
+            mode_path = inference_base_path / mode
             
-            if not inference_path.exists():
-                print(f"Warning: Path not found: {inference_path}")
+            if not mode_path.exists():
+                print(f"Warning: Path not found: {mode_path}")
                 continue
             
             try:
-                visualizer = InferenceResultsVisualizer(inference_path)
-                if 'SingleExtParams' in mode:
+                visualizer = InferenceResultsVisualizer(mode_path)
+                if mode == 'SingleExtParams':
                     visualizer.plot_single_mode(inference_name)
-                elif 'CumulativeExtParams' in mode:
+                elif mode == 'CumulativeExtParams':
                     visualizer.plot_cumulative_mode(inference_name)
-                    
+
             except Exception as e:
-                print(f"Error processing {inference_name}: {e}")
                 import traceback
                 traceback.print_exc()
+
 
 
 if __name__ == "__main__":
