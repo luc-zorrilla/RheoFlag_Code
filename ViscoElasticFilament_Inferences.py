@@ -1171,7 +1171,7 @@ if __name__ == "__main__":
 
     ## Bending elasticity (Sp4 = 1e-3->1e3, Beta = 0)
 
-    if True:
+    if False:
         base_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_BendingElasticity'
     
         int_param_range = {
@@ -1233,7 +1233,7 @@ if __name__ == "__main__":
 
     ## Shear elasticity (Sp4 = 1, Beta = 1e-3->1e3) 
     
-    if True:
+    if False:
         base_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_ShearElasticity'
 
         int_param_range = {
@@ -1291,7 +1291,70 @@ if __name__ == "__main__":
             cumul_param_indices=cumul_param_indices,
         )
 
-    ## Bending + Shear elasticities (Sp4 = 1:1e-3->1e3, Beta = 1e-3->1e3)
+    ## Bending + Shear elasticities (Sp4 = 1e-3->1e3, Beta = 1e-3->1e3)
+
+    if False:
+        base_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_BendingShearElasticity'
+    
+        int_param_range = {
+            'Sp4': np.pow(10, np.linspace(start=-3, stop=3, num=3)),
+            'Beta': np.pow(10, np.linspace(start=-3, stop=3, num=3)),
+        }
+        ground_truth_fixed_int_params = {}
+
+        A_vec = np.pow(10, np.linspace(start=-6, stop=-2, num=50))
+        ext_param_range = {
+            'A': A_vec,
+        }
+        ground_truth_fixed_ext_params = {}
+
+        initial_guesses = [
+            {'Sp4': 1e-1, 'Beta': 0},
+        ]
+        param_keys_to_infer = list(initial_guesses[0].keys())
+
+        sim_param_dict = {}
+
+        cumul_param_indices = [{'A':(0, k)} for k in range(A_vec.shape[0])]
+
+        # ========== RUN INFERENCES ==========
+        
+        # Test 1: Single external parameter inference
+        print("=" * 80)
+        print("TEST 1: Single External Parameter Inference Mode")
+        print("=" * 80)
+        run_inference_pipeline(
+            base_path=base_path / 'SingleExtParams',
+            int_param_range=int_param_range,
+            ground_truth_fixed_int_params=ground_truth_fixed_int_params,
+            ext_param_range=ext_param_range,
+            ground_truth_fixed_ext_params=ground_truth_fixed_ext_params,
+            sim_param_dict=sim_param_dict,
+            param_keys_to_infer=param_keys_to_infer,
+            initial_guesses=initial_guesses,
+            mode='single',
+        )
+
+        # Test 2: Cumulative inference
+        print("\n" + "=" * 80)
+        print("TEST 2: Cumulative Inference Mode")
+        print("=" * 80)
+        run_inference_pipeline(
+            base_path=base_path / 'CumulativeExtParams',
+            int_param_range=int_param_range,
+            ground_truth_fixed_int_params=ground_truth_fixed_int_params,
+            ext_param_range=ext_param_range,
+            ground_truth_fixed_ext_params=ground_truth_fixed_ext_params,
+            sim_param_dict=sim_param_dict,
+            param_keys_to_infer=param_keys_to_infer,
+            initial_guesses=initial_guesses,
+            mode='cumulative',
+            cumul_param_indices=cumul_param_indices,
+        )
+
+    # Infer viscosities
+
+    ## Bending viscosity (Sp4 = 1e-3->1e3, Beta = 0, tau_b = 1e-3->1e3)
 
     if True:
         base_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_BendingShearElasticity'
@@ -1351,3 +1414,9 @@ if __name__ == "__main__":
             mode='cumulative',
             cumul_param_indices=cumul_param_indices,
         )
+
+    ## Shear viscosity (Sp4 = 1e-3->1e3, Beta = 1e-3->1e3, tau_s = 1e-3->1e3)
+
+    ## Bending + Shear viscosity (Sp4 = 1e-3->1e3, Beta = 1e-3->1e3, tau_b = 1e-3 -> 1e3, tau_s = 1e-3->1e3)
+        
+    # Elasticity + Viscosity
