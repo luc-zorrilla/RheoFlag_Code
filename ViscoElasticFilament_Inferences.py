@@ -1357,22 +1357,24 @@ if __name__ == "__main__":
     ## Bending viscosity (Sp4 = 1e-3->1e3, Beta = 0, tau_b = 1e-3->1e3)
 
     if True:
-        base_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ElasticInference_BendingShearElasticity'
+        base_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ViscousInference_BendingViscosity'
     
         int_param_range = {
             'Sp4': np.pow(10, np.linspace(start=-3, stop=3, num=3)),
-            'Beta': np.pow(10, np.linspace(start=-3, stop=3, num=3)),
+            'tau_b': np.pow(10, np.linspace(start=-3, stop=3, num=3)),
         }
         ground_truth_fixed_int_params = {}
 
-        A_vec = np.pow(10, np.linspace(start=-6, stop=-2, num=50))
+        A_vec = np.pow(10, np.linspace(start=-6, stop=-2, num=5))
+        w0_vec = np.pow(10, np.linspace(start = -3, stop = 3, num = 7))
         ext_param_range = {
             'A': A_vec,
+            'w0': w0_vec,
         }
         ground_truth_fixed_ext_params = {}
 
         initial_guesses = [
-            {'Sp4': 1e-1, 'Beta': 0},
+            {'tau_b':0},
         ]
         param_keys_to_infer = list(initial_guesses[0].keys())
 
