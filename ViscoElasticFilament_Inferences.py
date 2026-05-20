@@ -1040,6 +1040,75 @@ def _save_parameter_reference(base_path, int_param_range, ext_param_range, cumul
         json.dump(reference, f, indent=2)
     
     print(f"Parameter reference saved: {base_path / 'parameter_reference.json'}") 
+
+def _get_completed_int_param_combinations(manifest_path, int_param_range):
+    """Extract already-computed internal parameter index combinations from manifest.
+    
+    Args:
+        manifest_path: Path to results_manifest.json
+        int_param_range: Dict of internal parameter ranges (to determine parameter order)
+    
+    Returns a set of tuples where each tuple represents completed int_param_indices,
+    in the same order as int_param_range.keys() would produce.
+    """
+    manifest_path = Path(manifest_path)
+    if not manifest_path.exists():
+        return set()
+    
+    try:
+        with open(manifest_path, 'r') as f:
+            manifest_data = json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return set()
+    
+    # Load parameter reference to map values back to indices
+    reference_path = manifest_path.parent / 'parameter_reference.json'
+    if not reference_path.exists():
+        print("Warning: parameter_reference.json not found. Cannot map values to indices.")
+        return set()
+    
+    try:
+        with open(reference_path, 'r') as f:
+            reference_data = json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return set()
+    
+    completed = set()
+    int_param_ref = reference_data.get('internal_parameters', {})
+    
+    # Build reverse mapping: param_name -> {value: index}
+    value_to_idx = {}
+    for param_name, idx_dict in int_param_ref.items():
+        value_to_idx[param_name] = {float(v): int(i) for i, v in idx_dict.items()}
+    
+    # Use the same parameter order as int_param_range
+    int_param_names = list(int_param_range.keys())
+    
+    # Extract completed combinations from manifest
+    for entry in manifest_data.get('entries', []):
+        int_params = entry.get('int_params', {})
+        
+        # Try to convert all int_param values to indices in the correct order
+        try:
+            indices = []
+            for param_name in int_param_names:  # Use actual iteration order
+                param_value = float(int_params[param_name])
+                if param_name not in value_to_idx:
+                    raise KeyError(f"Parameter {param_name} not in reference")
+                
+                idx = value_to_idx[param_name].get(param_value)
+                if idx is None:
+                    raise ValueError(f"Value {param_value} not found for {param_name}")
+                
+                indices.append(idx)
+            
+            completed.add(tuple(indices))
+        except (KeyError, ValueError, TypeError) as e:
+            print(f"Warning: Could not map entry to indices: {e}")
+            continue
+    
+    return completed
+
 def run_inference_pipeline(
     base_path,
     int_param_range,
@@ -1055,27 +1124,15 @@ def run_inference_pipeline(
     n_jobs=-1,
     elastic_params_list=None,
     viscous_params_list=None,
+    skip_existing=True,
 ):
-    """Orchestrator: loop through internal parameters and run inference.
-
+    """Enhanced orchestrator with checkpoint resume capability.
+    
     Args:
-        base_path: Root directory for results
-        int_param_range: Dict of internal parameter ranges
-        ground_truth_fixed_int_params: Fixed internal parameters
-        ext_param_range: Dict of external parameter ranges
-        ground_truth_fixed_ext_params: Fixed external parameters
-        sim_param_dict: Dict of simulation parameters
-        param_keys_to_infer: List of parameters to infer
-        initial_guesses: List of initial guess dicts
-        mode: 'single' (loop ext params) or 'cumulative' (bulk ext params)
-        cumul_param_indices: For cumulative mode, list of dicts, each dict containing 
-                            (start, end) indices per ext param
-        loss_fn: Loss function
-        n_jobs: Number of parallel jobs
-        elastic_params_list: For cumulative mode
-        viscous_params_list: For cumulative mode
+        skip_existing: If True, skip internal parameter combinations already in manifest.
+                    Safe to use on first run (will be empty set).
     """
-
+    
     if elastic_params_list is None:
         elastic_params_list = ['Sp4', 'Beta']
     if viscous_params_list is None:
@@ -1087,8 +1144,33 @@ def run_inference_pipeline(
     base_path.mkdir(parents=True, exist_ok=True)
 
     manifest = ResultsManifest(base_path)
-
-    _save_parameter_reference(base_path, int_param_range, ext_param_range, cumul_param_indices)
+    
+    # Get completed combinations if resuming
+    completed_combos = set()
+    if skip_existing:
+        completed_combos = _get_completed_int_param_combinations(
+            base_path / 'results_manifest.json',
+            int_param_range,  # Pass to ensure correct parameter order
+        )
+        if completed_combos:
+            print(f"Found {len(completed_combos)} already completed internal parameter combinations")
+    
+    # Only save reference if it doesn't exist (preserve on resume)
+    if not (base_path / 'parameter_reference.json').exists():
+        _save_parameter_reference(base_path, int_param_range, ext_param_range, cumul_param_indices)
+    else:
+        print(f"Using existing parameter reference: {base_path / 'parameter_reference.json'}")
+        # Load existing manifest entries to preserve them
+        manifest_path = base_path / 'results_manifest.json'
+        if manifest_path.exists():
+            try:
+                with open(manifest_path, 'r') as f:
+                    manifest_data = json.load(f)
+                    for entry_dict in manifest_data.get('entries', []):
+                        entry = ResultManifestEntry(**entry_dict)
+                        manifest.entries.append(entry)
+            except Exception as e:
+                print(f"Warning: Could not load existing manifest: {e}")
 
     int_param_names = list(int_param_range.keys())
     ext_param_names = list(ext_param_range.keys())
@@ -1097,7 +1179,19 @@ def run_inference_pipeline(
         *[range(len(int_param_range[name])) for name in int_param_names]
     )
 
+    total_combos = int(np.prod([len(int_param_range[name]) for name in int_param_names]))
+    processed_count = 0
+    skipped_count = 0
+
     for int_param_indices in int_param_indices_iter:
+        # Create a hashable key for this combination (in the same order as iteration)
+        indices_key = tuple(int_param_indices)
+        
+        # Skip if already computed
+        if skip_existing and indices_key in completed_combos:
+            skipped_count += 1
+            continue
+        
         int_param_dict = {}
         folder_name_parts_int = []
 
@@ -1111,8 +1205,11 @@ def run_inference_pipeline(
             **int_param_dict,
         }
 
-        if mode == 'single':
+        processed_count += 1
+        remaining = total_combos - skipped_count - processed_count
+        print(f"\n[{processed_count}/{total_combos - skipped_count}] Processing: {int_param_dict} (Skipped: {skipped_count}, Remaining: {remaining})")
 
+        if mode == 'single':
             _run_single_mode(
                 base_path,
                 manifest,
@@ -1131,7 +1228,6 @@ def run_inference_pipeline(
             )          
 
         elif mode == 'cumulative':
-            # Ensure cumul_param_indices is a list; wrap single dict in list if needed
             cumul_indices_list = cumul_param_indices if isinstance(cumul_param_indices, list) else [cumul_param_indices]
             
             _run_cumulative_mode(
@@ -1152,6 +1248,11 @@ def run_inference_pipeline(
                 elastic_params_list,
                 viscous_params_list,
             )
+    
+    # Save manifest at the end
+    manifest.save()
+    print(f"\n✓ Pipeline complete. Processed {processed_count} new combinations. Skipped {skipped_count} existing combinations.")
+
 
 
 if __name__ == "__main__":
@@ -1210,8 +1311,9 @@ if __name__ == "__main__":
             sim_param_dict=sim_param_dict,
             param_keys_to_infer=param_keys_to_infer,
             initial_guesses=initial_guesses,
-            mode='single',
-        )
+            mode='single',          
+            skip_existing=True,
+        )  
 
         # Test 2: Cumulative inference
         print("\n" + "=" * 80)
@@ -1227,7 +1329,8 @@ if __name__ == "__main__":
             param_keys_to_infer=param_keys_to_infer,
             initial_guesses=initial_guesses,
             mode='cumulative',
-            cumul_param_indices=cumul_param_indices,
+            cumul_param_indices=cumul_param_indices,        
+            skip_existing=True,            
         )
 
 
@@ -1272,6 +1375,7 @@ if __name__ == "__main__":
             param_keys_to_infer=param_keys_to_infer,
             initial_guesses=initial_guesses,
             mode='single',
+            skip_existing=True,
         )
 
         # Test 2: Cumulative inference
@@ -1289,6 +1393,7 @@ if __name__ == "__main__":
             initial_guesses=initial_guesses,
             mode='cumulative',
             cumul_param_indices=cumul_param_indices,
+            skip_existing=True,   
         )
 
     ## Bending + Shear elasticities (Sp4 = 1e-3->1e3, Beta = 1e-3->1e3)
@@ -1333,6 +1438,7 @@ if __name__ == "__main__":
             param_keys_to_infer=param_keys_to_infer,
             initial_guesses=initial_guesses,
             mode='single',
+            skip_existing=True,   
         )
 
         # Test 2: Cumulative inference
@@ -1350,6 +1456,7 @@ if __name__ == "__main__":
             initial_guesses=initial_guesses,
             mode='cumulative',
             cumul_param_indices=cumul_param_indices,
+            skip_existing=True,   
         )
 
     # Infer viscosities
@@ -1360,8 +1467,8 @@ if __name__ == "__main__":
         base_path = Path(__file__).resolve().parent.parent / 'Inference' / 'FromSimulationData' / 'ViscousInference_BendingViscosity'
     
         int_param_range = {
-            'Sp4': np.pow(10, np.linspace(start=-3, stop=3, num=3)),
-            'tau_b': np.pow(10, np.linspace(start=-3, stop=3, num=3)),
+            'Sp4': np.array([1e0]), # np.pow(10, np.linspace(start=-3, stop=3, num=3)),
+            'tau_b': np.array([1e0]), # np.pow(10, np.linspace(start=-3, stop=3, num=3)),
         }
         ground_truth_fixed_int_params = {}
 
@@ -1398,6 +1505,7 @@ if __name__ == "__main__":
             param_keys_to_infer=param_keys_to_infer,
             initial_guesses=initial_guesses,
             mode='single',
+            skip_existing=True,
         )
 
         # Test 2: Cumulative inference
@@ -1415,6 +1523,7 @@ if __name__ == "__main__":
             initial_guesses=initial_guesses,
             mode='cumulative',
             cumul_param_indices=cumul_param_indices,
+            skip_existing=True,
         )
 
     ## Shear viscosity (Sp4 = 1e-3->1e3, Beta = 1e-3->1e3, tau_s = 1e-3->1e3)

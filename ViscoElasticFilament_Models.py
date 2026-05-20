@@ -600,7 +600,6 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
                 sim_output = {"value": sol.y, "shape": sol.y.shape}  
 
         else: # Root finding algorithm
-
             # Warning: excluded the first two coordinates because they are numerically fixed to 0 to avoid error propagation # TODO: use g_no_basal_translation instead
 
             # Method "hybr" seems to be the only one that works, because it handles metastable eigenvalues (i.e., lambda = 0)
