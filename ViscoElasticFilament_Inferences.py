@@ -414,6 +414,7 @@ class ResultManifestEntry:
     """Single entry in the results manifest."""
     int_params: Dict[str, float]
     ext_params: Optional[Dict[str, float]]
+    sim_params: Optional[Dict[str, float]]
     result_file: str
     mode: str
     pass_idx: Optional[int] = None
@@ -426,36 +427,52 @@ class ResultsManifest:
         self.base_path = Path(base_path)
         self.entries: List[ResultManifestEntry] = []
     
-    def add_single_result(self, int_params, ext_params, result_file):
+    def add_single_result(self, int_params, ext_params, sim_params, result_file):
         """Register a single-mode inference result."""
+
         # Convert NumPy types to Python native types
         int_params = _convert_to_serializable(int_params)
         ext_params = _convert_to_serializable(ext_params)
+        sim_params = _convert_to_serializable(sim_params)
         
         entry = ResultManifestEntry(
             int_params=int_params,
             ext_params=ext_params,
+            sim_params=sim_params,
             result_file=str(result_file.relative_to(self.base_path)),
             mode='single',
         )
         self.entries.append(entry)
-    
-    def add_cumulative_result(self, int_params, result_file, pass_idx, cumul_indices):
-        """Register a cumulative-mode pass result."""
+        
+    def add_cumulative_result(self, int_params, ext_params, sim_params, result_file, 
+                            pass_idx, cumul_indices):
+        """Register a cumulative-mode pass result.
+        
+        Args:
+            int_params: Dict of internal parameters (ground truth values)
+            ext_params: Dict of external parameters (ground truth values)
+            sim_params: Dict of simulation parameters (ground truth values)
+            result_file: Path to the result file
+            pass_idx: Index of the cumulative pass
+            cumul_indices: Dict of {param_name: (start_idx, end_idx)} for ranges
+        """
         # Convert NumPy types to Python native types
         int_params = _convert_to_serializable(int_params)
+        ext_params = _convert_to_serializable(ext_params)
+        sim_params = _convert_to_serializable(sim_params)
         cumul_indices = _convert_to_serializable(cumul_indices)
         
         entry = ResultManifestEntry(
             int_params=int_params,
-            ext_params=None,
+            ext_params=ext_params,
+            sim_params=sim_params,
             result_file=str(result_file.relative_to(self.base_path)),
             mode='cumulative_pass',
             pass_idx=pass_idx,
             cumul_indices=cumul_indices,
         )
         self.entries.append(entry)
-    
+
     def save(self):
         """Write manifest to JSON with proper type conversion."""
         manifest_file = self.base_path / 'results_manifest.json'
@@ -579,7 +596,7 @@ def _determine_inference_passes(param_keys_to_infer, elastic_params_list, viscou
     unknown_keys = [k for k in param_keys_to_infer if k not in elastic_params_list and k not in viscous_params_list]
     
     if unknown_keys:
-        raise ValueError(f"Unknown parameters for inference: {unknown_keys}. # TODO: full inference")
+        raise ValueError(f"Unknown parameters for inference: {unknown_keys}.")
     
     if elastic_keys and viscous_keys:
         # Two passes
@@ -673,7 +690,7 @@ def run_single_ext_param_inference(
     ground_truth_int_params = make_ground_truth_int_params(**int_params)
     ground_truth_ext_params = make_ground_truth_ext_params(**ext_params)
     ground_truth_sim_params = make_ground_truth_sim_params(**sim_params)
-    
+
     # Create model with only parameters to infer
     model_class = model_params_only_flow(
         ground_truth_int_params,
@@ -879,137 +896,445 @@ def run_cumulative_inference(
     
     return passes_results
 
-def _run_single_mode(base_path, manifest, ground_truth_int_params, int_param_dict, 
-                    int_param_names, int_param_indices, ext_param_range, ext_param_names,
-                    ground_truth_fixed_ext_params, sim_param_dict, param_keys_to_infer,
-                    initial_guesses, loss_fn, n_jobs):
-    """Run single-mode inference and register results."""
+def _process_single_inference(base_path, manifest, ground_truth_int_params, int_param_dict,
+                            ground_truth_ext_params, ground_truth_sim_params,
+                            param_keys_to_infer, initial_guesses, loss_fn, n_jobs):
+    """Helper to avoid code duplication in _run_single_mode."""
     
-    ext_param_indices_iter = product(
-        *[range(len(ext_param_range[name])) for name in ext_param_names]
+    result_folder = _build_result_folder_path(
+        base_path, 'single', int_param_dict, ground_truth_ext_params, ground_truth_sim_params
+    )
+    result_folder.mkdir(parents=True, exist_ok=True)
+    
+    print(f"Processing: {result_folder.name}")
+    
+    result = run_single_ext_param_inference(
+        int_params=ground_truth_int_params,
+        ext_params=ground_truth_ext_params,
+        sim_params=ground_truth_sim_params,
+        param_keys_to_infer=param_keys_to_infer,
+        initial_guesses=initial_guesses,
+        loss_fn=loss_fn,
+        n_jobs=n_jobs,
     )
     
-    for ext_param_indices in ext_param_indices_iter:
-        ext_param_dict = {}
-        for param_name, idx in zip(ext_param_names, ext_param_indices):
-            ext_param_dict[param_name] = ext_param_range[param_name][idx]
-        
-        ground_truth_ext_params = {
-            **ground_truth_fixed_ext_params,
-            **ext_param_dict,
-        }
-        
-        # Build result folder with cleaner naming
-        result_folder = _build_result_folder_path(
-            base_path, 'single', int_param_dict, ext_param_dict
-        )
-        result_folder.mkdir(parents=True, exist_ok=True)
-        
-        print(f"Processing: {result_folder.name}")
-        
-        result = run_single_ext_param_inference(
-            int_params=ground_truth_int_params,
-            ext_params=ground_truth_ext_params,
-            sim_params=sim_param_dict,
-            param_keys_to_infer=param_keys_to_infer,
-            initial_guesses=initial_guesses,
-            loss_fn=loss_fn,
-            n_jobs=n_jobs,
+    result_file = result_folder / 'result.pkl'
+    result.save(str(result_file.resolve()))
+    
+    manifest.add_single_result(
+        int_params=ground_truth_int_params,
+        ext_params=ground_truth_ext_params,
+        sim_params=ground_truth_sim_params,
+        result_file=result_file,
+    )
+    
+    manifest.save()
+    print(f"\nResults manifest saved to {base_path / 'results_manifest.json'}")    
+
+def _process_cumulative_inference(base_path, manifest, ground_truth_int_params, int_param_dict,
+                                ground_truth_ext_params, sim_param_range, sim_param_names,
+                                ground_truth_fixed_sim_params, param_keys_to_infer, initial_guesses,
+                                cumul_param_indices, cumul_config_idx, loss_fn, n_jobs,
+                                elastic_params_list, viscous_params_list, sim_loop_mode,
+                                ext_param_range):
+    """Process cumulative inference with sim_param iteration."""
+    
+    if sim_loop_mode == 'product':
+        sim_param_indices_iter = product(
+            *[range(len(sim_param_range[name])) for name in sim_param_names]
         )
         
-        result_file = result_folder / 'result.pkl'
-        result.save(str(result_file.resolve()))
+        for sim_param_indices in sim_param_indices_iter:
+            sim_param_dict = {}
+            for param_name, idx in zip(sim_param_names, sim_param_indices):
+                sim_param_dict[param_name] = sim_param_range[param_name][idx]
+
+            ground_truth_sim_params = {
+                **ground_truth_fixed_sim_params,
+                **sim_param_dict,
+            }
+            
+            _execute_cumulative_inference(
+                base_path, manifest, ground_truth_int_params, int_param_dict,
+                ground_truth_ext_params, ground_truth_sim_params,
+                param_keys_to_infer, initial_guesses,
+                cumul_param_indices, cumul_config_idx, loss_fn, n_jobs,
+                elastic_params_list, viscous_params_list, ext_param_range
+            )
+
+    elif sim_loop_mode == 'zip':
+        sim_param_indices_iter = product(
+            *[range(len(sim_param_range[name])) for name in sim_param_names]
+        )
         
-        # Register in manifest
-        manifest.add_single_result(
-            int_params=ground_truth_int_params,
-            ext_params=ground_truth_ext_params,
-            result_file=result_file,
+        for sim_param_indices in sim_param_indices_iter:
+            sim_param_dict = {}
+            for param_name, idx in zip(sim_param_names, sim_param_indices):
+                sim_param_dict[param_name] = sim_param_range[param_name][idx]
+
+            ground_truth_sim_params = {
+                **ground_truth_fixed_sim_params,
+                **sim_param_dict,
+            }
+            
+            _execute_cumulative_inference(
+                base_path, manifest, ground_truth_int_params, int_param_dict,
+                ground_truth_ext_params, ground_truth_sim_params,
+                param_keys_to_infer, initial_guesses,
+                cumul_param_indices, cumul_config_idx, loss_fn, n_jobs,
+                elastic_params_list, viscous_params_list, ext_param_range
+            )
+
+    else:
+        raise ValueError(f"sim_loop_mode must be 'product' or 'zip', got {sim_loop_mode}")
+
+def _process_cumulative_inference_with_sim(base_path, manifest, ground_truth_int_params, int_param_dict,
+                                        ground_truth_ext_params, ground_truth_sim_params,
+                                        param_keys_to_infer, initial_guesses,
+                                        cumul_param_indices, cumul_config_idx, loss_fn, n_jobs,
+                                        elastic_params_list, viscous_params_list, ext_param_range):
+    """Process cumulative inference when sim_params are pre-selected (zip mode)."""
+    
+    _execute_cumulative_inference(
+        base_path, manifest, ground_truth_int_params, int_param_dict,
+        ground_truth_ext_params, ground_truth_sim_params,
+        param_keys_to_infer, initial_guesses,
+        cumul_param_indices, cumul_config_idx, loss_fn, n_jobs,
+        elastic_params_list, viscous_params_list, ext_param_range
+    )
+
+def _execute_cumulative_inference(base_path, manifest, ground_truth_int_params, int_param_dict,
+                                ground_truth_ext_params, ground_truth_sim_params,
+                                param_keys_to_infer, initial_guesses,
+                                cumul_param_indices, cumul_config_idx, loss_fn, n_jobs,
+                                elastic_params_list, viscous_params_list, ext_param_range):
+    """Execute a single cumulative inference run."""
+    
+    ext_params_summary = {}
+    ext_params_summary.update({k: v for k, v in ground_truth_ext_params.items() 
+                            if k not in ext_param_range})
+
+    if cumul_param_indices:
+        for param_name, (start_idx, end_idx) in cumul_param_indices.items():
+            if param_name in ext_param_range:
+                start_val = ext_param_range[param_name][start_idx]
+                end_val = ext_param_range[param_name][end_idx]
+                ext_params_summary[param_name] = f"{start_val:.4g}_to_{end_val:.4g}"
+
+    # Now pass sim_params to the folder path builder
+    result_folder_base = _build_result_folder_path_cumulative(
+        base_path, int_param_dict, ext_params_summary, sim_params=ground_truth_sim_params
+    )
+    result_folder_base.parent.mkdir(parents=True, exist_ok=True)
+    result_folder_base.mkdir(parents=True, exist_ok=True)
+
+    print(f"Processing cumulative (config {cumul_config_idx}): {result_folder_base.name}")
+
+    passes_results = run_cumulative_inference(
+        int_params=ground_truth_int_params,
+        ext_param_range=ext_param_range,
+        ground_truth_fixed_ext_params=ground_truth_ext_params,
+        sim_params=ground_truth_sim_params,
+        param_keys_to_infer=param_keys_to_infer,
+        initial_guesses=initial_guesses,
+        cumul_param_indices=cumul_param_indices,
+        loss_fn=loss_fn,
+        n_jobs=n_jobs,
+        elastic_params_list=elastic_params_list,
+        viscous_params_list=viscous_params_list,
+    )
+
+    for pass_idx, result in passes_results:
+        if result is not None:
+            result_file = result_folder_base / f'pass_{pass_idx:02d}.pkl'
+            result.save(str(result_file.resolve()))
+
+            manifest.add_cumulative_result(
+                int_params=ground_truth_int_params,
+                ext_params=ground_truth_ext_params,
+                sim_params=ground_truth_sim_params,
+                result_file=result_file,
+                pass_idx=pass_idx,
+                cumul_indices=cumul_param_indices,
+            )
+
+    manifest.save()
+    print(f"Manifest saved after config {cumul_config_idx}")
+
+def _process_sim_params(base_path, manifest, ground_truth_int_params, int_param_dict,
+                        ground_truth_ext_params, sim_param_range, sim_param_names,
+                        ground_truth_fixed_sim_params, param_keys_to_infer, initial_guesses,
+                        loss_fn, n_jobs, sim_loop_mode='product'):
+    """Handle sim_param iteration based on sim_loop_mode."""
+    
+    if sim_loop_mode == 'product':
+        # All combinations of sim_param keys
+        sim_param_indices_iter = product(
+            *[range(len(sim_param_range[name])) for name in sim_param_names]
         )
+        
+        for sim_param_indices in sim_param_indices_iter:
+            sim_param_dict = {}
+            for param_name, idx in zip(sim_param_names, sim_param_indices):
+                sim_param_dict[param_name] = sim_param_range[param_name][idx]
+            
+            ground_truth_sim_params = {
+                **ground_truth_fixed_sim_params,
+                **sim_param_dict,
+            }
+            
+            _process_single_inference(
+                base_path, manifest, ground_truth_int_params, int_param_dict,
+                ground_truth_ext_params, ground_truth_sim_params,
+                param_keys_to_infer, initial_guesses, loss_fn, n_jobs
+            )
+    
+    elif sim_loop_mode == 'zip':
+        # Paired sim_param keys (T_span paired with T_eval, etc.)
+        sim_param_indices_iters = [
+            enumerate(sim_param_range[name]) for name in sim_param_names
+        ]
+        
+        for indices_tuple in zip(*sim_param_indices_iters):
+            sim_param_dict = {}
+            for param_name, (idx, value) in zip(sim_param_names, indices_tuple):
+                sim_param_dict[param_name] = value
+            
+            ground_truth_sim_params = {
+                **ground_truth_fixed_sim_params,
+                **sim_param_dict,
+            }
+            
+            _process_single_inference(
+                base_path, manifest, ground_truth_int_params, int_param_dict,
+                ground_truth_ext_params, ground_truth_sim_params,
+                param_keys_to_infer, initial_guesses, loss_fn, n_jobs
+            )
+    
+    else:
+        raise ValueError(f"sim_loop_mode must be 'product' or 'zip', got {sim_loop_mode}")
 
-        manifest.save()
-        print(f"\nResults manifest saved to {base_path / 'results_manifest.json'}")  
-
-def _run_cumulative_mode(base_path, manifest, ground_truth_int_params, int_param_dict,
-                         int_param_names, int_param_indices, ext_param_range,
-                         ground_truth_fixed_ext_params, sim_param_dict, param_keys_to_infer,
-                         initial_guesses, cumul_param_indices_list, loss_fn, n_jobs,
-                         elastic_params_list, viscous_params_list):
-    """Run cumulative-mode inference and register results."""
-
-    # Loop through each cumulative parameter index configuration
-    for cumul_config_idx, cumul_param_indices in enumerate(cumul_param_indices_list):
-        ext_params_summary = {}
-        ext_params_summary.update(ground_truth_fixed_ext_params)
-
-        if cumul_param_indices:
-            for param_name, (start_idx, end_idx) in cumul_param_indices.items():
-                if param_name in ext_param_range:
-                    start_val = ext_param_range[param_name][start_idx]
-                    end_val = ext_param_range[param_name][end_idx]
-                    ext_params_summary[param_name] = f"{start_val:.4g}_to_{end_val:.4g}"
-
-        result_folder_base = _build_result_folder_path_cumulative(
-            base_path, int_param_dict, ext_params_summary
+def _run_single_mode(base_path, manifest, ground_truth_int_params, int_param_dict, 
+                    int_param_names, int_param_indices, ext_param_range, ext_param_names,
+                    ground_truth_fixed_ext_params, sim_param_range, sim_param_names,
+                    ground_truth_fixed_sim_params,
+                    param_keys_to_infer,
+                    initial_guesses, loss_fn, n_jobs,
+                    ext_sim_loop_mode='product',
+                    sim_loop_mode='product'):
+    """Run single-mode inference iterating over both ext_params and sim_params.
+        Args:
+        ext_sim_loop_mode: 'product' for nested loops (all combinations),
+                        'zip' for paired iteration (one-to-one matching).
+        sim_loop_mode: 'product' or 'zip' for different sim_param keys (T_span vs T_eval)                        
+    """
+    if ext_sim_loop_mode == 'product':
+        # Double nested loop: all ext_param combinations
+        ext_param_indices_iter = product(
+            *[range(len(ext_param_range[name])) for name in ext_param_names]
         )
-        result_folder_base.parent.mkdir(parents=True, exist_ok=True)
-        result_folder_base.mkdir(parents=True, exist_ok=True)
-
-        print(f"Processing cumulative (config {cumul_config_idx}): {result_folder_base.name}")
-
-        passes_results = run_cumulative_inference(
-            int_params=ground_truth_int_params,
-            ext_param_range=ext_param_range,
-            ground_truth_fixed_ext_params=ground_truth_fixed_ext_params,
-            sim_params=sim_param_dict,
-            param_keys_to_infer=param_keys_to_infer,
-            initial_guesses=initial_guesses,
-            cumul_param_indices=cumul_param_indices,
-            loss_fn=loss_fn,
-            n_jobs=n_jobs,
-            elastic_params_list=elastic_params_list,
-            viscous_params_list=viscous_params_list,
+        
+        for ext_param_indices in ext_param_indices_iter:
+            ext_param_dict = {}
+            for param_name, idx in zip(ext_param_names, ext_param_indices):
+                ext_param_dict[param_name] = ext_param_range[param_name][idx]
+            
+            ground_truth_ext_params = {
+                **ground_truth_fixed_ext_params,
+                **ext_param_dict,
+            }
+            
+            _process_sim_params(
+                base_path, manifest, ground_truth_int_params, int_param_dict,
+                ground_truth_ext_params, sim_param_range, sim_param_names,
+                ground_truth_fixed_sim_params, param_keys_to_infer, initial_guesses,
+                loss_fn, n_jobs, sim_loop_mode
+            )
+    
+    elif ext_sim_loop_mode == 'zip':
+        # Single nested loop: paired ext_param and sim_param iteration
+        ext_param_indices_iter = product(
+            *[range(len(ext_param_range[name])) for name in ext_param_names]
         )
+        
+        sim_param_indices_iter = product(
+            *[range(len(sim_param_range[name])) for name in sim_param_names]
+        )
+        
+        for ext_param_indices, sim_param_indices in zip(ext_param_indices_iter, sim_param_indices_iter):
+            ext_param_dict = {}
+            for param_name, idx in zip(ext_param_names, ext_param_indices):
+                ext_param_dict[param_name] = ext_param_range[param_name][idx]
+            
+            ground_truth_ext_params = {
+                **ground_truth_fixed_ext_params,
+                **ext_param_dict,
+            }
+            
+            # For 'zip' mode, also directly process sim_params without further iteration
+            sim_param_dict = {}
+            for param_name, idx in zip(sim_param_names, sim_param_indices):
+                sim_param_dict[param_name] = sim_param_range[param_name][idx]
+            
+            ground_truth_sim_params = {
+                **ground_truth_fixed_sim_params,
+                **sim_param_dict,
+            }
+            
+            _process_single_inference(
+                base_path, manifest, ground_truth_int_params, int_param_dict,
+                ground_truth_ext_params, ground_truth_sim_params,
+                param_keys_to_infer, initial_guesses, loss_fn, n_jobs
+            )
+    
+    else:
+        raise ValueError(f"ext_sim_loop_mode must be 'product' or 'zip', got {ext_sim_loop_mode}")
 
-        for pass_idx, result in passes_results:
-            if result is not None:
-                result_file = result_folder_base / f'pass_{pass_idx:02d}.pkl'
-                result.save(str(result_file.resolve()))
+def _run_cumulative_mode(
+        base_path, manifest, 
+        ground_truth_int_params, int_param_dict, int_param_names, int_param_indices, 
+        ext_param_range, ground_truth_fixed_ext_params, 
+        sim_param_range, sim_param_names,
+        param_keys_to_infer, initial_guesses, cumul_param_indices_list, loss_fn, n_jobs,
+        elastic_params_list, viscous_params_list,
+        ext_sim_loop_mode='product', sim_loop_mode='product'
+        ):
 
-                manifest.add_cumulative_result(
-                    int_params=ground_truth_int_params,
-                    result_file=result_file,
-                    pass_idx=pass_idx,
-                    cumul_indices=cumul_param_indices,
+    """Run cumulative-mode inference and register results.
+
+    Args:
+        ext_sim_loop_mode: 'product' for all combinations, 'zip' for paired iteration.
+        sim_loop_mode: 'product' or 'zip' for different sim_param keys.    
+    """
+
+    if ext_sim_loop_mode == 'product':
+        # Iterate over all combinations of ext_params and sim_params
+        ext_param_indices_iter = product(
+            *[range(len(ext_param_range[name])) for name in ext_param_range.keys()]
+        )
+        
+        sim_param_indices_iter = product(
+            *[range(len(sim_param_range[name])) for name in sim_param_range.keys()]
+        )
+        
+        for ext_param_indices in ext_param_indices_iter:
+            ext_param_dict = {}
+            for param_name, idx in zip(ext_param_range.keys(), ext_param_indices):
+                ext_param_dict[param_name] = ext_param_range[param_name][idx]
+
+            ground_truth_ext_params = {
+                **ground_truth_fixed_ext_params,
+                **ext_param_dict,
+            }
+
+            for cumul_config_idx, cumul_param_indices in enumerate(cumul_param_indices_list):
+                _process_cumulative_inference(
+                    base_path, manifest, ground_truth_int_params, int_param_dict,
+                    ground_truth_ext_params, sim_param_range, sim_param_names,
+                    ground_truth_fixed_sim_params, param_keys_to_infer, initial_guesses,
+                    cumul_param_indices, cumul_config_idx, loss_fn, n_jobs,
+                    elastic_params_list, viscous_params_list, sim_loop_mode,
+                    ext_param_range
                 )
 
-        # Save manifest after each cumulative configuration
-        manifest.save()
-        print(f"Manifest saved after config {cumul_config_idx}")                
+    elif ext_sim_loop_mode == 'zip':
+        # Pair ext_params with sim_params one-to-one
+        ext_param_indices_iter = product(
+            *[range(len(ext_param_range[name])) for name in ext_param_range.keys()]
+        )
+        
+        sim_param_indices_iter = product(
+            *[range(len(sim_param_range[name])) for name in sim_param_range.keys()]
+        )
+        
+        for ext_param_indices, sim_param_indices in zip(ext_param_indices_iter, sim_param_indices_iter):
+            ext_param_dict = {}
+            for param_name, idx in zip(ext_param_range.keys(), ext_param_indices):
+                ext_param_dict[param_name] = ext_param_range[param_name][idx]
 
-def _build_result_folder_path(base_path, mode, int_params, ext_params):
-    """Build result folder path with readable naming."""
+            sim_param_dict = {}
+            for param_name, idx in zip(sim_param_range.keys(), sim_param_indices):
+                sim_param_dict[param_name] = sim_param_range[param_name][idx]
+
+            ground_truth_ext_params = {
+                **ground_truth_fixed_ext_params,
+                **ext_param_dict,
+            }
+            
+            ground_truth_sim_params = {
+                **ground_truth_fixed_sim_params,
+                **sim_param_dict,
+            }
+
+            for cumul_config_idx, cumul_param_indices in enumerate(cumul_param_indices_list):
+                _process_cumulative_inference_with_sim(
+                    base_path, manifest, ground_truth_int_params, int_param_dict,
+                    ground_truth_ext_params, ground_truth_sim_params, 
+                    param_keys_to_infer, initial_guesses,
+                    cumul_param_indices, cumul_config_idx, loss_fn, n_jobs,
+                    elastic_params_list, viscous_params_list,
+                    ext_param_range
+                )
+
+    else:
+        raise ValueError(f"ext_sim_loop_mode must be 'product' or 'zip', got {ext_sim_loop_mode}")
+
+def _format_param_value(value):
+    """Format a single parameter value for folder naming.
+    
+    Args:
+        value: A parameter value (scalar, string, tuple, list, or numpy array)
+    
+    Returns:
+        Formatted string representation
+    """
+    if isinstance(value, str):
+        return value
+    elif isinstance(value, (float, int, np.floating, np.integer)):
+        return f"{value:.4g}".replace(' ', '')
+    elif isinstance(value, (np.ndarray, tuple, list)):
+        return f"{value[0]:.4g}_{value[-1]:.4g}".replace(' ', '')
+    else:
+        raise TypeError(f"Unsupported parameter type: {type(value)}")
+
+def _build_result_folder_path(base_path, mode, int_params, ext_params, sim_params):
+    """Build result folder path with readable naming.
+    
+    Handles scalars (int, float, str), tuples, lists, and numpy arrays.
+    """
     parts = []
     
     # Internal parameters
     for name, value in sorted(int_params.items()):
-        parts.append(f"{name}={value:.4g}".replace(' ', ''))
+        parts.append(f"{name}={_format_param_value(value)}")
     
-    # External parameters (include for both single and cumulative)
+    # External parameters
     if ext_params:
         for name, value in sorted(ext_params.items()):
-            parts.append(f"{name}={value:.4g}".replace(' ', ''))
-    
+            parts.append(f"{name}={_format_param_value(value)}")
+
+    # Simulation parameters
+    if sim_params:
+        for name, value in sorted(sim_params.items()):
+            parts.append(f"{name}={_format_param_value(value)}")
+
     folder_name = '__'.join(parts) if parts else 'results'
     return base_path / folder_name
 
-def _build_result_folder_path_cumulative(base_path, int_params, ext_params_summary):
-    """Build cumulative result folder path with readable naming including ext param ranges."""
+def _build_result_folder_path_cumulative(base_path, int_params, ext_params_summary, sim_params=None):
+    """Build cumulative result folder path with readable naming including ext param ranges.
+    
+    Args:
+        base_path: Base directory path
+        int_params: Dict of internal parameters with scalar values
+        ext_params_summary: Dict of external parameters (including ranges like "1e-4_to_1e-2")
+        sim_params: Optional dict of simulation parameters with scalar values
+    """
     parts = []
     
-    # Internal parameters
+    # Internal parameters (use consistent formatting with single mode)
     for name, value in sorted(int_params.items()):
-        parts.append(f"{name}={value:.4g}".replace(' ', ''))
+        parts.append(f"{name}={_format_param_value(value)}")
     
     # External parameters (including ranges for cumulative)
     for name, value in sorted(ext_params_summary.items()):
@@ -1017,31 +1342,61 @@ def _build_result_folder_path_cumulative(base_path, int_params, ext_params_summa
             # For range values like "1e-4_to_1e-2"
             parts.append(f"{name}={value}")
         else:
-            parts.append(f"{name}={value:.4g}".replace(' ', ''))
+            parts.append(f"{name}={_format_param_value(value)}")
+    
+    # Simulation parameters (now included for consistency)
+    if sim_params:
+        for name, value in sorted(sim_params.items()):
+            parts.append(f"{name}={_format_param_value(value)}")
     
     folder_name = '__'.join(parts) if parts else 'results'
     return base_path / folder_name
 
-def _save_parameter_reference(base_path, int_param_range, ext_param_range, cumul_param_indices):
-    """Save parameter ranges as reference (static lookup)."""
+def _save_parameter_reference(base_path, int_param_range, ext_param_range, sim_param_range, cumul_param_indices):
+    """Save parameter ranges as reference (static lookup).
+    
+    Handles scalar values, tuples, lists, and numpy arrays.
+    """
+
+    def _serialize_param_value(val):
+        """Convert a parameter value to a JSON-serializable format."""
+        if isinstance(val, (int, float, str, bool, type(None))):
+            # Scalar values
+            return float(val) if isinstance(val, (int, float)) else val
+        elif isinstance(val, (tuple, list)):
+            # Convert sequences to lists of floats
+            return [float(v) for v in val]
+        elif isinstance(val, np.ndarray):
+            # Convert numpy arrays to lists
+            return val.tolist()
+        elif isinstance(val, (np.floating, np.integer)):
+            # Numpy scalars
+            return float(val)
+        else:
+            raise TypeError(f"Cannot serialize parameter value of type {type(val).__name__}: {val}")
+
+    def _serialize_param_range(param_range):
+        """Convert a parameter range dict to serializable format."""
+        return {
+            name: {i: _serialize_param_value(val) for i, val in enumerate(values)}
+            for name, values in param_range.items()
+        }
+
     reference = {
-        'internal_parameters': {
-            name: {i: float(val) for i, val in enumerate(values)}
-            for name, values in int_param_range.items()
-        },
-        'external_parameters': {
-            name: {i: float(val) for i, val in enumerate(values)}
-            for name, values in ext_param_range.items()
-        },
+        'internal_parameters': _serialize_param_range(int_param_range),
+        'external_parameters': _serialize_param_range(ext_param_range),
+        'simulation_parameters': _serialize_param_range(sim_param_range),
         'cumulative_indices': _convert_to_serializable(cumul_param_indices or {}),
     }
     
     with open(base_path / 'parameter_reference.json', 'w') as f:
         json.dump(reference, f, indent=2)
     
-    print(f"Parameter reference saved: {base_path / 'parameter_reference.json'}") 
+    print(f"Parameter reference saved: {base_path / 'parameter_reference.json'}")
 
-def _get_completed_int_param_combinations(manifest_path, int_param_range):
+
+def _get_completed_int_param_combinations(manifest_path, int_param_range): 
+    # TODO: add external and simulation parameters checkpoint/resum logic as well
     """Extract already-computed internal parameter index combinations from manifest.
     
     Args:
@@ -1115,10 +1470,13 @@ def run_inference_pipeline(
     ground_truth_fixed_int_params,
     ext_param_range,
     ground_truth_fixed_ext_params,
-    sim_param_dict,
+    sim_param_range,
+    ground_truth_fixed_sim_params,
     param_keys_to_infer,
     initial_guesses,
     mode='single',
+    ext_sim_loop_mode='product',
+    sim_loop_mode='product',
     cumul_param_indices=None,
     loss_fn=None,
     n_jobs=-1,
@@ -1126,7 +1484,9 @@ def run_inference_pipeline(
     viscous_params_list=None,
     skip_existing=True,
 ):
-    """Enhanced orchestrator with checkpoint resume capability.
+    """Enhanced orchestrator with:
+        - checkpoint resume capability,
+        - configurable ext/sim parameter loop mode.
     
     Args:
         skip_existing: If True, skip internal parameter combinations already in manifest.
@@ -1145,7 +1505,7 @@ def run_inference_pipeline(
 
     manifest = ResultsManifest(base_path)
     
-    # Get completed combinations if resuming
+    # Get completed combinations if resuming # TODO: Update to add sim_params and ext_params combinations as well.
     completed_combos = set()
     if skip_existing:
         completed_combos = _get_completed_int_param_combinations(
@@ -1157,7 +1517,7 @@ def run_inference_pipeline(
     
     # Only save reference if it doesn't exist (preserve on resume)
     if not (base_path / 'parameter_reference.json').exists():
-        _save_parameter_reference(base_path, int_param_range, ext_param_range, cumul_param_indices)
+        _save_parameter_reference(base_path, int_param_range, ext_param_range, sim_param_range, cumul_param_indices)
     else:
         print(f"Using existing parameter reference: {base_path / 'parameter_reference.json'}")
         # Load existing manifest entries to preserve them
@@ -1174,6 +1534,7 @@ def run_inference_pipeline(
 
     int_param_names = list(int_param_range.keys())
     ext_param_names = list(ext_param_range.keys())
+    sim_param_names = list(sim_param_range.keys())
 
     int_param_indices_iter = product(
         *[range(len(int_param_range[name])) for name in int_param_names]
@@ -1220,11 +1581,15 @@ def run_inference_pipeline(
                 ext_param_range,
                 ext_param_names,
                 ground_truth_fixed_ext_params,
-                sim_param_dict,
+                sim_param_range,
+                sim_param_names,
+                ground_truth_fixed_sim_params,
                 param_keys_to_infer,
                 initial_guesses,
                 loss_fn,
                 n_jobs,
+                ext_sim_loop_mode=ext_sim_loop_mode,
+                sim_loop_mode=sim_loop_mode,
             )          
 
         elif mode == 'cumulative':
@@ -1239,7 +1604,8 @@ def run_inference_pipeline(
                 int_param_indices,
                 ext_param_range,
                 ground_truth_fixed_ext_params,
-                sim_param_dict,
+                sim_param_range,
+                sim_param_names,
                 param_keys_to_infer,
                 initial_guesses,
                 cumul_indices_list,
@@ -1247,13 +1613,13 @@ def run_inference_pipeline(
                 n_jobs,
                 elastic_params_list,
                 viscous_params_list,
+                ext_sim_loop_mode=ext_sim_loop_mode,
+                sim_loop_mode=sim_loop_mode,
             )
     
     # Save manifest at the end
     manifest.save()
     print(f"\n✓ Pipeline complete. Processed {processed_count} new combinations. Skipped {skipped_count} existing combinations.")
-
-
 
 if __name__ == "__main__":
     
@@ -1286,14 +1652,14 @@ if __name__ == "__main__":
         }
         ground_truth_fixed_ext_params = {}
 
+        cumul_param_indices = [{'A':(0, k)} for k in range(A_vec.shape[0])]
+
         initial_guesses = [
             {'Sp4': 1e-1},
         ]
         param_keys_to_infer = list(initial_guesses[0].keys())
 
         sim_param_dict = {}
-
-        cumul_param_indices = [{'A':(0, k)} for k in range(A_vec.shape[0])]
 
 
         # ========== RUN INFERENCES ==========
@@ -1333,7 +1699,6 @@ if __name__ == "__main__":
             skip_existing=True,            
         )
 
-
     ## Shear elasticity (Sp4 = 1, Beta = 1e-3->1e3) 
     
     if False:
@@ -1350,14 +1715,14 @@ if __name__ == "__main__":
         }
         ground_truth_fixed_ext_params = {}
 
+        cumul_param_indices = [{'A':(0, k)} for k in range(A_vec.shape[0])]
+
         initial_guesses = [
             {'Beta': 0},
         ]
         param_keys_to_infer = (initial_guesses[0].keys())
 
         sim_param_dict = {}
-
-        cumul_param_indices = [{'A':(0, k)} for k in range(A_vec.shape[0])]
 
         # ========== RUN INFERENCES ==========
         
@@ -1413,14 +1778,14 @@ if __name__ == "__main__":
         }
         ground_truth_fixed_ext_params = {}
 
+        cumul_param_indices = [{'A':(0, k)} for k in range(A_vec.shape[0])]
+
         initial_guesses = [
             {'Sp4': 1e-1, 'Beta': 0},
         ]
         param_keys_to_infer = list(initial_guesses[0].keys())
 
         sim_param_dict = {}
-
-        cumul_param_indices = [{'A':(0, k)} for k in range(A_vec.shape[0])]
 
         # ========== RUN INFERENCES ==========
         
@@ -1472,41 +1837,52 @@ if __name__ == "__main__":
         }
         ground_truth_fixed_int_params = {}
 
-        A_vec = np.pow(10, np.linspace(start=-6, stop=-2, num=5))
-        w0_vec = np.pow(10, np.linspace(start = -3, stop = 3, num = 7))
+        w0_vec = np.array([1e0, 1e1]) # np.pow(10, np.linspace(start = -3, stop = 3, num = 7))
         ext_param_range = {
-            'A': A_vec,
             'w0': w0_vec,
         }
-        ground_truth_fixed_ext_params = {}
+        ground_truth_fixed_ext_params = {'A':1e-6}
+        
+        cumul_param_indices = [{'w0':(0, k)} for k in range(w0_vec.shape[0])]
 
         initial_guesses = [
             {'tau_b':0},
         ]
         param_keys_to_infer = list(initial_guesses[0].keys())
 
-        sim_param_dict = {}
-
-        cumul_param_indices = [{'A':(0, k)} for k in range(A_vec.shape[0])]
+        N_T = 100
+        T_span_vec = np.array([((1/10)/w0, 10/w0) for w0 in w0_vec])
+        T_eval_vec = [np.linspace((1/10)/w0, 10/w0, N_T) for w0 in w0_vec]
+        sim_param_range = {
+            'T_span':T_span_vec,
+            'T_eval':T_eval_vec,
+        }
+        ground_truth_fixed_sim_params = {
+            # 'T_span':(1e-4, 1e4),
+            'method':'BDF',
+            }
 
         # ========== RUN INFERENCES ==========
         
-        # Test 1: Single external parameter inference
-        print("=" * 80)
-        print("TEST 1: Single External Parameter Inference Mode")
-        print("=" * 80)
-        run_inference_pipeline(
-            base_path=base_path / 'SingleExtParams',
-            int_param_range=int_param_range,
-            ground_truth_fixed_int_params=ground_truth_fixed_int_params,
-            ext_param_range=ext_param_range,
-            ground_truth_fixed_ext_params=ground_truth_fixed_ext_params,
-            sim_param_dict=sim_param_dict,
-            param_keys_to_infer=param_keys_to_infer,
-            initial_guesses=initial_guesses,
-            mode='single',
-            skip_existing=True,
-        )
+        # # Test 1: Single external parameter inference
+        # print("=" * 80)
+        # print("TEST 1: Single External Parameter Inference Mode")
+        # print("=" * 80)
+        # run_inference_pipeline(
+        #     base_path=base_path / 'SingleExtParams',
+        #     int_param_range=int_param_range,
+        #     ground_truth_fixed_int_params=ground_truth_fixed_int_params,
+        #     ext_param_range=ext_param_range,
+        #     ground_truth_fixed_ext_params=ground_truth_fixed_ext_params,
+        #     sim_param_range=sim_param_range,
+        #     ground_truth_fixed_sim_params=ground_truth_fixed_sim_params,
+        #     param_keys_to_infer=param_keys_to_infer,
+        #     initial_guesses=initial_guesses,
+        #     mode='single',
+        #     skip_existing=True,
+        #     ext_sim_loop_mode='zip', # w0 paired with T_span/T_eval
+        #     sim_loop_mode='zip', # T_span paired with T_eval
+        # )
 
         # Test 2: Cumulative inference
         print("\n" + "=" * 80)
@@ -1518,12 +1894,15 @@ if __name__ == "__main__":
             ground_truth_fixed_int_params=ground_truth_fixed_int_params,
             ext_param_range=ext_param_range,
             ground_truth_fixed_ext_params=ground_truth_fixed_ext_params,
-            sim_param_dict=sim_param_dict,
+            sim_param_range=sim_param_range,
+            ground_truth_fixed_sim_params=ground_truth_fixed_sim_params,
             param_keys_to_infer=param_keys_to_infer,
             initial_guesses=initial_guesses,
             mode='cumulative',
             cumul_param_indices=cumul_param_indices,
             skip_existing=True,
+            ext_sim_loop_mode='zip', # w0 paired with T_span/T_eval
+            sim_loop_mode='zip', # T_span paired with T_eval            
         )
 
     ## Shear viscosity (Sp4 = 1e-3->1e3, Beta = 1e-3->1e3, tau_s = 1e-3->1e3)
