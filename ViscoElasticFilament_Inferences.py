@@ -1394,7 +1394,6 @@ def _save_parameter_reference(base_path, int_param_range, ext_param_range, sim_p
     
     print(f"Parameter reference saved: {base_path / 'parameter_reference.json'}")
 
-
 def _get_completed_int_param_combinations(manifest_path, int_param_range): 
     # TODO: add external and simulation parameters checkpoint/resum logic as well
     """Extract already-computed internal parameter index combinations from manifest.

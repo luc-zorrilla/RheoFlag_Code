@@ -252,6 +252,7 @@ class InferenceResult:
         success: Whether optimization converged
         message: Optimizer message
     """
+    
     params: Dict[str, float]
     loss: float
     covariance: Optional[np.ndarray] = None
@@ -857,7 +858,31 @@ class InferencePipeline:
         
         summary_lines.append("\n" + "="*80 + "\n")
         return "\n".join(summary_lines)    
-            
-# ============================================================================
-# USAGE EXAMPLE WITH YOUR BASINHOPPING OPTIMIZER ON VISCOELASTIC FILAMENT
-# ============================================================================
+
+class ModelsToInference:
+    """
+    Class representing inferences to be made.
+    
+    Given:
+        - a list of models, each with (int_params, ext_params_list, sim_params_list)
+        
+    Do:
+        - Make inference pipelines
+        - Run them.
+
+    """
+
+    def __init__(self, model_list):
+        self.model_list = model_list
+
+    def make_pipeline(self, inference_indices):
+        """Makes inference pipeline from the list of models. 
+        
+        Args:
+            - inference_indices: which models to infer together. E.g., if (0, 1), infer models 0 and 1 together.
+        
+        """
+        # return pipeline
+        pass
+
+    
