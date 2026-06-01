@@ -5,35 +5,9 @@ import dill as pickle
 from typing import Any, List, Tuple, Dict, Optional
 from joblib import Parallel, delayed
 from datetime import datetime
-from abc import ABC, abstractmethod
 
-# ============================================================================
-# 1. MODEL CLASS
-# ============================================================================
-
-# TODO: fuse with existing Model class for compatibility
-
-class Model(ABC):
-    """Base Model class. Subclasses implement create_inference_pipeline."""
-    
-    def __init__(self, int_params: dict, ext_params: dict, sim_params: dict):
-        self.int_params = int_params
-        self.ext_params = ext_params
-        self.sim_params = sim_params
-        self.output_data = None
-    
-    @abstractmethod
-    def simulate(self) -> None:
-        """Run simulation, store results in self.output_data."""
-        pass
-    
-    @abstractmethod
-    def create_inference_pipeline(self) -> 'InferencePipeline':
-        """
-        Create an InferencePipeline instance configured for this Model subclass.
-        Subclasses override to specify their specific inference logic.
-        """
-        pass
+from Models import Model, ModelList
+from Inferences import Inference, InferencePipeline, InferenceResult
 
 # ============================================================================
 # 2. ENHANCED CHECKPOINT SYSTEM
@@ -255,7 +229,6 @@ def run_single_simulation(
     
     return model
 
-
 def parallel_simulate(
     int_params_list: List[dict],
     ext_params_list: List[dict],
@@ -310,7 +283,6 @@ def parallel_simulate(
     
     print(f"✓ Simulations complete: {len(models)} models")
     return models
-
 
 # ============================================================================
 # 4. INFERENCE STAGE (with pipeline abstraction)
@@ -509,41 +481,9 @@ class InferenceWorkflow:
             shutil.rmtree(self.checkpoint_mgr.checkpoint_dir)
         self.checkpoint_mgr.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
-
 # ============================================================================
 # 6. EXAMPLE USAGE & SUBCLASS IMPLEMENTATION
 # ============================================================================
-
-class MyModel(Model):
-    """Example Model subclass."""
-    
-    def simulate(self) -> None:
-        """Implement simulation logic."""
-        # Example: simple numerical simulation
-        a = self.int_params.get("a", 1.0)
-        b = self.ext_params.get("b", 1.0)
-        c = self.sim_params.get("c", 0.1)
-        
-        # Simulate some data (e.g., time series)
-        import numpy as np
-        t = np.linspace(0, 10, 100)
-        self.output_data = a * np.sin(b * t + c)
-    
-    def create_inference_pipeline(self) -> 'InferencePipeline':
-        """
-        Create an InferencePipeline configured for this model subclass.
-        This is where you specify model-specific inference strategy.
-        """
-        # Example: use a custom inference pipeline for MyModel
-        pipeline = InferencePipeline( # TODO: wrong, modify this
-            model_class=MyModel,
-            inference_stages=[
-                {"name": "stage1", "params": ["a"]},
-                {"name": "stage2", "params": ["b"]},
-            ]
-        )
-        return pipeline
-
 
 if __name__ == "__main__":
     from pathlib import Path

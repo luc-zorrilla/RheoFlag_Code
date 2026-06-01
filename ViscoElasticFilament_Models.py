@@ -645,25 +645,6 @@ class ViscoElasticFilament(Model):
         self.sim_output = res
         return res
 
-    # @classmethod
-    # def simulate_batch( # TODO: vectorize this function
-    #     cls,
-    #     int_params_batch: Sequence[Any],
-    #     ext_params_batch: Sequence[Any],
-    #     sim_params_batch: Sequence[Any],
-    # ) -> List[Dict[str, Any]]:
-    #     """
-    #     Vectorized batch implementation (if possible).
-    #     Returns: List[{"value": np.ndarray, "shape": tuple}]
-    #     """
-        
-    #     results = []
-    #     for ip, ep, sp in zip(int_params_batch, ext_params_batch, sim_params_batch):
-    #         instance = cls(ip, ep, sp)
-    #         output = instance.simulate_single()
-    #         results.append(output)
-    #     return results
-
 # Define the pre-determined function to transform (A, w0, psi) into InterpFlow
 def FlowParams_to_InterpFlow(int_params, ext_params, sim_params):
     """ Transform external parameters (Lambdas, Zetas, A, w0, psi) -> (Lambdas, Zetas, InterpFlow). """

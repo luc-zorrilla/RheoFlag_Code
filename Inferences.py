@@ -13,6 +13,9 @@ from pathlib import Path
 # ============================================================================
 # FUNCTIONS
 # ============================================================================
+
+# TODO: turn bounded optimisation algorithm into unbounded algorithms using such transform
+
 def transform_to_unbounded(t, bounds):
     """
     Transform unbounded R^n to bounded/semi-bounded domain.
@@ -232,7 +235,6 @@ def Vectorize_Functional(func, m):
 
     return f_vec
 
-
 # ============================================================================
 # DATA STRUCTURES
 # ============================================================================
@@ -291,8 +293,8 @@ class PipelinePass:
         compose_int_params: Composition function for int_params (via compose_model)
         optimizer: optimizer class instance to run the inference optimisation
         optimizer_kwargs: arguments for optimizer
-        
     """
+
     name: str
     model_class: Type
     ground_truths: List[np.ndarray]
@@ -307,76 +309,80 @@ class PipelinePass:
     optimizer: Callable = None
     optimizer_kwargs: Dict[str, Any] = None
 
-
 # ============================================================================
 # EXTENDED INFERENCE CLASS (Multi-Ground-Truth Support)
 # ============================================================================
 
+@dataclass
 class Inference:
     """
     Optimization-based parameter inference with multi-ground-truth support.
     
     Given:
-    - A Model subclass (e.g., Square)
+    - A Model subclass
     - Single or multiple ground truths (same internal parameters, varying conditions)
     - Custom loss function, with aggregated loss across all ground truths
     
+    Do:
+    - Infers internal parameters via optimization
+
     Methods
     - __init__ : constructor
     - _normalize_list: handles single and multiple ground truths similarly
     - objective: 
     - infer inference of internal parameters (int_params)
     - infer_batch: parallel inference over multiple initial guesses        
-    - _compute_hessian: 
+    - _compute_hessian
     """
     
-    def __init__(
-        self,
-        model_class: Type,
-        ground_truths: List[np.ndarray] | np.ndarray,
-        loss_fn: Callable,
-        ext_params_list: List[Any] | Any = None,
-        sim_params_list: List[Any] | Any = None,
-        optimizer: Callable = None,
-        optimizer_kwargs: Dict[str, Any] = None,
-        n_jobs: int = -1,  # Parallelization across initial guesses AND objective calls
-        product_or_zip: str = "product",
-    ):
-        """
-        Args:
-            model_class: Model subclass (e.g., Square, ReducedModel)
-            ground_truths: Single array or list of arrays (multiple conditions)
-            loss_fn: Callable(predicted, ground_truth) -> scalar loss
-                    Will be called once per ground truth; results are summed
-            ext_params_list: Single dict or list of dicts (one per ground truth)
-            sim_params_list: Single dict or list of dicts (one per ground truth)
-            optimizer: Scipy optimizer (default: minimize with L-BFGS-B)
-            optimizer_kwargs: Dict of optimizer settings
-            n_jobs: Number of parallel jobs for initial guess batches (-1 = all cores)
-        """
-        self.model_class = model_class
-        self.loss_fn = loss_fn
-        self.optimizer = optimizer or minimize
-        self.optimizer_kwargs = optimizer_kwargs
-        self.n_jobs = n_jobs  # Separate from batch parallelism
-        self._objective_n_jobs = n_jobs  # Separate from batch parallelism
-        self.result: Optional[OptimizeResult] = None
-        self.hessian: Optional[np.ndarray] = None
-        self.covariance: Optional[np.ndarray] = None
+    model_class: Type
+    ground_truths: List[np.ndarray] | np.ndarray
+    loss_fn: Callable
+    ext_params_list: List[Any] | Any = None
+    sim_params_list: List[Any] | Any = None
+    optimizer: Callable = field(default_factory=lambda: minimize)
+    optimizer_kwargs: Dict[str, Any] = field(default_factory=dict)
+    n_jobs: int = -1
+    product_or_zip: str = "product"
 
-        # Normalize all three together
-        self.ground_truths, self.ext_params_list, self.sim_params_list = self._normalize_lists(
-            ground_truths,
-            ext_params_list,
-            sim_params_list,
-            product_or_zip,
+    # Derived / computed fields (not in __init__)
+    result: Optional[OptimizeResult] = field(default=None, init=False, repr=False)
+    hessian: Optional[np.ndarray] = field(default=None, init=False, repr=False)
+    covariance: Optional[np.ndarray] = field(default=None, init=False, repr=False)
+    _objective_n_jobs: int = field(default=-1, init=False, repr=False)
+    _normalized_ground_truths: List[np.ndarray] = field(default_factory=list, init=False, repr=False)
+    _normalized_ext_params: List[Any] = field(default_factory=list, init=False, repr=False)
+    _normalized_sim_params: List[Any] = field(default_factory=list, init=False, repr=False)
+
+    def __post_init__(self):
+        """Normalize and validate parameters after dataclass initialization."""
+        if not self.optimizer_kwargs:
+            self.optimizer_kwargs = {}
+        
+        # Normalize all three parameter groups together
+        (
+            self._normalized_ground_truths,
+            self._normalized_ext_params,
+            self._normalized_sim_params,
+        ) = self._normalize_lists(
+            self.ground_truths,
+            self.ext_params_list,
+            self.sim_params_list,
+            self.product_or_zip,
         )
-
+        
         # Verify consistency
-        assert len(self.ground_truths) == len(self.ext_params_list) == len(self.sim_params_list), (
-            f"Mismatched lengths: {len(self.ground_truths)} GTs vs "
-            f"{len(self.ext_params_list)} ext vs {len(self.sim_params_list)} sim"
+        assert (
+            len(self._normalized_ground_truths)
+            == len(self._normalized_ext_params)
+            == len(self._normalized_sim_params)
+        ), (
+            f"Mismatched lengths: {len(self._normalized_ground_truths)} GTs vs "
+            f"{len(self._normalized_ext_params)} ext vs {len(self._normalized_sim_params)} sim"
         )
+
+    # ========== Parameter Normalization ==========
+    """Handle single and multiple ground truths, external and simulation parameters."""
 
     @staticmethod
     def _normalize_lists(
@@ -411,7 +417,7 @@ class Inference:
         ext_list = ext_params_list if isinstance(ext_params_list, list) else [ext_params_list]
         sim_list = sim_params_list if isinstance(sim_params_list, list) else [sim_params_list]
         
-        # ext_list and sim_list are independent; generate all combinations
+        # Step 2: Determine expected number of conditions
         if "product" in product_or_zip:
             n_conditions = len(ext_list) * len(sim_list)
         elif "zip" in product_or_zip:
@@ -421,7 +427,7 @@ class Inference:
         else:
             raise ValueError("product_or_zip should either be 'zip' or 'product'")
         
-        # Verify ground_truths count matches
+        # Step 3: Verify ground_truths count
         if len(gt_list) != n_conditions:
             raise ValueError(
                 f"ground_truths length ({len(gt_list)}) "
@@ -429,7 +435,7 @@ class Inference:
                 f"({len(gt_list)} = {n_conditions})"
             )
         
-        # Create paired lists (in order)
+        # Step 4: Create paired lists in order
         if "product" in product_or_zip:
             paired_params = list(product(ext_list, sim_list))
         elif "zip" in product_or_zip:
@@ -438,6 +444,9 @@ class Inference:
         sim_list = [sp for _, sp in paired_params]
         
         return gt_list, ext_list, sim_list
+
+    # ========== Loss Computation ==========
+    """Compute losses for individual ground truths and aggregated objectives."""
 
     @staticmethod
     def _compute_single_loss(
@@ -490,9 +499,9 @@ class Inference:
                 gt,
             )
             for gt, ext_params, sim_params in zip(
-                self.ground_truths,
-                self.ext_params_list,
-                self.sim_params_list,
+                self._normalized_ground_truths,
+                self._normalized_ext_params,
+                self._normalized_sim_params,
             )
         )
         
@@ -502,7 +511,49 @@ class Inference:
         if not valid_losses:
             return np.inf  # Penalize if all losses are NaN
         return sum(valid_losses)
-    
+
+    # ========== Hessian & Uncertainty ==========
+    """Compute Hessian and covariance for parameter uncertainty estimation."""
+
+
+    def _compute_hessian(self, param_keys: Tuple[str, ...]):
+        """
+        Compute Hessian numerically via finite differences.
+        Invert to estimate parameter covariance (inverse of Fisher information).
+        
+        Args:
+            param_keys: Parameter names corresponding to optimization variables
+        """
+        n_params = len(param_keys)
+        vec_func = Vectorize_Functional( # TODO: can't I vectorize it always?? This could speed up computation.
+                lambda x: self.objective(x, param_keys), 
+                m = n_params,
+            )
+
+        if "bounds" in self.optimizer_kwargs.keys():
+            self.hessian = compute_hessian_bounded(
+                f = vec_func, 
+                x0 = self.result.x, 
+                bounds = self.optimizer_kwargs['bounds'],
+            )
+
+        else:
+            self.hessian = sd.hessian(
+                f = vec_func,
+                x = self.result.x,
+            ).ddf
+        
+
+        # Invert Hessian to get covariance
+        try:
+            self.covariance = np.linalg.inv(self.hessian)
+        except np.linalg.LinAlgError:
+            print(f"Warning: Hessian singular at optimum for {param_keys}, covariance unavailable.")
+            self.covariance = np.ones_like(self.hessian) * np.inf
+
+    # ========== Parameter Inference ==========
+    """Run optimization to infer parameters from ground truths."""
+
     def infer(
         self,
         initial_guess: Dict[str, float],
@@ -592,75 +643,64 @@ class Inference:
         )
         return results
     
-    def _compute_hessian(self, param_keys: Tuple[str, ...]):
-        """
-        Compute Hessian numerically via finite differences.
-        Invert to estimate parameter covariance (inverse of Fisher information).
-        
-        Args:
-            param_keys: Parameter names corresponding to optimization variables
-        """
-        n_params = len(param_keys)
-        vec_func = Vectorize_Functional( # TODO: can't I vectorize it always?? This could speed up computation.
-                lambda x: self.objective(x, param_keys), 
-                m = n_params,
-            )
-
-        if "bounds" in self.optimizer_kwargs.keys():
-            self.hessian = compute_hessian_bounded(
-                f = vec_func, 
-                x0 = self.result.x, 
-                bounds = self.optimizer_kwargs['bounds'],
-            )
-
-        else:
-            self.hessian = sd.hessian(
-                f = vec_func,
-                x = self.result.x,
-            ).ddf
-        
-
-        # Invert Hessian to get covariance (approximation of parameter uncertainty)
-        try:
-            self.covariance = np.linalg.inv(self.hessian)
-        except np.linalg.LinAlgError:
-            print(f"Warning: Hessian singular at optimum for {param_keys}, covariance unavailable.")
-            self.covariance = np.ones_like(self.hessian) * np.inf
-
 # ============================================================================
 # MULTI-PASS INFERENCE PIPELINE
 # ============================================================================
 
+@dataclass
 class InferencePipeline:
     """
     Sequential inference pipeline for parameter estimation.
     
-    Implements a multi-pass strategy:
-    - Pass 1: Infer low-dim subset with reduced model
-    - Pass 2: Fix Pass 1 results, infer additional parameters
-    - etc.
-    
-    Each pass uses `compose_model` to enforce fixed parameters from prior passes.
+    Implements a multi-pass strategy where each pass infers a subset of parameters
+    while fixing results from prior passes via model composition.
     """
+
+    passes: List["PipelinePass"]
+    loss_fn: Callable
+    n_jobs_per_pass: int = -1
     
-    def __init__(
-        self,
-        passes: List[PipelinePass],
-        loss_fn: Callable,
-        n_jobs_per_pass: int = -1,
-    ):
+    # Derived / computed fields (not in __init__)
+    results: List["InferenceResult"] = field(default_factory=list, init=False, repr=False)
+    parameter_trajectory: List[Dict[str, float]] = field(default_factory=list, init=False, repr=False)    
+    
+    # ========== Factory Methods ==========
+    """Create InferencePipeline instances with special initialization logic."""
+
+    @classmethod
+    def from_factory(
+        cls,
+        make_pipeline_fn: Callable[..., "InferencePipeline"],
+        *args,
+        **kwargs,
+    ) -> "InferencePipeline":
         """
+        Create an InferencePipeline using a model-specific factory function.
+        
+        The factory function is responsible
+        for defining passes, loss function, and other configuration. This method
+        simply delegates to it and returns the result.
+        
         Args:
-            passes: List of PipelinePass instances (in sequential order)
-            loss_fn: Shared loss function across all passes
-            n_jobs_per_pass: Parallelization for initial guesses within each pass
+            make_pipeline_fn: Callable that returns an InferencePipeline instance.
+            *args: Positional arguments passed to make_pipeline_fn.
+            **kwargs: Keyword arguments passed to make_pipeline_fn.
+        
+        Returns:
+            Configured InferencePipeline instance.
+        
+        Example:
+            pipeline = InferencePipeline.from_factory(
+                custom_make_inference_pipeline,
+                ground_truths=[gt1, gt2],
+                n_jobs_per_pass=-1,
+            )
         """
-        self.passes = passes
-        self.loss_fn = loss_fn
-        self.n_jobs_per_pass = n_jobs_per_pass
-        self.results: List[InferenceResult] = []
-        self.parameter_trajectory: List[Dict[str, float]] = []
-    
+        return make_pipeline_fn(*args, **kwargs)
+
+    # ========== Pipeline Execution ==========
+    """Run sequential inference passes with parameter accumulation."""
+
     def run(
         self,
         initial_guesses_per_pass: List[List[Dict[str, float]]],
@@ -677,28 +717,31 @@ class InferencePipeline:
         
         Returns:
             List of InferenceResult objects (one per pass)
+
+        Raises:
+            AssertionError: If initial_guesses_per_pass length doesn't match passes.
         """
-        assert len(initial_guesses_per_pass) == len(self.passes), \
-            f"Must provide initial guesses for each pass"
-        
+
+        assert len(initial_guesses_per_pass) == len(self.passes), (
+            f"Must provide initial guesses for each pass: "
+            f"got {len(initial_guesses_per_pass)}, expected {len(self.passes)}"
+        )
         accumulated_params = {}  # Parameters inferred so far
         
         for pass_idx, (pass_def, initial_guesses) in enumerate( # This has to be computed sequentially.
             zip(self.passes, initial_guesses_per_pass)
         ):
-            print(f"\n{'='*60}")
-            print(f"Pipeline Pass {pass_idx + 1}: {pass_def.name}")
-            print(f"Inferring: {pass_def.param_keys_to_infer}")
-            print(f"Fixed from prior passes: {list(accumulated_params.keys())}")
-            print(f"{'='*60}")
-            
-            # Build the model for this pass
+
+            if verbose:
+                self._print_pass_header(pass_idx, pass_def, accumulated_params)
+
+            # Build model with fixed parameters from prior passes
             model_for_pass = self._build_pass_model(
                 pass_def,
-                fixed_params=accumulated_params # If there are fixed parameters, compose the model to enforce them
+                fixed_params=accumulated_params, # If there are fixed parameters, compose the model to enforce them
             )
             
-            # Create Inference instance for this pass
+            # Create and run Inference for this pass
             inference = Inference(
                 model_class=model_for_pass,
                 ground_truths=pass_def.ground_truths,
@@ -714,41 +757,27 @@ class InferencePipeline:
             # Run inference on all initial guesses for this pass
             if verbose:
                 print(f"Running {len(initial_guesses)} inference(s) in parallel...")
+            
             pass_results = inference.infer_batch(initial_guesses)
 
-            # ===== SELECT BEST RESULT =====
-            # Choose the result with the lowest loss TODO See if this is what I want to do or not.
-
-            best_result = min(
-                pass_results, 
-                key=lambda r: np.inf if np.isfinite(r.loss) else r.loss,
-                )
+            # Select best result by loss TODO See if this is what I want to do or not.
+            best_result = self._select_best_result(pass_results)
+            self.results.append(best_result)    
             
             if verbose:
-                print(f"\nPass {pass_idx + 1} Results:")
-                print(f"  Best loss: {best_result.loss:.8e}")
-                print(f"  Best parameters: {best_result.params}")
-                print(f"  Converged: {best_result.success}")
-                if best_result.std_errors is not None:
-                    print(f"  Standard errors: {dict(zip(pass_def.param_keys_to_infer, best_result.std_errors))}")
-                
-                # Compare all results for robustness
-                losses = [r.loss for r in pass_results]
-                print(f"  Loss range across {len(pass_results)} runs: [{min(losses):.8e}, {max(losses):.8e}]")
-                if len(pass_results) > 1:
-                    print(f"  Loss std dev: {np.std(losses):.8e}")
+                self._print_pass_results(pass_idx, pass_def, best_result, pass_results)
             
-            # Store this pass's best result
-            self.results.append(best_result)
-            
-            # Update accumulated parameters: add newly inferred params
+            # Accumulate parameters for next pass
             accumulated_params.update(best_result.params)
             self.parameter_trajectory.append(accumulated_params.copy())
             
             if verbose:
-                print(f"  Accumulated parameters for next pass: {accumulated_params}")
+                print(f"  Accumulated parameters for next pass: {accumulated_params}\n")
         
         return self.results
+
+    # ========== Model Composition ==========
+    """Build pass-specific models with fixed parameters from prior passes."""
 
     def _build_pass_model(
         self,
@@ -758,29 +787,24 @@ class InferencePipeline:
         """
         Build the model for a single pass, enforcing fixed parameters from prior passes.
         
-        If this is Pass 1 (no fixed params), return the model as-is.
-        If this is Pass 2+ (fixed params exist), compose the model to enforce them.
-        
+        Pass 1 returns the base model unchanged. Pass 2+ wraps it via compose_model
+        to merge fixed parameters with newly inferred ones.
+
         Args:
             pass_def: PipelinePass definition for this pass
-            fixed_params: Parameters inferred in prior passes (to be held constant)
+            fixed_params: Parameters inferred in prior passes (to hold constant)
         
         Returns:
             Model class (potentially wrapped via compose_model)
         """
+
         if not fixed_params:
             # Pass 1: No composition needed
             return pass_def.model_class
         
-        # Pass 2+: Compose model to fix parameters from prior passes
-        # The composition function will merge fixed_params with newly inferred ones
+        # Pass 2+: Compose to enforce fixed parameters
         def compose_int_params_with_fixed(int_params, ext_params, sim_params):
-            """
-            Merge fixed parameters (from prior passes) with newly inferred ones.
-            
-            int_params contains only the parameters being inferred in this pass.
-            We extend it with the fixed parameters from prior passes.
-            """
+            """Merge fixed parameters from prior passes with newly inferred ones."""
             merged = {**fixed_params, **int_params}
             return merged
         
@@ -793,26 +817,78 @@ class InferencePipeline:
         
         return composed
     
-    def get_parameter_trajectory(self) -> Dict[str, List[float]]:
+    # ========== Result Selection & Logging ==========
+    """Select best results and print execution summaries."""
+
+    @staticmethod
+    def _select_best_result(pass_results: List["InferenceResult"]) -> "InferenceResult":
+        """
+        Select result with lowest finite loss, penalizing NaN or Inf losses.
+        """
+        return min(
+            pass_results,
+            key=lambda r: r.loss if np.isfinite(r.loss) else np.inf,
+        )
+
+    @staticmethod
+    def _print_pass_header(
+        pass_idx: int,
+        pass_def: "PipelinePass",
+        accumulated_params: Dict[str, float],
+    ):
+        """Print header for a pipeline pass."""
+        print(f"\n{'='*60}")
+        print(f"Pipeline Pass {pass_idx + 1}: {pass_def.name}")
+        print(f"Inferring: {pass_def.param_keys_to_infer}")
+        print(f"Fixed from prior passes: {list(accumulated_params.keys())}")
+        print(f"{'='*60}")
+    
+    @staticmethod
+    def _print_pass_results(
+        pass_idx: int,
+        pass_def: "PipelinePass",
+        best_result: "InferenceResult",
+        all_results: List["InferenceResult"],
+    ):
+        """Print results summary for a pipeline pass."""
+        print(f"\nPass {pass_idx + 1} Results:")
+        print(f"  Best loss: {best_result.loss:.8e}")
+        print(f"  Best parameters: {best_result.params}")
+        print(f"  Converged: {best_result.success}")
+        
+        if best_result.std_errors is not None:
+            std_dict = dict(zip(pass_def.param_keys_to_infer, best_result.std_errors))
+            print(f"  Standard errors: {std_dict}")
+        
+        losses = [r.loss for r in all_results]
+        print(f"  Loss range across {len(all_results)} runs: [{min(losses):.8e}, {max(losses):.8e}]")
+        if len(all_results) > 1:
+            print(f"  Loss std dev: {np.std(losses):.8e}")
+
+    # ========== Analysis & Reporting ==========
+    """Extract and format results across passes."""
+
+    def get_parameter_trajectory(self) -> Dict[str, List[Optional[float]]]:
         """
         Extract parameter trajectory across all passes.
         
+        Parameters inferred in Pass 1 appear in all subsequent passes.
+        Parameters inferred in Pass N appear as None in earlier passes.
+        
         Returns:
-            Dict like {'x': [1.0, 1.05], 'y': [2.0, 2.01], 'z': [None, 0.5]}
-            where None indicates a parameter not yet inferred in that pass.
+            Dict like {'x': [1.0, 1.05], 'y': [2.0, 2.01], 'z': [None, 0.5]}.
         """
         if not self.parameter_trajectory:
             return {}
         
-        # Get all unique parameter names across all passes
+        # Collect all unique parameter names
         all_param_names = set()
         for params in self.parameter_trajectory:
             all_param_names.update(params.keys())
         
-        # Build trajectory dict
+        # Build trajectory with None for missing parameters
         trajectory = {name: [] for name in all_param_names}
-        
-        for step, params_dict in enumerate(self.parameter_trajectory):
+        for params_dict in self.parameter_trajectory:
             for name in all_param_names:
                 trajectory[name].append(params_dict.get(name, None))
         
@@ -820,69 +896,41 @@ class InferencePipeline:
     
     def summary(self) -> str:
         """
-        Generate a human-readable summary of the pipeline execution.
+        Generate a formatted summary of pipeline execution.
+        
+        Includes losses, parameters, standard errors, and convergence status per pass.
         
         Returns:
-            Formatted string with losses, parameters, and uncertainties per pass
+            Human-readable summary string.
         """
         if not self.results:
             return "Pipeline not yet executed."
         
-        summary_lines = [
+        lines = [
             "\n" + "="*80,
             "INFERENCE PIPELINE SUMMARY",
             "="*80,
         ]
         
         for pass_idx, (pass_def, result) in enumerate(zip(self.passes, self.results)):
-            summary_lines.append(f"\nPass {pass_idx + 1}: {pass_def.name}")
-            summary_lines.append(f"  Model: {pass_def.model_class.__name__}")
-            summary_lines.append(f"  Final loss: {result.loss:.8e}")
-            summary_lines.append(f"  Success: {result.success}")
-            summary_lines.append(f"  Iterations: {result.iterations}")
-            summary_lines.append(f"  Parameters:")
+            lines.append(f"\nPass {pass_idx + 1}: {pass_def.name}")
+            lines.append(f"  Model: {pass_def.model_class.__name__}")
+            lines.append(f"  Final loss: {result.loss:.8e}")
+            lines.append(f"  Success: {result.success}")
+            lines.append(f"  Iterations: {result.iterations}")
+            lines.append(f"  Parameters:")
             
             for param_name, param_value in result.params.items():
+                std_err_str = ""
                 if result.std_errors is not None:
                     param_keys = tuple(pass_def.param_keys_to_infer)
-                    idx = param_keys.index(param_name) if param_name in param_keys else None
-                    if idx is not None:
+                    if param_name in param_keys:
+                        idx = param_keys.index(param_name)
                         std_err = result.std_errors[idx]
-                        summary_lines.append(
-                            f"    {param_name}: {param_value:.6e} ± {std_err:.6e}"
-                        )
-                    else:
-                        summary_lines.append(f"    {param_name}: {param_value:.6e}")
-                else:
-                    summary_lines.append(f"    {param_name}: {param_value:.6e}")
+                        std_err_str = f" ± {std_err:.6e}"
+                
+                lines.append(f"    {param_name}: {param_value:.6e}{std_err_str}")
         
-        summary_lines.append("\n" + "="*80 + "\n")
-        return "\n".join(summary_lines)    
-
-class ModelsToInference:
-    """
-    Class representing inferences to be made.
-    
-    Given:
-        - a list of models, each with (int_params, ext_params_list, sim_params_list)
-        
-    Do:
-        - Make inference pipelines
-        - Run them.
-
-    """
-
-    def __init__(self, model_list):
-        self.model_list = model_list
-
-    def make_pipeline(self, inference_indices):
-        """Makes inference pipeline from the list of models. 
-        
-        Args:
-            - inference_indices: which models to infer together. E.g., if (0, 1), infer models 0 and 1 together.
-        
-        """
-        # return pipeline
-        pass
-
+        lines.append("\n" + "="*80)
+        return "\n".join(lines)
     
