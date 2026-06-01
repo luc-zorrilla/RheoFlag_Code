@@ -13,6 +13,8 @@ from itertools import product, zip_longest
 from pathlib import Path
 from scipy.optimize import Bounds
 
+from joblib import Parallel, delayed
+
 
 ### Optimization schemes
 
@@ -358,8 +360,7 @@ def model_params_only_flow(
         return full_params
     
     # Create composed model with the embedding function
-    ComposedModel = compose_model(
-        ViscoElasticFilament_FlowParams_ScalarBending,
+    ComposedModel = ViscoElasticFilament_FlowParams_ScalarBending.compose(
         compose_int_params=embed_params_flow,
     )
     return ComposedModel
@@ -415,7 +416,8 @@ model_lists, _ = workflow.run(
     sim_params_list=sim_params_list,
     model_class=ViscoElasticFilament_FlowParams_ScalarBending,
     inference_tasks=[],  # Define inference tasks if needed
-    n_jobs_simulation=4,
+    n_jobs_simulation=-1,
+    n_jobs_inference=-1,
 )
 
 # Generate ground truth data for comparison

@@ -2,7 +2,7 @@ from typing import Any, Callable, Dict, List, Tuple, Optional, Type
 from functools import partial
 from dataclasses import dataclass, field
 import numpy as np
-import joblib
+from joblib import Parallel, delayed
 from scipy.optimize import minimize, OptimizeResult
 import scipy.differentiate as sd
 from itertools import product

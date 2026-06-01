@@ -359,7 +359,7 @@ class SimulationInferenceWorkflow:
         int_params_list: List[dict],
         ext_params_list: List[dict],
         sim_params_list: List[dict],
-        model_class: type,
+        model_class: Type[Model],
         inference_tasks: List[InferenceTask],
         n_jobs_simulation: int = -1,
         n_jobs_inference: int = -1,

@@ -640,9 +640,6 @@ class ViscoElasticFilament(Model):
         This method should populate self.sim_output with the result before returning.
         Returns: {"value": np.ndarray, "shape": tuple} # Is shape necessary?
         """
-        print(f"int_params = {self.int_params}")
-        print(f"ext_params = {self.ext_params}")
-        print(f"sim_params = {self.sim_params}")
         res = ViscoElasticFilament_Simulate(self.int_params, self.ext_params, self.sim_params)
         self.sim_output = res
         return res
@@ -676,6 +673,7 @@ def tau_b_to_taus_b(int_params, ext_params, sim_params):
     new_int_params = int_params.copy()
     new_int_params['taus_b'] = [new_int_params['tau_b']]*(new_int_params['N']-1) # Making uniform distribution of taus_b.
     new_int_params.pop('tau_b')
+    
     return new_int_params
 
 ViscoElasticFilament_FlowParams_ScalarBending = ViscoElasticFilament_FlowParams.compose(
