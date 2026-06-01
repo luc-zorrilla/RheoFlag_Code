@@ -1,5 +1,6 @@
 from joblib import Parallel, delayed
 from typing import Any, Callable, Iterable, List, Sequence, Type, Optional, Tuple, Dict, Literal
+from abc import abstractmethod
 from dataclasses import dataclass, field
 import numpy as np
 import logging
@@ -151,7 +152,7 @@ class Model:
                 self.int_params = compose_int_params(self.int_params, self.ext_params, self.sim_params) if compose_int_params else self.int_params
                 self.ext_params = compose_ext_params(self.int_params, self.ext_params, self.sim_params) if compose_ext_params else self.ext_params
                 self.sim_params = compose_sim_params(self.int_params, self.ext_params, self.sim_params) if compose_sim_params else self.sim_params
-        
+
         ComposedModel.__name__ = f"Composed{cls.__name__}"
         return ComposedModel
 

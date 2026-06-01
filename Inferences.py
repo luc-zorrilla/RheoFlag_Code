@@ -6,7 +6,6 @@ import joblib
 from scipy.optimize import minimize, OptimizeResult
 import scipy.differentiate as sd
 from itertools import product
-from Models import compose_model
 import dill as pickle
 from pathlib import Path
 
@@ -290,7 +289,7 @@ class PipelinePass:
         product_or_zip: whether or not to do a cartesian product of ext_params_list and sim_params_list
         param_keys_to_infer: Which internal parameters to infer in this pass
         fixed_params: Dict of {param_name: value} for parameters inferred in prior passes
-        compose_int_params: Composition function for int_params (via compose_model)
+        compose_int_params: Composition function for int_params (via compose)
         optimizer: optimizer class instance to run the inference optimisation
         optimizer_kwargs: arguments for optimizer
     """
@@ -787,7 +786,7 @@ class InferencePipeline:
         """
         Build the model for a single pass, enforcing fixed parameters from prior passes.
         
-        Pass 1 returns the base model unchanged. Pass 2+ wraps it via compose_model
+        Pass 1 returns the base model unchanged. Pass 2+ wraps it via compose
         to merge fixed parameters with newly inferred ones.
 
         Args:
@@ -795,7 +794,7 @@ class InferencePipeline:
             fixed_params: Parameters inferred in prior passes (to hold constant)
         
         Returns:
-            Model class (potentially wrapped via compose_model)
+            Model class (potentially wrapped via compose)
         """
 
         if not fixed_params:
@@ -808,8 +807,7 @@ class InferencePipeline:
             merged = {**fixed_params, **int_params}
             return merged
         
-        composed = compose_model(
-            pass_def.model_class,
+        composed = pass_def.model_class.compose(
             compose_int_params=compose_int_params_with_fixed,
             compose_ext_params=pass_def.compose_ext_params,
             compose_sim_params=pass_def.compose_sim_params,

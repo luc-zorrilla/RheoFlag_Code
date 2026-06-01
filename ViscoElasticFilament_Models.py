@@ -4,7 +4,7 @@ from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 from scipy.linalg import solve
 from scipy.optimize import root, approx_fprime
-from Models import Model, compose_model, parallel_simulate_batch
+from Models import Model, ModelList
 import time
 
 ## --- Initial conditions --- ##
@@ -640,7 +640,9 @@ class ViscoElasticFilament(Model):
         This method should populate self.sim_output with the result before returning.
         Returns: {"value": np.ndarray, "shape": tuple} # Is shape necessary?
         """
-
+        print(f"int_params = {self.int_params}")
+        print(f"ext_params = {self.ext_params}")
+        print(f"sim_params = {self.sim_params}")
         res = ViscoElasticFilament_Simulate(self.int_params, self.ext_params, self.sim_params)
         self.sim_output = res
         return res
@@ -664,8 +666,7 @@ def FlowParams_to_InterpFlow(int_params, ext_params, sim_params):
     return {'Lambdas': ext_params['Lambdas'], 'Zetas': ext_params['Zetas'], 'InterpFlow': InterpFlow}
     
 # Define the ViscoElasticFilament_FlowParams class by composing the ViscoElasticFilament class
-ViscoElasticFilament_FlowParams = compose_model(
-    ViscoElasticFilament,
+ViscoElasticFilament_FlowParams = ViscoElasticFilament.compose(
     compose_ext_params=FlowParams_to_InterpFlow,
 )
 
@@ -677,7 +678,6 @@ def tau_b_to_taus_b(int_params, ext_params, sim_params):
     new_int_params.pop('tau_b')
     return new_int_params
 
-ViscoElasticFilament_FlowParams_ScalarBending = compose_model(
-    ViscoElasticFilament_FlowParams,
+ViscoElasticFilament_FlowParams_ScalarBending = ViscoElasticFilament_FlowParams.compose(
     compose_int_params=tau_b_to_taus_b,
 )
