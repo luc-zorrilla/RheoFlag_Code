@@ -15,7 +15,6 @@ from scipy.optimize import Bounds
 
 from joblib import Parallel, delayed
 
-
 ### Optimization schemes
 
 class RandomDisplacementBounds:
@@ -321,7 +320,7 @@ def make_ground_truth_data_list(
     
     return ground_truths
 
-def model_params_only_flow(
+def model_params_only_flow( # TODO: this might not be necessary as a full function
     ground_truth_int_params,
     param_keys_to_infer,
 ):
@@ -390,53 +389,427 @@ def make_optimizer_kwargs(
         'global_minimizer_kwargs': global_minimizer_kwargs,
     }
 
-# Define parameter ranges
-int_params_list = [
-    make_ground_truth_int_params(N=10, Sp4=1e0),
-    make_ground_truth_int_params(N=10, Sp4=1e1),
-]
+def _make_optimizer_bounds(param_keys_to_infer):
+    """Create optimizer bounds for given parameter keys."""
+    lb = [
+        0 if ('Beta' in param_key or 'tau_b' in param_key or 'tau_s' in param_key) 
+        else (1e-6 if 'Sp4' in param_key else 0) 
+        for param_key in param_keys_to_infer
+    ]
+    ub = [np.inf] * len(param_keys_to_infer)
+    return Bounds(lb=lb, ub=ub)
 
-ext_params_list = [
-    make_ground_truth_ext_params(A=1e-6),
-    make_ground_truth_ext_params(A=1e-5),
-]
+def make_one_pass_pipeline(
+    model_class: Type[Model],
+    ground_truths: List[np.ndarray],
+    ext_params_list: List[Dict[str, Any]],
+    sim_params_list: List[Dict[str, Any]],
+    param_keys_to_infer: List[str],
+    loss_fn: Callable,
+    optimizer: Callable,
+    name: str = "pass_0",
+    product_or_zip: str = "product",
+    fixed_params: Optional[Dict[str, float]] = None,
+    compose_int_params: Optional[Callable] = None,
+    compose_ext_params: Optional[Callable] = None,
+    compose_sim_params: Optional[Callable] = None,
+    optimizer_kwargs: Optional[Dict[str, Any]] = None,
+    n_jobs_per_pass: int = -1,
+) -> InferencePipeline:
+    """
+    Factory function to create a single-pass InferencePipeline.
+    
+    Args:
+        model_class: Model subclass to use in the pass
+        ground_truths: List of ground truth arrays
+        ext_params_list: List of external params per ground truth
+        sim_params_list: List of simulation params per ground truth
+        param_keys_to_infer: Which internal parameters to infer
+        loss_fn: Loss function for the pipeline
+        optimizer: Optimizer class instance
+        name: Human-readable pass identifier
+        product_or_zip: "product" or "zip" for params combination strategy
+        fixed_params: Dict of parameters from prior passes (defaults to empty)
+        compose_int_params: Composition function for int_params
+        compose_ext_params: Composition function for ext_params
+        compose_sim_params: Composition function for sim_params
+        optimizer_kwargs: Arguments for optimizer
+        n_jobs_per_pass: Number of parallel jobs (-1 for all cores)
+    
+    Returns:
+        InferencePipeline with a single PipelinePass configured
+    """
+    if fixed_params is None:
+        fixed_params = {}
+    if optimizer_kwargs is None:
+        optimizer_kwargs = {}
+    
+    # Create the single pass
+    pass_0 = PipelinePass(
+        name=name,
+        model_class=model_class,
+        ground_truths=ground_truths,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        param_keys_to_infer=param_keys_to_infer,
+        fixed_params=fixed_params,
+        product_or_zip=product_or_zip,
+        compose_int_params=compose_int_params,
+        compose_ext_params=compose_ext_params,
+        compose_sim_params=compose_sim_params,
+        optimizer=optimizer,
+        optimizer_kwargs=optimizer_kwargs,
+    )
+    
+    # Return configured pipeline
+    return InferencePipeline(
+        passes=[pass_0],
+        loss_fn=loss_fn,
+        n_jobs_per_pass=n_jobs_per_pass,
+    )
 
-sim_params_list = [
-    make_ground_truth_sim_params(T_sim_max=300),
-    make_ground_truth_sim_params(T_sim_max=500),
-]
 
-# Create workflow
-workflow = SimulationInferenceWorkflow(checkpoint_dir=Path("./vef_checkpoints"))
+def _determine_inference_passes(param_keys_to_infer, elastic_params_list, viscous_params_list, min_w0):
+    """Determine number of passes and split parameters based on min_w0.
+    
+    Returns:
+        (n_passes, list of pass_configs)
+        where each pass_config = {
+            'name': str,
+            'param_keys': list,
+            'w0_filter': callable or None,
+        }
+    """
+    
+    elastic_keys = [k for k in param_keys_to_infer if k in elastic_params_list]
+    viscous_keys = [k for k in param_keys_to_infer if k in viscous_params_list]
+    unknown_keys = [k for k in param_keys_to_infer if k not in elastic_params_list and k not in viscous_params_list]
+    
+    if unknown_keys:
+        raise ValueError(f"Unknown parameters for inference: {unknown_keys}.")
+    
+    if elastic_keys and viscous_keys:
+        # Two passes
+        return 2, [
+            {
+                'name': 'Elastic Inference',
+                'param_keys': elastic_keys,
+                'w0_filter': lambda w0: w0 == min_w0,
+            },
+            {
+                'name': 'Viscous Inference',
+                'param_keys': viscous_keys,
+                'w0_filter': lambda w0: w0 > 0,
+            },
+        ]
+    elif elastic_keys:
+        # One pass: elastic only
+        return 1, [
+            {
+                'name': 'Elastic Inference',
+                'param_keys': elastic_keys,
+                'w0_filter': lambda w0: w0 == min_w0,
+            },
+        ]
+    else:
+        # One pass: viscous only
+        return 1, [
+            {
+                'name': 'Viscous Inference',
+                'param_keys': viscous_keys,
+                'w0_filter': lambda w0: w0 > 0,
+            },
+        ]
 
-# Run simulations
-model_lists, _ = workflow.run(
-    int_params_list=int_params_list,
-    ext_params_list=ext_params_list,
-    sim_params_list=sim_params_list,
-    model_class=ViscoElasticFilament_FlowParams_ScalarBending,
-    inference_tasks=[],  # Define inference tasks if needed
-    n_jobs_simulation=-1,
-    n_jobs_inference=-1,
-)
+def _filter_ext_params_by_w0(ext_params_list, w0_filter):
+    """Filter external parameters by w0 value.
+    
+    Args:
+        ext_params_list: List of external parameter dicts
+        w0_filter: Function that takes w0 value and returns bool
+    
+    Returns:
+        Filtered list of external parameter dicts
+    """
+    return [
+        ext_params for ext_params in ext_params_list
+        if w0_filter(ext_params.get('w0', 0))
+    ]
 
-# Generate ground truth data for comparison
-ground_truth_int = make_ground_truth_int_params(N=10)
-ground_truth_ext_list = [
-    make_ground_truth_ext_params(A=1e-6),
-    make_ground_truth_ext_params(A=1e-5),
-]
-ground_truth_sim_list = [
-    make_ground_truth_sim_params(T_sim_max=300),
-    make_ground_truth_sim_params(T_sim_max=500),
-]
+def make_two_pass_pipeline(
+    model_class: Type,
+    ground_truths: List[np.ndarray],
+    ext_params_list: List[Dict[str, Any]],
+    sim_params_list: List[Dict[str, Any]],
+    param_keys_to_infer: List[str],
+    elastic_params_list: List[str],
+    viscous_params_list: List[str],
+    loss_fn: Callable,
+    optimizer: Callable,
+    min_w0: float = 0.0,
+    product_or_zip: str = "product",
+    compose_int_params: Optional[Callable] = None,
+    compose_ext_params: Optional[Callable] = None,
+    compose_sim_params: Optional[Callable] = None,
+    optimizer_kwargs: Optional[Dict[str, Any]] = None,
+    n_jobs_per_pass: int = -1,
+) -> InferencePipeline:
+    """
+    Factory function to create a two-pass InferencePipeline.
+    
+    Splits parameters into elastic (pass 1) and viscous (pass 2) inference passes.
+    Pass 1 (elastic) filters ext_params_list to w0 == min_w0.
+    Pass 2 (viscous) uses fixed params from pass 1 and filters to w0 > 0.
+    
+    Args:
+        model_class: Model subclass to use in both passes
+        ground_truths: List of ground truth arrays
+        ext_params_list: List of external params per ground truth
+        sim_params_list: List of simulation params per ground truth
+        param_keys_to_infer: Which internal parameters to infer
+        elastic_params_list: List of parameter names that are elastic
+        viscous_params_list: List of parameter names that are viscous
+        loss_fn: Loss function for the pipeline
+        optimizer: Optimizer class instance
+        min_w0: Minimum w0 value for elastic pass filtering
+        product_or_zip: "product" or "zip" for params combination strategy
+        compose_int_params: Composition function for int_params
+        compose_ext_params: Composition function for ext_params
+        compose_sim_params: Composition function for sim_params
+        optimizer_kwargs: Arguments for optimizer
+        n_jobs_per_pass: Number of parallel jobs (-1 for all cores)
+    
+    Returns:
+        InferencePipeline with two PipelinePass instances (elastic then viscous)
+    
+    Raises:
+        ValueError: If elastic_keys and viscous_keys are both empty
+    """
+    if optimizer_kwargs is None:
+        optimizer_kwargs = {}
+    
+    # Determine passes and their configurations
+    n_passes, pass_configs = _determine_inference_passes(
+        param_keys_to_infer,
+        elastic_params_list,
+        viscous_params_list,
+        min_w0,
+    )
 
-ground_truths = make_ground_truth_data_list(
-    ground_truth_int,
-    ground_truth_ext_list,
-    ground_truth_sim_list,
-    product_or_zip="product"
-)
+    passes = []
+    fixed_params = {}  # Accumulates inferred params from prior passes
+    
+    for i, pass_config in enumerate(pass_configs):
+        # Filter ext_params_list by w0
+        filtered_ext_params = _filter_ext_params_by_w0(
+            ext_params_list,
+            pass_config['w0_filter'],
+        )
+        
+        # Create ground_truths corresponding to filtered ext_params
+        filtered_ground_truths = [
+            gt for gt, ext_params in zip(ground_truths, ext_params_list)
+            if pass_config['w0_filter'](ext_params.get('w0', 0))
+        ]
+        
+        # Ensure we have matching lengths
+        if len(filtered_ground_truths) != len(filtered_ext_params):
+            raise ValueError(
+                f"Mismatch in filtered ground_truths and ext_params for pass {i}: "
+                f"{len(filtered_ground_truths)} vs {len(filtered_ext_params)}"
+            )
+        
+        # Create pass
+        pass_obj = PipelinePass(
+            name=pass_config['name'],
+            model_class=model_class,
+            ground_truths=filtered_ground_truths,
+            ext_params_list=filtered_ext_params,
+            sim_params_list=sim_params_list,
+            param_keys_to_infer=pass_config['param_keys'],
+            fixed_params=fixed_params.copy(),  # Use accumulated params
+            product_or_zip=product_or_zip,
+            compose_int_params=compose_int_params,
+            compose_ext_params=compose_ext_params,
+            compose_sim_params=compose_sim_params,
+            optimizer=optimizer,
+            optimizer_kwargs=optimizer_kwargs,
+        )
+        passes.append(pass_obj)
+    
+    # Return configured pipeline
+    return InferencePipeline(
+        passes=passes,
+        loss_fn=loss_fn,
+        n_jobs_per_pass=n_jobs_per_pass,
+    )
 
-print(f"Generated {len(ground_truths)} ground truth datasets")
-print(f"Model lists: {len(model_lists)}")
+if __name__ == "__main__":
+    
+    # ========================================================================
+    # Generate ground truth data and parameter ranges
+    # ========================================================================
+
+    # Internal parameters: Sp4 and tau_b (will be used in product with ext/sim)
+    Sp4_values = [1e0, 1e1]
+    tau_b_values = [0, 1]
+
+    int_params_list = [
+        make_ground_truth_int_params(Sp4=Sp4, tau_b=tau_b)
+        for Sp4 in Sp4_values
+        for tau_b in tau_b_values
+    ]
+    
+    # External and simulation parameters: A and w0 (zipped together)
+    w0_values = [0.0, 1e-3]
+    A_values = [1e-6, 1e-5]
+    
+    def make_sim_params_for_w0(w0):
+        """Create simulation parameters based on w0 value."""
+        if w0 == 0.0:
+            return {
+                "T_span": (1e6, 2e6),
+                "T_eval": np.linspace(1e6, 2e6, int(1e0)),
+                "method": "hybr",
+            }
+        else:
+            T_start = (1.0 / 10.0) / w0
+            T_end = 10.0 / w0
+            N_T = 100
+            return {
+                "T_span": (T_start, T_end),
+                "T_eval": np.linspace(T_start, T_end, N_T),
+                "method": "BDF",
+            }
+    
+    # Zip ext_params and sim_params together (they depend on w0)
+    ext_and_sim_pairs = [
+        (
+            make_ground_truth_ext_params(A=A, w0=w0),
+            make_sim_params_for_w0(w0),
+        )
+        for A in A_values
+        for w0 in w0_values
+    ]
+    
+    # Now create the same-length lists via product of int_params with ext/sim pairs
+    n_int_params = len(int_params_list)
+    n_ext_sim_pairs = len(ext_and_sim_pairs)
+    
+    # Repeat int_params for each ext/sim pair
+    ground_truth_int_params_list = [
+        int_params_list[i % n_int_params]
+        for _ in range(n_ext_sim_pairs)
+        for i in range(n_int_params)
+    ]
+    
+    # Tile ext_params and sim_params to match
+    ground_truth_ext_params_list = [
+        pair[0]
+        for pair in ext_and_sim_pairs
+        for _ in range(n_int_params)
+    ]
+    
+    ground_truth_sim_params_list = [
+        pair[1]
+        for pair in ext_and_sim_pairs
+        for _ in range(n_int_params)
+    ]
+    
+    # Verify all lists have the same length
+    assert len(ground_truth_int_params_list) == len(ground_truth_ext_params_list) == len(ground_truth_sim_params_list)
+    print(f"Parameter list length: {len(ground_truth_int_params_list)}")
+    
+    ground_truths = make_ground_truth_data_list(
+        ground_truth_int_params_list,
+        ground_truth_ext_params_list,
+        ground_truth_sim_params_list,
+        product_or_zip="zip"  # Use zip since lists are already aligned
+    )
+    
+    print(f"Generated {len(ground_truths)} ground truth datasets")
+
+    # ========================================================================
+    # Create workflow
+    # ========================================================================
+    
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=Path("./vef_checkpoints_two_pass"))
+    
+    # ========================================================================
+    # Run simulations # TODO: Can this be done later on instead?
+    # ========================================================================
+    
+    model_lists, _ = workflow.run(
+        int_params_list=ground_truth_int_params_list,
+        ext_params_list=ground_truth_ext_params_list,
+        sim_params_list=ground_truth_sim_params_list,
+        model_class=ViscoElasticFilament_FlowParams_ScalarBending,
+        inference_tasks=[],  # Will define inference tasks below
+        n_jobs_simulation=-1,
+        n_jobs_inference=-1,
+    )
+    
+    print(f"Generated {len(model_lists)} model lists")
+    print(f"Model list keys: {list(model_lists.keys())[:5]}...")  # Show first 5
+    
+    # ========================================================================
+    # Define inference task with two-pass pipeline
+    # ========================================================================
+    
+    initial_guesses=[ # TODO: check where to put this and if it is correct
+        {"Sp4": 1e-1, "tau_b": 0},  # Initial guess for inference
+    ]
+    param_keys_to_infer = list(initial_guesses[0].keys())
+
+    # Elastic and viscous parameter lists
+    elastic_params = ["Sp4", "Beta"] # Infer in pass 1 (Elastic Pass)
+    viscous_params = ["tau_b", "tau_s"]  # Infer in pass 2 (Viscous Pass)
+    
+    # Create inference task
+    inference_task = InferenceTask(
+        task_id=0,
+        model_indices=tuple((i, j, k) for i in range(len(int_params_list_expanded))
+                                    for j in range(len(ext_params_list))
+                                    for k in range(len(sim_params_list))),
+        make_pipeline_fn=custom_make_inference_pipeline_two_pass,
+        pipeline_kwargs={
+            "model_class": ViscoElasticFilament_FlowParams_ScalarBending,
+            "ground_truths": ground_truths,
+            "ext_params_list": ground_truth_ext_params_list,
+            "sim_params_list": ground_truth_sim_params_list,
+            "param_keys_to_infer": param_keys_to_infer,
+            "elastic_params_list": elastic_params,
+            "viscous_params_list": viscous_params,
+            "loss_fn": rel_mse_loss_fn,
+            "optimizer": basinhopping_optimizer,
+            "min_w0": 0.0,
+            "product_or_zip": "zip",  # Use zip for aligned lists
+            "optimizer_kwargs": optimizer_kwargs,
+            "n_jobs_per_pass": -1,
+        },
+        initial_guesses=initial_guesses,
+    )
+    
+    # ========================================================================
+    # Run inference
+    # ========================================================================
+    
+    print("\nStarting two-pass inference...")
+    model_lists, inference_results = workflow.run(
+        int_params_list=ground_truth_int_params_list,
+        ext_params_list=ground_truth_ext_params_list,
+        sim_params_list=ground_truth_sim_params_list,
+        model_class=ViscoElasticFilament_FlowParams_ScalarBending,
+        inference_tasks=[inference_task],
+        n_jobs_simulation=-1,
+        n_jobs_inference=-1,
+    )
+    
+    print(f"\nInference complete!")
+    print(f"Results keys: {list(inference_results.keys())}")
+    
+    # Retrieve and inspect results
+    if 0 in inference_results:
+        result = inference_results[0]
+        print(f"\nPass 1 (Elastic) inferred: {result.get('pass_0_params', {})}")
+        print(f"Pass 2 (Viscous) inferred: {result.get('pass_1_params', {})}")
