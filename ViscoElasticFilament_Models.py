@@ -647,7 +647,7 @@ class ViscoElasticFilament(Model):
 # Define the pre-determined function to transform (A, w0, psi) into InterpFlow
 def FlowParams_to_InterpFlow(int_params, ext_params, sim_params):
     """ Transform external parameters (Lambdas, Zetas, A, w0, psi) -> (Lambdas, Zetas, InterpFlow). """
-    
+
     ## Intermediate parameters
     T_eval = sim_params['T_eval']
     X_flow_field_string, X_flow_field = CreateFlowField(ext_params['A'], ext_params['w0'], ext_params['psi'], T_eval)
@@ -670,6 +670,7 @@ ViscoElasticFilament_FlowParams = ViscoElasticFilament.compose(
 # Define the pre-determined function to transform (A, w0, psi) into InterpFlow
 def tau_b_to_taus_b(int_params, ext_params, sim_params):
     """ Transform internal parameters (..., tau_b, ...) -> (..., taus_b, ...). """
+    
     new_int_params = int_params.copy()
     new_int_params['taus_b'] = [new_int_params['tau_b']]*(new_int_params['N']-1) # Making uniform distribution of taus_b.
     new_int_params.pop('tau_b')

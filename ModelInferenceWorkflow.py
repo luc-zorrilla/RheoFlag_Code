@@ -1,19 +1,21 @@
-from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
-from joblib import Parallel, delayed
-from datetime import datetime
-import json
 import dill as pickle
-
+import json
+from datetime import datetime
+from typing import Any, Optional, Dict
+from joblib import Parallel, delayed
+from dataclasses import dataclass, field
 from Models import Model, ModelList
-from Inferences import Inference, InferencePipeline, InferenceResult
+from Inferences import Inference, InferencePipeline
 
+# =========== #
+# Checkpoints #
+# =========== #
 
 @dataclass
 class CheckpointEntry:
     """Metadata for a single completed task."""
-    task_key: str  # "{int_idx}_{ext_idx}_{sim_idx}" for simulations
+    task_key: str
     completed: bool
     timestamp: str
     filepath: str  # relative path to saved artifact
@@ -23,10 +25,9 @@ class CheckpointEntry:
 class WorkflowCheckpoint:
     """High-level checkpoint tracking the entire workflow."""
     simulation_entries: Dict[str, CheckpointEntry] = field(default_factory=dict)
-    inference_entries: Dict[int, CheckpointEntry] = field(default_factory=dict)
+    inference_entries: Dict[str, CheckpointEntry] = field(default_factory=dict)
     stage: str = "simulation"
     timestamp: str = ""
-
 
 class CheckpointManager:
     """Unified checkpoint system for simulations and inferences."""
@@ -38,9 +39,9 @@ class CheckpointManager:
         self.artifacts_dir = self.checkpoint_dir / "artifacts"
         self.artifacts_dir.mkdir(exist_ok=True)
     
-    # ============================================================================
-    # Artifact Storage (Models, Inference Results)
-    # ============================================================================
+    # ========================================================================
+    # Artifact Storage
+    # ========================================================================
     
     def save_artifact(self, artifact_type: str, key: str, artifact: Any) -> str:
         """
@@ -48,7 +49,7 @@ class CheckpointManager:
         
         Args:
             artifact_type: "models" or "inference"
-            key: Unique identifier (e.g., "0_1_2" for (int_idx, ext_idx, sim_idx))
+            key: Unique identifier (e.g., "int_0_pair_2" or "inference_task_5")
             artifact: Object to pickle
         
         Returns:
@@ -71,9 +72,15 @@ class CheckpointManager:
                 return pickle.load(f)
         return None
     
-    # ============================================================================
+    def artifact_exists(self, artifact_type: str, key: str) -> bool:
+        """Check if artifact exists without loading."""
+        type_dir = self.artifacts_dir / artifact_type
+        filepath = type_dir / f"{key}.pkl"
+        return filepath.exists()
+    
+    # ========================================================================
     # Checkpoint Persistence
-    # ============================================================================
+    # ========================================================================
     
     def save_checkpoint(self, checkpoint: WorkflowCheckpoint):
         """Save checkpoint metadata to JSON."""
@@ -81,11 +88,21 @@ class CheckpointManager:
             "stage": checkpoint.stage,
             "timestamp": checkpoint.timestamp,
             "simulation_entries": {
-                k: {"task_key": v.task_key, "completed": v.completed, "timestamp": v.timestamp, "filepath": v.filepath}
+                k: {
+                    "task_key": v.task_key,
+                    "completed": v.completed,
+                    "timestamp": v.timestamp,
+                    "filepath": v.filepath,
+                }
                 for k, v in checkpoint.simulation_entries.items()
             },
             "inference_entries": {
-                str(k): {"task_key": v.task_key, "completed": v.completed, "timestamp": v.timestamp, "filepath": v.filepath}
+                k: {
+                    "task_key": v.task_key,
+                    "completed": v.completed,
+                    "timestamp": v.timestamp,
+                    "filepath": v.filepath,
+                }
                 for k, v in checkpoint.inference_entries.items()
             },
         }
@@ -106,7 +123,7 @@ class CheckpointManager:
         }
         
         inference_entries = {
-            int(k): CheckpointEntry(**v)
+            k: CheckpointEntry(**v)
             for k, v in data.get("inference_entries", {}).items()
         }
         
@@ -117,70 +134,81 @@ class CheckpointManager:
             timestamp=data.get("timestamp", ""),
         )
     
-    # ============================================================================
+    # ========================================================================
     # Query Methods
-    # ============================================================================
+    # ========================================================================
     
-    def is_simulation_done(self, int_idx: int, ext_idx: int, sim_idx: int) -> bool:
+    def is_simulation_done(self, int_idx: int, pair_idx: int) -> bool:
         """Check if simulation task is completed."""
         checkpoint = self.load_checkpoint()
         if not checkpoint:
             return False
-        task_key = f"{int_idx}_{ext_idx}_{sim_idx}"
+        task_key = f"int_{int_idx}_pair_{pair_idx}"
         return checkpoint.simulation_entries.get(task_key, CheckpointEntry(task_key, False, "", "")).completed
     
-    def is_inference_done(self, task_id: int) -> bool:
+    def is_inference_done(self, task_key: str) -> bool:
         """Check if inference task is completed."""
         checkpoint = self.load_checkpoint()
         if not checkpoint:
             return False
-        return checkpoint.inference_entries.get(task_id, CheckpointEntry("", False, "", "")).completed
+        return checkpoint.inference_entries.get(task_key, CheckpointEntry(task_key, False, "", "")).completed
 
+# =========== #
+# Simulations #
+# =========== #
 
-# ============================================================================
-# SIMULATION STAGE
-# ============================================================================
+@dataclass
+class SimulationTask:
+    """A single simulation: one int_params with one (ext_params, sim_params) pair."""
+    int_idx: int
+    pair_idx: int  # Index within ext/sim pairs
+    int_params: dict
+    ext_params: dict
+    sim_params: dict
+
 
 def run_single_simulation(
     int_idx: int,
-    ext_idx: int,
-    sim_idx: int,
+    pair_idx: int,
     int_params: dict,
-    ext_params: dict,
-    sim_params: dict,
+    ext_params_list: list,
+    sim_params_list: list,
     model_class: type,
     checkpoint_mgr: CheckpointManager,
 ) -> ModelList:
     """
-    Simulate a single parameter set using ModelList.
+    Simulate one internal parameter with all zipped (ext, sim) pairs.
     
     Args:
-        int_idx, ext_idx, sim_idx: Indices for nested loops
-        int_params, ext_params, sim_params: Parameter dicts
+        int_idx: Internal parameter index
+        pair_idx: Index in the ext/sim pair list (unused here, kept for consistency)
+        int_params: Single internal parameter dict
+        ext_params_list: List of external parameter dicts
+        sim_params_list: List of simulation parameter dicts (same length as ext)
         model_class: The Model subclass to instantiate
-        checkpoint_mgr: CheckpointManager for resuming
+        checkpoint_mgr: CheckpointManager for checkpointing
     
     Returns:
-        ModelList with results populated
+        ModelList with all (ext, sim) combinations
     """
-    task_key = f"{int_idx}_{ext_idx}_{sim_idx}"
+    task_key = f"int_{int_idx}_pair_all"  # All pairs for this int_idx
     
     # Check if already completed
-    if checkpoint_mgr.is_simulation_done(int_idx, ext_idx, sim_idx):
+    if checkpoint_mgr.artifact_exists("models", task_key):
         model_list = checkpoint_mgr.load_artifact("models", task_key)
         if model_list:
             return model_list
     
-    # Create ModelList with single Model (or batch if needed)
+    # Create ModelList with batch of models (one per ext/sim pair)
     model_list = ModelList.from_params(
         model_class=model_class,
-        int_params_batch=[int_params],
-        ext_params_batch=[ext_params],
-        sim_params_batch=[sim_params],
+        int_params_batch=[int_params] * len(ext_params_list),  # Repeat for each pair
+        ext_params_batch=ext_params_list,
+        sim_params_batch=sim_params_list,
     )
     
-    # Run simulation (serial since it's already one model)
-    model_list.simulate(n_jobs=1, parallel=False)
+    # Run simulation in parallel
+    model_list.simulate(n_jobs=-1, parallel=True)
     
     # Save and checkpoint
     artifact_path = checkpoint_mgr.save_artifact("models", task_key, model_list)
@@ -197,106 +225,140 @@ def run_single_simulation(
     
     return model_list
 
-
-def parallel_simulate(
-    int_params_list: List[dict],
-    ext_params_list: List[dict],
-    sim_params_list: List[dict],
+def parallel_simulate_nested(
+    int_params_list: list,
+    ext_params_list: list,
+    sim_params_list: list,
     model_class: type,
     checkpoint_mgr: CheckpointManager,
     n_jobs: int = -1,
-) -> Dict[Tuple[int, int, int], ModelList]:
+) -> Dict[int, ModelList]:
     """
-    Simulate all parameter combinations in parallel (nested loops).
+    Outer loop over int_params, inner loop over zipped (ext, sim) pairs.
+    
+    Each int_params creates one ModelList with multiple models (one per pair).
+    
+    Args:
+        int_params_list: List of internal parameter dicts
+        ext_params_list: List of external parameter dicts
+        sim_params_list: List of simulation parameter dicts (must equal len(ext_params_list))
+        model_class: The Model subclass to instantiate
+        checkpoint_mgr: CheckpointManager for resuming
+        n_jobs: Parallelization across int_idx (outer loop)
     
     Returns:
-        Dict mapping (int_idx, ext_idx, sim_idx) -> ModelList
+        Dict mapping int_idx -> ModelList (with len(ext_params_list) models each)
     """
-    tasks = [
-        (int_idx, ext_idx, sim_idx, int_params_list[int_idx], ext_params_list[ext_idx], sim_params_list[sim_idx])
-        for int_idx in range(len(int_params_list))
-        for ext_idx in range(len(ext_params_list))
-        for sim_idx in range(len(sim_params_list))
+    assert len(ext_params_list) == len(sim_params_list), \
+        "ext_params_list and sim_params_list must have same length"
+    
+    n_int = len(int_params_list)
+    n_pairs = len(ext_params_list)
+    
+    print(f"Simulation structure:")
+    print(f"  Internal params: {n_int}")
+    print(f"  Ext/Sim pairs: {n_pairs}")
+    print(f"  Total ModelLists: {n_int}")
+    print(f"  Total models: {n_int * n_pairs}")
+    
+    # Check which int_idx tasks need recomputation
+    pending_int_idx = [
+        i for i in range(n_int)
+        if not checkpoint_mgr.artifact_exists("models", f"int_{i}_pair_all")
     ]
     
-    print(f"Total simulation tasks: {len(tasks)}")
-    
-    pending_tasks = [
-        t for t in tasks
-        if not checkpoint_mgr.is_simulation_done(t[0], t[1], t[2])
-    ]
-    
-    if pending_tasks:
-        print(f"Running {len(pending_tasks)} pending simulations...")
+    if pending_int_idx:
+        print(f"Running {len(pending_int_idx)} pending int_idx tasks...")
         Parallel(n_jobs=n_jobs)(
             delayed(run_single_simulation)(
-                t[0], t[1], t[2], t[3], t[4], t[5], model_class, checkpoint_mgr
+                int_idx,
+                0,  # pair_idx unused
+                int_params_list[int_idx],
+                ext_params_list,
+                sim_params_list,
+                model_class,
+                checkpoint_mgr,
             )
-            for t in pending_tasks
+            for int_idx in pending_int_idx
         )
     
-    # Load all completed models
-    models = {}
-    for int_idx, ext_idx, sim_idx, _, _, _ in tasks:
-        task_key = f"{int_idx}_{ext_idx}_{sim_idx}"
-        model_list = checkpoint_mgr.load_artifact("models", task_key)
-        models[(int_idx, ext_idx, sim_idx)] = model_list
+    # Load all ModelLists
+    model_lists = {}
+    for int_idx in range(n_int):
+        model_list = checkpoint_mgr.load_artifact("models", f"int_{int_idx}_pair_all")
+        model_lists[int_idx] = model_list
     
-    print(f"✓ Simulations complete: {len(models)} ModelLists")
-    return models
+    print(f"✓ Simulations complete: {len(model_lists)} ModelLists")
+    return model_lists
 
-
-# ============================================================================
-# INFERENCE STAGE
-# ============================================================================
+# ========== #
+# Inferences #
+# ========== #
 
 @dataclass
 class InferenceTask:
-    """A single inference job definition."""
-    task_id: int
-    model_indices: Tuple[Tuple[int, int, int], ...]  # Which ModelLists to use
-    make_pipeline_fn: Callable[..., InferencePipeline]  # Factory function
-    pipeline_kwargs: Dict[str, Any] = field(default_factory=dict)  # Args to factory
-    initial_guesses: List[Dict[str, float]] = field(default_factory=list)  # For Inference
+    """Single inference job on models with same int_params."""
+    task_key: str  # Unique identifier
+    int_idx: int  # Which ModelList to use
+    pair_indices: Optional[List[int]] = None  # If None, use all models in ModelList
+    make_pipeline_fn: Optional[callable] = None  # Factory function for pipeline
+    pipeline_kwargs: dict = field(default_factory=dict)
+    initial_guesses: list = field(default_factory=list)
 
-
-def run_single_inference_task(
+def run_single_inference(
     task: InferenceTask,
-    model_lists: Dict[Tuple[int, int, int], ModelList],
+    model_lists: Dict[int, ModelList],
     checkpoint_mgr: CheckpointManager,
 ) -> Any:
     """
-    Run a single inference task with pipeline factory.
+    Run inference on a ModelList (or subset of models within it).
     
     Args:
-        task: InferenceTask defining the inference job
-        model_lists: Dict of available ModelLists
+        task: InferenceTask defining the inference
+        model_lists: Dict of int_idx -> ModelList
         checkpoint_mgr: CheckpointManager for checkpointing
     
     Returns:
-        Inference result (depends on pipeline)
+        Inference result
     """
-    if checkpoint_mgr.is_inference_done(task.task_id):
-        return checkpoint_mgr.load_artifact("inference", str(task.task_id))
+    if checkpoint_mgr.is_inference_done(task.task_key):
+        return checkpoint_mgr.load_artifact("inference", task.task_key)
     
-    # Gather ModelLists for this task
-    task_model_lists = [model_lists[idx] for idx in task.model_indices]
+    # Get the ModelList
+    model_list = model_lists[task.int_idx]
     
-    # Create pipeline via factory function
+    # Filter to specific pairs if requested
+    if task.pair_indices is not None:
+        filtered_model_list = ModelList(
+            models=[model_list.models[i] for i in task.pair_indices]
+        )
+    else:
+        filtered_model_list = model_list
+    
+    # Create pipeline via factory
     pipeline = InferencePipeline.from_factory(
         task.make_pipeline_fn,
-        model_lists=task_model_lists,
+        model_list=filtered_model_list,
         **task.pipeline_kwargs,
     )
     
-    # Run pipeline (handles multi-pass inference internally)
-    result = pipeline.run()
+    # Extract initial_guesses from pipeline_kwargs and wrap per pass
+    initial_guesses = task.pipeline_kwargs.get("initial_guesses", [])
+    n_passes = len(pipeline.passes)
+    initial_guesses_per_pass = [initial_guesses for _ in range(n_passes)]
+    # TODO: could be an issue if initial_guesses need to be modified for each pass (e.g., due to composition)
+    
+    # Run pipeline with proper argument structure
+    result = pipeline.run(
+        initial_guesses_per_pass=initial_guesses_per_pass,
+        verbose=True,
+    )
     
     # Checkpoint
-    artifact_path = checkpoint_mgr.save_artifact("inference", str(task.task_id), result)
+    artifact_path = checkpoint_mgr.save_artifact("inference", task.task_key, result)
     checkpoint = checkpoint_mgr.load_checkpoint() or WorkflowCheckpoint()
-    checkpoint.inference_entries[task.task_id] = CheckpointEntry(
-        task_key=str(task.task_id),
+    checkpoint.inference_entries[task.task_key] = CheckpointEntry(
+        task_key=task.task_key,
         completed=True,
         timestamp=str(datetime.now()),
         filepath=artifact_path,
@@ -307,110 +369,95 @@ def run_single_inference_task(
     
     return result
 
-
-def parallel_infer(
+def parallel_infer_nested(
     inference_tasks: List[InferenceTask],
-    model_lists: Dict[Tuple[int, int, int], ModelList],
+    model_lists: Dict[int, ModelList],
     checkpoint_mgr: CheckpointManager,
     n_jobs: int = -1,
-) -> Dict[int, Any]:
+) -> Dict[str, Any]:
     """
     Run all inference tasks in parallel.
     
     Returns:
-        Dict mapping task_id -> inference result
+        Dict mapping task_key -> inference result
     """
     print(f"Total inference tasks: {len(inference_tasks)}")
     
     pending_tasks = [
         t for t in inference_tasks
-        if not checkpoint_mgr.is_inference_done(t.task_id)
+        if not checkpoint_mgr.is_inference_done(t.task_key)
     ]
     
     if pending_tasks:
         print(f"Running {len(pending_tasks)} pending inferences...")
         Parallel(n_jobs=n_jobs)(
-            delayed(run_single_inference_task)(task, model_lists, checkpoint_mgr)
+            delayed(run_single_inference)(task, model_lists, checkpoint_mgr)
             for task in pending_tasks
         )
     
     # Load all results
     results = {}
     for task in inference_tasks:
-        result = checkpoint_mgr.load_artifact("inference", str(task.task_id))
-        results[task.task_id] = result
+        result = checkpoint_mgr.load_artifact("inference", task.task_key)
+        results[task.task_key] = result
     
     print(f"✓ Inferences complete: {len(results)} results")
     return results
 
-
-# ============================================================================
-# HIGH-LEVEL WORKFLOW ORCHESTRATOR
-# ============================================================================
+# ============ #
+# Orchestrator #
+# ============ #
 
 class SimulationInferenceWorkflow:
-    """Orchestrates simulation → inference pipeline with checkpoint support."""
+    """Orchestrates nested simulation → inference pipeline with checkpoints."""
     
     def __init__(self, checkpoint_dir: Path = Path("./checkpoints")):
         self.checkpoint_mgr = CheckpointManager(checkpoint_dir)
     
-    def run(
+    def run_simulations(
         self,
-        int_params_list: List[dict],
-        ext_params_list: List[dict],
-        sim_params_list: List[dict],
-        model_class: Type[Model],
-        inference_tasks: List[InferenceTask],
-        n_jobs_simulation: int = -1,
-        n_jobs_inference: int = -1,
-    ) -> Tuple[Dict[Tuple[int, int, int], ModelList], Dict[int, Any]]:
+        int_params_list: list,
+        ext_params_list: list,
+        sim_params_list: list,
+        model_class: type,
+        n_jobs: int = -1,
+    ) -> Dict[int, ModelList]:
         """
-        Execute simulation → inference pipeline with resume capability.
-        
-        Args:
-            int_params_list: List of internal parameter dicts
-            ext_params_list: List of external parameter dicts
-            sim_params_list: List of simulation parameter dicts
-            model_class: Model subclass to instantiate
-            inference_tasks: List of InferenceTask objects
-            n_jobs_simulation: Parallelization for simulations
-            n_jobs_inference: Parallelization for inferences
+        Run nested simulations: outer loop over int_params, inner loop over ext/sim pairs.
         
         Returns:
-            Tuple of (model_lists_dict, inference_results_dict)
+            Dict mapping int_idx -> ModelList
         """
-        # Stage 1: Simulate all parameter combinations
-        model_lists = parallel_simulate(
+        return parallel_simulate_nested(
             int_params_list,
             ext_params_list,
             sim_params_list,
             model_class,
             self.checkpoint_mgr,
-            n_jobs=n_jobs_simulation,
+            n_jobs=n_jobs,
         )
-        
-        # Stage 2: Run inferences
-        inference_results = parallel_infer(
+    
+    def run_inferences(
+        self,
+        inference_tasks: List[InferenceTask],
+        model_lists: Dict[int, ModelList],
+        n_jobs: int = -1,
+    ) -> Dict[str, Any]:
+        """Run inference tasks."""
+        return parallel_infer_nested(
             inference_tasks,
             model_lists,
             self.checkpoint_mgr,
-            n_jobs=n_jobs_inference,
+            n_jobs=n_jobs,
         )
-        
-        return model_lists, inference_results
     
-    # ========================================================================
-    # Result Retrieval
-    # ========================================================================
+    def get_model_list(self, int_idx: int) -> Optional[ModelList]:
+        """Retrieve a ModelList by int_idx."""
+        return self.checkpoint_mgr.load_artifact("models", f"int_{int_idx}_pair_all")
     
-    def get_inference_result(self, task_id: int) -> Optional[Any]:
-        """Retrieve a specific inference result by task_id."""
-        return self.checkpoint_mgr.load_artifact("inference", str(task_id))
-    
-    def get_model_list(self, int_idx: int, ext_idx: int, sim_idx: int) -> Optional[ModelList]:
-        """Retrieve a specific ModelList by indices."""
-        task_key = f"{int_idx}_{ext_idx}_{sim_idx}"
-        return self.checkpoint_mgr.load_artifact("models", task_key)
+    def get_inference_result(self, task_key: str) -> Optional[Any]:
+        """Retrieve an inference result by task_key."""
+        return self.checkpoint_mgr.load_artifact("inference", task_key)
     
     def get_checkpoint_status(self) -> Optional[WorkflowCheckpoint]:
         """Get current checkpoint status."""

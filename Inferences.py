@@ -488,8 +488,8 @@ class Inference:
         int_params = {key: param_vector[i] for i, key in enumerate(param_keys)}
         
         # Parallel computation of individual losses
-        losses = joblib.Parallel(n_jobs=self._objective_n_jobs, backend='loky')(
-            joblib.delayed(self._compute_single_loss)(
+        losses = Parallel(n_jobs=self._objective_n_jobs, backend='loky')(
+            delayed(self._compute_single_loss)(
                 self.model_class,
                 self.loss_fn,
                 int_params,
@@ -636,8 +636,8 @@ class Inference:
         if len(initial_guesses) == 1:
             objective_n_jobs = self.n_jobs
                 
-        results = joblib.Parallel(n_jobs=self.n_jobs, backend='loky')(
-            joblib.delayed(self.infer)(ig, objective_n_jobs=objective_n_jobs)
+        results = Parallel(n_jobs=self.n_jobs, backend='loky')(
+            delayed(self.infer)(ig, objective_n_jobs=objective_n_jobs)
             for ig in initial_guesses
         )
         return results

@@ -1,13 +1,14 @@
 from joblib import Parallel, delayed
-from typing import Any, Callable, Iterable, List, Sequence, Type, Optional, Tuple, Dict, Literal
-from abc import abstractmethod
-from dataclasses import dataclass, field
-import numpy as np
-import logging
-from itertools import zip_longest, product
 import json
 import dill as pickle # enhanced pickle library that handles function pickling as well
+import copy
+import numpy as np
+
+from typing import Any, Callable, Iterable, List, Sequence, Type, Optional, Tuple, Dict, Literal
+from dataclasses import dataclass, field
+from itertools import zip_longest, product
 from pathlib import Path
+
 
 class NumpyTupleEncoder(json.JSONEncoder):
     """Custom JSON encoder that recursively marks numpy arrays and tuples with type metadata."""
@@ -81,148 +82,71 @@ class NumpyTupleDecoder(json.JSONDecoder):
                     for item in obj]
         return obj
 
-# TODO: remove when .compose() is debugged
-# def compose_model(
-#     model_class: Type[Model],
-#     compose_int_params: Optional[Callable[[Any], Any]] = None,
-#     compose_ext_params: Optional[Callable[[Any], Any]] = None,
-#     compose_sim_params: Optional[Callable[[Any], Any]] = None
-# ) -> Type[Model]:
-#     """
-#     Create a new Model class by composing input parameters with functions.
-
-#     The composed model applies composition functions to the internal, external, and
-#     simulation parameters before passing them to the base model's simulate_single() method.
-
-#     Args:
-#         model_class: A Model subclass to compose.
-#         compose_int_params: Optional callable that transforms internal parameters.
-#                         Signature: Any -> Any
-#         compose_ext_params: Optional callable that transforms external parameters.
-#                         Signature: Any -> Any
-#         compose_sim_params: Optional callable that transforms simulation parameters.
-#                         Signature: Any -> Any
-
-#     Returns:
-#         A new Model class with composed parameter behavior.
-
-#     Example:
-#         # Create Identity from Square + sqrt on int_params
-#         class Square(Model):
-#             def simulate_single(self) -> Dict[str, Any]:
-#                 return {"value": self.int_params['x'] ** 2, "shape": self.int_params.shape}
-
-#         Identity = compose_model(
-#             Square,
-#             compose_int_params=np.sqrt,
-#             compose_ext_params=lambda d: {**d, "scale": d["scale"] * 0.5}
-#         )
-#         identity_instance = Identity(int_params={'x':25.0}, ext_params={"scale": 2.0}, sim_params=None)
-#         output = identity_instance.simulate_single()  # Square(sqrt(25.0)) with modified ext_params
-#     """
-
-#     class ComposedModel(model_class):
-#         def __init__(self, int_params: np.ndarray, ext_params: Any, sim_params: Any):
-#             # Apply composition functions
-#             transformed_int_params = int_params
-#             transformed_ext_params = ext_params
-#             transformed_sim_params = sim_params
-
-#             if compose_int_params:
-#                 transformed_int_params = compose_int_params(int_params, ext_params, sim_params)
-#             if compose_ext_params:
-#                 transformed_ext_params = compose_ext_params(int_params, ext_params, sim_params)
-#             if compose_sim_params:
-#                 transformed_sim_params = compose_sim_params(int_params, ext_params, sim_params)
-
-#             # Initialize the base model with transformed parameters
-#             super().__init__(transformed_int_params, transformed_ext_params, transformed_sim_params)
-
 # --- Core model base ---
 @dataclass
 class Model():
     """
-    Base model class. Handles forward simulation only
-
-    Subclasses SHOULD:
-    - implement simulate_single(self) -> Dict[str, Any] (with keys "value" and "shape")
-    - optionally implement simulate_batch(cls, ...) for performance.
-
-    Constructor semantics:
-    - int_params: numpy array or scalar representing internal parameters
-    - ext_params: external parameters for this instance (may be None)
-    - sim_params: simulation parameters / options (may be None)
-    - sim_output: initialized as None; populated after simulate_single() or simulate_batch() is called
+    Base model class. Handles forward simulation only.
+    
+    Stores original parameters for inspection and composition chaining.
     """
-
     int_params: Any
     ext_params: Any
     sim_params: Any
     sim_output: Optional[Dict[str, Any]] = field(default=None, init=False, repr=True)
+    
+    # Track original parameters (set in __post_init__)
+    _orig_int_params: Any = field(default=None, init=False, repr=False)
+    _orig_ext_params: Any = field(default=None, init=False, repr=False)
+    _orig_sim_params: Any = field(default=None, init=False, repr=False)
 
-    # ========== Simulation ==========
-    """Core forward simulation interface."""
-
-    @abstractmethod
-    def simulate_single(self) -> Dict[str, Any]:
-        """
-        Run forward simulation for a single instance. Must be overridden.
-        Subclasses should populate self.sim_output with the result before returning.
-        Returns: {"value": np.ndarray, "shape": tuple}
-        """
-        raise NotImplementedError
-
-    # ========== Factory Methods ==========
-    """Create Model instances with special initialization logic."""
+    def __post_init__(self):
+        """Initialize original parameter tracking if not already set."""
+        # Store originals BEFORE any composition modifies them
+        if self._orig_int_params is None:
+            self._orig_int_params = copy.deepcopy(self.int_params)
+        if self._orig_ext_params is None:
+            self._orig_ext_params = copy.deepcopy(self.ext_params)
+        if self._orig_sim_params is None:
+            self._orig_sim_params = copy.deepcopy(self.sim_params)
 
     @classmethod
     def compose(
         cls,
-        compose_int_params: Optional[Callable[[Any, Any, Any], Any]] = None,
-        compose_ext_params: Optional[Callable[[Any, Any, Any], Any]] = None,
-        compose_sim_params: Optional[Callable[[Any, Any, Any], Any]] = None,
+        compose_int_params: Optional[Callable[[Any, Any, Any]]] = None,
+        compose_ext_params: Optional[Callable[[Any, Any, Any]]] = None,
+        compose_sim_params: Optional[Callable[[Any, Any, Any]]] = None,
     ) -> Type[Model]:
-
         """
-        Create a new Model subclass with composed parameters. 
-        Inherits @dataclass behavior from parent.
-
-        The composed model applies composition functions to the internal, external, and
-        simulation parameters before passing them to the base model's simulate_single() method.
-
-        Args:
-            model_class: A Model subclass to compose.
-            compose_int_params: Optional callable that transforms internal parameters.
-                            Signature: Any -> Any
-            compose_ext_params: Optional callable that transforms external parameters.
-                            Signature: Any -> Any
-            compose_sim_params: Optional callable that transforms simulation parameters.
-                            Signature: Any -> Any
-
-        Returns:
-            A new Model class with composed parameter behavior.
+        Create a new Model subclass with composed parameters.
         """
-
         class ComposedModel(cls):
 
             def __post_init__(self):
-                # Call parent's __post_init__ if it exists (for nested compositions)
-                if hasattr(super(), '__post_init__'):
-                    super().__post_init__()
+                # Call parent's __post_init__ first (stores originals NOW)
+                super().__post_init__()
                 
-                # Store originals AFTER parent transformation
-                orig_int = self.int_params
-                orig_ext = self.ext_params
-                orig_sim = self.sim_params
-
+                # NOW apply compositions to the current parameters
                 if compose_int_params:
-                    self.int_params = compose_int_params(orig_int, orig_ext, orig_sim)
+                    self.int_params = compose_int_params(
+                        self._orig_int_params, 
+                        self._orig_ext_params, 
+                        self._orig_sim_params,
+                    )
                 if compose_ext_params:
-                    self.ext_params = compose_ext_params(orig_int, orig_ext, orig_sim)
+                    self.ext_params = compose_ext_params(
+                        self._orig_int_params, 
+                        self._orig_ext_params, 
+                        self._orig_sim_params,
+                    )
                 if compose_sim_params:
-                    self.sim_params = compose_sim_params(orig_int, orig_ext, orig_sim)
+                    self.sim_params = compose_sim_params(
+                        self._orig_int_params, 
+                        self._orig_ext_params, 
+                        self._orig_sim_params,
+                    )
 
-        ComposedModel = dataclass(ComposedModel) # Critical to regenerate __init__ with __post_init__
+        ComposedModel = dataclass(ComposedModel) # Enforce post_init
         ComposedModel.__name__ = f"Composed{cls.__name__}"
         return ComposedModel
 
@@ -238,12 +162,16 @@ class Model():
         filepath.parent.mkdir(parents=True, exist_ok=True)
         
         data = {
-            'int_params': self.int_params,  # Handles numpy arrays and tuples via encoder
+            'int_params': self.int_params,
             'ext_params': self.ext_params,
             'sim_params': self.sim_params,
+            # Store originals to reconstruct composed models correctly
+            '_orig_int_params': self._orig_int_params,
+            '_orig_ext_params': self._orig_ext_params,
+            '_orig_sim_params': self._orig_sim_params,
             'sim_output': {
                 'value': self.sim_output['value'],
-                'shape': self.sim_output['shape']  # Will be encoded as tuple
+                'shape': self.sim_output['shape']
             }
         }
 
@@ -266,6 +194,11 @@ class Model():
             sim_params=data['sim_params']
         )
         
+        # Restore original parameters (important for composed models)
+        instance._orig_int_params = data['_orig_int_params']
+        instance._orig_ext_params = data['_orig_ext_params']
+        instance._orig_sim_params = data['_orig_sim_params']
+        
         # Populate the derived sim_output
         instance.sim_output = {
             'value': data['sim_output']['value'],
@@ -275,19 +208,29 @@ class Model():
         return instance     
 
     def pickle_model(self, filepath):
-        """Pickle entire Model instance."""
+        """Pickle entire Model instance (preserves all state including originals)."""
         filepath = Path(filepath)
         filepath.parent.mkdir(parents=True, exist_ok=True)
         
         with open(filepath, 'wb') as f:
-            pickle.dump(self, f, protocol = -1)
+            pickle.dump(self, f, protocol=-1)
 
     @classmethod
     def unpickle(cls, filepath) -> "Model":
         """Unpickle and restore a Model instance."""
         with open(filepath, 'rb') as f:
-            return pickle.load(f)       
-            
+            model = pickle.load(f)
+        
+        # Ensure originals are set (defensive against old pickles)
+        if model._orig_int_params is None:
+            model._orig_int_params = copy.deepcopy(model.int_params)
+        if model._orig_ext_params is None:
+            model._orig_ext_params = copy.deepcopy(model.ext_params)
+        if model._orig_sim_params is None:
+            model._orig_sim_params = copy.deepcopy(model.sim_params)
+        
+        return model
+
 @dataclass
 class ModelList:
     """Container for batch simulation of multiple Model instances."""
