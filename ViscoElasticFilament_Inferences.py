@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, List, Tuple, Optional, Type
 from pathlib import Path
 from itertools import product, zip_longest
 import copy
+import shutil
 
 import numpy as np
 from scipy.optimize import Bounds
@@ -685,183 +686,363 @@ def make_inference_pipeline_single(
     )
 
 
-if __name__ == "__main__":
-    
-    # ============================================================================
-    # SCENARIO 1: Single parameter inference (Sp4) varying A
-    # ============================================================================
-    
-    print("\n" + "="*80)
-    print("SCENARIO 1: Infer Sp4 (varying A)")
-    print("="*80)
+# =============== TESTS ===============================
 
-    # ========================================================================
-    # 1. Define internal parameter ranges
-    # ========================================================================
+def test_viscoelastic_filament_single_pass_inference():
+    """
+    Test ViscoElasticFilament inference with:
+    - One internal parameter: Sp4
+    - One external parameter set: A = 1e-6, w0 = 0
+    - One inference pass
+    """
     
-    # Internal parameters: Sp4 (outer loop)
-    Sp4_values = [1e0, 1e1]
-
+    checkpoint_dir = Path("./test_checkpoints_vef")
+    if checkpoint_dir.exists():
+        shutil.rmtree(checkpoint_dir)
+    
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+    
+    print("\n" + "=" * 80)
+    print("TEST: ViscoElasticFilament Single-Pass Inference")
+    print("=" * 80)
+    
+    # =========================================================================
+    # PHASE 1: SIMULATION
+    # =========================================================================
+    print("\nPHASE 1: Running Simulations")
+    print("-" * 80)
+    
+    # Single internal parameter: Sp4 = 1e0
+    ground_truth_Sp4 = 1e0
     int_params_list = [
-        make_ground_truth_int_params(Sp4=Sp4)
-        for Sp4 in Sp4_values
-    ]
-
-    print(f"Internal parameter combinations: {len(int_params_list)}")
-    for i, params in enumerate(int_params_list):
-        print(f"  int_idx={i}: Sp4={params.get('Sp4')}")
-        print(f"    Keys present: {list(params.keys())}")  # <-- ADD THIS
-        print(f"    'taus_b' present? {'taus_b' in params}")  # <-- AND THIS        
-        
-
-    # ========================================================================
-    # 2. Define coupled external and simulation parameters (inner loop, zipped)
-    # ========================================================================
-    
-    A_values = [1e-6, 1e-5]    
-    
-    ext_and_sim_pairs = [
-        (
-            make_ground_truth_ext_params(A=A),
-            make_sim_params_for_w0(0),
-        )
-        for A in A_values
+        make_ground_truth_int_params(Sp4=ground_truth_Sp4)
     ]
     
-    # Flatten into separate lists for the workflow
-    ext_params_list = [pair[0] for pair in ext_and_sim_pairs]
-    sim_params_list = [pair[1] for pair in ext_and_sim_pairs]
-
-    print(f"\nExt/Sim parameter pairs: {len(ext_and_sim_pairs)}")
-    for i, (ext, sim) in enumerate(ext_and_sim_pairs):
-        print(f"  pair_idx={i}: A={ext.get('A')}, "
-            f"T_span={sim.get('T_span')}")
+    print(f"Internal parameters:")
+    print(f"  Sp4 (ground truth): {ground_truth_Sp4:.4e}")
+    print(f"  Keys in int_params: {list(int_params_list[0].keys())}")
     
-    # ========================================================================
-    # 3. Initialize workflow and run simulations
-    # ========================================================================
+    # Single external parameter set: A = 1e-6, w0 = 0
+    A_value = 1e-6
+    ext_params = make_ground_truth_ext_params(A=A_value)
+    sim_params = make_sim_params_for_w0(0)
     
-    workflow = SimulationInferenceWorkflow(checkpoint_dir=Path("./checkpoints"))
+    ext_params_list = [ext_params]
+    sim_params_list = [sim_params]
     
-    print(f"\n{'='*70}")
-    print("STAGE 1: SIMULATION")
-    print(f"{'='*70}")
-
-    print(f"ext_params_list = {ext_params_list}")
-
+    print(f"\nExternal parameters:")
+    print(f"  A: {A_value:.4e}")
+    print(f"  w0 (via sim_params): 0")
+    print(f"  T_span: {sim_params.get('T_span')}")
+    
+    # Run simulations
     model_lists = workflow.run_simulations(
         int_params_list=int_params_list,
         ext_params_list=ext_params_list,
         sim_params_list=sim_params_list,
         model_class=ViscoElasticFilament_FlowParams_ScalarBending,
-        n_jobs=-1,  # Use all available cores
+        n_jobs=1,
     )
-
-    print(f"\nSimulation results:")
-    print(f"  Total ModelLists: {len(model_lists)}")
+    
+    print(f"\n✓ Simulations complete")
+    print(f"  ModelLists created: {len(model_lists)}")
+    
+    # Inspect simulation results
     for int_idx, model_list in model_lists.items():
-        n_models = len(model_list.models) if hasattr(model_list, 'models') else 1
-        print(f"  int_idx={int_idx}: {n_models} models")
+        print(f"\n  int_idx={int_idx}:")
+        print(f"    Number of models: {len(model_list.models)}")
+        
+        for model_idx, model in enumerate(model_list.models):
+            print(f"\n    model[{model_idx}]:")
+            # print(f"      ext_params['A']: {model.ext_params.get('A'):.4e}")
+            print(f"      sim_output shape: {model.sim_output.get('value', np.array([])).shape}")
+            print(f"      sim_output (first 5 values): {model.sim_output.get('value', np.array([]))[:5]}")
     
-    # ========================================================================
-    # 4. Define inference tasks
-    # ========================================================================
+    # =========================================================================
+    # PHASE 2: INFERENCE
+    # =========================================================================
+    print("\n" + "=" * 80)
+    print("PHASE 2: One-Pass Inference")
+    print("-" * 80)
     
-    print(f"\n{'='*70}")
-    print("STAGE 2: INFERENCE")
-    print(f"{'='*70}\n")
+    # Define initial guess for Sp4 (intentionally wrong for testing)
+    initial_guesses = [{'Sp4': 5e-1}]
+    param_keys_to_infer = ['Sp4']
     
-    inference_tasks = []
-
-    # Single set of initial guesses for all tasks
-    initial_guesses = [{'Sp4': 1e-1}]
-    param_keys_to_infer = list(initial_guesses[0].keys())
-
-    # Optimizer
+    print(f"\nInference setup:")
+    print(f"  Parameter to infer: Sp4")
+    print(f"  Initial guess: {initial_guesses[0]['Sp4']:.4e}")
+    print(f"  Ground truth: {ground_truth_Sp4:.4e}")
+    
+    # Optimizer setup
     optimizer = basinhopping_optimizer
-    optimizer_kwargs = make_optimizer_kwargs(bounds = _make_optimizer_bounds(param_keys_to_infer))
+    bounds = _make_optimizer_bounds(param_keys_to_infer)
+    optimizer_kwargs = make_optimizer_kwargs(bounds=bounds)
     
-    # Task type 1: Single inferences on each (int_idx, pair_idx) combination
-    print("Defining single-model inference tasks...")
-    for int_idx in range(len(int_params_list)):
-        for pair_idx in range(len(ext_and_sim_pairs)):
-            task = InferenceTask(
-                task_key=f"single_int_{int_idx}_pair_{pair_idx}",
-                int_idx=int_idx,
-                pair_indices=[pair_idx],  # Single model inference
-                make_pipeline_fn=make_inference_pipeline_single,
-                pipeline_kwargs={
-                    "initial_guesses":initial_guesses,
-                    "loss_fn": rel_mse_loss_fn,
-                    "optimizer": optimizer,
-                    "optimizer_kwargs": optimizer_kwargs,
-                    "n_jobs_per_pass": 1,  # Avoid nested parallelism
-                },
-                initial_guesses=initial_guesses,    
-            )
-            inference_tasks.append(task)
+    print(f"  Optimizer: basinhopping")
+    print(f"  Optimizer bounds: {bounds}")
     
-    print(f"  Created {len(inference_tasks)} single-model inference tasks")
+    # Create single inference task
+    inference_tasks = [
+        InferenceTask(
+            task_key="infer_Sp4_single",
+            int_idx=0,
+            pair_indices=[0],  # Select first (and only) external param set
+            make_pipeline_fn=make_inference_pipeline_single,
+            pipeline_kwargs={
+                "initial_guesses": initial_guesses,
+                "loss_fn": rel_mse_loss_fn,
+                "optimizer": optimizer,
+                "optimizer_kwargs": optimizer_kwargs,
+                "n_jobs_per_pass": 1,
+            },
+            initial_guesses=initial_guesses,
+        )
+    ]
     
-    # ========================================================================
-    # 5. Run inferences
-    # ========================================================================
+    print(f"\nCreated {len(inference_tasks)} inference task(s)")
+    for task in inference_tasks:
+        print(f"  - {task.task_key}")
     
-    print(f"\n{'='*70}")
-    print("RUNNING INFERENCES")
-    print(f"{'='*70}\n")
-    
+    # Run inference
+    print(f"\nRunning inference...")
     inference_results = workflow.run_inferences(
         inference_tasks=inference_tasks,
         model_lists=model_lists,
-        n_jobs=-1,  # Parallelize across tasks
+        n_jobs=1,
     )
     
-    print(f"\nInference results:")
-    print(f"  Total completed: {len(inference_results)}")
-    for task_key, result in inference_results.items():
-        if result and hasattr(result, 'params'):
-            print(f"  {task_key}: Sp4={result.params.get('Sp4'):.4e}"
-                f"loss={result.loss:.6e}")    
+    print(f"✓ Inferences complete: {len(inference_results)} result(s)")
+    
+    # =========================================================================
+    # PHASE 3: VERIFICATION
+    # =========================================================================
+    print("\n" + "=" * 80)
+    print("PHASE 3: Verification")
+    print("-" * 80)
+    
+    task_key = "infer_Sp4_single"
+    result = inference_results[task_key]
+    
+    print(f"\nInference Result for '{task_key}':")
+    print(f"  Type: {type(result)}")
+    print(f"  Result object: {result}")
+    
+    if result:
+        # Extract inferred parameters
+        inferred_Sp4 = result.params.get('Sp4')
+        inferred_loss = result.loss
+        converged = getattr(result, 'success', None)
+        
+        print(f"\nParameter Estimation:")
+        print(f"  Ground truth Sp4: {ground_truth_Sp4:.6e}")
+        print(f"  Inferred Sp4:    {inferred_Sp4:.6e}")
+        print(f"  Absolute error:  {abs(inferred_Sp4 - ground_truth_Sp4):.6e}")
+        print(f"  Relative error:  {abs(inferred_Sp4 - ground_truth_Sp4) / ground_truth_Sp4 * 100:.2f}%")
+        
+        print(f"\nOptimization Status:")
+        print(f"  Final loss: {inferred_loss:.6e}")
+        print(f"  Converged: {converged}")
+        
+        # Define success criterion: relative error < 10%
+        relative_error = abs(inferred_Sp4 - ground_truth_Sp4) / ground_truth_Sp4
+        success = relative_error < 0.1
+        
+        print(f"\nTest Result: {'✓ PASS' if success else '✗ FAIL'}")
+        if success:
+            print(f"  Inferred parameter is within 10% of ground truth")
+        else:
+            print(f"  Inferred parameter exceeds 10% error threshold")
+        
+        return success
+    else:
+        print(f"\n✗ FAIL: No inference result returned")
+        return False
 
-    # ========================================================================
-    # 6. Retrieve and analyze results
-    # ========================================================================
+
+if __name__ == "__main__":
+    success = test_viscoelastic_filament_single_pass_inference()
+    if not success:
+        raise AssertionError("ViscoElasticFilament inference test failed")
+
+
+# if __name__ == "__main__":
     
-    print(f"\n{'='*70}")
-    print("RESULTS")
-    print(f"{'='*70}\n")
+#     # ============================================================================
+#     # SCENARIO 1: Single parameter inference (Sp4) varying A
+#     # ============================================================================
     
-    # Example: Get single inference result
-    single_result = workflow.get_inference_result("single_int_0_pair_0")
-    if single_result:
-        print(f"Single inference (int_0, pair_0): {single_result}")
+#     print("\n" + "="*80)
+#     print("SCENARIO 1: Infer Sp4 (varying A)")
+#     print("="*80)
+
+#     # ========================================================================
+#     # 1. Define internal parameter ranges
+#     # ========================================================================
     
-    # Example: Get cumulative inference result
-    cumulative_result = workflow.get_inference_result("cumulative_int_0")
-    if cumulative_result:
-        print(f"Cumulative inference (int_0): {cumulative_result}")
+#     # Internal parameters: Sp4 (outer loop)
+#     Sp4_values = [1e0, 1e1]
+
+#     int_params_list = [
+#         make_ground_truth_int_params(Sp4=Sp4)
+#         for Sp4 in Sp4_values
+#     ]
+
+#     print(f"Internal parameter combinations: {len(int_params_list)}")
+#     for i, params in enumerate(int_params_list):
+#         print(f"  int_idx={i}: Sp4={params.get('Sp4')}")
+#         print(f"    Keys present: {list(params.keys())}")  # <-- ADD THIS
+#         print(f"    'taus_b' present? {'taus_b' in params}")  # <-- AND THIS        
+        
+
+#     # ========================================================================
+#     # 2. Define coupled external and simulation parameters (inner loop, zipped)
+#     # ========================================================================
     
-    # Example: Get a specific ModelList
-    model_list_int_0 = workflow.get_model_list(int_idx=0)
-    if model_list_int_0:
-        n_models = len(model_list_int_0.models) if hasattr(model_list_int_0, 'models') else 1
-        print(f"ModelList for int_idx=0 has {n_models} models")
+#     A_values = [1e-6, 1e-5]    
     
-    # ========================================================================
-    # 7. Checkpoint status
-    # ========================================================================
+#     ext_and_sim_pairs = [
+#         (
+#             make_ground_truth_ext_params(A=A),
+#             make_sim_params_for_w0(0),
+#         )
+#         for A in A_values
+#     ]
     
-    checkpoint = workflow.get_checkpoint_status()
-    if checkpoint:
-        print(f"\nCheckpoint status:")
-        print(f"  Stage: {checkpoint.stage}")
-        print(f"  Simulations completed: {sum(1 for e in checkpoint.simulation_entries.values() if e.completed)}")
-        print(f"  Inferences completed: {sum(1 for e in checkpoint.inference_entries.values() if e.completed)}")
+#     # Flatten into separate lists for the workflow
+#     ext_params_list = [pair[0] for pair in ext_and_sim_pairs]
+#     sim_params_list = [pair[1] for pair in ext_and_sim_pairs]
+
+#     print(f"\nExt/Sim parameter pairs: {len(ext_and_sim_pairs)}")
+#     for i, (ext, sim) in enumerate(ext_and_sim_pairs):
+#         print(f"  pair_idx={i}: A={ext.get('A')}, "
+#             f"T_span={sim.get('T_span')}")
     
-    print(f"\n{'='*70}")
-    print("WORKFLOW COMPLETE")
-    print(f"{'='*70}")
+#     # ========================================================================
+#     # 3. Initialize workflow and run simulations
+#     # ========================================================================
+    
+#     workflow = SimulationInferenceWorkflow(checkpoint_dir=Path("./checkpoints"))
+    
+#     print(f"\n{'='*70}")
+#     print("STAGE 1: SIMULATION")
+#     print(f"{'='*70}")
+
+#     print(f"ext_params_list = {ext_params_list}")
+
+#     model_lists = workflow.run_simulations(
+#         int_params_list=int_params_list,
+#         ext_params_list=ext_params_list,
+#         sim_params_list=sim_params_list,
+#         model_class=ViscoElasticFilament_FlowParams_ScalarBending,
+#         n_jobs=-1,  # Use all available cores
+#     )
+
+#     print(f"\nSimulation results:")
+#     print(f"  Total ModelLists: {len(model_lists)}")
+#     for int_idx, model_list in model_lists.items():
+#         n_models = len(model_list.models) if hasattr(model_list, 'models') else 1
+#         print(f"  int_idx={int_idx}: {n_models} models")
+    
+#     # ========================================================================
+#     # 4. Define inference tasks
+#     # ========================================================================
+    
+#     print(f"\n{'='*70}")
+#     print("STAGE 2: INFERENCE")
+#     print(f"{'='*70}\n")
+    
+#     inference_tasks = []
+
+#     # Single set of initial guesses for all tasks
+#     initial_guesses = [{'Sp4': 1e-1}]
+#     param_keys_to_infer = list(initial_guesses[0].keys())
+
+#     # Optimizer
+#     optimizer = basinhopping_optimizer
+#     optimizer_kwargs = make_optimizer_kwargs(bounds = _make_optimizer_bounds(param_keys_to_infer))
+    
+#     # Task type 1: Single inferences on each (int_idx, pair_idx) combination
+#     print("Defining single-model inference tasks...")
+#     for int_idx in range(len(int_params_list)):
+#         for pair_idx in range(len(ext_and_sim_pairs)):
+#             task = InferenceTask(
+#                 task_key=f"single_int_{int_idx}_pair_{pair_idx}",
+#                 int_idx=int_idx,
+#                 pair_indices=[pair_idx],  # Single model inference
+#                 make_pipeline_fn=make_inference_pipeline_single,
+#                 pipeline_kwargs={
+#                     "initial_guesses":initial_guesses,
+#                     "loss_fn": rel_mse_loss_fn,
+#                     "optimizer": optimizer,
+#                     "optimizer_kwargs": optimizer_kwargs,
+#                     "n_jobs_per_pass": 1,  # Avoid nested parallelism
+#                 },
+#                 initial_guesses=initial_guesses,    
+#             )
+#             inference_tasks.append(task)
+    
+#     print(f"  Created {len(inference_tasks)} single-model inference tasks")
+    
+#     # ========================================================================
+#     # 5. Run inferences
+#     # ========================================================================
+    
+#     print(f"\n{'='*70}")
+#     print("RUNNING INFERENCES")
+#     print(f"{'='*70}\n")
+    
+#     inference_results = workflow.run_inferences(
+#         inference_tasks=inference_tasks,
+#         model_lists=model_lists,
+#         n_jobs=-1,  # Parallelize across tasks
+#     )
+    
+#     print(f"\nInference results:")
+#     print(f"  Total completed: {len(inference_results)}")
+#     for task_key, result in inference_results.items():
+#         if result and hasattr(result, 'params'):
+#             print(f"  {task_key}: Sp4={result.params.get('Sp4'):.4e}"
+#                 f"loss={result.loss:.6e}")    
+
+#     # ========================================================================
+#     # 6. Retrieve and analyze results
+#     # ========================================================================
+    
+#     print(f"\n{'='*70}")
+#     print("RESULTS")
+#     print(f"{'='*70}\n")
+    
+#     # Example: Get single inference result
+#     single_result = workflow.get_inference_result("single_int_0_pair_0")
+#     if single_result:
+#         print(f"Single inference (int_0, pair_0): {single_result}")
+    
+#     # Example: Get cumulative inference result
+#     cumulative_result = workflow.get_inference_result("cumulative_int_0")
+#     if cumulative_result:
+#         print(f"Cumulative inference (int_0): {cumulative_result}")
+    
+#     # Example: Get a specific ModelList
+#     model_list_int_0 = workflow.get_model_list(int_idx=0)
+#     if model_list_int_0:
+#         n_models = len(model_list_int_0.models) if hasattr(model_list_int_0, 'models') else 1
+#         print(f"ModelList for int_idx=0 has {n_models} models")
+    
+#     # ========================================================================
+#     # 7. Checkpoint status
+#     # ========================================================================
+    
+#     checkpoint = workflow.get_checkpoint_status()
+#     if checkpoint:
+#         print(f"\nCheckpoint status:")
+#         print(f"  Stage: {checkpoint.stage}")
+#         print(f"  Simulations completed: {sum(1 for e in checkpoint.simulation_entries.values() if e.completed)}")
+#         print(f"  Inferences completed: {sum(1 for e in checkpoint.inference_entries.values() if e.completed)}")
+    
+#     print(f"\n{'='*70}")
+#     print("WORKFLOW COMPLETE")
+#     print(f"{'='*70}")
 
 
     # # ============================================================================

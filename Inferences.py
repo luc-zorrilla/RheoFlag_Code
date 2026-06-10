@@ -783,39 +783,43 @@ class InferencePipeline:
         self,
         pass_def: PipelinePass,
         fixed_params: Dict[str, float],
+        verbose: bool = True,
     ) -> Type:
-        """
-        Build the model for a single pass, enforcing fixed parameters from prior passes.
+        """..."""
         
-        Pass 1 returns the base model unchanged. Pass 2+ wraps it via compose
-        to merge fixed parameters with newly inferred ones.
-
-        Args:
-            pass_def: PipelinePass definition for this pass
-            fixed_params: Parameters inferred in prior passes (to hold constant)
+        base_model = pass_def.model_class
         
-        Returns:
-            Model class (potentially wrapped via compose)
-        """
-
+        if verbose:
+            print(f"\n[Composition Debug]")
+            print(f"  Base model: {base_model.__name__}")
+            print(f"  Fixed params to enforce: {fixed_params}")
+        
         if not fixed_params:
-            # Pass 1: No composition needed
-            return pass_def.model_class
+            if verbose:
+                print(f"  → No additional composition (Pass 1)\n")
+            return base_model
         
-        # Pass 2+: Compose to enforce fixed parameters
         def compose_int_params_with_fixed(int_params, ext_params, sim_params):
-            """Merge fixed parameters from prior passes with newly inferred ones."""
-            merged = {**fixed_params, **int_params}
+            merged = int_params.copy() if isinstance(int_params, dict) else int_params
+            if isinstance(merged, dict):
+                if verbose:
+                    print(f"  [compose_int_params_with_fixed]")
+                    print(f"    Before merge: {merged}")
+                    print(f"    Fixed params: {fixed_params}")
+                merged.update(fixed_params)
+                if verbose:
+                    print(f"    After merge: {merged}\n")
             return merged
         
-        # TODO: check whether composition worked out well here
-        composed = pass_def.model_class.compose(
+        composed = base_model.compose(
             compose_int_params=compose_int_params_with_fixed,
-            compose_ext_params=pass_def.compose_ext_params,
-            compose_sim_params=pass_def.compose_sim_params,
         )
         
+        if verbose:
+            print(f"  → Composed with fixed-param enforcer\n")
+        
         return composed
+
     
     # ========== Result Selection & Logging ==========
     """Select best results and print execution summaries."""
