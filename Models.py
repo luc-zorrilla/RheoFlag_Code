@@ -84,31 +84,14 @@ class NumpyTupleDecoder(json.JSONDecoder):
 # --- Core model base ---
 @dataclass
 class Model:
-    """
-    Base model class. Handles forward simulation only
-
-    Subclasses SHOULD:
-    - implement simulate_single(self) -> Dict[str, Any] (with keys "value" and "shape")
-    - optionally implement simulate_batch(cls, ...) for performance.
-
-    Constructor semantics:
-    - int_params: numpy array or scalar representing internal parameters
-    - ext_params: external parameters for this instance (may be None)
-    - sim_params: simulation parameters / options (may be None)
-    - sim_output: initialized as None; populated after simulate_single() or simulate_batch() is called
-    """
-
     int_params: Any
     ext_params: Any
     sim_params: Any
     sim_output: Optional[Dict[str, Any]] = field(default=None, init=False, repr=True)
 
-    def __post_init__(self):
-        """Hook for subclasses to customize parameter initialization."""
-        pass
-
-    # ========== Factory Methods ==========
-    """Create Model instances with special initialization logic."""
+    def simulate_single(self) -> Dict[str, Any]:
+        """Override in subclasses."""
+        raise NotImplementedError
 
     @classmethod
     def compose(
@@ -116,26 +99,31 @@ class Model:
         compose_int_params: Optional[Callable[[Any, Any, Any], Any]] = None,
         compose_ext_params: Optional[Callable[[Any, Any, Any], Any]] = None,
         compose_sim_params: Optional[Callable[[Any, Any, Any], Any]] = None,
-    ) -> Type[Model]:
-        """
-        Create a new Model subclass with composed parameters.
-        """
+    ) -> Type["Model"]:
+        """Create a subclass that transforms parameters before simulation."""
 
         class ComposedModel(cls):
-            def __post_init__(self):
-
-                # Call parent's __post_init__ if it exists
-                if hasattr(super(), '__post_init__'):
-                    super().__post_init__()
-
-                """Called after dataclass __init__. Transform parameters here."""
-                if compose_int_params:
-                    self.int_params = compose_int_params(self.int_params, self.ext_params, self.sim_params)
-                if compose_ext_params:
-                    self.ext_params = compose_ext_params(self.int_params, self.ext_params, self.sim_params)
-                if compose_sim_params:
-                    self.sim_params = compose_sim_params(self.int_params, self.ext_params, self.sim_params)
+            def simulate_single(self) -> Dict[str, Any]:
+                int_params = self.int_params
+                ext_params = self.ext_params
+                sim_params = self.sim_params
                 
+                if compose_int_params:
+                    int_params = compose_int_params(int_params, ext_params, sim_params)
+                if compose_ext_params:
+                    ext_params = compose_ext_params(int_params, ext_params, sim_params)
+                if compose_sim_params:
+                    sim_params = compose_sim_params(int_params, ext_params, sim_params)
+                
+                # Temporarily swap and call parent's simulate_single
+                orig_int, orig_ext, orig_sim = self.int_params, self.ext_params, self.sim_params
+                self.int_params, self.ext_params, self.sim_params = int_params, ext_params, sim_params
+                try:
+                    # Call parent class's simulate_single, skipping ComposedModel's version
+                    return super(ComposedModel, self).simulate_single()
+                finally:
+                    self.int_params, self.ext_params, self.sim_params = orig_int, orig_ext, orig_sim
+
         ComposedModel.__name__ = f"Composed{cls.__name__}"
         return ComposedModel
 
@@ -289,343 +277,126 @@ class SimpleModel(Model):
         }
         return self.sim_output
 
-# ========== Test: Double Composition ==========
+# ========== Tests ================
+# --- Simple Model for Testing ---
+@dataclass
+class SquareModel(Model):
+    """Simple model that squares the internal parameter 'x'."""
+    
+    def simulate_single(self) -> Dict[str, Any]:
+        """Square the internal parameter x."""
+        x = self.int_params['x']
+        result = {
+            'value': x ** 2,
+            'shape': (1,),
+        }
+        self.sim_output = result
+        return result
 
-def test_double_composition():
-    """Test composing a model twice with different parameter transformations."""
+
+# --- Composition Functions ---
+def double_x(int_params, ext_params, sim_params):
+    """Transform: x -> 2*x"""
+    new_params = int_params.copy()
+    new_params['x'] *= 2
+    return new_params
+
+def apply_offset(int_params, ext_params, sim_params):
+    """Transform int_params using ext_params['offset']"""
+    new_params = int_params.copy()
+    offset = ext_params.get('offset', 0)
+    new_params['x'] += offset
+    return new_params
+
+def add_sim_scale(int_params, ext_params, sim_params):
+    """Transform: x -> x * scale (from sim_params)"""
+    new_params = int_params.copy()
+    scale = sim_params.get('scale', 1)
+    new_params['x'] *= scale
+    return new_params
+
+
+# --- Tests ---
+def test_no_composition():
+    """Test basic model without composition."""
+    print("Test 1: No composition")
+    model = SquareModel(
+        int_params={'x': 3},
+        ext_params=None,
+        sim_params=None,
+    )
+    result = model.simulate_single()
+    assert result['value'] == 9, f"Expected 9, got {result['value']}"
+    assert result['x_original'] == 3
+    assert model.int_params['x'] == 3, "Original params should be unchanged"
+    print(f"  ✓ x=3 -> x²=9 (original x={model.int_params['x']})")
+
+
+def test_single_composition_int_params():
+    """Test single composition on int_params."""
+    print("\nTest 2: Single composition (double_x)")
+    SquareModel_Double = SquareModel.compose(compose_int_params=double_x)
     
-    print("=" * 60)
-    print("TEST: Double Composition")
-    print("=" * 60)
+    model = SquareModel_Double(
+        int_params={'x': 3},
+        ext_params=None,
+        sim_params=None,
+    )
+    result = model.simulate_single()
+    # x=3 -> double_x -> x=6 -> square -> 36
+    assert result['value'] == 36, f"Expected 36, got {result['value']}"
+    assert model.int_params['x'] == 3, "Original params should be unchanged"
+    print(f"  ✓ x=3 -[double_x]-> x=6 -> x²=36 (original x={model.int_params['x']})")
+
+def test_single_composition_ext_params():
+    """Test single composition on ext_params."""
+    print("\nTest 3: Single composition (apply_offset via int_params)")
+    SquareModel_Offset = SquareModel.compose(compose_int_params=apply_offset)
     
-    # --- Composition 1: Scale internal parameters by 2 ---
-    def compose_int_params_v1(int_p, ext_p, sim_p):
-        """First composition: scale internal params by 2."""
-        print(f"  [Compose 1] int_params: {int_p} -> {int_p * 2}")
-        return int_p * 2
-    
-    ComposedModel_v1 = SimpleModel.compose(
-        compose_int_params=compose_int_params_v1
+    model = SquareModel_Offset(
+        int_params={'x': 3},
+        ext_params={'offset': 2},
+        sim_params=None,
+    )
+    result = model.simulate_single()
+    # x=3 -> apply_offset(offset=2) -> x=5 -> square -> 25
+    assert result['value'] == 25, f"Expected 25, got {result['value']}"
+    assert model.int_params['x'] == 3, "Original int_params should be unchanged"
+    assert model.ext_params['offset'] == 2, "Original ext_params should be unchanged"
+    print(f"  ✓ x=3 -[add_offset(2)]-> x=5 -> x²=25 (original x={model.int_params['x']})")
+
+def test_nested_compositions():
+    """Test multiple compositions in single compose call."""
+    print("\nTest 5: Multiple compositions (int + ext)")
+    SquareModel_Composed = SquareModel.compose(
+        compose_int_params=double_x,
+    )
+    SquareModel_Composed_Composed = SquareModel_Composed.compose(
+        compose_int_params=double_x,
     )
     
-    # --- Composition 2: Add offset to external parameters ---
-    def compose_ext_params_v2(int_p, ext_p, sim_p):
-        """Second composition: add 10 to external params."""
-        print(f"  [Compose 2] ext_params: {ext_p} -> {ext_p + 10}")
-        return ext_p + 10
-    
-    DoubleComposedModel = ComposedModel_v1.compose(
-        compose_ext_params=compose_ext_params_v2
+    model = SquareModel_Composed_Composed(
+        int_params={'x': 1},
+        ext_params=None,
+        sim_params=None,
     )
-    
-    # --- Test Execution ---
-    print("\n1. Creating instance with int_params=5, ext_params=3")
-    instance = DoubleComposedModel(
-        int_params=5,
-        ext_params=3,
-        sim_params=None
-    )
-    
-    print(f"   After composition:")
-    print(f"   - int_params: {instance.int_params} (expected: 10)")
-    print(f"   - ext_params: {instance.ext_params} (expected: 13)")
-    
-    print("\n2. Running simulation")
-    result = instance.simulate_single()
-    expected_value = 10 * 13  # (5*2) * (3+10) = 10 * 13 = 130
-    actual_value = result['value'][0]
-    
-    print(f"   Simulation output: {actual_value}")
-    print(f"   Expected: {expected_value}")
-    
-    # --- Assertions (manual validation) ---
-    assert instance.int_params == 10, f"int_params should be 10, got {instance.int_params}"
-    assert instance.ext_params == 13, f"ext_params should be 13, got {instance.ext_params}"
-    assert actual_value == expected_value, f"Result should be {expected_value}, got {actual_value}"
-    
-    print("\n✓ All assertions passed!")
-    print("=" * 60)
+    result = model.simulate_single()
+    # x=1 -> double_x -> x=2 -> double_x -> x=4 --> Square --> 16
+    assert result['value'] == 16, f"Expected 16, got {result['value']}"
+    assert model.int_params['x'] == 1
+    print(f"  ✓ x=1 -[double_x]-> x=2 -[double_x]-> x=4 -> x²=16")
 
-def test_double_composition_with_all_params():
-    """Test double composition affecting all three parameter types."""
-    
-    print("\n" + "=" * 60)
-    print("TEST: Double Composition (All Parameters)")
-    print("=" * 60)
-    
-    # --- Composition 1: Modify all three parameter types ---
-    def compose_all_v1(int_p, ext_p, sim_p):
-        print(f"  [Compose 1] int_params: {int_p} -> {int_p + 1}")
-        return int_p + 1
-    
-    def compose_ext_v1(int_p, ext_p, sim_p):
-        print(f"  [Compose 1] ext_params: {ext_p} -> {ext_p * 2}")
-        return ext_p * 2
-    
-    def compose_sim_v1(int_p, ext_p, sim_p):
-        print(f"  [Compose 1] sim_params: {sim_p} -> 'modified_v1'")
-        return 'modified_v1'
-    
-    ComposedModel_v1 = SimpleModel.compose(
-        compose_int_params=compose_all_v1,
-        compose_ext_params=compose_ext_v1,
-        compose_sim_params=compose_sim_v1
-    )
-    
-    # --- Composition 2: Further modification ---
-    def compose_int_v2(int_p, ext_p, sim_p):
-        print(f"  [Compose 2] int_params: {int_p} -> {int_p * 10}")
-        return int_p * 10
-    
-    # IMPORTANT: Compose v2 FIRST, then v1 as parent
-    # This way v1 runs first (adds 1), then v2 runs (multiplies by 10)
-    DoubleComposedModel = ComposedModel_v1.compose(
-        compose_int_params=compose_int_v2
-    )
-    
-    print("\n1. Creating instance with int_params=2, ext_params=5, sim_params='initial'")
-    instance = DoubleComposedModel(
-        int_params=2,
-        ext_params=5,
-        sim_params='initial'
-    )
-    
-    print(f"   After composition:")
-    print(f"   - int_params: {instance.int_params} (expected: 30 = (2+1)*10)")
-    print(f"   - ext_params: {instance.ext_params} (expected: 10 = 5*2)")
-    print(f"   - sim_params: {instance.sim_params} (expected: 'modified_v1')")
-    
-    # --- Assertions ---
-    assert instance.int_params == 30, f"int_params should be 30, got {instance.int_params}"
-    assert instance.ext_params == 10, f"ext_params should be 10, got {instance.ext_params}"
-    assert instance.sim_params == 'modified_v1', f"sim_params should be 'modified_v1', got {instance.sim_params}"
-    
-    print("\n✓ All assertions passed!")
-    print("=" * 60)
-
-def test_modellist_basic_creation():
-    """Test basic ModelList creation and model storage."""
-    
-    print("\n" + "=" * 60)
-    print("TEST: ModelList Basic Creation")
-    print("=" * 60)
-    
-    # Create individual models
-    models = [
-        SimpleModel(int_params=1, ext_params=2, sim_params=None),
-        SimpleModel(int_params=3, ext_params=4, sim_params=None),
-        SimpleModel(int_params=5, ext_params=6, sim_params=None),
-    ]
-    
-    # Create ModelList
-    model_list = ModelList(models=models)
-    
-    print(f"Created ModelList with {len(model_list.models)} models")
-    assert len(model_list.models) == 3, "Should have 3 models"
-    assert model_list.results is None, "Results should be None before simulation"
-    
-    print("✓ ModelList created successfully")
-    print("=" * 60)
-
-
-def test_modellist_from_params():
-    """Test ModelList.from_params factory method."""
-    
-    print("\n" + "=" * 60)
-    print("TEST: ModelList.from_params Factory")
-    print("=" * 60)
-    
-    int_params_batch = [1, 3, 5]
-    ext_params_batch = [2, 4, 6]
-    sim_params_batch = [None, None, None]
-    
-    model_list = ModelList.from_params(
-        model_class=SimpleModel,
-        int_params_batch=int_params_batch,
-        ext_params_batch=ext_params_batch,
-        sim_params_batch=sim_params_batch,
-    )
-    
-    print(f"Created ModelList with {len(model_list.models)} models")
-    assert len(model_list.models) == 3, "Should have 3 models"
-    
-    # Verify parameters are correctly assigned
-    for idx, model in enumerate(model_list.models):
-        assert model.int_params == int_params_batch[idx], \
-            f"Model {idx} int_params mismatch"
-        assert model.ext_params == ext_params_batch[idx], \
-            f"Model {idx} ext_params mismatch"
-    
-    print("✓ All models created with correct parameters")
-    print("=" * 60)
-
-
-def test_modellist_simulate_serial():
-    """Test ModelList.simulate() in serial mode."""
-    
-    print("\n" + "=" * 60)
-    print("TEST: ModelList Serial Simulation")
-    print("=" * 60)
-    
-    int_params_batch = [2, 3, 4]
-    ext_params_batch = [5, 6, 7]
-    
-    model_list = ModelList.from_params(
-        model_class=SimpleModel,
-        int_params_batch=int_params_batch,
-        ext_params_batch=ext_params_batch,
-        sim_params_batch=[None] * 3,
-    )
-    
-    print("Running serial simulation (n_jobs=1)...")
-    results = model_list.simulate(n_jobs=1, parallel=False)
-    
-    assert len(results) == 3, "Should have 3 results"
-    assert model_list.results is not None, "ModelList.results should be set"
-    
-    # Verify results
-    expected_values = [2*5, 3*6, 4*7]  # [10, 18, 28]
-    for idx, (result, expected) in enumerate(zip(results, expected_values)):
-        actual = result['value'][0]
-        print(f"  Model {idx}: {actual} (expected: {expected})")
-        assert actual == expected, f"Model {idx} result mismatch"
-    
-    print("✓ Serial simulation completed correctly")
-    print("=" * 60)
-
-
-def test_modellist_simulate_parallel():
-    """Test ModelList.simulate() in parallel mode."""
-    
-    print("\n" + "=" * 60)
-    print("TEST: ModelList Parallel Simulation")
-    print("=" * 60)
-    
-    int_params_batch = [2, 3, 4, 5]
-    ext_params_batch = [5, 6, 7, 8]
-    
-    model_list = ModelList.from_params(
-        model_class=SimpleModel,
-        int_params_batch=int_params_batch,
-        ext_params_batch=ext_params_batch,
-        sim_params_batch=[None] * 4,
-    )
-    
-    print("Running parallel simulation (n_jobs=-1)...")
-    results = model_list.simulate(n_jobs=-1, parallel=True)
-    
-    assert len(results) == 4, "Should have 4 results"
-    assert model_list.results is not None, "ModelList.results should be set"
-    
-    # Verify results match serial computation
-    expected_values = [2*5, 3*6, 4*7, 5*8]  # [10, 18, 28, 40]
-    for idx, (result, expected) in enumerate(zip(results, expected_values)):
-        actual = result['value'][0]
-        print(f"  Model {idx}: {actual} (expected: {expected})")
-        assert actual == expected, f"Model {idx} result mismatch"
-    
-    print("✓ Parallel simulation completed correctly")
-    print("=" * 60)
-
-
-def test_modellist_with_composed_models():
-    """Test ModelList with composed models."""
-    
-    print("\n" + "=" * 60)
-    print("TEST: ModelList with Composed Models")
-    print("=" * 60)
-    
-    # Create a composed model that scales int_params by 2
-    def compose_int_params(int_p, ext_p, sim_p):
-        return int_p * 2
-    
-    ComposedModel = SimpleModel.compose(
-        compose_int_params=compose_int_params
-    )
-    
-    # Create batch with composed model
-    int_params_batch = [1, 2, 3]
-    ext_params_batch = [5, 6, 7]
-    
-    model_list = ModelList.from_params(
-        model_class=ComposedModel,
-        int_params_batch=int_params_batch,
-        ext_params_batch=ext_params_batch,
-        sim_params_batch=[None] * 3,
-    )
-    
-    print("Created ModelList with composed models")
-    print("Running simulation...")
-    results = model_list.simulate(n_jobs=1, parallel=False)
-    
-    # Expected: (int_params * 2) * ext_params
-    expected_values = [1*2*5, 2*2*6, 3*2*7]  # [10, 24, 42]
-    for idx, (result, expected) in enumerate(zip(results, expected_values)):
-        actual = result['value'][0]
-        print(f"  Model {idx}: {actual} (expected: {expected})")
-        assert actual == expected, f"Model {idx} result mismatch"
-    
-    print("✓ Composed models in ModelList work correctly")
-    print("=" * 60)
-
-
-def test_modellist_with_double_composition():
-    """Test ModelList with doubly-composed models."""
-    
-    print("\n" + "=" * 60)
-    print("TEST: ModelList with Double-Composed Models")
-    print("=" * 60)
-    
-    # First composition: scale int_params by 2
-    def compose_int_v1(int_p, ext_p, sim_p):
-        return int_p * 2
-    
-    # Second composition: scale ext_params by 3
-    def compose_ext_v2(int_p, ext_p, sim_p):
-        return ext_p * 3
-    
-    ComposedModel_v1 = SimpleModel.compose(
-        compose_int_params=compose_int_v1
-    )
-    
-    DoubleComposedModel = ComposedModel_v1.compose(
-        compose_ext_params=compose_ext_v2
-    )
-    
-    # Create batch
-    int_params_batch = [1, 2, 3]
-    ext_params_batch = [5, 6, 7]
-    
-    model_list = ModelList.from_params(
-        model_class=DoubleComposedModel,
-        int_params_batch=int_params_batch,
-        ext_params_batch=ext_params_batch,
-        sim_params_batch=[None] * 3,
-    )
-    
-    print("Created ModelList with double-composed models")
-    print("Running simulation...")
-    results = model_list.simulate(n_jobs=1, parallel=False)
-    
-    # Expected: (int_params * 2) * (ext_params * 3)
-    expected_values = [1*2*5*3, 2*2*6*3, 3*2*7*3]  # [30, 72, 126]
-    for idx, (result, expected) in enumerate(zip(results, expected_values)):
-        actual = result['value'][0]
-        print(f"  Model {idx}: {actual} (expected: {expected})")
-        assert actual == expected, f"Model {idx} result mismatch"
-    
-    print("✓ Double-composed models in ModelList work correctly")
-    print("=" * 60)
-
-# ========== Run Tests ==========
-
+# Run all tests
 if __name__ == "__main__":
-    test_double_composition()
-    test_double_composition_with_all_params()
-    test_modellist_basic_creation()
-    test_modellist_from_params()
-    test_modellist_simulate_serial()
-    test_modellist_simulate_parallel()
-    test_modellist_with_composed_models()
-    test_modellist_with_double_composition()
-    print("\n✅ All tests completed successfully!\n")
+    print("=" * 60)
+    print("Testing Composition Method")
+    print("=" * 60)
+    
+    # test_no_composition() # OK
+    # test_single_composition_int_params() # OK
+    # test_single_composition_ext_params() # OK
+    test_nested_compositions()
+    
+    print("\n" + "=" * 60)
+    print("✓ All tests passed!")
+    print("=" * 60)

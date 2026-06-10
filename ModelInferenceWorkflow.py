@@ -486,6 +486,7 @@ class SimulationInferenceWorkflow:
 def test_workflow():
     """Test models in the SimulationInferenceWorkflow. """
 
+    print(f"Test workflow")
     # Clean up any previous checkpoints
     checkpoint_dir = Path("./test_checkpoints")
     if checkpoint_dir.exists():
@@ -509,6 +510,7 @@ def test_workflow():
     print(f"  Expected: {len(int_params_list)} ModelLists × {len(ext_params_list)} models = {len(int_params_list) * len(ext_params_list)} total models")
 
     # Run simulations
+    print(f"int_params_list, ext_params_list, sim_params_list = {int_params_list}, {ext_params_list}, {sim_params_list}")
     model_lists = workflow.run_simulations(
         int_params_list=int_params_list,
         ext_params_list=ext_params_list,
@@ -522,6 +524,7 @@ def test_workflow():
     for int_idx, model_list in model_lists.items():
         print(f"\n  int_idx={int_idx} (int_params={int_params_list[int_idx]}):")
         for model_idx, model in enumerate(model_list.models):
+            print(f"int_params, ext_params, sim_params = {model.int_params}, {model.ext_params}, {model.sim_params}")
             ext_val = ext_params_list[model_idx]
             result = model.sim_output['value'][0]
             expected = int_params_list[int_idx] * ext_val
@@ -578,6 +581,7 @@ def test_composition_with_workflow():
         model_list = model_lists[int_idx]
         if model_list and model_list.results:
             for model, result_dict in zip(model_list.models, model_list.results):
+                print(f"int_params, ext_params, sim_params = {model.int_params}, {model.ext_params}, {model.sim_params}")
                 if model.sim_output is None:
                     model.sim_output = result_dict
     

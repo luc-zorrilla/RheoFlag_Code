@@ -634,10 +634,10 @@ class ViscoElasticFilament(Model):
     ext_params: Any
     sim_params: Any
 
-    def __post_init__(self):
-        # Call parent's __post_init__ if it exists
-        if hasattr(super(), '__post_init__'):
-            super().__post_init__()
+    # def __post_init__(self):
+    #     # Call parent's __post_init__ if it exists
+    #     if hasattr(super(), '__post_init__'):
+    #         super().__post_init__()
         
     def simulate_single(self) -> Dict[str, Any]:
         """
