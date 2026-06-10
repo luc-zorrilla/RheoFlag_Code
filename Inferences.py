@@ -740,6 +740,13 @@ class InferencePipeline:
                 pass_def,
                 fixed_params=accumulated_params, # If there are fixed parameters, compose the model to enforce them
             )
+
+            # ==== DEBUG ====
+            print(f"model_for_pass = {model_for_pass}")
+            print(f"int_params = {model_for_pass.int_params}")
+            print(f"ext_params = {model_for_pass.ext_params}")
+            print(f"sim_params = {model_for_pass.sim_params}")
+            # ===============
             
             # Create and run Inference for this pass
             inference = Inference(

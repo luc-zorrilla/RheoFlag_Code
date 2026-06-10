@@ -343,6 +343,13 @@ def run_single_inference(
         )
     else:
         filtered_model_list = model_list
+
+    # === DEBUG ===
+    for model in filtered_model_list.models:
+        print(f"int_params = {model.int_params}")
+        print(f"ext_params = {model.ext_params}")
+        print(f"sim_params = {model.sim_params}")
+    # =============
     
     # Pass initial_guesses separately to the factory function
     pipeline_kwargs = dict(task.pipeline_kwargs)

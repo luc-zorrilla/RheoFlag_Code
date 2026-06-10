@@ -103,6 +103,9 @@ class Model:
         """Create a subclass that transforms parameters before simulation."""
 
         class ComposedModel(cls):
+
+
+            
             def simulate_single(self) -> Dict[str, Any]:
                 int_params = self.int_params
                 ext_params = self.ext_params
