@@ -84,71 +84,74 @@ class NumpyTupleDecoder(json.JSONDecoder):
 
 # --- Core model base ---
 @dataclass
-class Model():
+class Model:
     """
-    Base model class. Handles forward simulation only.
-    
-    Stores original parameters for inspection and composition chaining.
+    Base model class. Handles forward simulation only
+
+    Subclasses SHOULD:
+    - implement simulate_single(self) -> Dict[str, Any] (with keys "value" and "shape")
+    - optionally implement simulate_batch(cls, ...) for performance.
+
+    Constructor semantics:
+    - int_params: numpy array or scalar representing internal parameters
+    - ext_params: external parameters for this instance (may be None)
+    - sim_params: simulation parameters / options (may be None)
+    - sim_output: initialized as None; populated after simulate_single() or simulate_batch() is called
     """
+
     int_params: Any
     ext_params: Any
     sim_params: Any
     sim_output: Optional[Dict[str, Any]] = field(default=None, init=False, repr=True)
-    
-    # Track original parameters (set in __post_init__)
-    _orig_int_params: Any = field(default=None, init=False, repr=False)
-    _orig_ext_params: Any = field(default=None, init=False, repr=False)
-    _orig_sim_params: Any = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
-        """Initialize original parameter tracking if not already set."""
-        # Store originals BEFORE any composition modifies them
-        if self._orig_int_params is None:
-            self._orig_int_params = copy.deepcopy(self.int_params)
-        if self._orig_ext_params is None:
-            self._orig_ext_params = copy.deepcopy(self.ext_params)
-        if self._orig_sim_params is None:
-            self._orig_sim_params = copy.deepcopy(self.sim_params)
+        """Hook for subclasses to customize parameter initialization."""
+        pass
+
+    # # ========== Simulation ==========
+    # """Core forward simulation interface."""
+
+    # @abstractmethod
+    # def simulate_single(self) -> Dict[str, Any]:
+    #     """
+    #     Run forward simulation for a single instance. Must be overridden.
+    #     Subclasses should populate self.sim_output with the result before returning.
+    #     Returns: {"value": np.ndarray, "shape": tuple}
+    #     """
+    #     raise NotImplementedError
+
+    # ========== Factory Methods ==========
+    """Create Model instances with special initialization logic."""
 
     @classmethod
     def compose(
         cls,
-        compose_int_params: Optional[Callable[[Any, Any, Any]]] = None,
-        compose_ext_params: Optional[Callable[[Any, Any, Any]]] = None,
-        compose_sim_params: Optional[Callable[[Any, Any, Any]]] = None,
+        compose_int_params: Optional[Callable[[Any, Any, Any], Any]] = None,
+        compose_ext_params: Optional[Callable[[Any, Any, Any], Any]] = None,
+        compose_sim_params: Optional[Callable[[Any, Any, Any], Any]] = None,
     ) -> Type[Model]:
         """
         Create a new Model subclass with composed parameters.
         """
+
         class ComposedModel(cls):
-
             def __post_init__(self):
-                # Call parent's __post_init__ first (stores originals NOW)
-                super().__post_init__()
-                
-                # NOW apply compositions to the current parameters
-                if compose_int_params:
-                    self.int_params = compose_int_params(
-                        self._orig_int_params, 
-                        self._orig_ext_params, 
-                        self._orig_sim_params,
-                    )
-                if compose_ext_params:
-                    self.ext_params = compose_ext_params(
-                        self._orig_int_params, 
-                        self._orig_ext_params, 
-                        self._orig_sim_params,
-                    )
-                if compose_sim_params:
-                    self.sim_params = compose_sim_params(
-                        self._orig_int_params, 
-                        self._orig_ext_params, 
-                        self._orig_sim_params,
-                    )
 
-        ComposedModel = dataclass(ComposedModel) # Enforce post_init
+                # Call parent's __post_init__ if it exists
+                if hasattr(super(), '__post_init__'):
+                    super().__post_init__()
+
+                """Called after dataclass __init__. Transform parameters here."""
+                if compose_int_params:
+                    self.int_params = compose_int_params(self.int_params, self.ext_params, self.sim_params)
+                if compose_ext_params:
+                    self.ext_params = compose_ext_params(self.int_params, self.ext_params, self.sim_params)
+                if compose_sim_params:
+                    self.sim_params = compose_sim_params(self.int_params, self.ext_params, self.sim_params)
+                
         ComposedModel.__name__ = f"Composed{cls.__name__}"
         return ComposedModel
+
 
     # ========== Persistence ==========
     """Save and load model state (pickling, JSON, etc)."""
@@ -297,3 +300,141 @@ class ModelList:
             models.append(instance)
         
         return cls(models=models)
+
+# ========== Simple Model Implementation ==========
+
+@dataclass
+class SimpleModel(Model):
+    """A simple concrete model for testing."""
+    
+    def simulate_single(self) -> Dict[str, Any]:
+        """Simple simulation: multiply int_params by ext_params."""
+        result = self.int_params * self.ext_params
+        self.sim_output = {
+            'value': np.array([result]),
+            'shape': (1,)
+        }
+        return self.sim_output
+
+
+# ========== Test: Double Composition ==========
+
+def test_double_composition():
+    """Test composing a model twice with different parameter transformations."""
+    
+    print("=" * 60)
+    print("TEST: Double Composition")
+    print("=" * 60)
+    
+    # --- Composition 1: Scale internal parameters by 2 ---
+    def compose_int_params_v1(int_p, ext_p, sim_p):
+        """First composition: scale internal params by 2."""
+        print(f"  [Compose 1] int_params: {int_p} -> {int_p * 2}")
+        return int_p * 2
+    
+    ComposedModel_v1 = SimpleModel.compose(
+        compose_int_params=compose_int_params_v1
+    )
+    
+    # --- Composition 2: Add offset to external parameters ---
+    def compose_ext_params_v2(int_p, ext_p, sim_p):
+        """Second composition: add 10 to external params."""
+        print(f"  [Compose 2] ext_params: {ext_p} -> {ext_p + 10}")
+        return ext_p + 10
+    
+    DoubleComposedModel = ComposedModel_v1.compose(
+        compose_ext_params=compose_ext_params_v2
+    )
+    
+    # --- Test Execution ---
+    print("\n1. Creating instance with int_params=5, ext_params=3")
+    instance = DoubleComposedModel(
+        int_params=5,
+        ext_params=3,
+        sim_params=None
+    )
+    
+    print(f"   After composition:")
+    print(f"   - int_params: {instance.int_params} (expected: 10)")
+    print(f"   - ext_params: {instance.ext_params} (expected: 13)")
+    
+    print("\n2. Running simulation")
+    result = instance.simulate_single()
+    expected_value = 10 * 13  # (5*2) * (3+10) = 10 * 13 = 130
+    actual_value = result['value'][0]
+    
+    print(f"   Simulation output: {actual_value}")
+    print(f"   Expected: {expected_value}")
+    
+    # --- Assertions (manual validation) ---
+    assert instance.int_params == 10, f"int_params should be 10, got {instance.int_params}"
+    assert instance.ext_params == 13, f"ext_params should be 13, got {instance.ext_params}"
+    assert actual_value == expected_value, f"Result should be {expected_value}, got {actual_value}"
+    
+    print("\n✓ All assertions passed!")
+    print("=" * 60)
+
+def test_double_composition_with_all_params():
+    """Test double composition affecting all three parameter types."""
+    
+    print("\n" + "=" * 60)
+    print("TEST: Double Composition (All Parameters)")
+    print("=" * 60)
+    
+    # --- Composition 1: Modify all three parameter types ---
+    def compose_all_v1(int_p, ext_p, sim_p):
+        print(f"  [Compose 1] int_params: {int_p} -> {int_p + 1}")
+        return int_p + 1
+    
+    def compose_ext_v1(int_p, ext_p, sim_p):
+        print(f"  [Compose 1] ext_params: {ext_p} -> {ext_p * 2}")
+        return ext_p * 2
+    
+    def compose_sim_v1(int_p, ext_p, sim_p):
+        print(f"  [Compose 1] sim_params: {sim_p} -> 'modified_v1'")
+        return 'modified_v1'
+    
+    ComposedModel_v1 = SimpleModel.compose(
+        compose_int_params=compose_all_v1,
+        compose_ext_params=compose_ext_v1,
+        compose_sim_params=compose_sim_v1
+    )
+    
+    # --- Composition 2: Further modification ---
+    def compose_int_v2(int_p, ext_p, sim_p):
+        print(f"  [Compose 2] int_params: {int_p} -> {int_p * 10}")
+        return int_p * 10
+    
+    # IMPORTANT: Compose v2 FIRST, then v1 as parent
+    # This way v1 runs first (adds 1), then v2 runs (multiplies by 10)
+    DoubleComposedModel = ComposedModel_v1.compose(
+        compose_int_params=compose_int_v2
+    )
+    
+    print("\n1. Creating instance with int_params=2, ext_params=5, sim_params='initial'")
+    instance = DoubleComposedModel(
+        int_params=2,
+        ext_params=5,
+        sim_params='initial'
+    )
+    
+    print(f"   After composition:")
+    print(f"   - int_params: {instance.int_params} (expected: 30 = (2+1)*10)")
+    print(f"   - ext_params: {instance.ext_params} (expected: 10 = 5*2)")
+    print(f"   - sim_params: {instance.sim_params} (expected: 'modified_v1')")
+    
+    # --- Assertions ---
+    assert instance.int_params == 30, f"int_params should be 30, got {instance.int_params}"
+    assert instance.ext_params == 10, f"ext_params should be 10, got {instance.ext_params}"
+    assert instance.sim_params == 'modified_v1', f"sim_params should be 'modified_v1', got {instance.sim_params}"
+    
+    print("\n✓ All assertions passed!")
+    print("=" * 60)
+
+
+# ========== Run Tests ==========
+
+if __name__ == "__main__":
+    test_double_composition()
+    test_double_composition_with_all_params()
+    print("\n✅ All tests completed successfully!\n")
