@@ -658,8 +658,8 @@ def make_inference_pipeline_single(
 
     for model in model_list.models:
         ground_truths.append(model.sim_output['value'])
-        ext_params_list.append(copy.deepcopy(model._orig_ext_params))
-        sim_params_list.append(copy.deepcopy(model._orig_sim_params))
+        ext_params_list.append(copy.deepcopy(model.ext_params))
+        sim_params_list.append(copy.deepcopy(model.sim_params))
     
     param_keys_to_infer = list(initial_guesses[0].keys())
     
@@ -707,7 +707,9 @@ if __name__ == "__main__":
     print(f"Internal parameter combinations: {len(int_params_list)}")
     for i, params in enumerate(int_params_list):
         print(f"  int_idx={i}: Sp4={params.get('Sp4')}")
-    
+        print(f"    Keys present: {list(params.keys())}")  # <-- ADD THIS
+        print(f"    'taus_b' present? {'taus_b' in params}")  # <-- AND THIS        
+        
 
     # ========================================================================
     # 2. Define coupled external and simulation parameters (inner loop, zipped)
@@ -749,6 +751,14 @@ if __name__ == "__main__":
         model_class=ViscoElasticFilament_FlowParams_ScalarBending,
         n_jobs=-1,  # Use all available cores
     )
+
+    # # ========== RESTORE SIM_OUTPUT ==========
+    # for int_idx in range(len(model_lists)):
+    #     model_list = model_lists[int_idx]
+    #     if model_list and model_list.results:
+    #         for model, result_dict in zip(model_list.models, model_list.results):
+    #             if model.sim_output is None:
+    #                 model.sim_output = result_dict
     
     print(f"\nSimulation results:")
     print(f"  Total ModelLists: {len(model_lists)}")

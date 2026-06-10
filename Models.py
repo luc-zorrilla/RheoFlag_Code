@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from itertools import zip_longest, product
 from pathlib import Path
 
-
 class NumpyTupleEncoder(json.JSONEncoder):
     """Custom JSON encoder that recursively marks numpy arrays and tuples with type metadata."""
     
@@ -168,10 +167,6 @@ class Model:
             'int_params': self.int_params,
             'ext_params': self.ext_params,
             'sim_params': self.sim_params,
-            # Store originals to reconstruct composed models correctly
-            '_orig_int_params': self._orig_int_params,
-            '_orig_ext_params': self._orig_ext_params,
-            '_orig_sim_params': self._orig_sim_params,
             'sim_output': {
                 'value': self.sim_output['value'],
                 'shape': self.sim_output['shape']
@@ -197,11 +192,6 @@ class Model:
             sim_params=data['sim_params']
         )
         
-        # Restore original parameters (important for composed models)
-        instance._orig_int_params = data['_orig_int_params']
-        instance._orig_ext_params = data['_orig_ext_params']
-        instance._orig_sim_params = data['_orig_sim_params']
-        
         # Populate the derived sim_output
         instance.sim_output = {
             'value': data['sim_output']['value'],
@@ -211,7 +201,7 @@ class Model:
         return instance     
 
     def pickle_model(self, filepath):
-        """Pickle entire Model instance (preserves all state including originals)."""
+        """Pickle entire Model instance (preserves all state)."""
         filepath = Path(filepath)
         filepath.parent.mkdir(parents=True, exist_ok=True)
         
@@ -223,14 +213,6 @@ class Model:
         """Unpickle and restore a Model instance."""
         with open(filepath, 'rb') as f:
             model = pickle.load(f)
-        
-        # Ensure originals are set (defensive against old pickles)
-        if model._orig_int_params is None:
-            model._orig_int_params = copy.deepcopy(model.int_params)
-        if model._orig_ext_params is None:
-            model._orig_ext_params = copy.deepcopy(model.ext_params)
-        if model._orig_sim_params is None:
-            model._orig_sim_params = copy.deepcopy(model.sim_params)
         
         return model
 
@@ -431,10 +413,229 @@ def test_double_composition_with_all_params():
     print("\n✓ All assertions passed!")
     print("=" * 60)
 
+def test_modellist_basic_creation():
+    """Test basic ModelList creation and model storage."""
+    
+    print("\n" + "=" * 60)
+    print("TEST: ModelList Basic Creation")
+    print("=" * 60)
+    
+    # Create individual models
+    models = [
+        SimpleModel(int_params=1, ext_params=2, sim_params=None),
+        SimpleModel(int_params=3, ext_params=4, sim_params=None),
+        SimpleModel(int_params=5, ext_params=6, sim_params=None),
+    ]
+    
+    # Create ModelList
+    model_list = ModelList(models=models)
+    
+    print(f"Created ModelList with {len(model_list.models)} models")
+    assert len(model_list.models) == 3, "Should have 3 models"
+    assert model_list.results is None, "Results should be None before simulation"
+    
+    print("✓ ModelList created successfully")
+    print("=" * 60)
+
+
+def test_modellist_from_params():
+    """Test ModelList.from_params factory method."""
+    
+    print("\n" + "=" * 60)
+    print("TEST: ModelList.from_params Factory")
+    print("=" * 60)
+    
+    int_params_batch = [1, 3, 5]
+    ext_params_batch = [2, 4, 6]
+    sim_params_batch = [None, None, None]
+    
+    model_list = ModelList.from_params(
+        model_class=SimpleModel,
+        int_params_batch=int_params_batch,
+        ext_params_batch=ext_params_batch,
+        sim_params_batch=sim_params_batch,
+    )
+    
+    print(f"Created ModelList with {len(model_list.models)} models")
+    assert len(model_list.models) == 3, "Should have 3 models"
+    
+    # Verify parameters are correctly assigned
+    for idx, model in enumerate(model_list.models):
+        assert model.int_params == int_params_batch[idx], \
+            f"Model {idx} int_params mismatch"
+        assert model.ext_params == ext_params_batch[idx], \
+            f"Model {idx} ext_params mismatch"
+    
+    print("✓ All models created with correct parameters")
+    print("=" * 60)
+
+
+def test_modellist_simulate_serial():
+    """Test ModelList.simulate() in serial mode."""
+    
+    print("\n" + "=" * 60)
+    print("TEST: ModelList Serial Simulation")
+    print("=" * 60)
+    
+    int_params_batch = [2, 3, 4]
+    ext_params_batch = [5, 6, 7]
+    
+    model_list = ModelList.from_params(
+        model_class=SimpleModel,
+        int_params_batch=int_params_batch,
+        ext_params_batch=ext_params_batch,
+        sim_params_batch=[None] * 3,
+    )
+    
+    print("Running serial simulation (n_jobs=1)...")
+    results = model_list.simulate(n_jobs=1, parallel=False)
+    
+    assert len(results) == 3, "Should have 3 results"
+    assert model_list.results is not None, "ModelList.results should be set"
+    
+    # Verify results
+    expected_values = [2*5, 3*6, 4*7]  # [10, 18, 28]
+    for idx, (result, expected) in enumerate(zip(results, expected_values)):
+        actual = result['value'][0]
+        print(f"  Model {idx}: {actual} (expected: {expected})")
+        assert actual == expected, f"Model {idx} result mismatch"
+    
+    print("✓ Serial simulation completed correctly")
+    print("=" * 60)
+
+
+def test_modellist_simulate_parallel():
+    """Test ModelList.simulate() in parallel mode."""
+    
+    print("\n" + "=" * 60)
+    print("TEST: ModelList Parallel Simulation")
+    print("=" * 60)
+    
+    int_params_batch = [2, 3, 4, 5]
+    ext_params_batch = [5, 6, 7, 8]
+    
+    model_list = ModelList.from_params(
+        model_class=SimpleModel,
+        int_params_batch=int_params_batch,
+        ext_params_batch=ext_params_batch,
+        sim_params_batch=[None] * 4,
+    )
+    
+    print("Running parallel simulation (n_jobs=-1)...")
+    results = model_list.simulate(n_jobs=-1, parallel=True)
+    
+    assert len(results) == 4, "Should have 4 results"
+    assert model_list.results is not None, "ModelList.results should be set"
+    
+    # Verify results match serial computation
+    expected_values = [2*5, 3*6, 4*7, 5*8]  # [10, 18, 28, 40]
+    for idx, (result, expected) in enumerate(zip(results, expected_values)):
+        actual = result['value'][0]
+        print(f"  Model {idx}: {actual} (expected: {expected})")
+        assert actual == expected, f"Model {idx} result mismatch"
+    
+    print("✓ Parallel simulation completed correctly")
+    print("=" * 60)
+
+
+def test_modellist_with_composed_models():
+    """Test ModelList with composed models."""
+    
+    print("\n" + "=" * 60)
+    print("TEST: ModelList with Composed Models")
+    print("=" * 60)
+    
+    # Create a composed model that scales int_params by 2
+    def compose_int_params(int_p, ext_p, sim_p):
+        return int_p * 2
+    
+    ComposedModel = SimpleModel.compose(
+        compose_int_params=compose_int_params
+    )
+    
+    # Create batch with composed model
+    int_params_batch = [1, 2, 3]
+    ext_params_batch = [5, 6, 7]
+    
+    model_list = ModelList.from_params(
+        model_class=ComposedModel,
+        int_params_batch=int_params_batch,
+        ext_params_batch=ext_params_batch,
+        sim_params_batch=[None] * 3,
+    )
+    
+    print("Created ModelList with composed models")
+    print("Running simulation...")
+    results = model_list.simulate(n_jobs=1, parallel=False)
+    
+    # Expected: (int_params * 2) * ext_params
+    expected_values = [1*2*5, 2*2*6, 3*2*7]  # [10, 24, 42]
+    for idx, (result, expected) in enumerate(zip(results, expected_values)):
+        actual = result['value'][0]
+        print(f"  Model {idx}: {actual} (expected: {expected})")
+        assert actual == expected, f"Model {idx} result mismatch"
+    
+    print("✓ Composed models in ModelList work correctly")
+    print("=" * 60)
+
+
+def test_modellist_with_double_composition():
+    """Test ModelList with doubly-composed models."""
+    
+    print("\n" + "=" * 60)
+    print("TEST: ModelList with Double-Composed Models")
+    print("=" * 60)
+    
+    # First composition: scale int_params by 2
+    def compose_int_v1(int_p, ext_p, sim_p):
+        return int_p * 2
+    
+    # Second composition: scale ext_params by 3
+    def compose_ext_v2(int_p, ext_p, sim_p):
+        return ext_p * 3
+    
+    ComposedModel_v1 = SimpleModel.compose(
+        compose_int_params=compose_int_v1
+    )
+    
+    DoubleComposedModel = ComposedModel_v1.compose(
+        compose_ext_params=compose_ext_v2
+    )
+    
+    # Create batch
+    int_params_batch = [1, 2, 3]
+    ext_params_batch = [5, 6, 7]
+    
+    model_list = ModelList.from_params(
+        model_class=DoubleComposedModel,
+        int_params_batch=int_params_batch,
+        ext_params_batch=ext_params_batch,
+        sim_params_batch=[None] * 3,
+    )
+    
+    print("Created ModelList with double-composed models")
+    print("Running simulation...")
+    results = model_list.simulate(n_jobs=1, parallel=False)
+    
+    # Expected: (int_params * 2) * (ext_params * 3)
+    expected_values = [1*2*5*3, 2*2*6*3, 3*2*7*3]  # [30, 72, 126]
+    for idx, (result, expected) in enumerate(zip(results, expected_values)):
+        actual = result['value'][0]
+        print(f"  Model {idx}: {actual} (expected: {expected})")
+        assert actual == expected, f"Model {idx} result mismatch"
+    
+    print("✓ Double-composed models in ModelList work correctly")
+    print("=" * 60)
 
 # ========== Run Tests ==========
 
 if __name__ == "__main__":
     test_double_composition()
     test_double_composition_with_all_params()
+    test_modellist_basic_creation()
+    test_modellist_from_params()
+    test_modellist_simulate_serial()
+    test_modellist_simulate_parallel()
+    test_modellist_with_composed_models()
+    test_modellist_with_double_composition()
     print("\n✅ All tests completed successfully!\n")

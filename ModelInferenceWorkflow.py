@@ -2,11 +2,13 @@ from pathlib import Path
 import dill as pickle
 import json
 from datetime import datetime
+import shutil
 from typing import Any, Optional, Dict
 from joblib import Parallel, delayed
 from dataclasses import dataclass, field
-from Models import Model, ModelList
+from Models import Model, ModelList, SimpleModel
 from Inferences import Inference, InferencePipeline
+import numpy as np
 
 # =========== #
 # Checkpoints #
@@ -206,7 +208,7 @@ def run_single_simulation(
         ext_params_batch=ext_params_list,
         sim_params_batch=sim_params_list,
     )
-    
+
     # Run simulation in parallel
     model_list.simulate(n_jobs=-1, parallel=True)
     
@@ -286,6 +288,12 @@ def parallel_simulate_nested(
     model_lists = {}
     for int_idx in range(n_int):
         model_list = checkpoint_mgr.load_artifact("models", f"int_{int_idx}_pair_all")
+
+        if model_list and model_list.results:
+            for model, result_dict in zip(model_list.models, model_list.results):
+                if model.sim_output is None:
+                    model.sim_output = result_dict
+
         model_lists[int_idx] = model_list
     
     print(f"✓ Simulations complete: {len(model_lists)} ModelLists")
@@ -470,3 +478,319 @@ class SimulationInferenceWorkflow:
             shutil.rmtree(self.checkpoint_mgr.checkpoint_dir)
         self.checkpoint_mgr.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_mgr.artifacts_dir.mkdir(exist_ok=True)
+
+
+# ========== Test: Workflow ==========
+
+def test_workflow():
+    """Test models in the SimulationInferenceWorkflow. """
+
+    # Clean up any previous checkpoints
+    checkpoint_dir = Path("./test_checkpoints")
+    if checkpoint_dir.exists():
+        shutil.rmtree(checkpoint_dir)
+
+    # Create workflow
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+
+    # Define simple parameters
+    int_params_list = [2.0, 3.0, 4.0]  # 3 internal parameter values
+    ext_params_list = [10.0, 20.0]      # 2 external parameter values
+    sim_params_list = [None, None]      # 2 simulation parameters (not used in SimpleModel)
+
+    print("="*70)
+    print("SIMPLE MODEL SIMULATION TEST")
+    print("="*70)
+
+    print(f"\nInput structure:")
+    print(f"  Internal params: {len(int_params_list)} values = {int_params_list}")
+    print(f"  Ext/Sim pairs: {len(ext_params_list)} pairs")
+    print(f"  Expected: {len(int_params_list)} ModelLists × {len(ext_params_list)} models = {len(int_params_list) * len(ext_params_list)} total models")
+
+    # Run simulations
+    model_lists = workflow.run_simulations(
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        model_class=SimpleModel,
+        n_jobs=1,  # Use serial execution for easier debugging
+    )
+
+    print(f"\nResults:")
+    print(f"  ModelLists created: {len(model_lists)}")
+    for int_idx, model_list in model_lists.items():
+        print(f"\n  int_idx={int_idx} (int_params={int_params_list[int_idx]}):")
+        for model_idx, model in enumerate(model_list.models):
+            ext_val = ext_params_list[model_idx]
+            result = model.sim_output['value'][0]
+            expected = int_params_list[int_idx] * ext_val
+            print(f"    model[{model_idx}] (ext_params={ext_val}): result={result}, expected={expected}, match={result == expected}")
+
+    print("\n✓ Test complete!")
+
+
+def test_composition_with_workflow():
+    """Test composed models in the SimulationInferenceWorkflow."""
+    
+    print("\n" + "="*70)
+    print("COMPOSED MODEL SIMULATION TEST")
+    print("="*70)
+    
+    # Clean up any previous checkpoints
+    checkpoint_dir = Path("./test_checkpoints_composed")
+    if checkpoint_dir.exists():
+        shutil.rmtree(checkpoint_dir)
+    
+    # --- Create a composed model: scale internal params by 2 ---
+    def compose_int_params(int_p, ext_p, sim_p):
+        """Scale internal parameters by 2."""
+        return int_p * 2
+    
+    ComposedSimpleModel = SimpleModel.compose(
+        compose_int_params=compose_int_params
+    )
+    
+    # Create workflow
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+    
+    # Define parameters
+    int_params_list = [2.0, 3.0, 4.0]  # Will be scaled by 2 during composition
+    ext_params_list = [10.0, 20.0]
+    sim_params_list = [None, None]
+    
+    print(f"\nInput structure:")
+    print(f"  Internal params (before composition): {int_params_list}")
+    print(f"  Internal params (after composition): {[p * 2 for p in int_params_list]}")
+    print(f"  Ext/Sim pairs: {len(ext_params_list)}")
+    
+    # Run simulations with composed model
+    model_lists = workflow.run_simulations(
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        model_class=ComposedSimpleModel,
+        n_jobs=1,
+    )
+    
+    # Restore sim_output from results
+    for int_idx in range(len(model_lists)):
+        model_list = model_lists[int_idx]
+        if model_list and model_list.results:
+            for model, result_dict in zip(model_list.models, model_list.results):
+                if model.sim_output is None:
+                    model.sim_output = result_dict
+    
+    print(f"\nResults:")
+    print(f"  ModelLists created: {len(model_lists)}")
+    
+    all_correct = True
+    for int_idx, model_list in model_lists.items():
+        print(f"\n  int_idx={int_idx} (original int_params={int_params_list[int_idx]}):")
+        for model_idx, model in enumerate(model_list.models):
+            ext_val = ext_params_list[model_idx]
+            composed_int_val = int_params_list[int_idx] * 2  # After composition
+            result = model.sim_output['value'][0]
+            expected = composed_int_val * ext_val
+            match = result == expected
+            all_correct = all_correct and match
+            print(f"    model[{model_idx}] (ext_params={ext_val}): "
+                f"result={result}, expected={expected}, match={match}")
+            print(f"      int_params after composition: {model.int_params}")
+    
+    if all_correct:
+        print("\n✓ All composed model simulations passed!")
+    else:
+        print("\n✗ Some results did not match!")
+    
+    print("="*70)
+    return all_correct
+
+
+def test_double_composition_with_workflow():
+    """Test doubly-composed models in the workflow."""
+    
+    print("\n" + "="*70)
+    print("DOUBLE COMPOSED MODEL SIMULATION TEST")
+    print("="*70)
+    
+    checkpoint_dir = Path("./test_checkpoints_double_composed")
+    if checkpoint_dir.exists():
+        shutil.rmtree(checkpoint_dir)
+    
+    # --- Composition 1: Scale internal by 2 ---
+    def compose_int_v1(int_p, ext_p, sim_p):
+        return int_p * 2
+    
+    ComposedModel_v1 = SimpleModel.compose(
+        compose_int_params=compose_int_v1
+    )
+    
+    # --- Composition 2: Add offset to external ---
+    def compose_ext_v2(int_p, ext_p, sim_p):
+        return ext_p + 10
+    
+    DoubleComposedModel = ComposedModel_v1.compose(
+        compose_ext_params=compose_ext_v2
+    )
+    
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+    
+    int_params_list = [1.0, 2.0]
+    ext_params_list = [5.0, 15.0]
+    sim_params_list = [None, None]
+    
+    print(f"\nInput structure:")
+    print(f"  Internal params (before): {int_params_list}")
+    print(f"  Internal params (after compose v1): {[p * 2 for p in int_params_list]}")
+    print(f"  External params (before): {ext_params_list}")
+    print(f"  External params (after compose v2): {[p + 10 for p in ext_params_list]}")
+    
+    model_lists = workflow.run_simulations(
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        model_class=DoubleComposedModel,
+        n_jobs=1,
+    )
+    
+    # Restore sim_output
+    for int_idx in range(len(model_lists)):
+        model_list = model_lists[int_idx]
+        if model_list and model_list.results:
+            for model, result_dict in zip(model_list.models, model_list.results):
+                if model.sim_output is None:
+                    model.sim_output = result_dict
+    
+    print(f"\nResults:")
+    all_correct = True
+    for int_idx, model_list in model_lists.items():
+        original_int = int_params_list[int_idx]
+        composed_int = original_int * 2
+        print(f"\n  int_idx={int_idx} (original={original_int}, after compose v1={composed_int}):")
+        for model_idx, model in enumerate(model_list.models):
+            original_ext = ext_params_list[model_idx]
+            composed_ext = original_ext + 10
+            result = model.sim_output['value'][0]
+            expected = composed_int * composed_ext
+            match = result == expected
+            all_correct = all_correct and match
+            print(f"    model[{model_idx}] (ext: {original_ext} → {composed_ext}): "
+                f"result={result}, expected={expected}, match={match}")
+    
+    if all_correct:
+        print("\n✓ All double-composed model simulations passed!")
+    else:
+        print("\n✗ Some results did not match!")
+    
+    print("="*70)
+    return all_correct
+
+def test_composition_with_all_params():
+    """Test composition affecting all three parameter types in workflow."""
+    
+    print("\n" + "="*70)
+    print("COMPOSITION (ALL PARAMETERS) WITH WORKFLOW TEST")
+    print("="*70)
+    
+    checkpoint_dir = Path("./test_checkpoints_all_params")
+    if checkpoint_dir.exists():
+        shutil.rmtree(checkpoint_dir)
+    
+    # --- Extended SimpleModel that uses sim_params ---
+    @dataclass
+    class ExtendedSimpleModel(Model):
+        """SimpleModel that incorporates sim_params in computation."""
+        
+        def simulate_single(self) -> Dict[str, Any]:
+            """Multiply int_params by ext_params, scaled by sim_params multiplier."""
+            multiplier = self.sim_params.get('multiplier', 1.0) if self.sim_params else 1.0
+            result = self.int_params * self.ext_params * multiplier
+            self.sim_output = {
+                'value': np.array([result]),
+                'shape': (1,)
+            }
+            return self.sim_output
+    
+    # --- Composition: Modify all three parameters ---
+    def compose_int(int_p, ext_p, sim_p):
+        return int_p + 1
+    
+    def compose_ext(int_p, ext_p, sim_p):
+        return ext_p * 2
+    
+    def compose_sim(int_p, ext_p, sim_p):
+        if sim_p is None:
+            sim_p = {}
+        else:
+            sim_p = dict(sim_p)
+        sim_p['multiplier'] = 3.0
+        return sim_p
+    
+    ComposedExtendedModel = ExtendedSimpleModel.compose(
+        compose_int_params=compose_int,
+        compose_ext_params=compose_ext,
+        compose_sim_params=compose_sim
+    )
+    
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+    
+    int_params_list = [2.0, 3.0]
+    ext_params_list = [4.0, 5.0]
+    sim_params_list = [None, None]
+    
+    print(f"\nInput structure:")
+    print(f"  int_params (before): {int_params_list}")
+    print(f"  int_params (after +1): {[p + 1 for p in int_params_list]}")
+    print(f"  ext_params (before): {ext_params_list}")
+    print(f"  ext_params (after *2): {[p * 2 for p in ext_params_list]}")
+    print(f"  sim_params: None → {{'multiplier': 3.0}}")
+    
+    model_lists = workflow.run_simulations(
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        model_class=ComposedExtendedModel,
+        n_jobs=1,
+    )
+    
+    # Restore sim_output
+    for int_idx in range(len(model_lists)):
+        model_list = model_lists[int_idx]
+        if model_list and model_list.results:
+            for model, result_dict in zip(model_list.models, model_list.results):
+                if model.sim_output is None:
+                    model.sim_output = result_dict
+    
+    print(f"\nResults:")
+    all_correct = True
+    for int_idx, model_list in model_lists.items():
+        original_int = int_params_list[int_idx]
+        composed_int = original_int + 1
+        print(f"\n  int_idx={int_idx} (int: {original_int} → {composed_int}):")
+        for model_idx, model in enumerate(model_list.models):
+            original_ext = ext_params_list[model_idx]
+            composed_ext = original_ext * 2
+            result = model.sim_output['value'][0]
+            expected = composed_int * composed_ext * 3.0
+            match = result == expected
+            all_correct = all_correct and match
+            print(f"    model[{model_idx}] (ext: {original_ext} → {composed_ext}): "
+                f"result={result}, expected={expected} (computation: {composed_int} × {composed_ext} × 3), match={match}")
+    
+    if all_correct:
+        print("\n✓ All all-param composition tests passed!")
+    else:
+        print("\n✗ Some results did not match!")
+    
+    print("="*70)
+    return all_correct
+
+# ========== Run all workflow tests ==========
+if __name__ == "__main__":
+    test_workflow()
+    test_composition_with_workflow()
+    test_double_composition_with_workflow()
+    test_composition_with_all_params()
+    print("\n" + "="*70)
+    print("ALL COMPOSITION TESTS COMPLETED")
+    print("="*70)
