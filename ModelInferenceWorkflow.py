@@ -7,7 +7,8 @@ from typing import Any, Optional, Dict
 from joblib import Parallel, delayed
 from dataclasses import dataclass, field
 from Models import Model, ModelList, SimpleModel
-from Inferences import Inference, InferencePipeline
+from Inferences import Inference, InferencePipeline, PipelinePass
+from scipy.optimize import minimize, OptimizeResult
 import numpy as np
 
 # =========== #
@@ -343,6 +344,9 @@ def run_single_inference(
     else:
         filtered_model_list = model_list
     
+    # Pass initial_guesses separately to the factory function
+    pipeline_kwargs = dict(task.pipeline_kwargs)
+
     # Create pipeline via factory
     pipeline = InferencePipeline.from_factory(
         task.make_pipeline_fn,
@@ -350,12 +354,9 @@ def run_single_inference(
         **task.pipeline_kwargs,
     )
     
-    # Extract initial_guesses from pipeline_kwargs and wrap per pass
-    initial_guesses = task.pipeline_kwargs.get("initial_guesses", [])
     n_passes = len(pipeline.passes)
-    initial_guesses_per_pass = [initial_guesses for _ in range(n_passes)]
-    # TODO: could be an issue if initial_guesses need to be modified for each pass (e.g., due to composition)
-    
+    initial_guesses_per_pass = [task.initial_guesses for _ in range(n_passes)]
+
     # Run pipeline with proper argument structure
     result = pipeline.run(
         initial_guesses_per_pass=initial_guesses_per_pass,
@@ -785,12 +786,184 @@ def test_composition_with_all_params():
     print("="*70)
     return all_correct
 
+def test_workflow_with_inference():
+    """Test SimulationInferenceWorkflow: simulations → one-pass inference."""
+    
+    # Clean up any previous checkpoints
+    checkpoint_dir = Path("./test_checkpoints")
+    if checkpoint_dir.exists():
+        shutil.rmtree(checkpoint_dir)
+    
+    # Create workflow
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+    
+    # Define parameters
+    int_params_list = [
+        {'int_params': 2.0},
+        {'int_params': 3.0},
+        {'int_params': 4.0},
+    ]
+    ext_params_list = [
+        {'value': 5.0},
+        {'value': 10.0},
+    ]
+    sim_params_list = [None, None]
+    
+    print("=" * 70)
+    print("WORKFLOW: SIMULATION + ONE-PASS INFERENCE")
+    print("=" * 70)
+    
+    # =========================================================================
+    # PHASE 1: SIMULATIONS
+    # =========================================================================
+    print("\nPHASE 1: Running Simulations")
+    print("-" * 70)
+    print(f"Input structure:")
+    print(f"  Internal params: {len(int_params_list)} values")
+    print(f"  Ext/Sim pairs: {len(ext_params_list)} pairs")
+    print(f"  Expected: {len(int_params_list)} ModelLists × {len(ext_params_list)} models")
+    
+    model_lists = workflow.run_simulations(
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        model_class=SimpleModel,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ Simulations complete: {len(model_lists)} ModelLists created")
+    
+    # Verify simulation results
+    print(f"\nSimulation Results:")
+    for int_idx, model_list in model_lists.items():
+        int_param_val = int_params_list[int_idx]['int_params']
+        print(f"\n  int_idx={int_idx} (int_params={int_param_val}):")
+        for model_idx, model in enumerate(model_list.models):
+            ext_val = ext_params_list[model_idx]['value']
+            result = model.sim_output['value'][0]
+            expected = int_param_val * ext_val
+            match = abs(result - expected) < 1e-10
+            print(f"    model[{model_idx}] (ext={ext_val:>5}): result={result:>6.1f}, expected={expected:>6.1f} ✓" if match else f"    model[{model_idx}] (ext={ext_val:>5}): result={result:>6.1f}, expected={expected:>6.1f} ✗")
+    
+    # =========================================================================
+    # PHASE 2: ONE-PASS INFERENCE
+    # =========================================================================
+    print("\n" + "=" * 70)
+    print("PHASE 2: One-Pass Inference")
+    print("-" * 70)
+    
+    def make_simple_inference_pipeline(model_list, **kwargs):
+        """Factory function to create inference pipeline from ModelList."""
+        
+        # Extract ground truths from simulated models
+        ground_truths = [model.sim_output['value'] for model in model_list.models]
+        ext_params_batch = [{'value': model.ext_params['value']} for model in model_list.models]
+        
+        def loss_fn(predicted_list, ground_truth_list):
+            """MSE loss aggregated across all models."""
+            total_loss = 0.0
+            for predicted, gt in zip(predicted_list, ground_truth_list):
+                total_loss += np.mean((predicted - gt) ** 2)
+            return total_loss / len(ground_truth_list)
+        
+        # Single pass: infer int_params
+        pass_1 = PipelinePass(
+            name="Pass_1_infer_int_params",
+            model_class=SimpleModel,
+            ground_truths=ground_truths,
+            ext_params_list=ext_params_batch,
+            sim_params_list=[None] * len(ground_truths),
+            param_keys_to_infer=['int_params'],
+            fixed_params={},
+            product_or_zip="zip",
+            optimizer=minimize,
+            optimizer_kwargs={'method': 'Nelder-Mead'},
+        )
+        
+        return InferencePipeline(
+            passes=[pass_1],
+            loss_fn=loss_fn,
+            n_jobs_per_pass=-1,
+        )
+    
+    # Create inference tasks: one for each int_idx
+    inference_tasks = []
+    for int_idx in range(len(int_params_list)):
+        task = InferenceTask(
+            task_key=f"infer_int_{int_idx}",
+            int_idx=int_idx,
+            pair_indices=None,  # Use all models in the ModelList
+            make_pipeline_fn=make_simple_inference_pipeline,
+            pipeline_kwargs={},
+            initial_guesses=[{'int_params': 1.0}],
+        )
+        inference_tasks.append(task)
+    
+    print(f"\nCreated {len(inference_tasks)} inference task(s)")
+    for task in inference_tasks:
+        print(f"  - {task.task_key}: int_idx={task.int_idx}")
+    
+    # Run inferences
+    inference_results = workflow.run_inferences(
+        inference_tasks=inference_tasks,
+        model_lists=model_lists,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ Inferences complete: {len(inference_results)} result(s)")
+    
+    # =========================================================================
+    # PHASE 3: VERIFY INFERENCE RESULTS
+    # =========================================================================
+    print("\n" + "=" * 70)
+    print("PHASE 3: Verification")
+    print("-" * 70)
+    print(f"\nInference Results:")
+    
+    all_success = True
+    for int_idx in range(len(int_params_list)):
+        task_key = f"infer_int_{int_idx}"
+        result = inference_results[task_key]
+        true_int_params = int_params_list[int_idx]['int_params']
+        inferred_int_params = result[0].params['int_params']
+        error = abs(inferred_int_params - true_int_params)
+        success = error < 0.01
+        
+        print(f"\n  {task_key}:")
+        print(f"    True int_params: {true_int_params}")
+        print(f"    Inferred int_params: {inferred_int_params:.4f}")
+        print(f"    Error: {error:.6f}")
+        print(f"    Converged: {result[0].success}")
+        print(f"    Final loss: {result[0].loss:.6e}")
+        print(f"    Status: {'✓ PASS' if success else '✗ FAIL'}")
+        
+        all_success = all_success and success
+    
+    # =========================================================================
+    # FINAL SUMMARY
+    # =========================================================================
+    print("\n" + "=" * 70)
+    checkpoint_status = workflow.get_checkpoint_status()
+    print(f"Checkpoint Status:")
+    print(f"  Stage: {checkpoint_status.stage}")
+    print(f"  Simulation entries: {len(checkpoint_status.simulation_entries)}")
+    print(f"  Inference entries: {len(checkpoint_status.inference_entries)}")
+    
+    if all_success:
+        print("\n✓ WORKFLOW TEST PASSED!")
+    else:
+        print("\n✗ WORKFLOW TEST FAILED!")
+    print("=" * 70)
+    
+    assert all_success, "All inference results should match true parameters"
+
 # ========== Run all workflow tests ==========
 if __name__ == "__main__":
     test_workflow()
     test_composition_with_workflow()
     test_double_composition_with_workflow()
     test_composition_with_all_params()
+    test_workflow_with_inference()
     print("\n" + "="*70)
     print("ALL COMPOSITION TESTS COMPLETED")
     print("="*70)

@@ -752,14 +752,6 @@ if __name__ == "__main__":
         n_jobs=-1,  # Use all available cores
     )
 
-    # # ========== RESTORE SIM_OUTPUT ==========
-    # for int_idx in range(len(model_lists)):
-    #     model_list = model_lists[int_idx]
-    #     if model_list and model_list.results:
-    #         for model, result_dict in zip(model_list.models, model_list.results):
-    #             if model.sim_output is None:
-    #                 model.sim_output = result_dict
-    
     print(f"\nSimulation results:")
     print(f"  Total ModelLists: {len(model_lists)}")
     for int_idx, model_list in model_lists.items():
@@ -794,12 +786,13 @@ if __name__ == "__main__":
                 pair_indices=[pair_idx],  # Single model inference
                 make_pipeline_fn=make_inference_pipeline_single,
                 pipeline_kwargs={
-                    "initial_guesses": initial_guesses,
+                    "initial_guesses":initial_guesses,
                     "loss_fn": rel_mse_loss_fn,
                     "optimizer": optimizer,
                     "optimizer_kwargs": optimizer_kwargs,
                     "n_jobs_per_pass": 1,  # Avoid nested parallelism
                 },
+                initial_guesses=initial_guesses,    
             )
             inference_tasks.append(task)
     

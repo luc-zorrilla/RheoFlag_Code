@@ -8,6 +8,7 @@ import scipy.differentiate as sd
 from itertools import product
 import dill as pickle
 from pathlib import Path
+from Models import Model, SimpleModel
 
 # ============================================================================
 # FUNCTIONS
@@ -931,4 +932,227 @@ class InferencePipeline:
         
         lines.append("\n" + "="*80)
         return "\n".join(lines)
+
+
+# ============ TESTS =============
+
+
+def simple_loss_fn(predicted, ground_truth):
+    """Mean squared error loss. predicted is already a numpy array."""
+    return np.mean((predicted - ground_truth) ** 2)
+    
+def test_simple_inference():
+    """Test basic inference on SimpleModel with a single ground truth."""
+    
+    print("=" * 60)
+    print("TEST: SimpleModel Basic Inference")
+    print("=" * 60)
+    
+    # Ground truth: int_params = 5, ext_params = 3 → output = 15
+    ground_truth = np.array([15.0])
+
+    print("\n1. Setting up inference to recover int_params=5")
+    inference = Inference(
+        model_class=SimpleModel,
+        ground_truths=[ground_truth],
+        loss_fn=simple_loss_fn,
+        ext_params_list=[3],  # Pass scalar directly, not dict
+        sim_params_list=[None],
+        optimizer=minimize,
+        optimizer_kwargs=None,
+    )
+    
+    print("   Running inference with initial guess int_params=1.0")
+    initial_guess = {'int_params': 1.0}
+    result = inference.infer(initial_guess)
+    
+    print(f"\n2. Results:")
+    print(f"   Inferred int_params: {result.params['int_params']:.4f} (expected ~5.0)")
+    print(f"   Final loss: {result.loss:.6f}")
+    print(f"   Converged: {result.success}")
+    
+    assert result.success, "Optimization should converge"
+    assert abs(result.params['int_params'] - 5.0) < 0.01
+    assert result.loss < 1e-6
+    
+    print("\n✓ Inference test passed!")
+    print("=" * 60)
+
+
+def test_inference_batch():
+    """Test batch inference with multiple initial guesses."""
+    
+    print("\n" + "=" * 60)
+    print("TEST: SimpleModel Batch Inference")
+    print("=" * 60)
+    
+    # Ground truth: int_params=7, ext_params=2 → output=14
+    ground_truth = np.array([14.0])
+    
+    inference = Inference(
+        model_class=SimpleModel,
+        ground_truths=[ground_truth],
+        loss_fn=simple_loss_fn,
+        ext_params_list=[{'value': 2}],
+        sim_params_list=[None],
+        optimizer=minimize,
+        optimizer_kwargs=None,
+        n_jobs=-1,  # Parallel
+    )
+    
+    print("\n1. Running batch inference with 3 different initial guesses")
+    initial_guesses = [
+        {'int_params': 1.0},
+        {'int_params': 5.0},
+        {'int_params': 10.0},
+    ]
+    
+    results = inference.infer_batch(initial_guesses)
+    
+    print(f"   Ran {len(results)} inferences in parallel")
+    for idx, res in enumerate(results):
+        print(f"   - Guess {idx+1}: int_params={res.params['int_params']:.4f}, loss={res.loss:.6f}")
+    
+    # All should converge to ~7
+    for idx, res in enumerate(results):
+        assert res.success, f"Result {idx} should converge"
+        assert abs(res.params['int_params'] - 7.0) < 0.01, \
+            f"Result {idx} should recover int_params≈7.0"
+    
+    print("\n✓ Batch inference test passed!")
+    print("=" * 60)
+
+
+def test_inference_multi_ground_truth():
+    """Test inference with multiple ground truths (different external conditions)."""
+    
+    print("\n" + "=" * 60)
+    print("TEST: SimpleModel Multi-Ground-Truth Inference")
+    print("=" * 60)
+    
+    # True internal param: int_params = 4
+    # Varying external params: [2, 3, 5]
+    # Expected outputs: [8, 12, 20]
+    ground_truths = [
+        np.array([8.0]),
+        np.array([12.0]),
+        np.array([20.0]),
+    ]
+    
+    def aggregated_loss_fn(predicted_list, ground_truth_list):
+        """Aggregate MSE across all ground truths. predicted_list is list of arrays."""
+        total_loss = 0.0
+        for predicted, gt in zip(predicted_list, ground_truth_list):
+            total_loss += np.mean((predicted - gt) ** 2)
+        return total_loss / len(ground_truth_list)
+
+    inference = Inference(
+        model_class=SimpleModel,
+        ground_truths=ground_truths,
+        loss_fn=aggregated_loss_fn,
+        ext_params_list=[{'value': 2}, {'value': 3}, {'value': 5}],
+        sim_params_list=[None, None, None],
+        optimizer=minimize,
+        optimizer_kwargs=None,
+        product_or_zip="zip",
+    )
+    
+    print("\n1. Inferring int_params from 3 ground truths (different ext_params)")
+    initial_guess = {'int_params': 1.0}
+    result = inference.infer(initial_guess)
+    
+    print(f"\n2. Results:")
+    print(f"   Inferred int_params: {result.params['int_params']:.4f} (expected ~4.0)")
+    print(f"   Final loss: {result.loss:.6f}")
+    print(f"   Converged: {result.success}")
+    
+    assert result.success, "Optimization should converge"
+    assert abs(result.params['int_params'] - 4.0) < 0.01, \
+        f"Should recover int_params≈4.0, got {result.params['int_params']}"
+    
+    print("\n✓ Multi-ground-truth inference test passed!")
+    print("=" * 60)
+
+def test_pipeline_one_pass_simple():
+    """Test a single-pass pipeline with SimpleModel."""
+    
+    print("\n" + "=" * 60)
+    print("TEST: InferencePipeline One-Pass Simple")
+    print("=" * 60)
+    
+    # Ground truth: output = int_params * ext_params
+    # With ext_params=3, int_params=5, output should be 15
+    ground_truth = np.array([15.0])
+    
+    def pipeline_loss_fn(predicted_list, ground_truth_list):
+        """Aggregate MSE across all ground truths."""
+        total_loss = 0.0
+        for predicted, gt in zip(predicted_list, ground_truth_list):
+            total_loss += np.mean((predicted - gt) ** 2)
+        return total_loss / len(ground_truth_list)
+    
+    # Define single pass: Infer int_params
+    pass_1 = PipelinePass(
+        name="Pass_1_simple",
+        model_class=SimpleModel,
+        ground_truths=[ground_truth],
+        ext_params_list=[{'value': 3}],
+        sim_params_list=[None],
+        param_keys_to_infer=['int_params'],
+        fixed_params={},
+        product_or_zip="zip",
+        optimizer=minimize,
+        optimizer_kwargs=None,
+    )
+    
+    pipeline = InferencePipeline(
+        passes=[pass_1],
+        loss_fn=pipeline_loss_fn,
+        n_jobs_per_pass=-1,
+    )
+    
+    print("\n1. Running single-pass pipeline")
+    print("   Ground truth: 15.0")
+    print("   External params: 3")
+    print("   Goal: Infer int_params (expected ~5.0)")
+    
+    initial_guesses = [
+        [{'int_params': 1.0}]  # Single initial guess for Pass 1
+    ]
+    
+    results = pipeline.run(initial_guesses, verbose=True)
+    
+    print(f"\n2. Pipeline Results:")
+    print(f"   Number of passes executed: {len(results)}")
+    print(f"   Inferred int_params: {results[0].params['int_params']:.4f}")
+    print(f"   Final loss: {results[0].loss:.6f}")
+    print(f"   Converged: {results[0].success}")
+    
+    print(f"\n3. Parameter Trajectory:")
+    for i, params in enumerate(pipeline.parameter_trajectory):
+        print(f"   After Pass {i+1}: {params}")
+    
+    # Assertions
+    assert len(results) == 1, "Should have exactly 1 result"
+    assert results[0].success, "Optimization should converge"
+    assert abs(results[0].params['int_params'] - 5.0) < 0.01, \
+        f"Should recover int_params≈5.0, got {results[0].params['int_params']}"
+    assert results[0].loss < 1e-6, "Loss should be very small"
+    assert len(pipeline.parameter_trajectory) == 1, "Should have 1 trajectory point"
+    assert pipeline.parameter_trajectory[0] == results[0].params, \
+        "Trajectory should match final params"
+    
+    print("\n✓ One-pass simple pipeline test passed!")
+    print("=" * 60)
+
+
+# Run all tests
+if __name__ == "__main__":
+    test_simple_inference()
+    test_inference_batch()
+    test_inference_multi_ground_truth()
+    test_pipeline_one_pass_simple()
+    print("\n" + "=" * 60)
+    print("ALL INFERENCE TESTS PASSED ✓")
+    print("=" * 60)
     

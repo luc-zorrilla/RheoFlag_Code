@@ -107,18 +107,6 @@ class Model:
         """Hook for subclasses to customize parameter initialization."""
         pass
 
-    # # ========== Simulation ==========
-    # """Core forward simulation interface."""
-
-    # @abstractmethod
-    # def simulate_single(self) -> Dict[str, Any]:
-    #     """
-    #     Run forward simulation for a single instance. Must be overridden.
-    #     Subclasses should populate self.sim_output with the result before returning.
-    #     Returns: {"value": np.ndarray, "shape": tuple}
-    #     """
-    #     raise NotImplementedError
-
     # ========== Factory Methods ==========
     """Create Model instances with special initialization logic."""
 
@@ -150,7 +138,6 @@ class Model:
                 
         ComposedModel.__name__ = f"Composed{cls.__name__}"
         return ComposedModel
-
 
     # ========== Persistence ==========
     """Save and load model state (pickling, JSON, etc)."""
@@ -291,13 +278,16 @@ class SimpleModel(Model):
     
     def simulate_single(self) -> Dict[str, Any]:
         """Simple simulation: multiply int_params by ext_params."""
-        result = self.int_params * self.ext_params
+        # Extract scalar from dict if int_params is a dict
+        int_val = self.int_params['int_params'] if isinstance(self.int_params, dict) else self.int_params
+        ext_val = self.ext_params if not isinstance(self.ext_params, dict) else self.ext_params.get('value', self.ext_params)
+        
+        result = int_val * ext_val
         self.sim_output = {
             'value': np.array([result]),
             'shape': (1,)
         }
         return self.sim_output
-
 
 # ========== Test: Double Composition ==========
 
