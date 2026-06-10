@@ -639,9 +639,6 @@ class ViscoElasticFilament(Model):
         if hasattr(super(), '__post_init__'):
             super().__post_init__()
         
-        # Any additional initialization logic specific to ViscoElasticFilament
-        # (if you had any in __init__ before, put it here)
-
     def simulate_single(self) -> Dict[str, Any]:
         """
         Run forward simulation for a single instance of the viscoelastic filament.
@@ -649,23 +646,6 @@ class ViscoElasticFilament(Model):
         res = ViscoElasticFilament_Simulate(self.int_params, self.ext_params, self.sim_params)
         self.sim_output = res
         return res
-
-# class ViscoElasticFilament(Model):
-#     def __init__(self, int_params: Any, ext_params: Any, sim_params: Any):
-#         super().__init__(int_params, ext_params, sim_params)
-#         self.int_params = int_params
-#         self.ext_params = ext_params
-#         self.sim_params = sim_params
-
-#     def simulate_single(self) -> Dict[str, Any]:
-#         """
-#         Run forward simulation for a single instance of the viscoelastic filament.
-#         This method should populate self.sim_output with the result before returning.
-#         Returns: {"value": np.ndarray, "shape": tuple} # Is shape necessary?
-#         """
-#         res = ViscoElasticFilament_Simulate(self.int_params, self.ext_params, self.sim_params)
-#         self.sim_output = res
-#         return res
 
 # Define the pre-determined function to transform (A, w0, psi) into InterpFlow
 def FlowParams_to_InterpFlow(int_params, ext_params, sim_params):

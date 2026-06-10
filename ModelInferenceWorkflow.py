@@ -957,6 +957,399 @@ def test_workflow_with_inference():
     
     assert all_success, "All inference results should match true parameters"
 
+def test_workflow_with_single_composition_inference():
+    """Test workflow: composed simulations → one-pass inference to recover original params."""
+    
+    checkpoint_dir = Path("./test_checkpoints_composed_inference")
+    if checkpoint_dir.exists():
+        shutil.rmtree(checkpoint_dir)
+    
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+    
+    # Original parameters before composition
+    int_params_list = [
+        {'int_params': 2.0},
+        {'int_params': 3.0},
+        {'int_params': 4.0},
+    ]
+    ext_params_list = [
+        {'value': 5.0},
+        {'value': 10.0},
+    ]
+    sim_params_list = [None, None]
+    
+    print("=" * 70)
+    print("WORKFLOW: SINGLE COMPOSITION + ONE-PASS INFERENCE")
+    print("=" * 70)
+    
+    # Composition: scale int_params by 2
+    def compose_int_v1(int_p, ext_p, sim_p):
+        # Extract scalar from dict
+        int_val = int_p['int_params'] if isinstance(int_p, dict) else int_p
+        return int_val * 2
+    
+    ComposedSimpleModel = SimpleModel.compose(
+        compose_int_params=compose_int_v1
+    )
+    
+    print("\nPHASE 1: Running Composed Simulations")
+    print("-" * 70)
+    print(f"Composition: int_params → int_params * 2")
+    print(f"Input structure:")
+    print(f"  Original int_params: {[p['int_params'] for p in int_params_list]}")
+    print(f"  After composition: {[p['int_params'] * 2 for p in int_params_list]}")
+    print(f"  Ext params: {[p['value'] for p in ext_params_list]}")
+    
+    model_lists = workflow.run_simulations(
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        model_class=ComposedSimpleModel,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ Simulations complete: {len(model_lists)} ModelLists created")
+    
+    print(f"\nSimulation Results:")
+    for int_idx, model_list in model_lists.items():
+        original_int = int_params_list[int_idx]['int_params']
+        composed_int = original_int * 2
+        print(f"\n  int_idx={int_idx} (original={original_int}, composed={composed_int}):")
+        for model_idx, model in enumerate(model_list.models):
+            ext_val = ext_params_list[model_idx]['value']
+            result = model.sim_output['value'][0]
+            expected = composed_int * ext_val
+            match = abs(result - expected) < 1e-10
+            status = "✓" if match else "✗"
+            print(f"    model[{model_idx}] (ext={ext_val:>5}): result={result:>6.1f}, expected={expected:>6.1f} {status}")
+    
+    print("\n" + "=" * 70)
+    print("PHASE 2: One-Pass Inference (Recover Original Parameters)")
+    print("-" * 70)
+    print("Goal: Infer the original int_params before composition")
+    print("Strategy: Use composed model in inference to recover original values\n")
+    
+    def make_composed_inference_pipeline(model_list, **kwargs):
+        """Factory for inference pipeline with composed model."""
+        
+        ground_truths = [model.sim_output['value'] for model in model_list.models]
+        ext_params_batch = [model.ext_params for model in model_list.models]
+        
+        def loss_fn(predicted_list, ground_truth_list):
+            """MSE loss aggregated across all models."""
+            total_loss = 0.0
+            for predicted, gt in zip(predicted_list, ground_truth_list):
+                total_loss += np.mean((predicted - gt) ** 2)
+            return total_loss / len(ground_truth_list)
+        
+        # Use the composed model in the inference pipeline
+        pass_1 = PipelinePass(
+            name="Pass_1_infer_original_int_params",
+            model_class=ComposedSimpleModel,
+            ground_truths=ground_truths,
+            ext_params_list=ext_params_batch,
+            sim_params_list=[None] * len(ground_truths),
+            param_keys_to_infer=['int_params'],
+            fixed_params={},
+            product_or_zip="zip",
+            optimizer=minimize,
+            optimizer_kwargs={'method': 'Nelder-Mead'},
+        )
+        
+        return InferencePipeline(
+            passes=[pass_1],
+            loss_fn=loss_fn,
+            n_jobs_per_pass=-1,
+        )
+    
+    inference_tasks = []
+    for int_idx in range(len(int_params_list)):
+        task = InferenceTask(
+            task_key=f"infer_composed_int_{int_idx}",
+            int_idx=int_idx,
+            pair_indices=None,
+            make_pipeline_fn=make_composed_inference_pipeline,
+            pipeline_kwargs={},
+            initial_guesses=[{'int_params': 1.0}],
+        )
+        inference_tasks.append(task)
+    
+    print(f"Created {len(inference_tasks)} inference task(s)")
+    for task in inference_tasks:
+        print(f"  - {task.task_key}: int_idx={task.int_idx}")
+    
+    inference_results = workflow.run_inferences(
+        inference_tasks=inference_tasks,
+        model_lists=model_lists,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ Inferences complete: {len(inference_results)} result(s)")
+    
+    print("\n" + "=" * 70)
+    print("PHASE 3: Verification")
+    print("-" * 70)
+    print(f"\nInference Results:")
+    
+    all_success = True
+    for int_idx in range(len(int_params_list)):
+        task_key = f"infer_composed_int_{int_idx}"
+        result = inference_results[task_key]
+        true_original_int = int_params_list[int_idx]['int_params']
+        inferred_int = result[0].params['int_params']
+        error = abs(inferred_int - true_original_int)
+        success = error < 0.01
+        
+        print(f"\n  {task_key}:")
+        print(f"    True original int_params: {true_original_int}")
+        print(f"    Inferred int_params: {inferred_int:.4f}")
+        print(f"    Error: {error:.6f}")
+        print(f"    Converged: {result[0].success}")
+        print(f"    Final loss: {result[0].loss:.6e}")
+        print(f"    Status: {'✓ PASS' if success else '✗ FAIL'}")
+        
+        all_success = all_success and success
+    
+    print("\n" + "=" * 70)
+    checkpoint_status = workflow.get_checkpoint_status()
+    print(f"Checkpoint Status:")
+    print(f"  Stage: {checkpoint_status.stage}")
+    print(f"  Simulation entries: {len(checkpoint_status.simulation_entries)}")
+    print(f"  Inference entries: {len(checkpoint_status.inference_entries)}")
+    
+    if all_success:
+        print("\n✓ SINGLE COMPOSITION WORKFLOW TEST PASSED!")
+    else:
+        print("\n✗ SINGLE COMPOSITION WORKFLOW TEST FAILED!")
+    print("=" * 70)
+    
+    assert all_success, "All inference results should match original parameters"
+
+
+def test_workflow_with_double_composition_inference():
+    """Test workflow: doubly-composed simulations → multi-pass inference to recover original params."""
+    
+    checkpoint_dir = Path("./test_checkpoints_double_composed_inference")
+    if checkpoint_dir.exists():
+        shutil.rmtree(checkpoint_dir)
+    
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+    
+    # Original parameters before any composition
+    int_params_list = [
+        {'int_params': 1.0},
+        {'int_params': 2.0},
+    ]
+    ext_params_list = [
+        {'value': 5.0},
+        {'value': 15.0},
+    ]
+    sim_params_list = [None, None]
+    
+    print("=" * 70)
+    print("WORKFLOW: DOUBLE COMPOSITION + TWO-PASS INFERENCE")
+    print("=" * 70)
+    
+    # First composition: scale int_params by 2
+    def compose_int_v1(int_p, ext_p, sim_p):
+        # Extract scalar from dict
+        int_val = int_p['int_params'] if isinstance(int_p, dict) else int_p
+        return int_val * 2
+    
+    ComposedModel_v1 = SimpleModel.compose(
+        compose_int_params=compose_int_v1
+    )
+    
+    # Second composition: shift ext_params by +10
+    def compose_ext_v2(int_p, ext_p, sim_p):
+        # Extract scalar from dict
+        ext_val = ext_p['value'] if isinstance(ext_p, dict) else ext_p
+        return ext_val + 10
+    
+    DoubleComposedModel = ComposedModel_v1.compose(
+        compose_ext_params=compose_ext_v2
+    )
+    
+    print("\nPHASE 1: Running Double-Composed Simulations")
+    print("-" * 70)
+    print(f"Composition v1: int_params → int_params * 2")
+    print(f"Composition v2: ext_params → ext_params + 10")
+    print(f"Input structure:")
+    print(f"  Original int_params: {[p['int_params'] for p in int_params_list]}")
+    print(f"  After composition v1: {[p['int_params'] * 2 for p in int_params_list]}")
+    print(f"  Original ext_params: {[p['value'] for p in ext_params_list]}")
+    print(f"  After composition v2: {[p['value'] + 10 for p in ext_params_list]}")
+    
+    model_lists = workflow.run_simulations(
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        model_class=DoubleComposedModel,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ Simulations complete: {len(model_lists)} ModelLists created")
+    
+    print(f"\nSimulation Results:")
+    for int_idx, model_list in model_lists.items():
+        original_int = int_params_list[int_idx]['int_params']
+        composed_int = original_int * 2
+        print(f"\n  int_idx={int_idx} (original int={original_int}, composed int={composed_int}):")
+        for model_idx, model in enumerate(model_list.models):
+            original_ext = ext_params_list[model_idx]['value']
+            composed_ext = original_ext + 10
+            result = model.sim_output['value'][0]
+            expected = composed_int * composed_ext
+            match = abs(result - expected) < 1e-10
+            status = "✓" if match else "✗"
+            print(f"    model[{model_idx}] (ext: {original_ext}→{composed_ext:>5}): result={result:>6.1f}, expected={expected:>6.1f} {status}")
+    
+    print("\n" + "=" * 70)
+    print("PHASE 2: Two-Pass Inference")
+    print("-" * 70)
+    print("Pass 1: Infer int_params (recover effect of composition v1)")
+    print("Pass 2: Infer ext_params (recover effect of composition v2)\n")
+    
+    def make_double_composed_inference_pipeline(model_list, **kwargs):
+        """Factory for two-pass inference pipeline with double-composed model."""
+        
+        ground_truths = [model.sim_output['value'] for model in model_list.models]
+        ext_params_batch = [model.ext_params for model in model_list.models]
+        
+        def loss_fn(predicted_list, ground_truth_list):
+            """MSE loss aggregated across all models."""
+            total_loss = 0.0
+            for predicted, gt in zip(predicted_list, ground_truth_list):
+                total_loss += np.mean((predicted - gt) ** 2)
+            return total_loss / len(ground_truth_list)
+        
+        # Pass 1: Infer int_params with double-composed model
+        pass_1 = PipelinePass(
+            name="Pass_1_infer_int_params",
+            model_class=DoubleComposedModel,
+            ground_truths=ground_truths,
+            ext_params_list=ext_params_batch,
+            sim_params_list=[None] * len(ground_truths),
+            param_keys_to_infer=['int_params'],
+            fixed_params={},
+            product_or_zip="zip",
+            optimizer=minimize,
+            optimizer_kwargs={'method': 'Nelder-Mead'},
+        )
+        
+        # Pass 2: Infer ext_params with int_params fixed from Pass 1
+        pass_2 = PipelinePass(
+            name="Pass_2_infer_ext_params",
+            model_class=DoubleComposedModel,
+            ground_truths=ground_truths,
+            ext_params_list=ext_params_batch,
+            sim_params_list=[None] * len(ground_truths),
+            param_keys_to_infer=['value'],
+            fixed_params={},  # Will be populated with Pass 1 results
+            product_or_zip="zip",
+            optimizer=minimize,
+            optimizer_kwargs={'method': 'Nelder-Mead'},
+        )
+        
+        return InferencePipeline(
+            passes=[pass_1, pass_2],
+            loss_fn=loss_fn,
+            n_jobs_per_pass=-1,
+        )
+    
+    inference_tasks = []
+    for int_idx in range(len(int_params_list)):
+        task = InferenceTask(
+            task_key=f"infer_double_composed_{int_idx}",
+            int_idx=int_idx,
+            pair_indices=None,
+            make_pipeline_fn=make_double_composed_inference_pipeline,
+            pipeline_kwargs={},
+            initial_guesses=[
+                {'int_params': 1.0},
+                {'value': 5.0}
+            ],
+        )
+        inference_tasks.append(task)
+    
+    print(f"Created {len(inference_tasks)} inference task(s)")
+    for task in inference_tasks:
+        print(f"  - {task.task_key}: int_idx={task.int_idx}")
+    
+    inference_results = workflow.run_inferences(
+        inference_tasks=inference_tasks,
+        model_lists=model_lists,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ Inferences complete: {len(inference_results)} result(s)")
+    
+    print("\n" + "=" * 70)
+    print("PHASE 3: Verification")
+    print("-" * 70)
+    print(f"\nInference Results:")
+    
+    all_success = True
+    for int_idx in range(len(int_params_list)):
+        task_key = f"infer_double_composed_{int_idx}"
+        results = inference_results[task_key]
+        
+        true_original_int = int_params_list[int_idx]['int_params']
+        true_original_ext = ext_params_list[0]['value']  # First ext param as example
+        
+        # Pass 1 result: inferred int_params
+        pass_1_result = results[0]
+        inferred_int = pass_1_result.params['int_params']
+        int_error = abs(inferred_int - true_original_int)
+        int_success = int_error < 0.01
+        
+        # Pass 2 result: inferred ext_params
+        pass_2_result = results[1]
+        inferred_ext = pass_2_result.params['value']
+        ext_error = abs(inferred_ext - true_original_ext)
+
+        ext_success = ext_error < 0.01
+        
+        print(f"\n  {task_key}:")
+        print(f"    Pass 1 (Infer int_params):")
+        print(f"      True original: {true_original_int}")
+        print(f"      Inferred: {inferred_int:.4f}")
+        print(f"      Error: {int_error:.6f}")
+        print(f"      Loss: {pass_1_result.loss:.6e}")
+        print(f"      Status: {'✓ PASS' if int_success else '✗ FAIL'}")
+        
+        print(f"    Pass 2 (Infer ext_params):")
+        print(f"      True original: {true_original_ext}")
+        print(f"      Inferred: {inferred_ext:.4f}")
+        print(f"      Error: {ext_error:.6f}")
+        print(f"      Loss: {pass_2_result.loss:.6e}")
+        print(f"      Status: {'✓ PASS' if ext_success else '✗ FAIL'}")
+        print(f"    Accumulated params trajectory:")
+        
+        # Show parameter trajectory across passes
+        pipeline = workflow.get_inference_result(task_key)
+        # Note: pipeline.parameter_trajectory should be available if pipeline stores it
+        print(f"      After Pass 1: int_params={inferred_int:.4f}")
+        print(f"      After Pass 2: int_params={pass_2_result.params.get('int_params', inferred_int):.4f}, value={inferred_ext:.4f}")
+        
+        all_success = all_success and int_success and ext_success
+    
+    print("\n" + "=" * 70)
+    checkpoint_status = workflow.get_checkpoint_status()
+    print(f"Checkpoint Status:")
+    print(f"  Stage: {checkpoint_status.stage}")
+    print(f"  Simulation entries: {len(checkpoint_status.simulation_entries)}")
+    print(f"  Inference entries: {len(checkpoint_status.inference_entries)}")
+    
+    if all_success:
+        print("\n✓ DOUBLE COMPOSITION WORKFLOW TEST PASSED!")
+    else:
+        print("\n✗ DOUBLE COMPOSITION WORKFLOW TEST FAILED!")
+    print("=" * 70)
+    
+    assert all_success, "All inference results should match original parameters"
+
+
 # ========== Run all workflow tests ==========
 if __name__ == "__main__":
     test_workflow()
@@ -964,6 +1357,8 @@ if __name__ == "__main__":
     test_double_composition_with_workflow()
     test_composition_with_all_params()
     test_workflow_with_inference()
+    test_workflow_with_single_composition_inference()
+    test_workflow_with_double_composition_inference()    
     print("\n" + "="*70)
     print("ALL COMPOSITION TESTS COMPLETED")
     print("="*70)

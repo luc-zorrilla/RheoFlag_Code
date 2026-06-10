@@ -661,6 +661,9 @@ def make_inference_pipeline_single(
         ext_params_list.append(copy.deepcopy(model.ext_params))
         sim_params_list.append(copy.deepcopy(model.sim_params))
     
+    print("make_inference_pipeline_single")
+    print(f"ext_params_list = {ext_params_list}")
+
     param_keys_to_infer = list(initial_guesses[0].keys())
     
     pipeline_pass = PipelinePass(
@@ -727,7 +730,7 @@ if __name__ == "__main__":
     
     # Flatten into separate lists for the workflow
     ext_params_list = [pair[0] for pair in ext_and_sim_pairs]
-    sim_params_list = [pair[1] for pair in ext_and_sim_pairs] 
+    sim_params_list = [pair[1] for pair in ext_and_sim_pairs]
 
     print(f"\nExt/Sim parameter pairs: {len(ext_and_sim_pairs)}")
     for i, (ext, sim) in enumerate(ext_and_sim_pairs):
@@ -743,6 +746,8 @@ if __name__ == "__main__":
     print(f"\n{'='*70}")
     print("STAGE 1: SIMULATION")
     print(f"{'='*70}")
+
+    print(f"ext_params_list = {ext_params_list}")
 
     model_lists = workflow.run_simulations(
         int_params_list=int_params_list,

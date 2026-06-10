@@ -808,6 +808,7 @@ class InferencePipeline:
             merged = {**fixed_params, **int_params}
             return merged
         
+        # TODO: check whether composition worked out well here
         composed = pass_def.model_class.compose(
             compose_int_params=compose_int_params_with_fixed,
             compose_ext_params=pass_def.compose_ext_params,
