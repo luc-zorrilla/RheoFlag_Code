@@ -1961,7 +1961,6 @@ def test_workflow_with_inference_multi_sp4_tau_b(
                     f"true={res['true_tau_b']:.4e}, inferred={res['inferred_tau_b']:.4e}, "
                     f"abs_error={res['tau_b_abs_error']:.4e}, rel_error={res['tau_b_rel_error']:.2%}")
 
-
 def test_workflow_with_inference_two_pass_elastic_viscous(a_values: list[float] = None):
     """
     Test ViscoElasticFilament inference with:
@@ -3275,11 +3274,13 @@ if __name__ == "__main__":
     int_param_ranges = {'Sp4': [1.0], 'Beta':[0, 1.0], 'tau_b': [0, 1.0], 'tau_s':[0, 1.0]}
     ext_param_ranges = {'A': [1e-6, 1e-5], 'w0': [0.0, 1e-3, 1.0]}
     elastic_params_list = ['Sp4', 'Beta']
-    viscous_params_list = ['tau_b', 'tau_s']   
+    viscous_params_list = ['tau_b', 'tau_s']
+    inference_mode = "cumulative_inference"
     
     test_workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
         elastic_params_list = elastic_params_list,
         viscous_params_list = viscous_params_list,
+        inference_mode = inference_mode,
         )
