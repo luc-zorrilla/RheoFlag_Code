@@ -1,32 +1,55 @@
 {
-  "stage": "inference",
-  "timestamp": "2026-06-11 17:41:00.602907",
+  "stage": "simulation",
+  "timestamp": "2026-06-11 17:59:35.206229",
   "simulation_entries": {
     "int_0_pair_all": {
       "task_key": "int_0_pair_all",
       "completed": true,
-      "timestamp": "2026-06-11 17:38:58.979921",
+      "timestamp": "2026-06-11 17:59:33.553097",
       "filepath": "artifacts/models/int_0_pair_all.pkl"
     },
     "int_1_pair_all": {
       "task_key": "int_1_pair_all",
       "completed": true,
-      "timestamp": "2026-06-11 17:38:59.308166",
+      "timestamp": "2026-06-11 17:59:33.859443",
       "filepath": "artifacts/models/int_1_pair_all.pkl"
+    },
+    "int_2_pair_all": {
+      "task_key": "int_2_pair_all",
+      "completed": true,
+      "timestamp": "2026-06-11 17:59:34.044552",
+      "filepath": "artifacts/models/int_2_pair_all.pkl"
+    },
+    "int_3_pair_all": {
+      "task_key": "int_3_pair_all",
+      "completed": true,
+      "timestamp": "2026-06-11 17:59:34.260193",
+      "filepath": "artifacts/models/int_3_pair_all.pkl"
+    },
+    "int_4_pair_all": {
+      "task_key": "int_4_pair_all",
+      "completed": true,
+      "timestamp": "2026-06-11 17:59:34.506308",
+      "filepath": "artifacts/models/int_4_pair_all.pkl"
+    },
+    "int_5_pair_all": {
+      "task_key": "int_5_pair_all",
+      "completed": true,
+      "timestamp": "2026-06-11 17:59:34.702525",
+      "filepath": "artifacts/models/int_5_pair_all.pkl"
+    },
+    "int_6_pair_all": {
+      "task_key": "int_6_pair_all",
+      "completed": true,
+      "timestamp": "2026-06-11 17:59:34.959252",
+      "filepath": "artifacts/models/int_6_pair_all.pkl"
+    },
+    "int_7_pair_all": {
+      "task_key": "int_7_pair_all",
+      "completed": true,
+      "timestamp": "2026-06-11 17:59:35.206219",
+      "filepath": "artifacts/models/int_7_pair_all.pkl"
     }
   },
-  "inference_entries": {
-    "int_000_cumulative": {
-      "task_key": "int_000_cumulative",
-      "completed": true,
-      "timestamp": "2026-06-11 17:39:56.787454",
-      "filepath": "artifacts/inference/int_000_cumulative.pkl"
-    },
-    "int_001_cumulative": {
-      "task_key": "int_001_cumulative",
-      "completed": true,
-      "timestamp": "2026-06-11 17:41:00.602893",
-      "filepath": "artifacts/inference/int_001_cumulative.pkl"
-    }
-  }
+  "inference_entries": {}
 }

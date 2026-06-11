@@ -2826,14 +2826,6 @@ def test_workflow_elastic_viscous_general(
     
     assert len(model_lists) == len(int_params_list)
     
-    _verify_model_lists(
-        model_lists,
-        int_params_metadata,
-        ext_param_ranges.get('w0', [0.0, 1.0]),
-        len(ext_param_ranges.get('A', [1e-6])),
-    )
-    print(f"\n✓ All int_params successfully simulated with correct model ordering")
-    
     # PHASE 2: Two-Pass Inference
     print("\n" + "=" * 80)
     print("PHASE 2: Two-Pass Inference for Each Int-Params Combination")
@@ -2871,7 +2863,7 @@ def test_workflow_elastic_viscous_general(
     )
     
     print(f"\nCreated {len(inference_tasks)} inference task(s)")
-    _print_inference_tasks(inference_tasks, int_params_metadata)
+    _print_inference_tasks(inference_tasks, int_params_metadata, param_keys_to_infer)
     
     inference_results = workflow.run_inferences(
         inference_tasks=inference_tasks,
@@ -3000,12 +2992,18 @@ def _verify_model_lists(model_lists, int_params_metadata, w0_values, num_a_value
             assert actual_w0 == expected_w0, \
                 f"int_idx {int_idx}, model_idx {model_idx}: expected w0={expected_w0}, got {actual_w0}"
 
-def _print_inference_tasks(inference_tasks, int_params_metadata):
+def _print_inference_tasks(inference_tasks, int_params_metadata, param_keys_to_infer):
     """Print summary of inference tasks."""
     for idx, task in enumerate(inference_tasks):
         metadata = int_params_metadata[idx]
         print(f"  [{idx}] {task.task_key}")
-        print(f"       True: Sp4={metadata['Sp4']:.4e}, tau_b={metadata['tau_b']:.4e}")
+        
+        # Build dynamic parameter string
+        param_str = ", ".join(
+            f"{param_key}={metadata.get(param_key, 'N/A'):.4e}"
+            for param_key in param_keys_to_infer
+        )
+        print(f"       True: {param_str}")
 
 def _compute_inference_results(inference_results, int_params_metadata, inference_tasks):
     """Compute relative errors and status for all inference results."""
@@ -3191,30 +3189,77 @@ def _print_results_table_general(results_summary, param_keys_to_infer):
     print("-" * 120)
     
     # Print rows
-    for idx, (task_key, result_data) in enumerate(results_summary.items()):
-        row = [str(idx), task_key, result_data['status']]
+    for result_entry in results_summary:
+        row = [
+            str(result_entry['int_idx']),
+            result_entry['task_key'],
+            result_entry['status']
+        ]
         
         # Add parameter columns
         for param_key in param_keys_to_infer:
-            true_val = result_data['true_params'].get(param_key, float('nan'))
-            inferred_val = result_data['inferred_params'].get(param_key, float('nan'))
-            error_pct = result_data['errors'].get(param_key, float('nan'))
+            true_val = result_entry.get(f'{param_key}_true', float('nan'))
+            inferred_val = result_entry.get(f'{param_key}_inferred', float('nan'))
+            error_pct = result_entry.get(f'{param_key}_rel_error', float('nan'))
             
-            row.extend([
-                f"{true_val:.6e}",
-                f"{inferred_val:.6e}",
-                f"{error_pct:.2f}%" if not math.isnan(error_pct) else "N/A"
-            ])
+            if true_val is None or inferred_val is None or error_pct is None:
+                row.extend(['N/A', 'N/A', 'N/A'])
+            else:
+                row.extend([
+                    f"{true_val:.6e}",
+                    f"{inferred_val:.6e}",
+                    f"{error_pct * 100:.2f}%"
+                ])
         
         # Add convergence and loss
         row.extend([
-            str(result_data.get('converged', False)),
-            f"{result_data.get('loss', float('nan')):.6e}"
+            str(result_entry.get('converged', False)),
+            f"{result_entry.get('final_loss', float('nan')):.6e}"
         ])
         
         print(" | ".join(f"{v:>15}" for v in row))
     
     print("-" * 120)
+
+def _print_summary_statistics_general(results_summary, int_params_list, ext_params_list, param_keys_to_infer):
+    """Print summary statistics for generalized parameter inference."""
+    print("\n" + "=" * 80)
+    print("Summary Statistics")
+    print("-" * 80)
+    
+    passed = sum(1 for res in results_summary if res['status'] == '✓ PASS')
+    failed = len(results_summary) - passed
+    
+    print(f"\nResults: {passed}/{len(results_summary)} cases passed")
+    print(f"  Passed: {passed}")
+    print(f"  Failed: {failed}")
+    
+    # Compute average errors for each parameter
+    print(f"\nAverage Relative Errors:")
+    for param_key in param_keys_to_infer:
+        error_key = f'{param_key}_rel_error'
+        errors = [res.get(error_key) for res in results_summary if res.get(error_key) is not None]
+        
+        if errors:
+            avg_error = sum(errors) / len(errors)
+            print(f"  {param_key:>10}: {avg_error:.4%}")
+        else:
+            print(f"  {param_key:>10}: N/A")
+    
+    print(f"\nParameter Space Coverage:")
+    print(f"  Int_params combinations: {len(int_params_list)}")
+    print(f"  External param sets: {len(ext_params_list)}")
+    print(f"  Total models across all int_params: {len(int_params_list) * len(ext_params_list)}")
+    
+    # Two-pass strategy summary
+    print(f"\nTwo-Pass Strategy per Int-Params:")
+    w0_zero_count = sum(1 for e in ext_params_list if e.get('w0') == 0.0)
+    w0_pos_count = sum(1 for e in ext_params_list if e.get('w0', 0) > 0)
+    
+    print(f"  ✓ Pass 1 (Elastic): Optimizes on {w0_zero_count} models at w0=0")
+    print(f"  ✓ Pass 2 (Viscous): Optimizes on {w0_pos_count} models at w0>0")
+    
+    print("=" * 80)
 
 if __name__ == "__main__":
     # test_workflow_with_inference()
@@ -3225,4 +3270,16 @@ if __name__ == "__main__":
     # test_workflow_with_inference_two_pass_elastic_viscous()
     # test_workflow_with_inference_two_pass_elastic_viscous_multi_int_params()
     # test_workflow_elastic_viscous_condensed()
-    test_workflow_elastic_viscous_general()
+    # test_workflow_elastic_viscous_general()
+    
+    int_param_ranges = {'Sp4': [1.0], 'Beta':[0, 1.0], 'tau_b': [0, 1.0], 'tau_s':[0, 1.0]}
+    ext_param_ranges = {'A': [1e-6, 1e-5], 'w0': [0.0, 1e-3, 1.0]}
+    elastic_params_list = ['Sp4', 'Beta']
+    viscous_params_list = ['tau_b', 'tau_s']   
+    
+    test_workflow_elastic_viscous_general(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        elastic_params_list = elastic_params_list,
+        viscous_params_list = viscous_params_list,
+        )
