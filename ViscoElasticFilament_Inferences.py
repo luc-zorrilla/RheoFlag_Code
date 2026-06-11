@@ -787,14 +787,9 @@ def test_workflow_with_inference():
     bounds = _make_optimizer_bounds(param_keys_to_infer)
     optimizer_kwargs = make_optimizer_kwargs(bounds=bounds)
 
-    # Loss function setup
-    def loss_fn(predicted_list, ground_truth_list):
-        """MSE loss aggregated across all models."""
-        total_loss = 0.0
-        for predicted, gt in zip(predicted_list, ground_truth_list):
-            total_loss += np.mean((predicted - gt) ** 2)
-        return total_loss / len(ground_truth_list)
-        
+    # Loss function
+    loss_fn = rel_mse_loss_fn()
+
     def make_simple_inference_pipeline(model_list, **kwargs):
         """Factory function to create inference pipeline from ModelList."""
         

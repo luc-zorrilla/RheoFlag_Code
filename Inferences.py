@@ -7,6 +7,7 @@ from scipy.optimize import minimize, OptimizeResult
 import scipy.differentiate as sd
 from itertools import product
 import dill as pickle
+import copy
 from pathlib import Path
 from Models import Model, SimpleModel
 
@@ -451,7 +452,7 @@ class Inference:
     @staticmethod
     def _compute_single_loss(
         model_class: Type,
-        loss_fn: Callable,
+        loss_fn: Callable, # TODO: can use attribute directly maybe?
         int_params: Dict[str, float],
         ext_params: Any,
         sim_params: Any,
@@ -472,11 +473,7 @@ class Inference:
         Returns:
             Scalar loss value
         """
-        # === DEBUG ===
-        # print(f"compute_single_loss")
-        # print(f"int_params, ext_params, sim_params = {int_params}, {ext_params}, {sim_params}")
-        # =============
-        
+
         instance = model_class(int_params, ext_params, sim_params)
         predicted = instance.simulate_single()['value']
         loss_i = loss_fn(predicted, ground_truth)
@@ -745,14 +742,6 @@ class InferencePipeline:
                 pass_def,
                 fixed_params=accumulated_params, # If there are fixed parameters, compose the model to enforce them
             )
-
-            # ==== DEBUG ====
-            # print(f"model_for_pass = {model_for_pass}")
-            # print(f"vars(model_for_pass) = {vars(model_for_pass)}")
-            # print(f"int_params = {model_for_pass.int_params}")
-            # print(f"ext_params = {model_for_pass.ext_params}")
-            # print(f"sim_params = {model_for_pass.sim_params}")
-            # ===============
             
             # Create and run Inference for this pass
             inference = Inference(
@@ -825,17 +814,11 @@ class InferencePipeline:
         def compose_int_params_with_fixed(int_params, ext_params, sim_params):
             """Merge fixed parameters into int_params."""
             # Deep copy to avoid modifying the original
-            import copy
+            
             merged = copy.deepcopy(int_params)
             
             if isinstance(merged, dict):
-                if verbose:
-                    print(f"  [Composing int_params]")
-                    print(f"    Original: {merged}")
-                    print(f"    Fixed params: {fixed_params}")
                 merged.update(fixed_params)
-                if verbose:
-                    print(f"    Result: {merged}")
             
             return merged
         
