@@ -2640,7 +2640,6 @@ def test_workflow_elastic_viscous_condensed(
         'failed': sum(1 for res in results_summary if res['status'] == '✗ FAIL'),
     }
 
-
 # ============================================================================
 # Helper Functions
 # ============================================================================
@@ -2721,11 +2720,13 @@ def _compute_inference_results(inference_results, int_params_metadata, inference
         true_sp4 = metadata['Sp4']
         true_tau_b = metadata['tau_b']
         
-        result = inference_results[task.task_key]
-        inferred_params = result[0].params
+        pass_results = inference_results[task.task_key]  # List of results, one per pass
         
-        # Both parameters should be present after two-pass inference,
-        # but use .get() defensively in case one pass failed
+        # Merge parameters from all passes
+        inferred_params = {}
+        for pass_result in pass_results:
+            inferred_params.update(pass_result.params)
+        
         inferred_sp4 = inferred_params.get('Sp4')
         inferred_tau_b = inferred_params.get('tau_b')
         
@@ -2749,8 +2750,8 @@ def _compute_inference_results(inference_results, int_params_metadata, inference
             'inferred_tau_b': inferred_tau_b,
             'sp4_rel_error': sp4_rel_error,
             'tau_b_rel_error': tau_b_rel_error,
-            'converged': result[0].success,
-            'final_loss': result[0].loss,
+            'converged': pass_results[-1].success,  # Use final pass's success
+            'final_loss': pass_results[-1].loss,    # Use final pass's loss
             'status': '✓ PASS' if success else '✗ FAIL',
         })
     
