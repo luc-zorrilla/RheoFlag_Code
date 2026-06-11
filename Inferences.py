@@ -472,6 +472,11 @@ class Inference:
         Returns:
             Scalar loss value
         """
+        # === DEBUG ===
+        # print(f"compute_single_loss")
+        # print(f"int_params, ext_params, sim_params = {int_params}, {ext_params}, {sim_params}")
+        # =============
+        
         instance = model_class(int_params, ext_params, sim_params)
         predicted = instance.simulate_single()['value']
         loss_i = loss_fn(predicted, ground_truth)
@@ -742,10 +747,11 @@ class InferencePipeline:
             )
 
             # ==== DEBUG ====
-            print(f"model_for_pass = {model_for_pass}")
-            print(f"int_params = {model_for_pass.int_params}")
-            print(f"ext_params = {model_for_pass.ext_params}")
-            print(f"sim_params = {model_for_pass.sim_params}")
+            # print(f"model_for_pass = {model_for_pass}")
+            # print(f"vars(model_for_pass) = {vars(model_for_pass)}")
+            # print(f"int_params = {model_for_pass.int_params}")
+            # print(f"ext_params = {model_for_pass.ext_params}")
+            # print(f"sim_params = {model_for_pass.sim_params}")
             # ===============
             
             # Create and run Inference for this pass
@@ -792,12 +798,22 @@ class InferencePipeline:
         fixed_params: Dict[str, float],
         verbose: bool = True,
     ) -> Type:
-        """..."""
+        """
+        Build a pass-specific model class with fixed parameters from prior passes.
+        
+        Args:
+            pass_def: Pipeline pass definition containing the base model class
+            fixed_params: Dictionary of parameters to fix/override
+            verbose: Print debug information
+            
+        Returns:
+            A composed Model class (not an instance)
+        """
         
         base_model = pass_def.model_class
         
         if verbose:
-            print(f"\n[Composition Debug]")
+            print(f"\n[Model Composition]")
             print(f"  Base model: {base_model.__name__}")
             print(f"  Fixed params to enforce: {fixed_params}")
         
@@ -807,15 +823,20 @@ class InferencePipeline:
             return base_model
         
         def compose_int_params_with_fixed(int_params, ext_params, sim_params):
-            merged = int_params.copy() if isinstance(int_params, dict) else int_params
+            """Merge fixed parameters into int_params."""
+            # Deep copy to avoid modifying the original
+            import copy
+            merged = copy.deepcopy(int_params)
+            
             if isinstance(merged, dict):
                 if verbose:
-                    print(f"  [compose_int_params_with_fixed]")
-                    print(f"    Before merge: {merged}")
+                    print(f"  [Composing int_params]")
+                    print(f"    Original: {merged}")
                     print(f"    Fixed params: {fixed_params}")
                 merged.update(fixed_params)
                 if verbose:
-                    print(f"    After merge: {merged}\n")
+                    print(f"    Result: {merged}")
+            
             return merged
         
         composed = base_model.compose(
@@ -823,7 +844,7 @@ class InferencePipeline:
         )
         
         if verbose:
-            print(f"  → Composed with fixed-param enforcer\n")
+            print(f"  → Composed model: {composed.__name__}\n")
         
         return composed
 
