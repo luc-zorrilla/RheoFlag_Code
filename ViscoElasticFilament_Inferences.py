@@ -651,10 +651,6 @@ def make_two_pass_pipeline(model_list, **kwargs) -> InferencePipeline:
     for pass_config in pass_configs:
         pass_name = pass_config['name']
         param_keys = pass_config['param_keys']
-
-        # ==== DEBUG ====
-        print(f"pass_name, param_keys = {pass_name}, {param_keys}") # It works up to here
-        # ===============
         
         w0_filter = pass_config['w0_filter']
         
@@ -1830,7 +1826,7 @@ def test_workflow_with_inference_two_pass_elastic_viscous(a_values: list[float] 
         optimizer=optimizer,
         optimizer_kwargs=optimizer_kwargs,
         loss_fn=loss_fn,
-        param_keys_to_infer = param_keys_to_infer,
+        param_keys_to_infer=param_keys_to_infer,
     )
     
     task = InferenceTask(
@@ -1884,7 +1880,6 @@ def test_workflow_with_inference_two_pass_elastic_viscous(a_values: list[float] 
     print(f"\nPipeline Configuration:")
     print(f"  Number of internal parameter sets: 1")
     print(f"  Number of external parameter sets: {len(ext_params_list)}")
-    print(f"  Number of inference passes: {len(pipeline.passes)}")
     print(f"  Parameters split across passes: {param_keys_to_infer}")
     
     print("\n✓ TWO-PASS WORKFLOW TEST COMPLETED!")
@@ -1892,7 +1887,6 @@ def test_workflow_with_inference_two_pass_elastic_viscous(a_values: list[float] 
     
     return {
         'task_key': 'two_pass_elastic_viscous',
-        'num_passes': len(pipeline.passes),
         'elastic_params': elastic_params_list,
         'viscous_params': viscous_params_list,
         'true_sp4': ground_truth_Sp4,
@@ -1903,186 +1897,186 @@ def test_workflow_with_inference_two_pass_elastic_viscous(a_values: list[float] 
         'w0_values': w0_values,
     }
 
-# def test_workflow_two_pass_flexible_params(
-#     mode: str = 'cumulative_inference',
-#     int_params_list: list[dict] = None,
-#     ext_params_list: list[dict] = None,
-# ):
-#     """
-#     Test two-pass inference with flexible parameter dictionaries.
+def test_workflow_two_pass_flexible_params(
+    mode: str = 'cumulative_inference',
+    int_params_list: list[dict] = None,
+    ext_params_list: list[dict] = None,
+):
+    """
+    Test two-pass inference with flexible parameter dictionaries.
     
-#     Args:
-#         mode: 'single_inference' or 'cumulative_inference'
-#         int_params_list: List of internal parameter dicts to test
-#         ext_params_list: List of external parameter dicts to test
-#     """
+    Args:
+        mode: 'single_inference' or 'cumulative_inference'
+        int_params_list: List of internal parameter dicts to test
+        ext_params_list: List of external parameter dicts to test
+    """
     
-#     if int_params_list is None:
-#         int_params_list = [
-#             {'Sp4': 1.0, 'tau_b': 0},
-#             {'Sp4': 1.0, 'tau_b': 1},
-#         ]
+    if int_params_list is None:
+        int_params_list = [
+            {'Sp4': 1.0, 'tau_b': 0},
+            {'Sp4': 1.0, 'tau_b': 1},
+        ]
     
-#     if ext_params_list is None:
-#         ext_params_list = [
-#             {'A': 1e-6, 'w0': 0.0, 'psi': np.pi / 2},
-#             {'A': 1e-5, 'w0': 0.0, 'psi': np.pi / 2},
-#             {'A': 1e-6, 'w0': 1.0, 'psi': np.pi / 2},
-#             {'A': 1e-5, 'w0': 1.0, 'psi': np.pi / 2},            
-#         ]
+    if ext_params_list is None:
+        ext_params_list = [
+            {'A': 1e-6, 'w0': 0.0, 'psi': np.pi / 2},
+            {'A': 1e-5, 'w0': 0.0, 'psi': np.pi / 2},
+            {'A': 1e-6, 'w0': 1.0, 'psi': np.pi / 2},
+            {'A': 1e-5, 'w0': 1.0, 'psi': np.pi / 2},            
+        ]
 
-#     checkpoint_dir = Path(f"./test_checkpoints_two_pass_flexible_{mode}")
-#     if checkpoint_dir.exists():
-#         shutil.rmtree(checkpoint_dir)
+    checkpoint_dir = Path(f"./test_checkpoints_two_pass_flexible_{mode}")
+    if checkpoint_dir.exists():
+        shutil.rmtree(checkpoint_dir)
     
-#     workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
     
-#     print("\n" + "=" * 80)
-#     print(f"TEST: Two-Pass Flexible Parameters ({mode})")
-#     print("=" * 80)
+    print("\n" + "=" * 80)
+    print(f"TEST: Two-Pass Flexible Parameters ({mode})")
+    print("=" * 80)
     
-#     print("\nPHASE 1: Running Simulations")
-#     print("-" * 80)
+    print("\nPHASE 1: Running Simulations")
+    print("-" * 80)
     
-#     # Expand int_params_list to full parameter dicts
-#     full_int_params_list = []
-#     for int_params_partial in int_params_list:
-#         full_params = make_ground_truth_int_params(**int_params_partial)
-#         full_int_params_list.append(full_params)
+    # Expand int_params_list to full parameter dicts
+    full_int_params_list = []
+    for int_params_partial in int_params_list:
+        full_params = make_ground_truth_int_params(**int_params_partial)
+        full_int_params_list.append(full_params)
     
-#     print(f"Internal parameters (to infer):")
-#     for idx, int_params in enumerate(int_params_list):
-#         print(f"  [{idx}] {int_params}")
+    print(f"Internal parameters (to infer):")
+    for idx, int_params in enumerate(int_params_list):
+        print(f"  [{idx}] {int_params}")
     
-#     # Run simulations for all combinations
-#     model_lists = {}
-#     for int_idx, int_params in enumerate(full_int_params_list):
-#         param_keys_to_infer = list(int_params_list[int_idx].keys())
+    # Run simulations for all combinations
+    model_lists = {}
+    for int_idx, int_params in enumerate(full_int_params_list):
+        param_keys_to_infer = list(int_params_list[int_idx].keys())
         
-#         ReducedModel = model_params_only_flow(
-#             int_params,
-#             param_keys_to_infer,
-#         )
+        ReducedModel = model_params_only_flow(
+            int_params,
+            param_keys_to_infer,
+        )
         
-#         ext_params_full_list = []
-#         sim_params_list = []
-#         for ext_params_partial in ext_params_list:
-#             ext_params_full = make_ground_truth_ext_params(**ext_params_partial)
-#             sim_params = make_sim_params_for_w0(w0=ext_params_partial.get('w0', 0.0))
-#             ext_params_full_list.append(ext_params_full)
-#             sim_params_list.append(sim_params)
+        ext_params_full_list = []
+        sim_params_list = []
+        for ext_params_partial in ext_params_list:
+            ext_params_full = make_ground_truth_ext_params(**ext_params_partial)
+            sim_params = make_sim_params_for_w0(w0=ext_params_partial.get('w0', 0.0))
+            ext_params_full_list.append(ext_params_full)
+            sim_params_list.append(sim_params)
         
-#         print(f"\nExternal parameters:")
-#         for idx, ext_params in enumerate(ext_params_full_list):
-#             print(f"  [{idx}] {ext_params}")
+        print(f"\nExternal parameters:")
+        for idx, ext_params in enumerate(ext_params_full_list):
+            print(f"  [{idx}] {ext_params}")
 
-#         result = workflow.run_simulations(
-#             int_params_list=[int_params],
-#             ext_params_list=ext_params_full_list,
-#             sim_params_list=sim_params_list,
-#             model_class=ReducedModel,
-#             n_jobs=1,
-#         )
+        result = workflow.run_simulations(
+            int_params_list=[int_params],
+            ext_params_list=ext_params_full_list,
+            sim_params_list=sim_params_list,
+            model_class=ReducedModel,
+            n_jobs=1,
+        )
         
-#         model_lists.update(result)
+        model_lists.update(result)
     
-#     print(f"\n✓ Simulations complete")
-#     print(f"  Total ModelLists: {len(model_lists)}")
-#     for int_idx, model_list in model_lists.items():
-#         print(f"  int_idx={int_idx}: {len(model_list.models)} models")
+    print(f"\n✓ Simulations complete")
+    print(f"  Total ModelLists: {len(model_lists)}")
+    for int_idx, model_list in model_lists.items():
+        print(f"  int_idx={int_idx}: {len(model_list.models)} models")
     
-#     print("\n" + "=" * 70)
-#     print(f"PHASE 2: Creating Inference Tasks ({mode})")
-#     print("-" * 70)
+    print("\n" + "=" * 70)
+    print(f"PHASE 2: Creating Inference Tasks ({mode})")
+    print("-" * 70)
     
-#     param_keys_to_infer = list(int_params_list[0].keys())
-#     elastic_params_list = ['Sp4', 'Beta']
-#     viscous_params_list = ['tau_b', 'tau_s']
+    param_keys_to_infer = list(int_params_list[0].keys())
+    elastic_params_list = ['Sp4', 'Beta']
+    viscous_params_list = ['tau_b', 'tau_s']
     
-#     initial_guesses = [{'Sp4': 1e-1, 'tau_b': 0}]
+    initial_guesses = [{'Sp4': 1e-1, 'tau_b': 0}]
     
-#     optimizer = basinhopping_optimizer
-#     bounds = _make_optimizer_bounds(param_keys_to_infer)
-#     optimizer_kwargs = make_optimizer_kwargs(bounds=bounds)
-#     loss_fn = rel_mse_loss_fn()
+    optimizer = basinhopping_optimizer
+    bounds = _make_optimizer_bounds(param_keys_to_infer)
+    optimizer_kwargs = make_optimizer_kwargs(bounds=bounds)
+    loss_fn = rel_mse_loss_fn()
     
-#     inference_tasks = make_inference_tasks_two_pass(
-#         mode=mode,
-#         int_params_list=int_params_list,
-#         ext_params_list=ext_params_full_list,
-#         param_keys_to_infer=param_keys_to_infer,
-#         elastic_params_list=elastic_params_list,
-#         viscous_params_list=viscous_params_list,
-#         make_sim_params_fn=make_sim_params_for_w0,
-#         model_class=ReducedModel,  # Will be overridden per int_idx in actual run
-#         loss_fn=loss_fn,
-#         optimizer=optimizer,
-#         optimizer_kwargs=optimizer_kwargs,
-#         initial_guesses=initial_guesses,
-#         n_jobs_per_pass=-1,
-#     )
+    inference_tasks = make_inference_tasks_two_pass(
+        mode=mode,
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_full_list,
+        param_keys_to_infer=param_keys_to_infer,
+        elastic_params_list=elastic_params_list,
+        viscous_params_list=viscous_params_list,
+        make_sim_params_fn=make_sim_params_for_w0,
+        model_class=ReducedModel,  # Will be overridden per int_idx in actual run
+        loss_fn=loss_fn,
+        optimizer=optimizer,
+        optimizer_kwargs=optimizer_kwargs,
+        initial_guesses=initial_guesses,
+        n_jobs_per_pass=-1,
+    )
     
-#     print(f"\nCreated {len(inference_tasks)} inference tasks:")
-#     for task in inference_tasks:
-#         pair_info = f"pair_indices={task.pair_indices}" if task.pair_indices else "all ext_params"
-#         print(f"  {task.task_key} (int_idx={task.int_idx}, {pair_info})")
+    print(f"\nCreated {len(inference_tasks)} inference tasks:")
+    for task in inference_tasks:
+        pair_info = f"pair_indices={task.pair_indices}" if task.pair_indices else "all ext_params"
+        print(f"  {task.task_key} (int_idx={task.int_idx}, {pair_info})")
     
-#     print("\n" + "=" * 70)
-#     print("PHASE 3: Running Inference Tasks")
-#     print("-" * 70)
+    print("\n" + "=" * 70)
+    print("PHASE 3: Running Inference Tasks")
+    print("-" * 70)
     
-#     inference_results = workflow.run_inferences(
-#         inference_tasks=inference_tasks,
-#         model_lists=model_lists,
-#         n_jobs=1,  # Parallelize across tasks
-#     )
+    inference_results = workflow.run_inferences(
+        inference_tasks=inference_tasks,
+        model_lists=model_lists,
+        n_jobs=1,  # Parallelize across tasks
+    )
     
-#     print(f"\n✓ Inference complete")
-#     print(f"  Results obtained for {len(inference_results)} tasks")
+    print(f"\n✓ Inference complete")
+    print(f"  Results obtained for {len(inference_results)} tasks")
     
-#     print("\n" + "=" * 70)
-#     print("PHASE 4: Verification")
-#     print("-" * 70)
+    print("\n" + "=" * 70)
+    print("PHASE 4: Verification")
+    print("-" * 70)
     
-#     for task_key, result_list in inference_results.items():
-#         print(f"\nTask: {task_key}")
-#         if result_list and len(result_list) > 0:
-#             result = result_list[0]
-#             print(f"  Converged: {result.success}")
-#             print(f"  Final Loss: {result.loss:.6e}")
-#             print(f"  Inferred params: {result.params}")
-#         else:
-#             print(f"  No results")
+    for task_key, result_list in inference_results.items():
+        print(f"\nTask: {task_key}")
+        if result_list and len(result_list) > 0:
+            result = result_list[0]
+            print(f"  Converged: {result.success}")
+            print(f"  Final Loss: {result.loss:.6e}")
+            print(f"  Inferred params: {result.params}")
+        else:
+            print(f"  No results")
     
-#     print("\n" + "=" * 70)
-#     checkpoint_status = workflow.get_checkpoint_status()
-#     print(f"Checkpoint Status:")
-#     print(f"  Stage: {checkpoint_status.stage}")
-#     print(f"  Simulation entries: {len(checkpoint_status.simulation_entries)}")
-#     print(f"  Inference entries: {len(checkpoint_status.inference_entries)}")
+    print("\n" + "=" * 70)
+    checkpoint_status = workflow.get_checkpoint_status()
+    print(f"Checkpoint Status:")
+    print(f"  Stage: {checkpoint_status.stage}")
+    print(f"  Simulation entries: {len(checkpoint_status.simulation_entries)}")
+    print(f"  Inference entries: {len(checkpoint_status.inference_entries)}")
     
-#     print(f"\nSummary:")
-#     print(f"  Mode: {mode}")
-#     print(f"  Number of int_params sets: {len(int_params_list)}")
-#     print(f"  Number of ext_params sets: {len(ext_params_list)}")
-#     print(f"  Number of inference tasks: {len(inference_tasks)}")
-#     if mode == 'single_inference':
-#         print(f"  Total inferences: {len(int_params_list)} × {len(ext_params_list)} = {len(int_params_list) * len(ext_params_list)}")
-#     else:
-#         print(f"  Total inferences: {len(int_params_list)} (one per int_params)")
+    print(f"\nSummary:")
+    print(f"  Mode: {mode}")
+    print(f"  Number of int_params sets: {len(int_params_list)}")
+    print(f"  Number of ext_params sets: {len(ext_params_list)}")
+    print(f"  Number of inference tasks: {len(inference_tasks)}")
+    if mode == 'single_inference':
+        print(f"  Total inferences: {len(int_params_list)} × {len(ext_params_list)} = {len(int_params_list) * len(ext_params_list)}")
+    else:
+        print(f"  Total inferences: {len(int_params_list)} (one per int_params)")
     
-#     print("\n✓ TWO-PASS FLEXIBLE PARAMETERS TEST COMPLETED!")
-#     print("=" * 70)
+    print("\n✓ TWO-PASS FLEXIBLE PARAMETERS TEST COMPLETED!")
+    print("=" * 70)
     
-#     return {
-#         'mode': mode,
-#         'num_int_params_sets': len(int_params_list),
-#         'num_ext_params_sets': len(ext_params_list),
-#         'num_tasks': len(inference_tasks),
-#         'int_params_list': int_params_list,
-#         'ext_params_list': ext_params_list,
-#         'results': inference_results,
-#     }
+    return {
+        'mode': mode,
+        'num_int_params_sets': len(int_params_list),
+        'num_ext_params_sets': len(ext_params_list),
+        'num_tasks': len(inference_tasks),
+        'int_params_list': int_params_list,
+        'ext_params_list': ext_params_list,
+        'results': inference_results,
+    }
 
 if __name__ == "__main__":
     # test_workflow_with_inference()

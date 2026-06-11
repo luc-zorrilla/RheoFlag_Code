@@ -573,6 +573,7 @@ class Inference:
         Returns:
             InferenceResult with inferred parameters, uncertainties, convergence info
         """
+
         # Handle nested parallelism: if using infer_batch, set objective_n_jobs=1
         if objective_n_jobs is not None:
             self._objective_n_jobs = objective_n_jobs
@@ -780,7 +781,6 @@ class InferencePipeline:
 
     # ========== Model Composition ==========
     """Build pass-specific models with fixed parameters from prior passes."""
-
     def _build_pass_model(
         self,
         pass_def: PipelinePass,
@@ -790,8 +790,7 @@ class InferencePipeline:
         """
         Build a pass-specific model class with reduced parameters.
         
-        Reduces internal parameters to only those being inferred in this pass,
-        then overlays fixed parameters from prior passes via composition.
+        Creates instances that have pre-filtered int_params before inference.
         
         Args:
             pass_def: Pipeline pass definition containing the base model class
@@ -799,35 +798,43 @@ class InferencePipeline:
             verbose: Print debug information
             
         Returns:
-            A composed Model class (not an instance)
+            A Model class whose instances have reduced int_params
         """
         
         base_model = pass_def.model_class
+        param_keys_to_infer = pass_def.param_keys_to_infer
+
+        print(f"In build_pass_model: param_keys_to_infer = {param_keys_to_infer}")
         
-        # Step 1: Reduce to only parameters being inferred in this pass
-        reduced_model = base_model.reduce(pass_def.param_keys_to_infer)
-        
-        # Step 2: If there are fixed parameters, compose them in
-        if fixed_params:
-            def compose_int_params_with_fixed(int_params, ext_params, sim_params):
-                """Merge fixed parameters into reduced int_params."""
-                merged = copy.deepcopy(int_params) if isinstance(int_params, dict) else int_params
-                if isinstance(merged, dict):
-                    merged.update(fixed_params)
-                return merged
+        class ReducedAndFixedModel(base_model):
+            """Model with pre-filtered int_params and fixed parameters."""
             
-            composed = reduced_model.compose(
-                compose_int_params=compose_int_params_with_fixed,
-            )
-        else:
-            composed = reduced_model
+            def __post_init__(self):
+                """Filter int_params to only inferred keys, then add fixed params."""
+                # Step 1: Reduce to only parameters being inferred in this pass
+                if isinstance(self.int_params, dict):
+                    self.int_params = {
+                        key: self.int_params[key]
+                        for key in param_keys_to_infer
+                        if key in self.int_params
+                    }
+                
+                # Step 2: Add fixed parameters from prior passes
+                if fixed_params and isinstance(self.int_params, dict):
+                    self.int_params.update(fixed_params)
+                
+                # Call parent's __post_init__ if it exists
+                if hasattr(super(), '__post_init__'):
+                    super().__post_init__()
+        
+        ReducedAndFixedModel.__name__ = f"Reduced{base_model.__name__}"
         
         if verbose:
-            print(f"  → Reduced model: {composed.__name__}")
-            print(f"    Parameters to infer: {pass_def.param_keys_to_infer}")
+            print(f"  → Created model: {ReducedAndFixedModel.__name__}")
+            print(f"    Parameters to infer: {param_keys_to_infer}")
             print(f"    Fixed parameters: {list(fixed_params.keys())}\n")
         
-        return composed
+        return ReducedAndFixedModel
     
     # ========== Result Selection & Logging ==========
     """Select best results and print execution summaries."""

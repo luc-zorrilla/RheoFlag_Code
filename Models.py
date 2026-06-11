@@ -131,35 +131,36 @@ class Model:
         return ComposedModel
 
     @classmethod
-    def reduce(cls, param_keys_to_keep: List[str]) -> Type:
+    def reduce(cls, param_keys_to_keep: List[str]) -> Type["Model"]:
         """
         Create a reduced model class that only tracks specified internal parameters.
         
-        The resulting model will have a smaller int_params dict containing only
-        the specified keys. Other parameters are assumed to be handled externally
-        (e.g., fixed from prior inference passes).
+        Instances of the resulting class will have int_params automatically filtered
+        to contain only the specified keys upon initialization.
         
         Args:
             param_keys_to_keep: List of internal parameter keys to retain
             
         Returns:
-            A new Model subclass with reduced int_params
+            A new Model subclass with filtered int_params
         """
         base_model = cls
         
-        def compose_int_params_reduced(int_params, ext_params, sim_params):
-            """Keep only specified parameter keys."""
-            if isinstance(int_params, dict):
-                return {
-                    key: int_params[key]
-                    for key in param_keys_to_keep
-                    if key in int_params
-                }
-            return int_params
+        class ReducedModel(base_model):
+            def __post_init__(self):
+                """Filter int_params after dataclass initialization."""
+                if isinstance(self.int_params, dict):
+                    self.int_params = {
+                        key: self.int_params[key]
+                        for key in param_keys_to_keep
+                        if key in self.int_params
+                    }
+                # Call parent's __post_init__ if it exists
+                if hasattr(super(), '__post_init__'):
+                    super().__post_init__()
         
-        return base_model.compose(
-            compose_int_params=compose_int_params_reduced,
-        )
+        ReducedModel.__name__ = f"Reduced{base_model.__name__}"
+        return ReducedModel
 
     # ========== Persistence ==========
     """Save and load model state (pickling, JSON, etc)."""

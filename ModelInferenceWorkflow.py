@@ -344,9 +344,6 @@ def run_single_inference(
     else:
         filtered_model_list = model_list
     
-    # Pass initial_guesses separately to the factory function
-    pipeline_kwargs = dict(task.pipeline_kwargs)
-
     # Create pipeline via factory
     pipeline = InferencePipeline.from_factory(
         task.make_pipeline_fn,
@@ -354,10 +351,19 @@ def run_single_inference(
         **task.pipeline_kwargs,
     )
     
-    n_passes = len(pipeline.passes)
-    initial_guesses_per_pass = [task.initial_guesses for _ in range(n_passes)]
+    # Filter initial_guesses per pass based on param_keys_to_infer
+    initial_guesses_per_pass = []
+    for pass_idx, pipeline_pass in enumerate(pipeline.passes):
+        param_keys = pipeline_pass.param_keys_to_infer
+        
+        # Filter each initial guess to only include keys for this pass
+        filtered_guesses = [
+            {key: guess[key] for key in param_keys if key in guess}
+            for guess in task.initial_guesses
+        ]
+        initial_guesses_per_pass.append(filtered_guesses)
 
-    # Run pipeline with proper argument structure
+    # Run pipeline with filtered initial_guesses
     result = pipeline.run(
         initial_guesses_per_pass=initial_guesses_per_pass,
         verbose=True,
@@ -532,7 +538,6 @@ def test_workflow():
 
     print("\n✓ Test complete!")
 
-
 def test_composition_with_workflow():
     """Test composed models in the SimulationInferenceWorkflow."""
     
@@ -609,7 +614,6 @@ def test_composition_with_workflow():
     
     print("="*70)
     return all_correct
-
 
 def test_double_composition_with_workflow():
     """Test doubly-composed models in the workflow."""
