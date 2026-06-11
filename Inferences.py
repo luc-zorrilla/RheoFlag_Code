@@ -780,19 +780,21 @@ class InferencePipeline:
 
     # ========== Model Composition ==========
     """Build pass-specific models with fixed parameters from prior passes."""
-
     def _build_pass_model(
         self,
         pass_def: PipelinePass,
         fixed_params: Dict[str, float],
-        verbose: bool = True,
+        verbose: bool = False,
     ) -> Type:
         """
         Build a pass-specific model class with fixed parameters from prior passes.
         
+        Reduces internal parameters to only those being inferred in this pass,
+        while preserving fixed parameters from prior passes.
+        
         Args:
             pass_def: Pipeline pass definition containing the base model class
-            fixed_params: Dictionary of parameters to fix/override
+            fixed_params: Dictionary of parameters to fix/override from prior passes
             verbose: Print debug information
             
         Returns:
@@ -801,24 +803,23 @@ class InferencePipeline:
         
         base_model = pass_def.model_class
         
-        if verbose:
-            print(f"\n[Model Composition]")
-            print(f"  Base model: {base_model.__name__}")
-            print(f"  Fixed params to enforce: {fixed_params}")
-        
-        if not fixed_params:
-            if verbose:
-                print(f"  → No additional composition (Pass 1)\n")
-            return base_model
-        
         def compose_int_params_with_fixed(int_params, ext_params, sim_params):
-            """Merge fixed parameters into int_params."""
+            """
+            Reduce int_params to only param_keys_to_infer and merge fixed parameters.
+            """
             # Deep copy to avoid modifying the original
-            
             merged = copy.deepcopy(int_params)
             
             if isinstance(merged, dict):
-                merged.update(fixed_params)
+                # Keep only parameters being inferred in this pass
+                reduced = {
+                    key: merged[key]
+                    for key in pass_def.param_keys_to_infer
+                    if key in merged
+                }
+                # Merge in fixed parameters from prior passes
+                reduced.update(fixed_params)
+                merged = reduced
             
             return merged
         
@@ -827,10 +828,11 @@ class InferencePipeline:
         )
         
         if verbose:
-            print(f"  → Composed model: {composed.__name__}\n")
+            print(f"  → Composed model: {composed.__name__}")
+            print(f"    Parameters to infer: {pass_def.param_keys_to_infer}")
+            print(f"    Fixed parameters: {list(fixed_params.keys())}\n")
         
         return composed
-
     
     # ========== Result Selection & Logging ==========
     """Select best results and print execution summaries."""
