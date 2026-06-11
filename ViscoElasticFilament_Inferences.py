@@ -688,189 +688,131 @@ def make_two_pass_pipeline(model_list, **kwargs) -> InferencePipeline:
         n_jobs_per_pass=n_jobs_per_pass,
     )
 
-# def _make_two_pass_pipeline_factory(
-#     model_class,
-#     ext_params_list,
-#     sim_params_list,
-#     param_keys_to_infer,
-#     elastic_params_list,
-#     viscous_params_list,
-#     loss_fn,
-#     optimizer,
-#     optimizer_kwargs,
-#     n_jobs_per_pass,
-# ):
-#     """
-#     Factory function that returns a make_pipeline_fn with bound parameters.
-#     This allows pipeline creation to be deferred until inference time.
-#     """
+def _make_two_pass_pipeline_factory(
+    model_class,
+    ext_params_list,
+    sim_params_list,
+    param_keys_to_infer,
+    elastic_params_list,
+    viscous_params_list,
+    loss_fn,
+    optimizer,
+    optimizer_kwargs,
+    n_jobs_per_pass,
+):
+    """
+    Factory function that returns a make_pipeline_fn with bound parameters.
+    This allows pipeline creation to be deferred until inference time.
+    """
     
-#     def make_pipeline_fn(model_list=None, ground_truths=None, ground_truth_models=None, **kwargs):
-#         """
-#         Create a two-pass pipeline with the bound parameters.
+    def make_pipeline_fn(model_list, **kwargs):
+        """
+        Create a two-pass pipeline with the bound parameters.
         
-#         Args:
-#             model_list: ModelList object (from filtered data)
-#             ground_truths: List of ground truth simulation outputs (extracted from model_list if not provided)
-#             ground_truth_models: List of ground truth model instances (extracted from model_list if not provided)
-#             **kwargs: Additional arguments (ignored)
+        Args:
+            model_list: ModelList object (from filtered data)
+            **kwargs: Additional arguments (ignored)
         
-#         Returns:
-#             InferencePipeline configured for two-pass inference
-#         """
-#         # Extract from model_list if not explicitly provided
-#         if ground_truths is None and model_list is not None:
-#             ground_truths = [model.sim_output['value'] for model in model_list.models]
-        
-#         if ground_truth_models is None and model_list is not None:
-#             ground_truth_models = model_list.models
-        
-#         return make_two_pass_pipeline(
-#             model_class=model_class,
-#             ground_truths=ground_truths,
-#             ext_params_list=ext_params_list,
-#             sim_params_list=sim_params_list,
-#             param_keys_to_infer=param_keys_to_infer,
-#             elastic_params_list=elastic_params_list,
-#             viscous_params_list=viscous_params_list,
-#             loss_fn=loss_fn,
-#             optimizer=optimizer,
-#             product_or_zip='zip',
-#             optimizer_kwargs=optimizer_kwargs,
-#             n_jobs_per_pass=n_jobs_per_pass,
-#             ground_truth_models=ground_truth_models,
-#         )
+        Returns:
+            InferencePipeline configured for two-pass inference
+        """
+        return make_two_pass_pipeline(
+            model_list=model_list,
+            param_keys_to_infer=param_keys_to_infer,
+            elastic_params_list=elastic_params_list,
+            viscous_params_list=viscous_params_list,
+            optimizer=optimizer,
+            optimizer_kwargs=optimizer_kwargs,
+            loss_fn=loss_fn,
+            n_jobs_per_pass=n_jobs_per_pass,
+        )
     
-#     return make_pipeline_fn
+    return make_pipeline_fn
 
-# def make_inference_tasks_two_pass(
-#     mode: str,
-#     int_params_list: list[dict],
-#     ext_params_list: list[dict],
-#     param_keys_to_infer: list[str],
-#     elastic_params_list: list[str],
-#     viscous_params_list: list[str],
-#     make_sim_params_fn,
-#     model_class,
-#     loss_fn,
-#     optimizer,
-#     optimizer_kwargs,
-#     initial_guesses: list[dict],
-#     n_jobs_per_pass: int = -1,
-# ) -> list[InferenceTask]:
-#     """
-#     Create inference tasks with two-pass pipeline for each int_params set.
+def make_inference_tasks_two_pass(
+    mode: str,
+    int_params_list: list[dict],
+    ext_params_list: list[dict],
+    param_keys_to_infer: list[str],
+    elastic_params_list: list[str],
+    viscous_params_list: list[str],
+    make_sim_params_fn,
+    model_class,
+    loss_fn,
+    optimizer,
+    optimizer_kwargs,
+    initial_guesses: list[dict],
+    n_jobs_per_pass: int = -1,
+) -> list[InferenceTask]:
+    """Create inference tasks with two-pass pipeline."""
     
-#     Supports two modes:
-#     - 'single_inference': One inference task per (int_params, ext_params) pair
-#     - 'cumulative_inference': One inference task per int_params using all ext_params
+    if mode not in ('single_inference', 'cumulative_inference'):
+        raise ValueError(f"mode must be 'single_inference' or 'cumulative_inference', got '{mode}'")
     
-#     Args:
-#         mode: Either 'single_inference' or 'cumulative_inference'
-#         int_params_list: List of internal parameter dicts to infer for each
-#             e.g., [{'Sp4': 1.0, 'Beta': 1e-1}, {'Sp4': 2.0, 'Beta': 2e-1}]
-#         ext_params_list: List of external parameter dicts
-#             e.g., [{'A': 1e-6, 'w0': 1e-3, 'psi': np.pi/2}, ...]
-#         param_keys_to_infer: Keys to infer from int_params
-#             e.g., ['Sp4', 'Beta']
-#         elastic_params_list: Parameter keys classified as elastic
-#             e.g., ['Sp4', 'Beta']
-#         viscous_params_list: Parameter keys classified as viscous
-#             e.g., ['tau_b', 'tau_s']
-#         make_sim_params_fn: Function that takes w0 and returns sim_params dict
-#             signature: make_sim_params_fn(w0) -> dict
-#         model_class: Model class for inference
-#         loss_fn: Loss function
-#         optimizer: Optimizer function
-#         optimizer_kwargs: Optimizer kwargs (will be extended with bounds)
-#         initial_guesses: List of dicts with initial parameter guesses
-#             e.g., [{'Sp4': 1e-1, 'Beta': 1e-2}]
-#         n_jobs_per_pass: Number of parallel jobs per inference pass
+    if not int_params_list or not ext_params_list or not param_keys_to_infer:
+        raise ValueError("int_params_list, ext_params_list, and param_keys_to_infer cannot be empty")
     
-#     Returns:
-#         List of InferenceTask objects ready for execution
+    sim_params_list = [make_sim_params_fn(ext_params.get('w0', 0.0)) for ext_params in ext_params_list]
+    tasks = []
     
-#     Raises:
-#         ValueError: If mode is invalid or data structure is malformed
-#     """
-    
-#     if mode not in ('single_inference', 'cumulative_inference'):
-#         raise ValueError(f"mode must be 'single_inference' or 'cumulative_inference', got '{mode}'")
-    
-#     if not int_params_list:
-#         raise ValueError("int_params_list cannot be empty")
-    
-#     if not ext_params_list:
-#         raise ValueError("ext_params_list cannot be empty")
-    
-#     if not param_keys_to_infer:
-#         raise ValueError("param_keys_to_infer cannot be empty")
-    
-#     # Create sim_params_list by extracting w0 from ext_params
-#     sim_params_list = [make_sim_params_fn(ext_params.get('w0', 0.0)) for ext_params in ext_params_list]
-    
-#     tasks = []
-    
-#     if mode == 'single_inference':
-#         # One task per (int_params, ext_params) pair
-#         for int_idx, int_params in enumerate(int_params_list):
-#             for ext_idx, (ext_params, sim_params) in enumerate(zip(ext_params_list, sim_params_list)):
-#                 task_key = f"int_{int_idx:03d}_ext_{ext_idx:03d}"
+    if mode == 'single_inference':
+        for int_idx, int_params in enumerate(int_params_list):
+            for ext_idx, (ext_params, sim_params) in enumerate(zip(ext_params_list, sim_params_list)):
+                task_key = f"int_{int_idx:03d}_ext_{ext_idx:03d}"
                 
-#                 # Create pipeline for this specific pair
-#                 pipeline_fn = _make_two_pass_pipeline_factory(
-#                     model_class=model_class,
-#                     ext_params_list=[ext_params],
-#                     sim_params_list=[sim_params],
-#                     param_keys_to_infer=param_keys_to_infer,
-#                     elastic_params_list=elastic_params_list,
-#                     viscous_params_list=viscous_params_list,
-#                     loss_fn=loss_fn,
-#                     optimizer=optimizer,
-#                     optimizer_kwargs=optimizer_kwargs,
-#                     n_jobs_per_pass=n_jobs_per_pass,
-#                 )
+                # Factory for this specific ext_params pair
+                pipeline_fn = _make_two_pass_pipeline_factory(
+                    model_class=model_class,
+                    ext_params_list=[ext_params],
+                    sim_params_list=[sim_params],
+                    param_keys_to_infer=param_keys_to_infer,
+                    elastic_params_list=elastic_params_list,
+                    viscous_params_list=viscous_params_list,
+                    loss_fn=loss_fn,
+                    optimizer=optimizer,
+                    optimizer_kwargs=optimizer_kwargs,
+                    n_jobs_per_pass=n_jobs_per_pass,
+                )
                 
-#                 task = InferenceTask(
-#                     task_key=task_key,
-#                     int_idx=int_idx,
-#                     pair_indices=[(ext_idx,)],  # Single ext_params
-#                     make_pipeline_fn=pipeline_fn,
-#                     pipeline_kwargs={},  # Already bound in factory
-#                     initial_guesses=initial_guesses,
-#                 )
-#                 tasks.append(task)
+                task = InferenceTask(
+                    task_key=task_key,
+                    int_idx=int_idx,
+                    pair_indices=[(ext_idx,)],
+                    make_pipeline_fn=pipeline_fn,
+                    pipeline_kwargs={},
+                    initial_guesses=initial_guesses,
+                )
+                tasks.append(task)
     
-#     elif mode == 'cumulative_inference':
-#         # One task per int_params, using all ext_params
-#         for int_idx, int_params in enumerate(int_params_list):
-#             task_key = f"int_{int_idx:03d}_cumulative"
+    elif mode == 'cumulative_inference':
+        for int_idx, int_params in enumerate(int_params_list):
+            task_key = f"int_{int_idx:03d}_cumulative"
             
-#             # Create pipeline for all ext_params
-#             pipeline_fn = _make_two_pass_pipeline_factory(
-#                 model_class=model_class,
-#                 ext_params_list=ext_params_list,
-#                 sim_params_list=sim_params_list,
-#                 param_keys_to_infer=param_keys_to_infer,
-#                 elastic_params_list=elastic_params_list,
-#                 viscous_params_list=viscous_params_list,
-#                 loss_fn=loss_fn,
-#                 optimizer=optimizer,
-#                 optimizer_kwargs=optimizer_kwargs,
-#                 n_jobs_per_pass=n_jobs_per_pass,
-#             )
+            # Factory with all ext_params
+            pipeline_fn = _make_two_pass_pipeline_factory(
+                model_class=model_class,
+                ext_params_list=ext_params_list,
+                sim_params_list=sim_params_list,
+                param_keys_to_infer=param_keys_to_infer,
+                elastic_params_list=elastic_params_list,
+                viscous_params_list=viscous_params_list,
+                loss_fn=loss_fn,
+                optimizer=optimizer,
+                optimizer_kwargs=optimizer_kwargs,
+                n_jobs_per_pass=n_jobs_per_pass,
+            )
             
-#             task = InferenceTask(
-#                 task_key=task_key,
-#                 int_idx=int_idx,
-#                 pair_indices=None,  # Use all ext_params
-#                 make_pipeline_fn=pipeline_fn,
-#                 pipeline_kwargs={},  # Already bound in factory
-#                 initial_guesses=initial_guesses,
-#             )
-#             tasks.append(task)
+            task = InferenceTask(
+                task_key=task_key,
+                int_idx=int_idx,
+                pair_indices=None,
+                make_pipeline_fn=pipeline_fn,
+                pipeline_kwargs={},
+                initial_guesses=initial_guesses,
+            )
+            tasks.append(task)
     
-#     return tasks
+    return tasks
 
 # =============== TESTS ===============================
 
@@ -1713,6 +1655,315 @@ def test_workflow_with_inference_single_task_multi_ext(a_values: list[float] = N
         'a_values': a_values,
     }
 
+def test_workflow_with_inference_multi_sp4_tau_b(
+    sp4_values: list[float] = None,
+    tau_b_values: list[float] = None,
+) -> list[dict]:
+    """
+    Test ViscoElasticFilament one-pass inference with:
+    - Multiple internal parameters: All combinations of Sp4 and tau_b values
+    - Single external parameter set: A = 1e-6, w0 = 0 (shared across all int_params)
+    - One inference pass per internal parameter combination
+    - Verify that inference truly loops through all int_params combinations
+    
+    Args:
+        sp4_values: List of Sp4 values to test (default: [0.5, 1.0, 2.0])
+        tau_b_values: List of tau_b values to test (default: [0.5, 1.0, 2.0])
+    
+    Returns:
+        List of result dictionaries containing inference outcomes for each int_params
+    """
+    
+    if sp4_values is None:
+        sp4_values = [0.5, 1.0, 2.0]
+    if tau_b_values is None:
+        tau_b_values = [0, 1.0, 2.0]
+    
+    checkpoint_dir = Path("./test_checkpoints_vef_multi_sp4_tau_b")
+    if checkpoint_dir.exists():
+        shutil.rmtree(checkpoint_dir)
+    
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+    
+    print("\n" + "=" * 80)
+    print(f"TEST: ViscoElasticFilament Multi-Sp4-tau_b One-Pass Inference")
+    print(f"      ({len(sp4_values)} Sp4 × {len(tau_b_values)} tau_b = {len(sp4_values) * len(tau_b_values)} cases)")
+    print("=" * 80)
+    
+    # =========================================================================
+    # PHASE 1: SIMULATION
+    # =========================================================================
+    print("\nPHASE 1: Running Simulations")
+    print("-" * 80)
+    
+    # Create all combinations of (Sp4, tau_b)
+    int_params_list = [
+        make_ground_truth_int_params(Sp4=sp4_val, tau_b=tau_b_val)
+        for sp4_val in sp4_values
+        for tau_b_val in tau_b_values
+    ]
+    
+    # Build mapping for easy lookup during verification
+    int_params_map = {}  # (Sp4, tau_b) -> int_idx
+    for int_idx, int_params in enumerate(int_params_list):
+        sp4 = int_params.get('Sp4')
+        tau_b = int_params.get('tau_b')
+        int_params_map[(sp4, tau_b)] = int_idx
+    
+    print(f"Internal parameters (all combinations):")
+    print(f"  Sp4 values: {sp4_values}")
+    print(f"  tau_b values: {tau_b_values}")
+    print(f"  Total combinations: {len(int_params_list)}")
+    print(f"  Keys in int_params: {list(int_params_list[0].keys())}")
+    
+    print(f"\n  Detailed int_params combinations:")
+    for int_idx, int_params in enumerate(int_params_list):
+        sp4 = int_params.get('Sp4')
+        tau_b = int_params.get('tau_b')
+        print(f"    [{int_idx:2d}] Sp4={sp4:.4e}, tau_b={tau_b:.4e}")
+    
+    # Single external parameter set: A = 1e-6, w0 = 0
+    A_value = 1e-6
+    w0 = 0.0
+    ext_params = make_ground_truth_ext_params(A=A_value, w0=w0)
+    sim_params = make_sim_params_for_w0(w0=w0)
+    
+    print(f"\nExternal parameters (shared across all int_params):")
+    print(f"  A: {A_value:.4e}")
+    print(f"  w0 (via sim_params): {w0}")
+    print(f"  T_span: {sim_params.get('T_span')}")
+    print(f"  Number of ext_params sets: 1")
+    
+    # Single-element lists for ext/sim params
+    ext_params_list = [ext_params]
+    sim_params_list = [sim_params]
+    
+    # Get reduced model class (using first int_params as template)
+    param_keys_to_infer = ['Sp4', 'tau_b']
+    ReducedModel = model_params_only_flow(
+        int_params_list[0],
+        param_keys_to_infer,
+    )
+    
+    # Run simulations: outer loop over all int_params combinations, 
+    # inner loop over single ext/sim pair
+    model_lists = workflow.run_simulations(
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        model_class=ReducedModel,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ Simulations complete")
+    print(f"  ModelLists created: {len(model_lists)}")
+    print(f"  Expected: {len(int_params_list)}")
+    assert len(model_lists) == len(int_params_list), \
+        f"Mismatch: {len(model_lists)} ModelLists vs {len(int_params_list)} int_params"
+    
+    # Inspect simulation results to verify loop coverage
+    print(f"\n  Simulation results for each int_idx:")
+    for int_idx, model_list in model_lists.items():
+        sp4_val = int_params_list[int_idx].get('Sp4')
+        tau_b_val = int_params_list[int_idx].get('tau_b')
+        
+        assert len(model_list.models) == 1, \
+            f"int_idx={int_idx}: Expected 1 model (1 ext_params), got {len(model_list.models)}"
+        
+        model = model_list.models[0]
+        
+        # Verify ext_params matches
+        assert abs(model.ext_params.get('A') - A_value) < 1e-15, \
+            f"int_idx={int_idx}: ext_params['A'] mismatch"
+        
+        sim_output = model.sim_output.get('value', np.array([]))
+        
+        print(f"    int_idx={int_idx:2d} (Sp4={sp4_val:.4e}, tau_b={tau_b_val:.4e}): "
+            f"1 model, sim_output shape={sim_output.shape}")
+    
+    # =========================================================================
+    # PHASE 2: ONE-PASS INFERENCE FOR EACH INT_PARAMS
+    # =========================================================================
+    print("\n" + "=" * 70)
+    print("PHASE 2: One-Pass Inference for Each int_params Combination")
+    print("-" * 70)
+    
+    # Intentionally offset initial guesses from ground truth
+    initial_guesses = [
+        {'Sp4': 1e-1, 'tau_b': 1e-1}
+    ]
+    
+    print(f"\nInference setup:")
+    print(f"  Parameters to infer: {param_keys_to_infer}")
+    print(f"  Initial guess: {initial_guesses[0]}")
+    print(f"  Number of int_params combinations: {len(int_params_list)}")
+    
+    # Optimizer setup
+    optimizer = basinhopping_optimizer
+    bounds = _make_optimizer_bounds(param_keys_to_infer)
+    optimizer_kwargs = make_optimizer_kwargs(bounds=bounds)
+    loss_fn = rel_mse_loss_fn()
+    
+    pipeline_kwargs = dict(
+        optimizer=optimizer,
+        optimizer_kwargs=optimizer_kwargs,
+        loss_fn=loss_fn,
+    )
+    
+    # Create inference tasks: one for each int_idx
+    inference_tasks = []
+    for int_idx in range(len(int_params_list)):
+        sp4_true = int_params_list[int_idx].get('Sp4')
+        tau_b_true = int_params_list[int_idx].get('tau_b')
+        
+        task = InferenceTask(
+            task_key=f"infer_sp4_tau_b_{int_idx}",
+            int_idx=int_idx,
+            pair_indices=None,  # Use all models in the ModelList for this int_idx
+            make_pipeline_fn=make_simple_inference_pipeline,
+            pipeline_kwargs=pipeline_kwargs,
+            initial_guesses=initial_guesses,
+        )
+        inference_tasks.append(task)
+    
+    print(f"\nCreated {len(inference_tasks)} inference task(s):")
+    print(f"{'Task Key':<30} {'int_idx':<8} {'Sp4 (true)':<14} {'tau_b (true)':<14}")
+    print("-" * 66)
+    for idx, task in enumerate(inference_tasks):
+        sp4_true = int_params_list[idx].get('Sp4')
+        tau_b_true = int_params_list[idx].get('tau_b')
+        print(f"{task.task_key:<30} {task.int_idx:<8} {sp4_true:<14.4e} {tau_b_true:<14.4e}")
+    
+    # Run inferences
+    print(f"\nRunning {len(inference_tasks)} inference task(s)...")
+    inference_results = workflow.run_inferences(
+        inference_tasks=inference_tasks,
+        model_lists=model_lists,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ Inferences complete: {len(inference_results)} result(s)")
+    assert len(inference_results) == len(inference_tasks), \
+        f"Mismatch: {len(inference_results)} results vs {len(inference_tasks)} tasks"
+    
+    # =========================================================================
+    # PHASE 3: VERIFICATION
+    # =========================================================================
+    print("\n" + "=" * 70)
+    print("PHASE 3: Verification")
+    print("-" * 70)
+    
+    results_summary = []
+    all_success = True
+    convergence_failures = []
+    accuracy_failures = []
+    
+    abs_tolerance = 0.01
+    rel_tolerance = 0.05  # 5%
+    
+    print(f"\nAccuracy criteria:")
+    print(f"  Absolute tolerance: {abs_tolerance}")
+    print(f"  Relative tolerance: {rel_tolerance * 100:.1f}%")
+    print(f"  (Both must be satisfied for a PASS)")
+    
+    for int_idx in range(len(int_params_list)):
+        task_key = f"infer_sp4_tau_b_{int_idx}"
+        
+        assert task_key in inference_results, \
+            f"Missing result for task_key={task_key}"
+        
+        result = inference_results[task_key]
+        
+        # Extract ground truth
+        true_sp4 = int_params_list[int_idx].get('Sp4')
+        true_tau_b = int_params_list[int_idx].get('tau_b')
+        
+        # Extract inferred values
+        inferred_sp4 = result[0].params['Sp4']
+        inferred_tau_b = result[0].params['tau_b']
+        
+        # Compute errors
+        sp4_abs_error = abs(inferred_sp4 - true_sp4)
+        sp4_rel_error = sp4_abs_error / true_sp4 if true_sp4 != 0 else 0
+        
+        tau_b_abs_error = abs(inferred_tau_b - true_tau_b)
+        tau_b_rel_error = tau_b_abs_error / true_tau_b if true_tau_b != 0 else 0
+        
+        # Determine success (both abs and rel within tolerance)
+        sp4_success = (sp4_abs_error < abs_tolerance) and (sp4_rel_error < rel_tolerance)
+        tau_b_success = (tau_b_abs_error < abs_tolerance) and (tau_b_rel_error < rel_tolerance)
+        overall_success = sp4_success and tau_b_success
+        
+        if not result[0].success:
+            convergence_failures.append(int_idx)
+        
+        if not overall_success:
+            accuracy_failures.append(int_idx)
+        
+        results_summary.append({
+            'int_idx': int_idx,
+            'true_sp4': true_sp4,
+            'true_tau_b': true_tau_b,
+            'inferred_sp4': inferred_sp4,
+            'inferred_tau_b': inferred_tau_b,
+            'sp4_abs_error': sp4_abs_error,
+            'sp4_rel_error': sp4_rel_error,
+            'tau_b_abs_error': tau_b_abs_error,
+            'tau_b_rel_error': tau_b_rel_error,
+            'converged': result[0].success,
+            'final_loss': result[0].loss,
+            'sp4_success': sp4_success,
+            'tau_b_success': tau_b_success,
+            'overall_success': overall_success,
+            'status': '✓ PASS' if overall_success else '✗ FAIL',
+        })
+        
+        all_success = all_success and overall_success
+    
+    # Print formatted results table
+    print(f"\nInference Results Summary:")
+    print(f"\n{'idx':<4} {'Sp4 (T/I)':<20} {'tau_b (T/I)':<20} {'Sp4 Error':<15} {'tau_b Error':<15} {'Loss':<12} {'Status':<8}")
+    print("-" * 110)
+    
+    for res in results_summary:
+        true_inferred_sp4 = f"{res['true_sp4']:.2e}/{res['inferred_sp4']:.2e}"
+        true_inferred_tau_b = f"{res['true_tau_b']:.2e}/{res['inferred_tau_b']:.2e}"
+        sp4_error_str = f"{res['sp4_abs_error']:.2e} ({res['sp4_rel_error']:.1%})"
+        tau_b_error_str = f"{res['tau_b_abs_error']:.2e} ({res['tau_b_rel_error']:.1%})"
+        
+        print(
+            f"{res['int_idx']:<4} "
+            f"{true_inferred_sp4:<20} "
+            f"{true_inferred_tau_b:<20} "
+            f"{sp4_error_str:<15} "
+            f"{tau_b_error_str:<15} "
+            f"{res['final_loss']:<12.4e} "
+            f"{res['status']:<8}"
+        )
+    
+    # Print detailed failure analysis
+    if convergence_failures:
+        print(f"\n⚠ Convergence Failures ({len(convergence_failures)}):")
+        for int_idx in convergence_failures:
+            res = results_summary[int_idx]
+            print(f"  int_idx={int_idx}: "
+                f"Sp4={res['true_sp4']:.4e}, tau_b={res['true_tau_b']:.4e}, "
+                f"final_loss={res['final_loss']:.4e}")
+    
+    if accuracy_failures:
+        print(f"\n⚠ Accuracy Failures ({len(accuracy_failures)}):")
+        for int_idx in accuracy_failures:
+            res = results_summary[int_idx]
+            if not res['sp4_success']:
+                print(f"  int_idx={int_idx} (Sp4 fail): "
+                    f"true={res['true_sp4']:.4e}, inferred={res['inferred_sp4']:.4e}, "
+                    f"abs_error={res['sp4_abs_error']:.4e}, rel_error={res['sp4_rel_error']:.2%}")
+            if not res['tau_b_success']:
+                print(f"  int_idx={int_idx} (tau_b fail): "
+                    f"true={res['true_tau_b']:.4e}, inferred={res['inferred_tau_b']:.4e}, "
+                    f"abs_error={res['tau_b_abs_error']:.4e}, rel_error={res['tau_b_rel_error']:.2%}")
+
+
 def test_workflow_with_inference_two_pass_elastic_viscous(a_values: list[float] = None):
     """
     Test ViscoElasticFilament inference with:
@@ -1897,101 +2148,151 @@ def test_workflow_with_inference_two_pass_elastic_viscous(a_values: list[float] 
         'w0_values': w0_values,
     }
 
-def test_workflow_two_pass_flexible_params(
-    mode: str = 'cumulative_inference',
-    int_params_list: list[dict] = None,
-    ext_params_list: list[dict] = None,
+def test_workflow_with_inference_two_pass_elastic_viscous_multi_int_params(
+    sp4_values: list[float] = None,
+    tau_b_values: list[float] = None,
+    a_values: list[float] = None,
 ):
     """
-    Test two-pass inference with flexible parameter dictionaries.
+    Test ViscoElasticFilament two-pass inference with:
+    - Multiple internal parameters: Cartesian product of Sp4 and tau_b values
+    - Multiple external parameters: A values from a provided list
+    - Two-pass inference per int_params: Split elastic (Sp4) and viscous (tau_b) params
+      * Pass 1 (Elastic): Optimizes Sp4 at w0 = min_w0
+      * Pass 2 (Viscous): Optimizes tau_b at w0 > 0
+    - Verification that all int_params combinations are simulated and inferred
     
     Args:
-        mode: 'single_inference' or 'cumulative_inference'
-        int_params_list: List of internal parameter dicts to test
-        ext_params_list: List of external parameter dicts to test
+        sp4_values: List of Sp4 values to test (default: [0.5, 1.0, 2.0])
+        tau_b_values: List of tau_b values to test (default: [0.5, 1.0, 2.0])
+        a_values: List of A (amplitude) values to test (default: [1e-6, 1e-5, 1e-4])
     """
     
-    if int_params_list is None:
-        int_params_list = [
-            {'Sp4': 1.0, 'tau_b': 0},
-            {'Sp4': 1.0, 'tau_b': 1},
-        ]
+    if sp4_values is None:
+        sp4_values = [1.0]
+    if tau_b_values is None:
+        tau_b_values = [0, 1.0]
+    if a_values is None:
+        a_values = [1e-6]
     
-    if ext_params_list is None:
-        ext_params_list = [
-            {'A': 1e-6, 'w0': 0.0, 'psi': np.pi / 2},
-            {'A': 1e-5, 'w0': 0.0, 'psi': np.pi / 2},
-            {'A': 1e-6, 'w0': 1.0, 'psi': np.pi / 2},
-            {'A': 1e-5, 'w0': 1.0, 'psi': np.pi / 2},            
-        ]
-
-    checkpoint_dir = Path(f"./test_checkpoints_two_pass_flexible_{mode}")
+    checkpoint_dir = Path("./test_checkpoints_vef_two_pass_multi_int")
     if checkpoint_dir.exists():
         shutil.rmtree(checkpoint_dir)
     
     workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
     
     print("\n" + "=" * 80)
-    print(f"TEST: Two-Pass Flexible Parameters ({mode})")
+    print(f"TEST: ViscoElasticFilament Two-Pass Multi-Int-Params Inference")
+    print(f"      (Sp4: {len(sp4_values)} × tau_b: {len(tau_b_values)} = {len(sp4_values) * len(tau_b_values)} cases)")
     print("=" * 80)
     
-    print("\nPHASE 1: Running Simulations")
+    print("\nPHASE 0: Parameter Space Setup")
     print("-" * 80)
     
-    # Expand int_params_list to full parameter dicts
-    full_int_params_list = []
-    for int_params_partial in int_params_list:
-        full_params = make_ground_truth_int_params(**int_params_partial)
-        full_int_params_list.append(full_params)
+    print(f"\nInternal Parameters (Cartesian product):")
+    print(f"  Sp4 values: {sp4_values}")
+    print(f"  tau_b values: {tau_b_values}")
+    print(f"  Total combinations: {len(sp4_values) * len(tau_b_values)}")
     
-    print(f"Internal parameters (to infer):")
-    for idx, int_params in enumerate(int_params_list):
-        print(f"  [{idx}] {int_params}")
+    # Create all combinations of (Sp4, tau_b)
+    int_params_list = []
+    int_params_metadata = []  # Track (sp4, tau_b) for each entry
     
-    # Run simulations for all combinations
-    model_lists = {}
-    for int_idx, int_params in enumerate(full_int_params_list):
-        param_keys_to_infer = list(int_params_list[int_idx].keys())
-        
-        ReducedModel = model_params_only_flow(
-            int_params,
-            param_keys_to_infer,
-        )
-        
-        ext_params_full_list = []
-        sim_params_list = []
-        for ext_params_partial in ext_params_list:
-            ext_params_full = make_ground_truth_ext_params(**ext_params_partial)
-            sim_params = make_sim_params_for_w0(w0=ext_params_partial.get('w0', 0.0))
-            ext_params_full_list.append(ext_params_full)
+    for sp4 in sp4_values:
+        for tau_b in tau_b_values:
+            int_params = make_ground_truth_int_params(Sp4=sp4, tau_b=tau_b)
+            int_params_list.append(int_params)
+            int_params_metadata.append({'Sp4': sp4, 'tau_b': tau_b})
+    
+    print(f"\n  Generated {len(int_params_list)} int_params:")
+    for idx, metadata in enumerate(int_params_metadata):
+        print(f"    [{idx}] Sp4={metadata['Sp4']:.4e}, tau_b={metadata['tau_b']:.4e}")
+    
+    # External parameters: vary A across two w0 values
+    w0_values = [0.0, 1.0]
+    ext_params_list = []
+    sim_params_list = []
+    
+    print(f"\nExternal Parameters:")
+    print(f"  A values: {a_values} ({len(a_values)} values)")
+    print(f"  w0 values: {w0_values}")
+    print(f"  Total ext_params per int_params: {len(a_values) * len(w0_values)}")
+    
+    for w0 in w0_values:
+        sim_params = make_sim_params_for_w0(w0=w0)
+        for idx, a_val in enumerate(a_values):
+            ext_params = make_ground_truth_ext_params(A=a_val, w0=w0)
+            ext_params_list.append(ext_params)
             sim_params_list.append(sim_params)
-        
-        print(f"\nExternal parameters:")
-        for idx, ext_params in enumerate(ext_params_full_list):
-            print(f"  [{idx}] {ext_params}")
-
-        result = workflow.run_simulations(
-            int_params_list=[int_params],
-            ext_params_list=ext_params_full_list,
-            sim_params_list=sim_params_list,
-            model_class=ReducedModel,
-            n_jobs=1,
-        )
-        
-        model_lists.update(result)
+    
+    print(f"  Total external parameter sets: {len(ext_params_list)}")
+    
+    elastic_params_list = ['Sp4']
+    viscous_params_list = ['tau_b']
+    param_keys_to_infer = ['Sp4', 'tau_b']
+    
+    print(f"\nParameters to infer:")
+    print(f"  Elastic (Pass 1): {elastic_params_list}")
+    print(f"  Viscous (Pass 2): {viscous_params_list}")
+    
+    print("\n" + "=" * 80)
+    print("PHASE 1: Running Simulations for All Int-Params Combinations")
+    print("-" * 80)
+    
+    ReducedModel = model_params_only_flow(
+        int_params_list[0],
+        param_keys_to_infer,
+    )
+    
+    model_lists = workflow.run_simulations(
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        model_class=ReducedModel,
+        n_jobs=1,
+    )
     
     print(f"\n✓ Simulations complete")
-    print(f"  Total ModelLists: {len(model_lists)}")
-    for int_idx, model_list in model_lists.items():
-        print(f"  int_idx={int_idx}: {len(model_list.models)} models")
+    print(f"  Total ModelLists created: {len(model_lists)}")
+    print(f"  Expected: {len(int_params_list)}")
     
-    print("\n" + "=" * 70)
-    print(f"PHASE 2: Creating Inference Tasks ({mode})")
-    print("-" * 70)
+    # Verify all int_params were simulated
+    assert len(model_lists) == len(int_params_list), \
+        f"Expected {len(int_params_list)} ModelLists, got {len(model_lists)}"
     
-    param_keys_to_infer = list(int_params_list[0].keys())
-    elastic_params_list = ['Sp4', 'Beta']
-    viscous_params_list = ['tau_b', 'tau_s']
+    print(f"\nDetailed ModelList breakdown:")
+    for int_idx, (key, model_list) in enumerate(model_lists.items()):
+        metadata = int_params_metadata[int_idx]
+        num_models = len(model_list.models)
+        expected_models = len(ext_params_list)
+        
+        print(f"\n  int_idx={int_idx} (Sp4={metadata['Sp4']:.4e}, tau_b={metadata['tau_b']:.4e}):")
+        print(f"    Models in this ModelList: {num_models}")
+        print(f"    Expected: {expected_models}")
+        print(f"    Models per w0 group: {len(a_values)}")
+        
+        assert num_models == expected_models, \
+            f"int_idx {int_idx}: expected {expected_models} models, got {num_models}"
+        
+        # Verify models are ordered: first all w0=0, then all w0>0
+        for model_idx, model in enumerate(model_list.models):
+            a_val = model.ext_params.get('A')
+            w0_idx = model_idx // len(a_values)  # Which w0 group
+            expected_w0 = w0_values[w0_idx]
+            actual_w0 = model.ext_params.get('w0')
+            
+            if model_idx < len(a_values):
+                assert actual_w0 == 0.0, \
+                    f"int_idx {int_idx}, model_idx {model_idx}: expected w0=0, got {actual_w0}"
+            else:
+                assert actual_w0 > 0, \
+                    f"int_idx {int_idx}, model_idx {model_idx}: expected w0>0, got {actual_w0}"
+    
+    print(f"\n✓ All int_params successfully simulated with correct model ordering")
+    
+    print("\n" + "=" * 80)
+    print("PHASE 2: Two-Pass Inference for Each Int-Params Combination")
+    print("-" * 80)
     
     initial_guesses = [{'Sp4': 1e-1, 'tau_b': 0}]
     
@@ -2000,15 +2301,276 @@ def test_workflow_two_pass_flexible_params(
     optimizer_kwargs = make_optimizer_kwargs(bounds=bounds)
     loss_fn = rel_mse_loss_fn()
     
-    inference_tasks = make_inference_tasks_two_pass(
-        mode=mode,
+    pipeline_kwargs = dict(
+        optimizer=optimizer,
+        optimizer_kwargs=optimizer_kwargs,
+        loss_fn=loss_fn,
+        param_keys_to_infer=param_keys_to_infer,
+    )
+    
+    # Create one inference task per int_params combination
+    inference_tasks = []
+    for int_idx in range(len(int_params_list)):
+        metadata = int_params_metadata[int_idx]
+        task_key = f"infer_sp4_{metadata['Sp4']:.1e}_tau_b_{metadata['tau_b']:.1e}"
+        
+        task = InferenceTask(
+            task_key=task_key,
+            int_idx=int_idx,
+            pair_indices=None,  # Use all models for this int_params
+            make_pipeline_fn=make_two_pass_pipeline,
+            pipeline_kwargs=pipeline_kwargs,
+            initial_guesses=initial_guesses,
+        )
+        inference_tasks.append(task)
+    
+    print(f"\nCreated {len(inference_tasks)} inference task(s):")
+    for idx, task in enumerate(inference_tasks):
+        metadata = int_params_metadata[idx]
+        print(f"  [{idx}] {task.task_key}")
+        print(f"       True: Sp4={metadata['Sp4']:.4e}, tau_b={metadata['tau_b']:.4e}")
+    
+    # Run all inference tasks
+    inference_results = workflow.run_inferences(
+        inference_tasks=inference_tasks,
+        model_lists=model_lists,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ All two-pass inferences complete: {len(inference_results)} result(s)")
+    
+    print("\n" + "=" * 80)
+    print("PHASE 3: Verification & Results Summary")
+    print("-" * 80)
+    
+    results_summary = []
+    all_success = True
+    
+    print(f"\nDetailed Results:")
+    print(f"\n{'idx':<4} {'True Sp4':<12} {'True tau_b':<12} {'Inferred Sp4':<14} {'Inferred tau_b':<14} {'Sp4 Rel Error':<14} {'tau_b Rel Error':<14} {'Status':<8}")
+    print("-" * 110)
+    
+    for int_idx in range(len(int_params_list)):
+        metadata = int_params_metadata[int_idx]
+        true_sp4 = metadata['Sp4']
+        true_tau_b = metadata['tau_b']
+        
+        task_key = f"infer_sp4_{true_sp4:.1e}_tau_b_{true_tau_b:.1e}"
+        result = inference_results[task_key]
+        
+        inferred_sp4 = result[0].params['Sp4']
+        inferred_tau_b = result[0].params['tau_b']
+        
+        sp4_error = abs(inferred_sp4 - true_sp4)
+        sp4_rel_error = sp4_error / true_sp4 if true_sp4 != 0 else 0
+        
+        tau_b_error = abs(inferred_tau_b - true_tau_b)
+        tau_b_rel_error = tau_b_error / true_tau_b if true_tau_b != 0 else 0
+        
+        # Success if both parameters are within 10% relative error
+        success = (sp4_rel_error < 0.1) and (tau_b_rel_error < 0.1)
+        
+        results_summary.append({
+            'int_idx': int_idx,
+            'true_sp4': true_sp4,
+            'true_tau_b': true_tau_b,
+            'inferred_sp4': inferred_sp4,
+            'inferred_tau_b': inferred_tau_b,
+            'sp4_rel_error': sp4_rel_error,
+            'tau_b_rel_error': tau_b_rel_error,
+            'converged': result[0].success,
+            'final_loss': result[0].loss,
+            'status': '✓ PASS' if success else '✗ FAIL',
+        })
+        
+        print(
+            f"{int_idx:<4} "
+            f"{true_sp4:<12.4e} "
+            f"{true_tau_b:<12.4e} "
+            f"{inferred_sp4:<14.4e} "
+            f"{inferred_tau_b:<14.4e} "
+            f"{sp4_rel_error:<14.4%} "
+            f"{tau_b_rel_error:<14.4%} "
+            f"{results_summary[-1]['status']:<8}"
+        )
+        
+        all_success = all_success and success
+    
+    print("\n" + "=" * 80)
+    print("Summary Statistics")
+    print("-" * 80)
+    
+    passed = sum(1 for res in results_summary if res['status'] == '✓ PASS')
+    failed = len(results_summary) - passed
+    
+    print(f"\nResults: {passed}/{len(results_summary)} cases passed")
+    print(f"  Passed: {passed}")
+    print(f"  Failed: {failed}")
+    
+    avg_sp4_rel_error = sum(res['sp4_rel_error'] for res in results_summary) / len(results_summary)
+    avg_tau_b_rel_error = sum(res['tau_b_rel_error'] for res in results_summary) / len(results_summary)
+    
+    print(f"\nAverage Relative Errors:")
+    print(f"  Sp4:   {avg_sp4_rel_error:.4%}")
+    print(f"  tau_b: {avg_tau_b_rel_error:.4%}")
+    
+    print(f"\nParameter Space Coverage:")
+    print(f"  Int_params combinations: {len(int_params_list)}")
+    print(f"  External param sets: {len(ext_params_list)}")
+    print(f"  Total models across all int_params: {len(int_params_list) * len(ext_params_list)}")
+    
+    print(f"\nTwo-Pass Strategy per Int-Params:")
+    print(f"  ✓ Pass 1 (Elastic): Optimizes Sp4 on {len(a_values)} models at w0=0")
+    print(f"  ✓ Pass 2 (Viscous): Optimizes tau_b on {len(a_values)} models at w0>0")
+    
+    print("\n" + "=" * 80)
+    checkpoint_status = workflow.get_checkpoint_status()
+    print(f"Checkpoint Status:")
+    print(f"  Stage: {checkpoint_status.stage}")
+    print(f"  Simulation entries: {len(checkpoint_status.simulation_entries)}")
+    print(f"    Expected: {len(int_params_list)}")
+    print(f"  Inference entries: {len(checkpoint_status.inference_entries)}")
+    print(f"    Expected: {len(inference_tasks)}")
+    
+    assert len(checkpoint_status.simulation_entries) == len(int_params_list), \
+        f"Expected {len(int_params_list)} simulation entries, got {len(checkpoint_status.simulation_entries)}"
+    assert len(checkpoint_status.inference_entries) == len(inference_tasks), \
+        f"Expected {len(inference_tasks)} inference entries, got {len(checkpoint_status.inference_entries)}"
+    
+    print("\n" + "=" * 80)
+    if all_success:
+        print("✓ TWO-PASS MULTI-INT-PARAMS WORKFLOW TEST PASSED!")
+    else:
+        print("✗ TWO-PASS MULTI-INT-PARAMS WORKFLOW TEST FAILED!")
+    print("=" * 80)
+    
+    assert all_success, f"All inference results should match true parameters (within 10% rel error)"
+    
+    return {
+        'results_summary': results_summary,
+        'sp4_values': sp4_values,
+        'tau_b_values': tau_b_values,
+        'a_values': a_values,
+        'w0_values': w0_values,
+        'num_int_params': len(int_params_list),
+        'num_ext_params': len(ext_params_list),
+        'total_models': len(int_params_list) * len(ext_params_list),
+        'passed': passed,
+        'failed': failed,
+    }
+
+def test_workflow_elastic_viscous_condensed(
+    sp4_values: list[float] = None,
+    tau_b_values: list[float] = None,
+    a_values: list[float] = None,
+):
+    """
+    Test ViscoElasticFilament two-pass inference with:
+    - Multiple internal parameters: Cartesian product of Sp4 and tau_b values
+    - Multiple external parameters: A values from a provided list
+    - Two-pass inference per int_params: Split elastic (Sp4) and viscous (tau_b) params
+      * Pass 1 (Elastic): Optimizes Sp4 at w0 = min_w0
+      * Pass 2 (Viscous): Optimizes tau_b at w0 > 0
+    - Verification that all int_params combinations are simulated and inferred
+    
+    Args:
+        sp4_values: List of Sp4 values to test (default: [1.0])
+        tau_b_values: List of tau_b values to test (default: [0, 1.0])
+        a_values: List of A (amplitude) values to test (default: [1e-6])
+    """
+    
+    if sp4_values is None:
+        sp4_values = [1.0]
+    if tau_b_values is None:
+        tau_b_values = [0, 1.0]
+    if a_values is None:
+        a_values = [1e-6]
+    
+    checkpoint_dir = Path("./test_checkpoints_vef_two_pass_multi_int")
+    if checkpoint_dir.exists():
+        shutil.rmtree(checkpoint_dir)
+    
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+    
+    print("\n" + "=" * 80)
+    print(f"TEST: ViscoElasticFilament Two-Pass Multi-Int-Params Inference")
+    print(f"      (Sp4: {len(sp4_values)} × tau_b: {len(tau_b_values)} = {len(sp4_values) * len(tau_b_values)} cases)")
+    print("=" * 80)
+    
+    # PHASE 0: Parameter Space Setup
+    print("\nPHASE 0: Parameter Space Setup")
+    print("-" * 80)
+    
+    int_params_list, int_params_metadata = _setup_internal_params(sp4_values, tau_b_values)
+    w0_values = [0.0, 1.0]
+    ext_params_list, sim_params_list = _setup_external_params(w0_values, a_values)
+    
+    elastic_params_list = ['Sp4']
+    viscous_params_list = ['tau_b']
+    param_keys_to_infer = ['Sp4', 'tau_b']
+    
+    print(f"\nInternal Parameters (Cartesian product):")
+    print(f"  Sp4 values: {sp4_values}")
+    print(f"  tau_b values: {tau_b_values}")
+    print(f"  Total combinations: {len(int_params_list)}")
+    _print_int_params_summary(int_params_metadata)
+    
+    print(f"\nExternal Parameters:")
+    print(f"  A values: {a_values} ({len(a_values)} values)")
+    print(f"  w0 values: {w0_values}")
+    print(f"  Total external parameter sets: {len(ext_params_list)}")
+    
+    print(f"\nParameters to infer:")
+    print(f"  Elastic (Pass 1): {elastic_params_list}")
+    print(f"  Viscous (Pass 2): {viscous_params_list}")
+    
+    # PHASE 1: Run Simulations
+    print("\n" + "=" * 80)
+    print("PHASE 1: Running Simulations for All Int-Params Combinations")
+    print("-" * 80)
+    
+    ReducedModel = model_params_only_flow(
+        int_params_list[0],
+        param_keys_to_infer,
+    )
+    
+    model_lists = workflow.run_simulations(
         int_params_list=int_params_list,
-        ext_params_list=ext_params_full_list,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        model_class=ReducedModel,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ Simulations complete")
+    print(f"  Total ModelLists created: {len(model_lists)}")
+    print(f"  Expected: {len(int_params_list)}")
+    
+    assert len(model_lists) == len(int_params_list)
+    
+    _verify_model_lists(model_lists, int_params_metadata, w0_values, len(a_values))
+    print(f"\n✓ All int_params successfully simulated with correct model ordering")
+    
+    # PHASE 2: Two-Pass Inference
+    print("\n" + "=" * 80)
+    print("PHASE 2: Two-Pass Inference for Each Int-Params Combination")
+    print("-" * 80)
+    
+    initial_guesses = [{'Sp4': 1e-1, 'tau_b': 0}]
+    optimizer = basinhopping_optimizer
+    bounds = _make_optimizer_bounds(param_keys_to_infer)
+    optimizer_kwargs = make_optimizer_kwargs(bounds=bounds)
+    loss_fn = rel_mse_loss_fn()
+    
+    inference_tasks = make_inference_tasks_two_pass(
+        mode='cumulative_inference',
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_list,
         param_keys_to_infer=param_keys_to_infer,
         elastic_params_list=elastic_params_list,
         viscous_params_list=viscous_params_list,
         make_sim_params_fn=make_sim_params_for_w0,
-        model_class=ReducedModel,  # Will be overridden per int_idx in actual run
+        model_class=ReducedModel,
         loss_fn=loss_fn,
         optimizer=optimizer,
         optimizer_kwargs=optimizer_kwargs,
@@ -2016,72 +2578,238 @@ def test_workflow_two_pass_flexible_params(
         n_jobs_per_pass=-1,
     )
     
-    print(f"\nCreated {len(inference_tasks)} inference tasks:")
-    for task in inference_tasks:
-        pair_info = f"pair_indices={task.pair_indices}" if task.pair_indices else "all ext_params"
-        print(f"  {task.task_key} (int_idx={task.int_idx}, {pair_info})")
-    
-    print("\n" + "=" * 70)
-    print("PHASE 3: Running Inference Tasks")
-    print("-" * 70)
+    print(f"\nCreated {len(inference_tasks)} inference task(s)")
+    _print_inference_tasks(inference_tasks, int_params_metadata)
     
     inference_results = workflow.run_inferences(
         inference_tasks=inference_tasks,
         model_lists=model_lists,
-        n_jobs=1,  # Parallelize across tasks
+        n_jobs=1,
     )
     
-    print(f"\n✓ Inference complete")
-    print(f"  Results obtained for {len(inference_results)} tasks")
+    print(f"\n✓ All two-pass inferences complete: {len(inference_results)} result(s)")
     
-    print("\n" + "=" * 70)
-    print("PHASE 4: Verification")
-    print("-" * 70)
+    # PHASE 3: Verification & Results Summary
+    print("\n" + "=" * 80)
+    print("PHASE 3: Verification & Results Summary")
+    print("-" * 80)
     
-    for task_key, result_list in inference_results.items():
-        print(f"\nTask: {task_key}")
-        if result_list and len(result_list) > 0:
-            result = result_list[0]
-            print(f"  Converged: {result.success}")
-            print(f"  Final Loss: {result.loss:.6e}")
-            print(f"  Inferred params: {result.params}")
-        else:
-            print(f"  No results")
+    results_summary = _compute_inference_results(
+        inference_results, 
+        int_params_metadata, 
+        inference_tasks
+    )
     
-    print("\n" + "=" * 70)
+    _print_results_table(results_summary)
+    _print_summary_statistics(results_summary, int_params_list, ext_params_list, len(a_values))
+    
+    # Final checkpoint verification
+    print("\n" + "=" * 80)
     checkpoint_status = workflow.get_checkpoint_status()
     print(f"Checkpoint Status:")
     print(f"  Stage: {checkpoint_status.stage}")
     print(f"  Simulation entries: {len(checkpoint_status.simulation_entries)}")
+    print(f"    Expected: {len(int_params_list)}")
     print(f"  Inference entries: {len(checkpoint_status.inference_entries)}")
+    print(f"    Expected: {len(inference_tasks)}")
     
-    print(f"\nSummary:")
-    print(f"  Mode: {mode}")
-    print(f"  Number of int_params sets: {len(int_params_list)}")
-    print(f"  Number of ext_params sets: {len(ext_params_list)}")
-    print(f"  Number of inference tasks: {len(inference_tasks)}")
-    if mode == 'single_inference':
-        print(f"  Total inferences: {len(int_params_list)} × {len(ext_params_list)} = {len(int_params_list) * len(ext_params_list)}")
+    assert len(checkpoint_status.simulation_entries) == len(int_params_list)
+    assert len(checkpoint_status.inference_entries) == len(inference_tasks)
+    
+    all_success = all(res['status'] == '✓ PASS' for res in results_summary)
+    
+    print("\n" + "=" * 80)
+    if all_success:
+        print("✓ TWO-PASS MULTI-INT-PARAMS WORKFLOW TEST PASSED!")
     else:
-        print(f"  Total inferences: {len(int_params_list)} (one per int_params)")
+        print("✗ TWO-PASS MULTI-INT-PARAMS WORKFLOW TEST FAILED!")
+    print("=" * 80)
     
-    print("\n✓ TWO-PASS FLEXIBLE PARAMETERS TEST COMPLETED!")
-    print("=" * 70)
+    assert all_success, "All inference results should match true parameters (within 10% rel error)"
     
     return {
-        'mode': mode,
-        'num_int_params_sets': len(int_params_list),
-        'num_ext_params_sets': len(ext_params_list),
-        'num_tasks': len(inference_tasks),
-        'int_params_list': int_params_list,
-        'ext_params_list': ext_params_list,
-        'results': inference_results,
+        'results_summary': results_summary,
+        'sp4_values': sp4_values,
+        'tau_b_values': tau_b_values,
+        'a_values': a_values,
+        'w0_values': w0_values,
+        'num_int_params': len(int_params_list),
+        'num_ext_params': len(ext_params_list),
+        'total_models': len(int_params_list) * len(ext_params_list),
+        'passed': sum(1 for res in results_summary if res['status'] == '✓ PASS'),
+        'failed': sum(1 for res in results_summary if res['status'] == '✗ FAIL'),
     }
+
+
+# ============================================================================
+# Helper Functions
+# ============================================================================
+
+def _setup_internal_params(sp4_values, tau_b_values):
+    """Create Cartesian product of internal parameters."""
+    int_params_list = []
+    int_params_metadata = []
+    
+    for sp4 in sp4_values:
+        for tau_b in tau_b_values:
+            int_params = make_ground_truth_int_params(Sp4=sp4, tau_b=tau_b)
+            int_params_list.append(int_params)
+            int_params_metadata.append({'Sp4': sp4, 'tau_b': tau_b})
+    
+    return int_params_list, int_params_metadata
+
+
+def _setup_external_params(w0_values, a_values):
+    """Create external parameters for all w0 and A combinations."""
+    ext_params_list = []
+    sim_params_list = []
+    
+    for w0 in w0_values:
+        sim_params = make_sim_params_for_w0(w0=w0)
+        for a_val in a_values:
+            ext_params = make_ground_truth_ext_params(A=a_val, w0=w0)
+            ext_params_list.append(ext_params)
+            sim_params_list.append(sim_params)
+    
+    return ext_params_list, sim_params_list
+
+
+def _print_int_params_summary(int_params_metadata):
+    """Print summary of internal parameters."""
+    print(f"\n  Generated {len(int_params_metadata)} int_params:")
+    for idx, metadata in enumerate(int_params_metadata):
+        print(f"    [{idx}] Sp4={metadata['Sp4']:.4e}, tau_b={metadata['tau_b']:.4e}")
+
+
+def _verify_model_lists(model_lists, int_params_metadata, w0_values, num_a_values):
+    """Verify structure and ordering of all model lists."""
+    print(f"\nDetailed ModelList breakdown:")
+    
+    for int_idx, (key, model_list) in enumerate(model_lists.items()):
+        metadata = int_params_metadata[int_idx]
+        num_models = len(model_list.models)
+        expected_models = len(w0_values) * num_a_values
+        
+        print(f"\n  int_idx={int_idx} (Sp4={metadata['Sp4']:.4e}, tau_b={metadata['tau_b']:.4e}):")
+        print(f"    Models in this ModelList: {num_models} (expected: {expected_models})")
+        
+        assert num_models == expected_models, \
+            f"int_idx {int_idx}: expected {expected_models} models, got {num_models}"
+        
+        for model_idx, model in enumerate(model_list.models):
+            w0_idx = model_idx // num_a_values
+            expected_w0 = w0_values[w0_idx]
+            actual_w0 = model.ext_params.get('w0')
+            
+            assert actual_w0 == expected_w0, \
+                f"int_idx {int_idx}, model_idx {model_idx}: expected w0={expected_w0}, got {actual_w0}"
+
+
+def _print_inference_tasks(inference_tasks, int_params_metadata):
+    """Print summary of inference tasks."""
+    for idx, task in enumerate(inference_tasks):
+        metadata = int_params_metadata[idx]
+        print(f"  [{idx}] {task.task_key}")
+        print(f"       True: Sp4={metadata['Sp4']:.4e}, tau_b={metadata['tau_b']:.4e}")
+
+def _compute_inference_results(inference_results, int_params_metadata, inference_tasks):
+    """Compute relative errors and status for all inference results."""
+    results_summary = []
+    
+    for int_idx, task in enumerate(inference_tasks):
+        metadata = int_params_metadata[int_idx]
+        true_sp4 = metadata['Sp4']
+        true_tau_b = metadata['tau_b']
+        
+        result = inference_results[task.task_key]
+        inferred_params = result[0].params
+        
+        # Both parameters should be present after two-pass inference,
+        # but use .get() defensively in case one pass failed
+        inferred_sp4 = inferred_params.get('Sp4')
+        inferred_tau_b = inferred_params.get('tau_b')
+        
+        if inferred_sp4 is None or inferred_tau_b is None:
+            raise ValueError(
+                f"Task {task.task_key}: Missing inferred parameters. "
+                f"Got Sp4={inferred_sp4}, tau_b={inferred_tau_b}. "
+                f"Available keys: {list(inferred_params.keys())}"
+            )
+        
+        sp4_rel_error = abs(inferred_sp4 - true_sp4) / true_sp4 if true_sp4 != 0 else 0
+        tau_b_rel_error = abs(inferred_tau_b - true_tau_b) / true_tau_b if true_tau_b != 0 else 0
+        
+        success = (sp4_rel_error < 0.1) and (tau_b_rel_error < 0.1)
+        
+        results_summary.append({
+            'int_idx': int_idx,
+            'true_sp4': true_sp4,
+            'true_tau_b': true_tau_b,
+            'inferred_sp4': inferred_sp4,
+            'inferred_tau_b': inferred_tau_b,
+            'sp4_rel_error': sp4_rel_error,
+            'tau_b_rel_error': tau_b_rel_error,
+            'converged': result[0].success,
+            'final_loss': result[0].loss,
+            'status': '✓ PASS' if success else '✗ FAIL',
+        })
+    
+    return results_summary
+
+
+def _print_results_table(results_summary):
+    """Print detailed results table."""
+    print(f"\nDetailed Results:")
+    print(f"\n{'idx':<4} {'True Sp4':<12} {'True tau_b':<12} {'Inferred Sp4':<14} {'Inferred tau_b':<14} {'Sp4 Error':<14} {'tau_b Error':<14} {'Status':<8}")
+    print("-" * 110)
+    
+    for res in results_summary:
+        print(
+            f"{res['int_idx']:<4} "
+            f"{res['true_sp4']:<12.4e} "
+            f"{res['true_tau_b']:<12.4e} "
+            f"{res['inferred_sp4']:<14.4e} "
+            f"{res['inferred_tau_b']:<14.4e} "
+            f"{res['sp4_rel_error']:<14.4%} "
+            f"{res['tau_b_rel_error']:<14.4%} "
+            f"{res['status']:<8}"
+        )
+
+def _print_summary_statistics(results_summary, int_params_list, ext_params_list, num_a_values):
+    """Print summary statistics."""
+    print("\n" + "=" * 80)
+    print("Summary Statistics")
+    print("-" * 80)
+    
+    passed = sum(1 for res in results_summary if res['status'] == '✓ PASS')
+    failed = len(results_summary) - passed
+    
+    print(f"\nResults: {passed}/{len(results_summary)} cases passed")
+    print(f"  Passed: {passed}")
+    print(f"  Failed: {failed}")
+    
+    avg_sp4_error = sum(res['sp4_rel_error'] for res in results_summary) / len(results_summary)
+    avg_tau_b_error = sum(res['tau_b_rel_error'] for res in results_summary) / len(results_summary)
+    
+    print(f"\nAverage Relative Errors:")
+    print(f"  Sp4:   {avg_sp4_error:.4%}")
+    print(f"  tau_b: {avg_tau_b_error:.4%}")
+    
+    print(f"\nParameter Space Coverage:")
+    print(f"  Int_params combinations: {len(int_params_list)}")
+    print(f"  External param sets: {len(ext_params_list)}")
+    print(f"  Total models across all int_params: {len(int_params_list) * len(ext_params_list)}")
+    
+    print(f"\nTwo-Pass Strategy per Int-Params:")
+    print(f"  ✓ Pass 1 (Elastic): Optimizes Sp4 on {len([e for e in ext_params_list if e.get('w0') == 0.0])} models at w0=0")
+    print(f"  ✓ Pass 2 (Viscous): Optimizes tau_b on {len([e for e in ext_params_list if e.get('w0') > 0])} models at w0>0")
 
 if __name__ == "__main__":
     # test_workflow_with_inference()
     # test_workflow_with_inference_multi_sp4()
     # test_workflow_with_inference_multi_ext_params()
     # test_workflow_with_inference_single_task_multi_ext()
-    test_workflow_with_inference_two_pass_elastic_viscous()
-    # test_workflow_two_pass_flexible_params()
+    # test_workflow_with_inference_multi_sp4_tau_b()
+    # test_workflow_with_inference_two_pass_elastic_viscous()
+    # test_workflow_with_inference_two_pass_elastic_viscous_multi_int_params()
+    test_workflow_elastic_viscous_condensed()
