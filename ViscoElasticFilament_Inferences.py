@@ -1347,8 +1347,225 @@ def test_workflow_with_inference_multi_ext_params(a_values: list[float] = None):
     
     return results_summary
 
+def test_workflow_with_inference_single_task_multi_ext(a_values: list[float] = None):
+    """
+    Test ViscoElasticFilament inference with:
+    - Single internal parameter: Sp4 = 1.0 (fixed)
+    - Multiple external parameters: A values from a provided list
+    - Single inference task optimizing across ALL external parameters simultaneously
+    
+    Args:
+        a_values: List of A (amplitude) values to test (default: [1e-6, 1e-5, 1e-4, 1e-3])
+    """
+    
+    if a_values is None:
+        a_values = [1e-6, 1e-5, 1e-4, 1e-3]
+    
+    checkpoint_dir = Path("./test_checkpoints_vef_single_task_multi_ext")
+    if checkpoint_dir.exists():
+        shutil.rmtree(checkpoint_dir)
+    
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+    
+    print("\n" + "=" * 80)
+    print(f"TEST: ViscoElasticFilament Single-Task Multi-A Inference ({len(a_values)} models)")
+    print("=" * 80)
+    
+    # =========================================================================
+    # PHASE 1: SIMULATION
+    # =========================================================================
+    print("\nPHASE 1: Running Simulations")
+    print("-" * 80)
+    
+    # Single internal parameter: Sp4 = 1.0 (fixed)
+    ground_truth_Sp4 = 1.0
+    int_params = make_ground_truth_int_params(Sp4=ground_truth_Sp4)
+    int_params_list = [int_params]
+    
+    print(f"Internal parameters (fixed):")
+    print(f"  Sp4: {ground_truth_Sp4:.4e}")
+    print(f"  Keys in int_params: {list(int_params.keys())}")
+    
+    # Multiple external parameter sets: varying A values, w0 = 0
+    w0 = 0
+    sim_params = make_sim_params_for_w0(w0=w0)
+    
+    ext_params_list = [
+        make_ground_truth_ext_params(A=a_val, w0=0)
+        for a_val in a_values
+    ]
+    sim_params_list = [sim_params] * len(a_values)
+    
+    print(f"\nExternal parameters (varying A, w0 = 0):")
+    print(f"  Number of A values: {len(a_values)}")
+    for idx, a_val in enumerate(a_values):
+        print(f"    [{idx}] A = {a_val:.4e}")
+    print(f"  T_span: {sim_params.get('T_span')}")
+    
+    # Get the reduced model class for inference
+    param_keys_to_infer = ['Sp4']
+    ReducedModel = model_params_only_flow(
+        int_params,
+        param_keys_to_infer,
+    )
+    
+    # Run simulations: outer loop over int_params (single), inner loop over ext/sim pairs
+    model_lists = workflow.run_simulations(
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        model_class=ReducedModel,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ Simulations complete")
+    print(f"  ModelLists created: {len(model_lists)}")
+    
+    # Inspect simulation results
+    for int_idx, model_list in model_lists.items():
+        print(f"\n  int_idx={int_idx} (Sp4={ground_truth_Sp4:.4e}):")
+        print(f"    Number of models in ModelList: {len(model_list.models)}")
+        
+        for model_idx, model in enumerate(model_list.models):
+            a_val = a_values[model_idx]
+            print(f"\n    model[{model_idx}] (A={a_val:.4e}):")
+            print(f"      ext_params['A']: {model.ext_params.get('A'):.4e}")
+            sim_output = model.sim_output.get('value', np.array([]))
+            print(f"      sim_output shape: {sim_output.shape}")
+            if len(sim_output) > 0:
+                print(f"      sim_output (first 5 values): {sim_output[:5]}")
+
+    # =========================================================================
+    # PHASE 2: SINGLE INFERENCE TASK ACROSS ALL A VALUES
+    # =========================================================================
+    print("\n" + "=" * 70)
+    print("PHASE 2: Single Inference Task (All Models)")
+    print("-" * 70)
+    
+    # Initial guess for Sp4: intentionally offset from ground truth
+    initial_guesses = [{'Sp4': 1e-1}]
+    
+    print(f"\nInference setup:")
+    print(f"  Parameter to infer: Sp4")
+    print(f"  Initial guess: {initial_guesses[0]['Sp4']:.4e}")
+    print(f"  Ground truth Sp4: {ground_truth_Sp4:.4e}")
+    print(f"  Number of models to optimize across: {len(a_values)}")
+    print(f"  A values:")
+    for idx, a_val in enumerate(a_values):
+        print(f"    [{idx}] A = {a_val:.4e}")
+    
+    # Optimizer setup
+    optimizer = basinhopping_optimizer
+    bounds = _make_optimizer_bounds(param_keys_to_infer)
+    optimizer_kwargs = make_optimizer_kwargs(bounds=bounds)
+
+    # Loss function
+    loss_fn = rel_mse_loss_fn()
+
+    # Create single inference task with NO pair_indices (uses all models)
+    pipeline_kwargs = dict(
+        optimizer=optimizer,
+        optimizer_kwargs=optimizer_kwargs,
+        loss_fn=loss_fn,
+    )
+    
+    task = InferenceTask(
+        task_key="infer_sp4_all_a_values",
+        int_idx=0,  # Single internal parameter set
+        pair_indices=None,  # Use ALL models in the ModelList
+        make_pipeline_fn=make_simple_inference_pipeline,
+        pipeline_kwargs=pipeline_kwargs,
+        initial_guesses=initial_guesses,
+    )
+    
+    print(f"\nCreated single inference task:")
+    print(f"  task_key: {task.task_key}")
+    print(f"  int_idx: {task.int_idx}")
+    print(f"  pair_indices: {task.pair_indices} (None = use all {len(a_values)} models)")
+    
+    # Run inference
+    inference_results = workflow.run_inferences(
+        inference_tasks=[task],
+        model_lists=model_lists,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ Inference complete")
+    
+    # =========================================================================
+    # PHASE 3: VERIFY INFERENCE RESULTS
+    # =========================================================================
+    print("\n" + "=" * 70)
+    print("PHASE 3: Verification")
+    print("-" * 70)
+    
+    result = inference_results["infer_sp4_all_a_values"]
+    
+    true_sp4 = ground_truth_Sp4
+    inferred_sp4 = result[0].params['Sp4']
+    error = abs(inferred_sp4 - true_sp4)
+    rel_error = error / true_sp4 if true_sp4 != 0 else 0
+    success = error < 0.01  # Absolute tolerance
+    
+    print(f"\nInference Results:")
+    print(f"  True Sp4: {true_sp4:.4e}")
+    print(f"  Inferred Sp4: {inferred_sp4:.4e}")
+    print(f"  Absolute Error: {error:.6e}")
+    print(f"  Relative Error: {rel_error:.4%}")
+    print(f"  Final Loss: {result[0].loss:.6e}")
+    print(f"  Converged: {result[0].success}")
+    print(f"  Status: {'✓ PASS' if success else '✗ FAIL'}")
+    
+    # Detailed loss breakdown per A value (if available)
+    print(f"\nDetailed Results by A Value:")
+    print(f"{'idx':<4} {'A':<12} {'Loss (this A)':<14}")
+    print("-" * 30)
+    
+    # Access per-model losses if available in result structure
+    if hasattr(result[0], 'per_model_losses') and result[0].per_model_losses is not None:
+        for idx, (a_val, model_loss) in enumerate(zip(a_values, result[0].per_model_losses)):
+            print(f"{idx:<4} {a_val:<12.4e} {model_loss:<14.6e}")
+    else:
+        print("(Per-model loss breakdown not available in result)")
+    
+    # =========================================================================
+    # FINAL SUMMARY
+    # =========================================================================
+    print("\n" + "=" * 70)
+    checkpoint_status = workflow.get_checkpoint_status()
+    print(f"Checkpoint Status:")
+    print(f"  Stage: {checkpoint_status.stage}")
+    print(f"  Simulation entries: {len(checkpoint_status.simulation_entries)}")
+    print(f"  Inference entries: {len(checkpoint_status.inference_entries)}")
+    
+    print(f"\nInference Details:")
+    print(f"  Number of external parameter sets (A values): {len(a_values)}")
+    print(f"  Number of inference tasks: 1")
+    print(f"  Models optimized together: {len(a_values)}")
+    
+    if success:
+        print("\n✓ WORKFLOW TEST PASSED!")
+    else:
+        print("\n✗ WORKFLOW TEST FAILED!")
+    print("=" * 70)
+    
+    assert success, f"Inferred Sp4 should match true value (within 0.01 tolerance)"
+    
+    return {
+        'task_key': task.task_key,
+        'true_sp4': true_sp4,
+        'inferred_sp4': inferred_sp4,
+        'error': error,
+        'rel_error': rel_error,
+        'converged': result[0].success,
+        'final_loss': result[0].loss,
+        'num_models': len(a_values),
+        'a_values': a_values,
+    }
+
 
 if __name__ == "__main__":
     # test_workflow_with_inference()
     # test_workflow_with_inference_multi_sp4()
-    test_workflow_with_inference_multi_ext_params()
+    # test_workflow_with_inference_multi_ext_params()
+    test_workflow_with_inference_single_task_multi_ext()
