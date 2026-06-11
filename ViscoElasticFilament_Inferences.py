@@ -214,6 +214,8 @@ def basinhopping_optimizer(
     
     return ret
 
+### Loss function
+
 def rel_mse_loss_fn() -> Callable:
     """
     Define Relative Mean Square Error loss function.
@@ -231,6 +233,8 @@ def rel_mse_loss_fn() -> Callable:
         return np.linalg.norm(pred_flat[:min_len] - truth_flat[:min_len])**2 / np.linalg.norm(truth_flat[:min_len])**2
     
     return loss_function
+
+### Parameters and Ground Truth
 
 def make_ground_truth_int_params(
     Sp4 = 1e0,
@@ -308,7 +312,6 @@ def make_sim_params_for_w0(w0):
             "method": "BDF",
         }
     return make_ground_truth_sim_params(**sim_params_dict)
-
 
 def make_ground_truth_data_list(
     ground_truth_int_params,
@@ -686,6 +689,39 @@ def _make_optimizer_bounds(param_keys_to_infer):
 #     )
 
 
+
+def make_simple_inference_pipeline(model_list, **kwargs):
+    """Factory function to create inference pipeline from ModelList."""
+    
+    # Extract ground truths from simulated models
+    ground_truths = [model.sim_output['value'] for model in model_list.models]
+    ext_params_batch = [model.ext_params for model in model_list.models]
+    sim_params_batch = [model.sim_params for model in model_list.models]
+    
+    param_keys_to_infer = list(model_list.models[0].int_params.keys())
+    model_class = type(model_list.models[0])
+
+    # Single pass: infer int_params
+    pass_1 = PipelinePass(
+        name="One-pass Inference",
+        model_class=model_class,
+        ground_truths=ground_truths,
+        ext_params_list=ext_params_batch,
+        sim_params_list=sim_params_batch,
+        param_keys_to_infer=param_keys_to_infer,
+        fixed_params={},
+        product_or_zip="zip",
+        optimizer=kwargs['optimizer'],
+        optimizer_kwargs=kwargs['optimizer_kwargs'],
+    )
+    
+    return InferencePipeline(
+        passes=[pass_1],
+        loss_fn=kwargs['loss_fn'],
+        n_jobs_per_pass=-1,
+    )
+
+
 # =============== TESTS ===============================
 
 def test_workflow_with_inference():
@@ -730,7 +766,7 @@ def test_workflow_with_inference():
     )    
 
     # Single external parameter set: A = 1e-6, w0 = 0
-    A_value = 1e-4
+    A_value = 1e-6
     w0 = 0
     ext_params = make_ground_truth_ext_params(A=A_value, w0 = 0)
     sim_params = make_sim_params_for_w0(w0=w0)
@@ -790,37 +826,14 @@ def test_workflow_with_inference():
     # Loss function
     loss_fn = rel_mse_loss_fn()
 
-    def make_simple_inference_pipeline(model_list, **kwargs):
-        """Factory function to create inference pipeline from ModelList."""
-        
-        # Extract ground truths from simulated models
-        ground_truths = [model.sim_output['value'] for model in model_list.models]
-        ext_params_batch = [model.ext_params for model in model_list.models]
-        sim_params_batch = [model.sim_params for model in model_list.models]
-        
-        # Single pass: infer int_params
-        pass_1 = PipelinePass(
-            name="InferSp4",
-            model_class=ReducedModel,
-            ground_truths=ground_truths,
-            ext_params_list=ext_params_batch,
-            sim_params_list=sim_params_batch,
-            param_keys_to_infer=['Sp4'],
-            fixed_params={},
-            product_or_zip="zip",
-            optimizer=basinhopping_optimizer,
-            optimizer_kwargs=optimizer_kwargs,
-        )
-        
-        return InferencePipeline(
-            passes=[pass_1],
-            loss_fn=loss_fn,
-            n_jobs_per_pass=-1,
-        )
-    
     # Create inference tasks: one for each int_idx
     
     initial_guesses = [{'Sp4': 1e-1}]
+    pipeline_kwargs = dict(
+        optimizer = optimizer,
+        optimizer_kwargs = optimizer_kwargs,
+        loss_fn = loss_fn,
+    )
     
     inference_tasks = []
     for int_idx in range(len(int_params_list)):
@@ -829,7 +842,7 @@ def test_workflow_with_inference():
             int_idx=int_idx,
             pair_indices=None,  # Use all models in the ModelList
             make_pipeline_fn=make_simple_inference_pipeline,
-            pipeline_kwargs={},
+            pipeline_kwargs=pipeline_kwargs,
             initial_guesses=initial_guesses,
         )
         inference_tasks.append(task)
@@ -892,6 +905,227 @@ def test_workflow_with_inference():
     
     assert all_success, "All inference results should match true parameters"
 
+def test_workflow_with_inference_multi_sp4(sp4_values: list[float] = None):
+    """
+    Test ViscoElasticFilament inference with:
+    - Multiple internal parameters: Sp4 values from a provided list
+    - One external parameter set: A = 1e-6, w0 = 0 (shared across all int_params)
+    - One inference pass per internal parameter
+    
+    Args:
+        sp4_values: List of Sp4 values to test (default: [0.1, 1.0, 10.0])
+    """
+    
+    if sp4_values is None:
+        sp4_values = [0.1, 1.0, 10.0]
+    
+    checkpoint_dir = Path("./test_checkpoints_vef_multi")
+    if checkpoint_dir.exists():
+        shutil.rmtree(checkpoint_dir)
+    
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+    
+    print("\n" + "=" * 80)
+    print(f"TEST: ViscoElasticFilament Multi-Sp4 Inference ({len(sp4_values)} cases)")
+    print("=" * 80)
+    
+    # =========================================================================
+    # PHASE 1: SIMULATION
+    # =========================================================================
+    print("\nPHASE 1: Running Simulations")
+    print("-" * 80)
+    
+    # Multiple internal parameters: Sp4 values from input list
+    int_params_list = [
+        make_ground_truth_int_params(Sp4=sp4_val)
+        for sp4_val in sp4_values
+    ]
+    
+    print(f"Internal parameters:")
+    print(f"  Number of Sp4 values: {len(sp4_values)}")
+    for idx, sp4 in enumerate(sp4_values):
+        print(f"    [{idx}] Sp4 = {sp4:.4e}")
+    print(f"  Keys in int_params: {list(int_params_list[0].keys())}")
+    
+    # Single external parameter set: A = 1e-6, w0 = 0
+    A_value = 1e-6
+    w0 = 0
+    ext_params = make_ground_truth_ext_params(A=A_value, w0=0)
+    sim_params = make_sim_params_for_w0(w0=w0)
+    
+    print(f"\nExternal parameters (shared across all int_params):")
+    print(f"  A: {A_value:.4e}")
+    print(f"  w0 (via sim_params): {w0}")
+    print(f"  T_span: {sim_params.get('T_span')}")
+    
+    # For nested loop: ext_params_list and sim_params_list are single-element lists
+    # The workflow will pair each int_params with each (ext_params, sim_params)
+    ext_params_list = [ext_params]
+    sim_params_list = [sim_params]
+    
+    # Get the reduced model class for inference
+    param_keys_to_infer = ['Sp4']
+    ReducedModel = model_params_only_flow(
+        int_params_list[0],
+        param_keys_to_infer,
+    )
+    
+    # Run simulations: outer loop over int_params, inner loop over ext/sim pairs
+    model_lists = workflow.run_simulations(
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        model_class=ReducedModel,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ Simulations complete")
+    print(f"  ModelLists created: {len(model_lists)}")
+    
+    # Inspect simulation results
+    for int_idx, model_list in model_lists.items():
+        sp4_val = sp4_values[int_idx]
+        print(f"\n  int_idx={int_idx} (Sp4={sp4_val:.4e}):")
+        print(f"    Number of models: {len(model_list.models)}")
+        
+        for model_idx, model in enumerate(model_list.models):
+            print(f"\n    model[{model_idx}]:")
+            print(f"      ext_params['A']: {model.ext_params.get('A'):.4e}")
+            sim_output = model.sim_output.get('value', np.array([]))
+            print(f"      sim_output shape: {sim_output.shape}")
+            if len(sim_output) > 0:
+                print(f"      sim_output (first 5 values): {sim_output[:5]}")
+
+    # =========================================================================
+    # PHASE 2: ONE-PASS INFERENCE FOR EACH Sp4
+    # =========================================================================
+    print("\n" + "=" * 70)
+    print("PHASE 2: One-Pass Inference for Each Sp4 Value")
+    print("-" * 70)
+    
+    # Initial guess strategy: intentionally offset from ground truth
+    initial_guesses = [{'Sp4': 1e-1}]
+    
+    print(f"\nInference setup:")
+    print(f"  Parameter to infer: Sp4")
+    print(f"  Initial guess: {initial_guesses[0]['Sp4']:.4e}")
+    print(f"  Ground truth values:")
+    for idx, sp4 in enumerate(sp4_values):
+        print(f"    [{idx}] {sp4:.4e}")
+    
+    # Optimizer setup
+    optimizer = basinhopping_optimizer
+    bounds = _make_optimizer_bounds(param_keys_to_infer)
+    optimizer_kwargs = make_optimizer_kwargs(bounds=bounds)
+
+    # Loss function
+    loss_fn = rel_mse_loss_fn()
+
+    # Create inference tasks: one for each int_idx
+    pipeline_kwargs = dict(
+        optimizer=optimizer,
+        optimizer_kwargs=optimizer_kwargs,
+        loss_fn=loss_fn,
+    )
+    
+    inference_tasks = []
+    for int_idx in range(len(int_params_list)):
+        task = InferenceTask(
+            task_key=f"infer_sp4_{int_idx}",
+            int_idx=int_idx,
+            pair_indices=None,  # Use all models in the ModelList for this int_idx
+            make_pipeline_fn=make_simple_inference_pipeline,
+            pipeline_kwargs=pipeline_kwargs,
+            initial_guesses=initial_guesses,
+        )
+        inference_tasks.append(task)
+    
+    print(f"\nCreated {len(inference_tasks)} inference task(s):")
+    for idx, task in enumerate(inference_tasks):
+        print(f"  - {task.task_key}: int_idx={task.int_idx}, Sp4 (true)={sp4_values[idx]:.4e}")
+    
+    # Run inferences
+    inference_results = workflow.run_inferences(
+        inference_tasks=inference_tasks,
+        model_lists=model_lists,
+        n_jobs=1,
+    )
+    
+    print(f"\n✓ Inferences complete: {len(inference_results)} result(s)")
+    
+    # =========================================================================
+    # PHASE 3: VERIFY INFERENCE RESULTS
+    # =========================================================================
+    print("\n" + "=" * 70)
+    print("PHASE 3: Verification")
+    print("-" * 70)
+    
+    # Create summary table
+    results_summary = []
+    all_success = True
+    
+    for int_idx in range(len(int_params_list)):
+        task_key = f"infer_sp4_{int_idx}"
+        result = inference_results[task_key]
+        
+        true_sp4 = sp4_values[int_idx]
+        inferred_sp4 = result[0].params['Sp4']
+        error = abs(inferred_sp4 - true_sp4)
+        rel_error = error / true_sp4 if true_sp4 != 0 else 0
+        success = error < 0.01  # Absolute tolerance
+        
+        results_summary.append({
+            'int_idx': int_idx,
+            'true_sp4': true_sp4,
+            'inferred_sp4': inferred_sp4,
+            'error': error,
+            'rel_error': rel_error,
+            'converged': result[0].success,
+            'final_loss': result[0].loss,
+            'status': '✓ PASS' if success else '✗ FAIL',
+        })
+        
+        all_success = all_success and success
+    
+    # Print formatted results
+    print(f"\nInference Results Summary:")
+    print(f"\n{'idx':<4} {'True Sp4':<12} {'Inferred Sp4':<14} {'Abs Error':<12} {'Rel Error':<12} {'Loss':<12} {'Status':<8}")
+    print("-" * 90)
+    for res in results_summary:
+        print(
+            f"{res['int_idx']:<4} "
+            f"{res['true_sp4']:<12.4e} "
+            f"{res['inferred_sp4']:<14.4e} "
+            f"{res['error']:<12.6e} "
+            f"{res['rel_error']:<12.4%} "
+            f"{res['final_loss']:<12.4e} "
+            f"{res['status']:<8}"
+        )
+    
+    # =========================================================================
+    # FINAL SUMMARY
+    # =========================================================================
+    print("\n" + "=" * 70)
+    checkpoint_status = workflow.get_checkpoint_status()
+    print(f"Checkpoint Status:")
+    print(f"  Stage: {checkpoint_status.stage}")
+    print(f"  Simulation entries: {len(checkpoint_status.simulation_entries)}")
+    print(f"  Inference entries: {len(checkpoint_status.inference_entries)}")
+    
+    success_count = sum(1 for res in results_summary if res['status'] == '✓ PASS')
+    print(f"\nResults: {success_count}/{len(results_summary)} cases passed")
+    
+    if all_success:
+        print("\n✓ WORKFLOW TEST PASSED!")
+    else:
+        print("\n✗ WORKFLOW TEST FAILED!")
+    print("=" * 70)
+    
+    assert all_success, f"All inference results should match true parameters (within 0.01 tolerance)"
+    
+    return results_summary
+
 
 if __name__ == "__main__":
-    test_workflow_with_inference()
+    # test_workflow_with_inference()
+    test_workflow_with_inference_multi_sp4()
