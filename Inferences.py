@@ -780,6 +780,7 @@ class InferencePipeline:
 
     # ========== Model Composition ==========
     """Build pass-specific models with fixed parameters from prior passes."""
+
     def _build_pass_model(
         self,
         pass_def: PipelinePass,
@@ -787,10 +788,10 @@ class InferencePipeline:
         verbose: bool = False,
     ) -> Type:
         """
-        Build a pass-specific model class with fixed parameters from prior passes.
+        Build a pass-specific model class with reduced parameters.
         
         Reduces internal parameters to only those being inferred in this pass,
-        while preserving fixed parameters from prior passes.
+        then overlays fixed parameters from prior passes via composition.
         
         Args:
             pass_def: Pipeline pass definition containing the base model class
@@ -803,32 +804,26 @@ class InferencePipeline:
         
         base_model = pass_def.model_class
         
-        def compose_int_params_with_fixed(int_params, ext_params, sim_params):
-            """
-            Reduce int_params to only param_keys_to_infer and merge fixed parameters.
-            """
-            # Deep copy to avoid modifying the original
-            merged = copy.deepcopy(int_params)
-            
-            if isinstance(merged, dict):
-                # Keep only parameters being inferred in this pass
-                reduced = {
-                    key: merged[key]
-                    for key in pass_def.param_keys_to_infer
-                    if key in merged
-                }
-                # Merge in fixed parameters from prior passes
-                reduced.update(fixed_params)
-                merged = reduced
-            
-            return merged
+        # Step 1: Reduce to only parameters being inferred in this pass
+        reduced_model = base_model.reduce(pass_def.param_keys_to_infer)
         
-        composed = base_model.compose(
-            compose_int_params=compose_int_params_with_fixed,
-        )
+        # Step 2: If there are fixed parameters, compose them in
+        if fixed_params:
+            def compose_int_params_with_fixed(int_params, ext_params, sim_params):
+                """Merge fixed parameters into reduced int_params."""
+                merged = copy.deepcopy(int_params) if isinstance(int_params, dict) else int_params
+                if isinstance(merged, dict):
+                    merged.update(fixed_params)
+                return merged
+            
+            composed = reduced_model.compose(
+                compose_int_params=compose_int_params_with_fixed,
+            )
+        else:
+            composed = reduced_model
         
         if verbose:
-            print(f"  → Composed model: {composed.__name__}")
+            print(f"  → Reduced model: {composed.__name__}")
             print(f"    Parameters to infer: {pass_def.param_keys_to_infer}")
             print(f"    Fixed parameters: {list(fixed_params.keys())}\n")
         
