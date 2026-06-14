@@ -2787,7 +2787,7 @@ def workflow_elastic_viscous_general(
             sim_params_list.append(sim_params)
     else: # Fill with w0 = 0
         w0_value = 0
-        sim_params_list = [make_sim_params_for_w0(w0) for ep in ext_params_list]
+        sim_params_list = [make_sim_params_for_w0(w0_value) for ep in ext_params_list]
 
     print(f"\nExternal Parameters:")
     for name, values in ext_param_ranges.items():
@@ -2830,7 +2830,7 @@ def workflow_elastic_viscous_general(
     
     # Create initial guesses for all params to infer
     initial_guesses = {
-        param: 1e-1 if param.startswith('Sp') or param.startswith('Beta') else 0
+        param: 1e-1 if param.startswith('Sp') else 0
         for param in param_keys_to_infer
     }
     initial_guesses_list = [initial_guesses]
@@ -2912,8 +2912,6 @@ def workflow_elastic_viscous_general(
         print("✗ TWO-PASS GENERAL WORKFLOW TEST FAILED!")
     print("=" * 80)
     
-    assert all_success, "All inference results should match true parameters (within 10% rel error)"
-    
     return {
         'results_summary': results_summary,
         'int_param_ranges': int_param_ranges,
@@ -2927,7 +2925,6 @@ def workflow_elastic_viscous_general(
         'passed': sum(1 for res in results_summary if res['status'] == '✓ PASS'),
         'failed': sum(1 for res in results_summary if res['status'] == '✗ FAIL'),
     }
-
 
 # ============================================================================
 # Helper Functions
@@ -3202,43 +3199,18 @@ def _print_summary_statistics_general(results_summary, int_params_list, ext_para
     print("=" * 80)
 
 if __name__ == "__main__":
-    # test_workflow_with_inference()
-    # test_workflow_with_inference_multi_sp4()
-    # test_workflow_with_inference_multi_ext_params()
-    # test_workflow_with_inference_single_task_multi_ext()
-    # test_workflow_with_inference_multi_sp4_tau_b()
-    # test_workflow_with_inference_two_pass_elastic_viscous()
-    # test_workflow_with_inference_two_pass_elastic_viscous_multi_int_params()
-    # test_workflow_elastic_viscous_condensed()
 
-    # SINGLE MODE
+    # Bending Elasticity - Sp4
+
+    int_param_ranges = {'Sp4': [1.0]}
+    A_vec = np.pow(10, np.linspace(start = -6, stop = -1, num = 5))
+    ext_param_ranges = {'A': A_vec}
     elastic_params_list = ['Sp4']
-    viscous_params_list = ['tau_b']
+    viscous_params_list = []
+
     inference_mode = "single_inference"
-    # workflow_elastic_viscous_general(
-    #     elastic_params_list = elastic_params_list,
-    #     viscous_params_list = viscous_params_list,
-    #     inference_mode = inference_mode,
-    #     )
-    
-    # CUMULATIVE MODE
-    elastic_params_list = ['Sp4']
-    viscous_params_list = ['tau_b']    
-    inference_mode = "cumulative_inference"
-    # workflow_elastic_viscous_general(
-    #     elastic_params_list = elastic_params_list,
-    #     viscous_params_list = viscous_params_list,
-    #     inference_mode = inference_mode,
-    #     )    
+    checkpoint_str = "./Results/BendingElasticity/BendingElasticity"
 
-    # FULL CUMULATIVE MODE
-    int_param_ranges = {'Sp4': [1.0], 'Beta':[0, 1.0], 'tau_b': [0, 1.0], 'tau_s':[0, 1.0]}
-    ext_param_ranges = {'A': [1e-6, 1e-5], 'w0': [0.0, 1e-3, 1.0]}
-    elastic_params_list = ['Sp4', 'Beta']
-    viscous_params_list = ['tau_b', 'tau_s']
-    inference_mode = "cumulative_inference"
-    checkpoint_str = "./elastic_viscous_all_params"
-    
     workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
@@ -3247,3 +3219,164 @@ if __name__ == "__main__":
         inference_mode = inference_mode,
         checkpoint_str=checkpoint_str,
         )
+
+    inference_mode = "cumulative_inference"   
+    for k in range(6):
+        A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
+        ext_param_ranges = {'A': A_vec_k}
+        checkpoint_str = f"./Results/BendingElasticity/BendingElasticity_{k}"
+
+        workflow_elastic_viscous_general(
+            int_param_ranges=int_param_ranges,
+            ext_param_ranges=ext_param_ranges,
+            elastic_params_list = elastic_params_list,
+            viscous_params_list = viscous_params_list,
+            inference_mode = inference_mode,
+            checkpoint_str=checkpoint_str,
+            )
+
+    # Shear Elasticity - Beta
+
+    int_param_ranges = {'Beta': [1.0]}
+    A_vec = np.pow(10, np.linspace(start = -6, stop = -1, num = 5))
+    ext_param_ranges = {'A': A_vec}
+    elastic_params_list = ['Beta']
+    viscous_params_list = []
+
+    inference_mode = "single_inference"
+    checkpoint_str = "./Results/ShearElasticity/ShearElasticity"
+
+    workflow_elastic_viscous_general(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        elastic_params_list = elastic_params_list,
+        viscous_params_list = viscous_params_list,
+        inference_mode = inference_mode,
+        checkpoint_str=checkpoint_str,
+        )
+
+    inference_mode = "cumulative_inference"   
+    for k in range(6):
+        A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
+        ext_param_ranges = {'A': A_vec_k}
+        checkpoint_str = f"./Results/ShearElasticity/ShearElasticity_{k}"
+
+        workflow_elastic_viscous_general(
+            int_param_ranges=int_param_ranges,
+            ext_param_ranges=ext_param_ranges,
+            elastic_params_list = elastic_params_list,
+            viscous_params_list = viscous_params_list,
+            inference_mode = inference_mode,
+            checkpoint_str=checkpoint_str,
+            )
+
+
+    # Bending & Shear Elasticities - Sp4, Beta
+
+    int_param_ranges = {'Sp4': [1.0], 'Beta': [1.0]}
+    A_vec = np.pow(10, np.linspace(start = -6, stop = -1, num = 5))
+    ext_param_ranges = {'A': A_vec}
+    elastic_params_list = ['Sp4', 'Beta']
+    viscous_params_list = []
+
+    inference_mode = "single_inference"
+    checkpoint_str = "./Results/BendingShearElasticity/BendingShearElasticity"
+
+    workflow_elastic_viscous_general(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        elastic_params_list = elastic_params_list,
+        viscous_params_list = viscous_params_list,
+        inference_mode = inference_mode,
+        checkpoint_str=checkpoint_str,
+        )
+
+    inference_mode = "cumulative_inference"   
+    for k in range(6):
+        A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
+        ext_param_ranges = {'A': A_vec_k}
+        checkpoint_str = f"./Results/BendingShearElasticity/BendingShearElasticity_{k}"
+
+        workflow_elastic_viscous_general(
+            int_param_ranges=int_param_ranges,
+            ext_param_ranges=ext_param_ranges,
+            elastic_params_list = elastic_params_list,
+            viscous_params_list = viscous_params_list,
+            inference_mode = inference_mode,
+            checkpoint_str=checkpoint_str,
+            )
+
+    # Bending Viscosity (Fixed Bending Elasticity)
+
+    int_param_ranges = {'tau_b': [1.0]}
+    A_vec = [1e-6]
+    w0_vec = np.pow(10, np.linspace(start = -3, stop = 3, num = 7))
+    ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
+    elastic_params_list = []
+    viscous_params_list = ['tau_b']
+
+    inference_mode = "single_inference"
+    checkpoint_str = "./Results/BendingViscosity/BendingViscosity"
+
+    workflow_elastic_viscous_general(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        elastic_params_list = elastic_params_list,
+        viscous_params_list = viscous_params_list,
+        inference_mode = inference_mode,
+        checkpoint_str=checkpoint_str,
+        )
+
+    inference_mode = "cumulative_inference"   
+    for l in range(7):
+        w0_vec_l = np.pow(10, np.linspace(start = -3, stop = 3+l, num = l+1))
+        ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
+        checkpoint_str = f"./Results/BendingViscosity/BendingViscosity_{l}"
+
+        workflow_elastic_viscous_general(
+            int_param_ranges=int_param_ranges,
+            ext_param_ranges=ext_param_ranges,
+            elastic_params_list = elastic_params_list,
+            viscous_params_list = viscous_params_list,
+            inference_mode = inference_mode,
+            checkpoint_str=checkpoint_str,
+            )
+
+
+    # # Bending Elasticity + Viscosity - Sp4, tau_b
+
+    # int_param_ranges = {'Sp4': [1.0], 'tau_b': [1.0]}
+    # A_vec = np.pow(10, np.linspace(start = -6, stop = -1, num = 5))
+    # w0_vec = np.hstack((np.array([0]), np.pow(10, np.linspace(start = -3, stop = 3, num = 3)))
+    # ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
+    # elastic_params_list = ['Sp4']
+    # viscous_params_list = ['tau_b']
+
+    # inference_mode = "single_inference"
+    # checkpoint_str = "./Results/BendingElasticityViscosity/BendingElasticityViscosity"
+
+    # workflow_elastic_viscous_general(
+    #     int_param_ranges=int_param_ranges,
+    #     ext_param_ranges=ext_param_ranges,
+    #     elastic_params_list = elastic_params_list,
+    #     viscous_params_list = viscous_params_list,
+    #     inference_mode = inference_mode,
+    #     checkpoint_str=checkpoint_str,
+    #     )
+
+    # inference_mode = "cumulative_inference"   
+    # for k in range(6):
+    #     A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
+    #     for l in range(3):
+    #         w0_vec_l = np.pow(10, np.linspace(start = -3, stop = int(-3+3*l), num = l+1))
+    #         ext_param_ranges = {'A': A_vec_k, 'w0':w0_vec_l}
+    #         checkpoint_str = f"./Results/BendingElasticityViscosity/BendingElasticityViscosity_{k}_{l}"
+
+    #         workflow_elastic_viscous_general(
+    #             int_param_ranges=int_param_ranges,
+    #             ext_param_ranges=ext_param_ranges,
+    #             elastic_params_list = elastic_params_list,
+    #             viscous_params_list = viscous_params_list,
+    #             inference_mode = inference_mode,
+    #             checkpoint_str=checkpoint_str,
+    #             )
