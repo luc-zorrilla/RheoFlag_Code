@@ -775,7 +775,7 @@ def make_inference_tasks_two_pass(
                 task = InferenceTask(
                     task_key=task_key,
                     int_idx=int_idx,
-                    pair_indices=[(ext_idx,)],
+                    pair_indices=[ext_idx],
                     make_pipeline_fn=pipeline_fn,
                     pipeline_kwargs={},
                     initial_guesses=initial_guesses,
@@ -803,7 +803,7 @@ def make_inference_tasks_two_pass(
             task = InferenceTask(
                 task_key=task_key,
                 int_idx=int_idx,
-                pair_indices=None,
+                pair_indices=list(range(len(ext_params_list))), # None
                 make_pipeline_fn=pipeline_fn,
                 pipeline_kwargs={},
                 initial_guesses=initial_guesses,
@@ -2510,7 +2510,7 @@ def test_workflow_elastic_viscous_condensed(
     print(f"  Sp4 values: {sp4_values}")
     print(f"  tau_b values: {tau_b_values}")
     print(f"  Total combinations: {len(int_params_list)}")
-    _print_int_params_summary(int_params_metadata)
+    _print_int_params_summary(int_params_metadata, param_keys_to_infer)
     
     print(f"\nExternal Parameters:")
     print(f"  A values: {a_values} ({len(a_values)} values)")
@@ -2637,7 +2637,7 @@ def test_workflow_elastic_viscous_condensed(
         'failed': sum(1 for res in results_summary if res['status'] == '✗ FAIL'),
     }
 
-def test_workflow_elastic_viscous_general(
+def workflow_elastic_viscous_general(
     int_param_ranges: Dict[str, list] = None,
     ext_param_ranges: Dict[str, list] = None,
     inference_mode: str = 'cumulative_inference',
@@ -2648,6 +2648,7 @@ def test_workflow_elastic_viscous_general(
     n_jobs_per_pass: int = -1,
     n_jobs_simulation: int = 1,
     n_jobs_inference: int = 1,
+    checkpoint_str = "./test_checkpoints_vef_elastic_viscous_general",
 ):
     """
     Generalized two-pass inference workflow with flexible parameter configuration.
@@ -2726,10 +2727,7 @@ def test_workflow_elastic_viscous_general(
     
     param_keys_to_infer = list(set(elastic_params_list) | set(viscous_params_list))
     
-    checkpoint_dir = Path(f"./test_checkpoints_vef_two_pass_general_{inference_mode}")
-    if checkpoint_dir.exists():
-        shutil.rmtree(checkpoint_dir)
-    
+    checkpoint_dir = Path(checkpoint_str + f"_{inference_mode}")
     workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
     
     print("\n" + "=" * 80)
@@ -2763,7 +2761,7 @@ def test_workflow_elastic_viscous_general(
     for name, values in int_param_ranges.items():
         print(f"  {name}: {values} ({len(values)} values)")
     print(f"  Total combinations: {len(int_params_list)}")
-    _print_int_params_summary(int_params_metadata)
+    _print_int_params_summary(int_params_metadata, param_keys_to_infer)
 
     # Create external parameters based on which ext_params are "special"
     # (i.e., need special handling like w0 for determining passes)
@@ -2862,7 +2860,7 @@ def test_workflow_elastic_viscous_general(
     )
     
     print(f"\nCreated {len(inference_tasks)} inference task(s)")
-    _print_inference_tasks(inference_tasks, int_params_metadata, param_keys_to_infer)
+    # _print_inference_tasks(inference_tasks, int_params_metadata, param_keys_to_infer)
     
     inference_results = workflow.run_inferences(
         inference_tasks=inference_tasks,
@@ -2962,11 +2960,16 @@ def _setup_external_params(w0_values, a_values):
     
     return ext_params_list, sim_params_list
 
-def _print_int_params_summary(int_params_metadata):
+def _print_int_params_summary(int_params_metadata, param_keys_to_infer):
     """Print summary of internal parameters."""
     print(f"\n  Generated {len(int_params_metadata)} int_params:")
     for idx, metadata in enumerate(int_params_metadata):
-        print(f"    [{idx}] Sp4={metadata['Sp4']:.4e}, tau_b={metadata['tau_b']:.4e}")
+        # Build dynamic parameter string
+        param_str = ", ".join(
+            f"{param_key}={metadata.get(param_key, 'N/A'):.4e}"
+            for param_key in param_keys_to_infer
+        )
+        print(f"    [{idx}] {param_str}")
 
 def _verify_model_lists(model_lists, int_params_metadata, w0_values, num_a_values):
     """Verify structure and ordering of all model lists."""
@@ -3003,70 +3006,6 @@ def _print_inference_tasks(inference_tasks, int_params_metadata, param_keys_to_i
             for param_key in param_keys_to_infer
         )
         print(f"       True: {param_str}")
-
-def _compute_inference_results(inference_results, int_params_metadata, inference_tasks):
-    """Compute relative errors and status for all inference results."""
-    results_summary = []
-    
-    for int_idx, task in enumerate(inference_tasks):
-        metadata = int_params_metadata[int_idx]
-        true_sp4 = metadata['Sp4']
-        true_tau_b = metadata['tau_b']
-        
-        pass_results = inference_results[task.task_key]  # List of results, one per pass
-        
-        # Merge parameters from all passes
-        inferred_params = {}
-        for pass_result in pass_results:
-            inferred_params.update(pass_result.params)
-        
-        inferred_sp4 = inferred_params.get('Sp4')
-        inferred_tau_b = inferred_params.get('tau_b')
-        
-        if inferred_sp4 is None or inferred_tau_b is None:
-            raise ValueError(
-                f"Task {task.task_key}: Missing inferred parameters. "
-                f"Got Sp4={inferred_sp4}, tau_b={inferred_tau_b}. "
-                f"Available keys: {list(inferred_params.keys())}"
-            )
-        
-        sp4_rel_error = abs(inferred_sp4 - true_sp4) / true_sp4 if true_sp4 != 0 else 0
-        tau_b_rel_error = abs(inferred_tau_b - true_tau_b) / true_tau_b if true_tau_b != 0 else 0
-        
-        success = (sp4_rel_error < 0.1) and (tau_b_rel_error < 0.1)
-        
-        results_summary.append({
-            'int_idx': int_idx,
-            'true_sp4': true_sp4,
-            'true_tau_b': true_tau_b,
-            'inferred_sp4': inferred_sp4,
-            'inferred_tau_b': inferred_tau_b,
-            'sp4_rel_error': sp4_rel_error,
-            'tau_b_rel_error': tau_b_rel_error,
-            'converged': pass_results[-1].success,  # Use final pass's success
-            'final_loss': pass_results[-1].loss,    # Use final pass's loss
-            'status': '✓ PASS' if success else '✗ FAIL',
-        })
-    
-    return results_summary
-
-def _print_results_table(results_summary):
-    """Print detailed results table."""
-    print(f"\nDetailed Results:")
-    print(f"\n{'idx':<4} {'True Sp4':<12} {'True tau_b':<12} {'Inferred Sp4':<14} {'Inferred tau_b':<14} {'Sp4 Error':<14} {'tau_b Error':<14} {'Status':<8}")
-    print("-" * 110)
-    
-    for res in results_summary:
-        print(
-            f"{res['int_idx']:<4} "
-            f"{res['true_sp4']:<12.4e} "
-            f"{res['true_tau_b']:<12.4e} "
-            f"{res['inferred_sp4']:<14.4e} "
-            f"{res['inferred_tau_b']:<14.4e} "
-            f"{res['sp4_rel_error']:<14.4%} "
-            f"{res['tau_b_rel_error']:<14.4%} "
-            f"{res['status']:<8}"
-        )
 
 def _print_summary_statistics(results_summary, int_params_list, ext_params_list, num_a_values):
     """Print summary statistics."""
@@ -3119,7 +3058,9 @@ def _compute_inference_results_general(
     """
     results_summary = []
     
-    for int_idx, task in enumerate(inference_tasks):
+    for result, task in zip(inference_results, inference_tasks):
+        int_idx = task.int_idx  # ← Use task's stored index, not loop counter
+
         metadata = int_params_metadata[int_idx]
         
         pass_results = inference_results[task.task_key]
@@ -3269,18 +3210,40 @@ if __name__ == "__main__":
     # test_workflow_with_inference_two_pass_elastic_viscous()
     # test_workflow_with_inference_two_pass_elastic_viscous_multi_int_params()
     # test_workflow_elastic_viscous_condensed()
-    # test_workflow_elastic_viscous_general()
+
+    # SINGLE MODE
+    elastic_params_list = ['Sp4']
+    viscous_params_list = ['tau_b']
+    inference_mode = "single_inference"
+    # workflow_elastic_viscous_general(
+    #     elastic_params_list = elastic_params_list,
+    #     viscous_params_list = viscous_params_list,
+    #     inference_mode = inference_mode,
+    #     )
     
+    # CUMULATIVE MODE
+    elastic_params_list = ['Sp4']
+    viscous_params_list = ['tau_b']    
+    inference_mode = "cumulative_inference"
+    # workflow_elastic_viscous_general(
+    #     elastic_params_list = elastic_params_list,
+    #     viscous_params_list = viscous_params_list,
+    #     inference_mode = inference_mode,
+    #     )    
+
+    # FULL CUMULATIVE MODE
     int_param_ranges = {'Sp4': [1.0], 'Beta':[0, 1.0], 'tau_b': [0, 1.0], 'tau_s':[0, 1.0]}
     ext_param_ranges = {'A': [1e-6, 1e-5], 'w0': [0.0, 1e-3, 1.0]}
     elastic_params_list = ['Sp4', 'Beta']
     viscous_params_list = ['tau_b', 'tau_s']
     inference_mode = "cumulative_inference"
+    checkpoint_str = "./elastic_viscous_all_params"
     
-    test_workflow_elastic_viscous_general(
+    workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
         elastic_params_list = elastic_params_list,
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,
+        checkpoint_str=checkpoint_str,
         )
