@@ -3329,7 +3329,7 @@ if __name__ == "__main__":
 
     inference_mode = "cumulative_inference"   
     for l in range(7):
-        w0_vec_l = np.pow(10, np.linspace(start = -3, stop = 3+l, num = l+1))
+        w0_vec_l = np.pow(10, np.linspace(start = -3, stop = -3+l, num = l+1))
         ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
         checkpoint_str = f"./Results/BendingViscosity/BendingViscosity_{l}"
 
@@ -3343,40 +3343,113 @@ if __name__ == "__main__":
             )
 
 
-    # # Bending Elasticity + Viscosity - Sp4, tau_b
+    # Shear Viscosity (Fixed Bending Elasticity & Shear Elasticity)
 
-    # int_param_ranges = {'Sp4': [1.0], 'tau_b': [1.0]}
-    # A_vec = np.pow(10, np.linspace(start = -6, stop = -1, num = 5))
-    # w0_vec = np.hstack((np.array([0]), np.pow(10, np.linspace(start = -3, stop = 3, num = 3)))
-    # ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
-    # elastic_params_list = ['Sp4']
-    # viscous_params_list = ['tau_b']
+    int_param_ranges = {'tau_b': [1.0], 'Beta':[1.0]}
+    A_vec = [1e-6]
+    w0_vec = np.pow(10, np.linspace(start = -3, stop = 3, num = 7))
+    ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
+    elastic_params_list = []
+    viscous_params_list = ['tau_b']
 
-    # inference_mode = "single_inference"
-    # checkpoint_str = "./Results/BendingElasticityViscosity/BendingElasticityViscosity"
+    inference_mode = "single_inference"
+    checkpoint_str = "./Results/ShearViscosity/ShearViscosity"
 
-    # workflow_elastic_viscous_general(
-    #     int_param_ranges=int_param_ranges,
-    #     ext_param_ranges=ext_param_ranges,
-    #     elastic_params_list = elastic_params_list,
-    #     viscous_params_list = viscous_params_list,
-    #     inference_mode = inference_mode,
-    #     checkpoint_str=checkpoint_str,
-    #     )
+    workflow_elastic_viscous_general(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        elastic_params_list = elastic_params_list,
+        viscous_params_list = viscous_params_list,
+        inference_mode = inference_mode,
+        checkpoint_str=checkpoint_str,
+        )
 
-    # inference_mode = "cumulative_inference"   
-    # for k in range(6):
-    #     A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
-    #     for l in range(3):
-    #         w0_vec_l = np.pow(10, np.linspace(start = -3, stop = int(-3+3*l), num = l+1))
-    #         ext_param_ranges = {'A': A_vec_k, 'w0':w0_vec_l}
-    #         checkpoint_str = f"./Results/BendingElasticityViscosity/BendingElasticityViscosity_{k}_{l}"
+    inference_mode = "cumulative_inference"   
+    for l in range(7):
+        w0_vec_l = np.pow(10, np.linspace(start = -3, stop = -3+l, num = l+1))
+        ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
+        checkpoint_str = f"./Results/ShearViscosity/ShearViscosity_{l}"
 
-    #         workflow_elastic_viscous_general(
-    #             int_param_ranges=int_param_ranges,
-    #             ext_param_ranges=ext_param_ranges,
-    #             elastic_params_list = elastic_params_list,
-    #             viscous_params_list = viscous_params_list,
-    #             inference_mode = inference_mode,
-    #             checkpoint_str=checkpoint_str,
-    #             )
+        workflow_elastic_viscous_general(
+            int_param_ranges=int_param_ranges,
+            ext_param_ranges=ext_param_ranges,
+            elastic_params_list = elastic_params_list,
+            viscous_params_list = viscous_params_list,
+            inference_mode = inference_mode,
+            checkpoint_str=checkpoint_str,
+            )
+    
+
+    # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
+
+    int_param_ranges = {'tau_b': [1.0], 'tau_s':[1.0], 'Beta':[1.0]}
+    A_vec = [1e-6]
+    w0_vec = np.pow(10, np.linspace(start = -3, stop = 3, num = 7))
+    ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
+    elastic_params_list = []
+    viscous_params_list = ['tau_b', 'tau_s']
+
+    inference_mode = "single_inference"
+    checkpoint_str = "./Results/BendingShearViscosity/BendingShearViscosity"
+
+    workflow_elastic_viscous_general(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        elastic_params_list = elastic_params_list,
+        viscous_params_list = viscous_params_list,
+        inference_mode = inference_mode,
+        checkpoint_str=checkpoint_str,
+        )
+
+    inference_mode = "cumulative_inference"   
+    for l in range(7):
+        w0_vec_l = np.pow(10, np.linspace(start = -3, stop = -3+l, num = l+1))
+        ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
+        checkpoint_str = f"./Results/BendingShearViscosity/BendingShearViscosity_{l}"
+
+        workflow_elastic_viscous_general(
+            int_param_ranges=int_param_ranges,
+            ext_param_ranges=ext_param_ranges,
+            elastic_params_list = elastic_params_list,
+            viscous_params_list = viscous_params_list,
+            inference_mode = inference_mode,
+            checkpoint_str=checkpoint_str,
+            )
+    
+
+    ## With cumulated A
+
+    int_param_ranges = {'tau_b': [1.0], 'tau_s':[1.0], 'Beta':[1.0]}
+    A_vec = [1e-6, 1e-5]
+    w0_vec = np.pow(10, np.linspace(start = -3, stop = 3, num = 7))
+    ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
+    elastic_params_list = []
+    viscous_params_list = ['tau_b', 'tau_s']
+
+    inference_mode = "single_inference"
+    checkpoint_str = "./Results/BendingShearViscosity_MultipleA/BendingShearViscosity_MultipleA"
+
+    workflow_elastic_viscous_general(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        elastic_params_list = elastic_params_list,
+        viscous_params_list = viscous_params_list,
+        inference_mode = inference_mode,
+        checkpoint_str=checkpoint_str,
+        )
+
+    inference_mode = "cumulative_inference"   
+    for l in range(7):
+        w0_vec_l = np.pow(10, np.linspace(start = -3, stop = -3+l, num = l+1))
+        ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
+        checkpoint_str = f"./Results/BendingShearViscosity_MultipleA/BendingShearViscosity_MultipleA_{l}"
+
+        workflow_elastic_viscous_general(
+            int_param_ranges=int_param_ranges,
+            ext_param_ranges=ext_param_ranges,
+            elastic_params_list = elastic_params_list,
+            viscous_params_list = viscous_params_list,
+            inference_mode = inference_mode,
+            checkpoint_str=checkpoint_str,
+            )
+    
