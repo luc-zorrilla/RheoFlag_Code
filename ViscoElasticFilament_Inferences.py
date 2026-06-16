@@ -2836,11 +2836,14 @@ def workflow_elastic_viscous_general(
     }
     initial_guesses_list = [initial_guesses]
     
-    # Build optimizer_kwargs if not provided
+    # Build optimizer_kwargs if not provided # TODO: Modify given w0!
     if optimizer_kwargs is None:
         optimizer_kwargs = make_optimizer_kwargs(
-            bounds=_make_optimizer_bounds(param_keys_to_infer)
+            bounds=_make_optimizer_bounds(param_keys_to_infer),
         )
+    
+    print(f"optimizer_kwargs = {optimizer_kwargs}")
+    
     
     loss_fn = rel_mse_loss_fn()
     
@@ -3311,7 +3314,7 @@ if __name__ == "__main__":
 
     int_param_ranges = {'tau_b': [1.0]}
     A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 7))
+    w0_vec = [1e0] # np.pow(10, -np.linspace(start = -3, stop = 3, num = 7))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_b']
@@ -3319,29 +3322,51 @@ if __name__ == "__main__":
     inference_mode = "single_inference"
     checkpoint_str = "./Results/BendingViscosity/BendingViscosity"
 
+    param_keys_to_infer = ['tau_b']
+    optimizer_kwargs = make_optimizer_kwargs(
+        bounds=_make_optimizer_bounds(param_keys_to_infer),
+        local_minimizer_kwargs = {
+            'method': 'L-BFGS-B',
+            'jac': '3-point',
+            'options': {
+                'ftol': 1e-8,
+                'gtol': 1e-8,
+                'eps': 1e-1, # TODO: put >= than dT!
+                'finite_diff_rel_step': 1e-6,
+            },
+        },
+        global_minimizer_kwargs = {
+            'niter': 9,
+            'T': 0,
+            'stepsize': 5,
+            'tol': 1e-10,
+        },
+    )
+
     workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
         elastic_params_list = elastic_params_list,
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,
+        optimizer_kwargs = optimizer_kwargs,
         checkpoint_str=checkpoint_str,
         )
 
-    inference_mode = "cumulative_inference"   
-    for l in range(7):
-        w0_vec_l = np.pow(10, np.linspace(start = -3, stop = -3+l, num = l+1))
-        ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
-        checkpoint_str = f"./Results/BendingViscosity/BendingViscosity_{l}"
+    # inference_mode = "cumulative_inference"   
+    # for l in range(7):
+    #     w0_vec_l = np.pow(10, np.linspace(start = -3, stop = -3+l, num = l+1))
+    #     ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
+    #     checkpoint_str = f"./Results/BendingViscosity/BendingViscosity_{l}"
 
-        workflow_elastic_viscous_general(
-            int_param_ranges=int_param_ranges,
-            ext_param_ranges=ext_param_ranges,
-            elastic_params_list = elastic_params_list,
-            viscous_params_list = viscous_params_list,
-            inference_mode = inference_mode,
-            checkpoint_str=checkpoint_str,
-            )
+    #     workflow_elastic_viscous_general(
+    #         int_param_ranges=int_param_ranges,
+    #         ext_param_ranges=ext_param_ranges,
+    #         elastic_params_list = elastic_params_list,
+    #         viscous_params_list = viscous_params_list,
+    #         inference_mode = inference_mode,
+    #         checkpoint_str=checkpoint_str,
+    #         )
 
 
     # # Shear Viscosity (Fixed Bending Elasticity & Shear Elasticity)

@@ -1,0 +1,13 @@
+{
+  "stage": "simulation",
+  "timestamp": "2026-06-16 12:36:31.816764",
+  "simulation_entries": {
+    "int_0_pair_all": {
+      "task_key": "int_0_pair_all",
+      "completed": true,
+      "timestamp": "2026-06-16 12:36:31.816741",
+      "filepath": "artifacts/models/int_0_pair_all.pkl"
+    }
+  },
+  "inference_entries": {}
+}
