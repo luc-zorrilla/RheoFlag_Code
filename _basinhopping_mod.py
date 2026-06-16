@@ -698,7 +698,7 @@ def basinhopping(func, x0, niter=100, T=1.0, stepsize=0.5,
             raise TypeError("accept_test must be callable")
         accept_tests = [accept_test]
 
-    # use default
+    # use default (Metropolis acceptance criterion)
     metropolis = Metropolis(T, rng=rng)
     accept_tests.append(metropolis)
 

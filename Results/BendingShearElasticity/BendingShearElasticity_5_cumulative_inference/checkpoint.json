@@ -1,11 +1,11 @@
 {
   "stage": "inference",
-  "timestamp": "2026-06-14 16:45:04.777349",
+  "timestamp": "2026-06-16 14:34:12.077651",
   "simulation_entries": {
     "int_0_pair_all": {
       "task_key": "int_0_pair_all",
       "completed": true,
-      "timestamp": "2026-06-14 16:39:22.616060",
+      "timestamp": "2026-06-16 14:29:16.373628",
       "filepath": "artifacts/models/int_0_pair_all.pkl"
     }
   },
@@ -13,7 +13,7 @@
     "int_000_cumulative": {
       "task_key": "int_000_cumulative",
       "completed": true,
-      "timestamp": "2026-06-14 16:45:04.777317",
+      "timestamp": "2026-06-16 14:34:12.077620",
       "filepath": "artifacts/inference/int_000_cumulative.pkl"
     }
   }
