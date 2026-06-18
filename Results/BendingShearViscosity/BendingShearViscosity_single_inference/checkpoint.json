@@ -1,11 +1,11 @@
 {
   "stage": "inference",
-  "timestamp": "2026-06-16 17:39:29.270579",
+  "timestamp": "2026-06-16 19:26:29.304566",
   "simulation_entries": {
     "int_0_pair_all": {
       "task_key": "int_0_pair_all",
       "completed": true,
-      "timestamp": "2026-06-16 17:24:00.579135",
+      "timestamp": "2026-06-16 18:27:59.227400",
       "filepath": "artifacts/models/int_0_pair_all.pkl"
     }
   },
@@ -13,26 +13,44 @@
     "int_000_ext_000": {
       "task_key": "int_000_ext_000",
       "completed": true,
-      "timestamp": "2026-06-16 17:27:29.144005",
+      "timestamp": "2026-06-16 18:30:15.711804",
       "filepath": "artifacts/inference/int_000_ext_000.pkl"
     },
     "int_000_ext_001": {
       "task_key": "int_000_ext_001",
       "completed": true,
-      "timestamp": "2026-06-16 17:31:11.194955",
+      "timestamp": "2026-06-16 18:34:17.937526",
       "filepath": "artifacts/inference/int_000_ext_001.pkl"
     },
     "int_000_ext_002": {
       "task_key": "int_000_ext_002",
       "completed": true,
-      "timestamp": "2026-06-16 17:35:33.063612",
+      "timestamp": "2026-06-16 18:38:59.008562",
       "filepath": "artifacts/inference/int_000_ext_002.pkl"
     },
     "int_000_ext_003": {
       "task_key": "int_000_ext_003",
       "completed": true,
-      "timestamp": "2026-06-16 17:39:29.270565",
+      "timestamp": "2026-06-16 18:42:01.422729",
       "filepath": "artifacts/inference/int_000_ext_003.pkl"
+    },
+    "int_000_ext_004": {
+      "task_key": "int_000_ext_004",
+      "completed": true,
+      "timestamp": "2026-06-16 18:45:41.724044",
+      "filepath": "artifacts/inference/int_000_ext_004.pkl"
+    },
+    "int_000_ext_005": {
+      "task_key": "int_000_ext_005",
+      "completed": true,
+      "timestamp": "2026-06-16 19:09:01.679900",
+      "filepath": "artifacts/inference/int_000_ext_005.pkl"
+    },
+    "int_000_ext_006": {
+      "task_key": "int_000_ext_006",
+      "completed": true,
+      "timestamp": "2026-06-16 19:26:29.304555",
+      "filepath": "artifacts/inference/int_000_ext_006.pkl"
     }
   }
 }

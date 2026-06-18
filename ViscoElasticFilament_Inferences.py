@@ -25,7 +25,7 @@ class RandomDisplacementBounds:
     """random displacement with bounds:  see: https://stackoverflow.com/a/21967888/2320035
         Modified: dropped acceptance-rejection sampling
     """
-    def __init__(self, bounds, stepsize=0.5):
+    def __init__(self, bounds, stepsize):
         self.bounds = bounds
         self.stepsize = stepsize
 
@@ -68,7 +68,7 @@ def basinhopping_optimizer(
                     'ftol':1e-8, 
                     'gtol':1e-8, 
                     'eps': 1e-8, 
-                    'finite_diff_rel_step':1e-6,
+                    'finite_diff_rel_step':None,
                     }
                 ... (other local optimizer options) # 'maxiter': 1000,
             }
@@ -76,11 +76,11 @@ def basinhopping_optimizer(
     Args (Global Minimizer):
         global_minimizer_kwargs: Dict with basin-hopping configuration:
             {
-                'niter': 9,  # Basin-hopping iterations
+                'niter': 49,  # Basin-hopping iterations
                 'stepsize': 5,  # Maximum step size for perturbations
                 'T': 1,  # Temperature for Metropolis acceptance
                 'tol': 1e-10,  # Early stopping tolerance --> Not in basinhopping function
-                'stepwise_factor':0.9, # Stepsize multiplication/division factor
+                'stepwise_factor':1-1e-16, # Stepsize multiplication/division factor
             }
     
     Returns:
@@ -101,23 +101,23 @@ def basinhopping_optimizer(
             'ftol':1e-8,  # Functional tolerance for local minimizer
             'gtol':1e-8,  # Gradient tolerance for local minimizer
             'eps': 1e-8,  # ?
-            'finite_diff_rel_step':1e-6, # ?
+            'finite_diff_rel_step':None, # ?
         }
     }
 
     global_minimizer_kwargs = global_minimizer_kwargs or {
-        'niter': 9,  # Basin-hopping iterations
-        'stepsize': 5,  # Maximum step size for perturbations
+        'niter': 49,  # Basin-hopping iterations
+        'stepsize': 10,  # Maximum step size for perturbations
         'T': 1,  # Temperature for Metropolis acceptance
         'tol': 1e-10,  # Early stopping tolerance
-        'stepwise_factor':0.9, # Stepsize multiplication factor per update
+        'stepwise_factor':1 - 1e-16, # Stepsize multiplication factor per update
     }
     
     # --- Extract global minimizer parameters ---
-    niter = global_minimizer_kwargs.pop('niter', 9)
-    T = global_minimizer_kwargs.pop('T', 0)
-    stepsize = global_minimizer_kwargs.pop('stepsize', 5)
-    stepwise_factor = global_minimizer_kwargs.pop('stepwise_factor', 0.9)
+    niter = global_minimizer_kwargs.pop('niter', 49)
+    T = global_minimizer_kwargs.pop('T', 1)
+    stepsize = global_minimizer_kwargs.pop('stepsize', 10)
+    stepwise_factor = global_minimizer_kwargs.pop('stepwise_factor', 1-1e-16)
     tol = global_minimizer_kwargs.pop('tol', 1e-10)
     
     # --- Extract local minimizer parameters ---
@@ -128,7 +128,7 @@ def basinhopping_optimizer(
             'ftol':1e-8, 
             'gtol':1e-8, 
             'eps': 1e-8, 
-            'finite_diff_rel_step':1e-6,
+            'finite_diff_rel_step':None,
         })
     
     X_local = []
@@ -409,10 +409,10 @@ def make_optimizer_kwargs(
         },
     },
     global_minimizer_kwargs = {
-        'niter': 9,
+        'niter': 49,
         'T': 1,
-        'stepsize': 5,
-        'stepwise_factor':0.9,
+        'stepsize': 10,
+        'stepwise_factor':1-1e-16,
         'tol': 1e-10,
     },
 ):
@@ -1226,7 +1226,7 @@ def _compute_inference_results_general(
     rel_error_threshold=0.1,
 ):
     """
-    Compute relative errors for all inferred parameters.
+    Compute relative errors for all inferred parameters and extract sigma from Hessian.
     
     Args:
         inference_results: Dict mapping task_key -> [pass1_result, pass2_result, ...]
@@ -1236,7 +1236,7 @@ def _compute_inference_results_general(
         rel_error_threshold: Threshold for pass/fail (default 10%)
     
     Returns:
-        List of result dicts with errors and pass/fail status
+        List of result dicts with errors, pass/fail status, and sigma values
     """
     results_summary = []
     
@@ -1249,8 +1249,18 @@ def _compute_inference_results_general(
         
         # Merge parameters from all passes
         inferred_params = {}
+        std_errors_dict = {}
+        
         for pass_result in pass_results:
             inferred_params.update(pass_result.params)
+            
+            # Extract standard errors (sigma) from the last pass result
+            if pass_result.std_errors is not None:
+                # std_errors is an array; map to parameter names
+                param_names = list(pass_result.params.keys())
+                for i, param_name in enumerate(param_names):
+                    if i < len(pass_result.std_errors):
+                        std_errors_dict[param_name] = pass_result.std_errors[i]
         
         # Compute errors for each parameter
         result_entry = {
@@ -1265,11 +1275,13 @@ def _compute_inference_results_general(
         for param_key in param_keys_to_infer:
             true_value = metadata.get(param_key)
             inferred_value = inferred_params.get(param_key)
+            sigma_value = std_errors_dict.get(param_key)
             
             if true_value is None:
                 result_entry[f'{param_key}_true'] = None
                 result_entry[f'{param_key}_inferred'] = None
                 result_entry[f'{param_key}_rel_error'] = None
+                result_entry[f'{param_key}_sigma'] = None
                 continue
             
             if inferred_value is None:
@@ -1286,6 +1298,7 @@ def _compute_inference_results_general(
             result_entry[f'{param_key}_true'] = true_value
             result_entry[f'{param_key}_inferred'] = inferred_value
             result_entry[f'{param_key}_rel_error'] = rel_error
+            result_entry[f'{param_key}_sigma'] = sigma_value  # ← Add sigma from Hessian
             
             if rel_error >= rel_error_threshold:
                 all_within_threshold = False
@@ -1294,6 +1307,7 @@ def _compute_inference_results_general(
         results_summary.append(result_entry)
     
     return results_summary
+
 
 def _print_results_table_general(results_summary, param_keys_to_infer):
     """Print detailed results table for all parameters."""
@@ -1455,7 +1469,6 @@ if __name__ == "__main__":
             checkpoint_str=checkpoint_str,
             )
 
-
     # Bending & Shear Elasticities - Sp4, Beta
 
     int_param_ranges = {'Sp4': [1.0], 'Beta': [1.0]}
@@ -1493,7 +1506,6 @@ if __name__ == "__main__":
 
     # Bending Viscosity (Fixed Bending Elasticity)
 
-    
     int_param_ranges = {'tau_b': [1.0]}
     A_vec = [1e-6]
     w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 7))
@@ -1565,7 +1577,7 @@ if __name__ == "__main__":
             )
     
 
-    # # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
+    # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
 
     int_param_ranges = {'tau_b': [1.0], 'tau_s':[1.0], 'Beta':[1.0]}
     A_vec = [1e-6]
@@ -1583,59 +1595,20 @@ if __name__ == "__main__":
         elastic_params_list = elastic_params_list,
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,
-        optimizer_kwargs=optimizer_kwargs,
         checkpoint_str=checkpoint_str,
         )
 
-    # inference_mode = "cumulative_inference"   
-    # for l in range(7):
-    #     w0_vec_l = np.pow(10, -np.linspace(start = -3, stop = -3+l, num = l+1))
-    #     ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
-    #     checkpoint_str = f"./Results/BendingShearViscosity/BendingShearViscosity_{l}"
+    inference_mode = "cumulative_inference"   
+    for l in range(7):
+        w0_vec_l = np.pow(10, -np.linspace(start = -3, stop = -3+l, num = l+1))
+        ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
+        checkpoint_str = f"./Results/BendingShearViscosity/BendingShearViscosity_{l}"
 
-    #     workflow_elastic_viscous_general(
-    #         int_param_ranges=int_param_ranges,
-    #         ext_param_ranges=ext_param_ranges,
-    #         elastic_params_list = elastic_params_list,
-    #         viscous_params_list = viscous_params_list,
-    #         inference_mode = inference_mode,
-    #         checkpoint_str=checkpoint_str,
-    #         )
-    
-
-    # ## With cumulated A
-
-    # int_param_ranges = {'tau_b': [1.0], 'tau_s':[1.0], 'Beta':[1.0]}
-    # A_vec = [1e-6, 1e-5]
-    # w0_vec = np.pow(10, np.linspace(start = -3, stop = 3, num = 7))
-    # ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
-    # elastic_params_list = []
-    # viscous_params_list = ['tau_b', 'tau_s']
-
-    # inference_mode = "single_inference"
-    # checkpoint_str = "./Results/BendingShearViscosity_MultipleA/BendingShearViscosity_MultipleA"
-
-    # workflow_elastic_viscous_general(
-    #     int_param_ranges=int_param_ranges,
-    #     ext_param_ranges=ext_param_ranges,
-    #     elastic_params_list = elastic_params_list,
-    #     viscous_params_list = viscous_params_list,
-    #     inference_mode = inference_mode,
-    #     checkpoint_str=checkpoint_str,
-    #     )
-
-    # inference_mode = "cumulative_inference"   
-    # for l in range(7):
-    #     w0_vec_l = np.pow(10, np.linspace(start = -3, stop = -3+l, num = l+1))
-    #     ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
-    #     checkpoint_str = f"./Results/BendingShearViscosity_MultipleA/BendingShearViscosity_MultipleA_{l}"
-
-    #     workflow_elastic_viscous_general(
-    #         int_param_ranges=int_param_ranges,
-    #         ext_param_ranges=ext_param_ranges,
-    #         elastic_params_list = elastic_params_list,
-    #         viscous_params_list = viscous_params_list,
-    #         inference_mode = inference_mode,
-    #         checkpoint_str=checkpoint_str,
-    #         )
-    
+        workflow_elastic_viscous_general(
+            int_param_ranges=int_param_ranges,
+            ext_param_ranges=ext_param_ranges,
+            elastic_params_list = elastic_params_list,
+            viscous_params_list = viscous_params_list,
+            inference_mode = inference_mode,
+            checkpoint_str=checkpoint_str,
+            )
