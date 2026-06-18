@@ -6,38 +6,40 @@ from ViscoElasticFilament_Inferences import workflow_elastic_viscous_general
 import pickle
 import json
 
-def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, ax=None):
+def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric='std', ax=None):
     """
-    Plot sigma (Hessian-based standard error) for multiple internal parameters vs external parameter.
-    All parameters plotted on same axis for comparison.
+    Plot metric (Hessian-based standard error or relative error) for multiple internal parameters vs external parameter.
+    All parameters plotted on same axis for comparison, plus combined metric (L2 norm).
     
     Args:
         workflow_output: Dict from workflow_elastic_viscous_general
         int_params: List of internal parameter names (e.g., ['Sp4', 'Beta', 'eta'])
+        ext_param_name: Name of external parameter to plot against
+        metric: 'std' for Hessian standard error, 'rel_error' for relative error (L2 norm)
         ax: Matplotlib axis (creates new figure if None)
     
     Returns:
         Matplotlib axis object
     """
     if ax is None:
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(14, 7))
     
     results_summary = workflow_output['results_summary']
     ext_param_ranges = workflow_output['ext_param_ranges']
     
-    # Detect external parameter (assuming single external parameter)
+    # Detect external parameter
     ext_values = ext_param_ranges[ext_param_name]
     
     if ext_values is None:
         raise ValueError(f"External parameter '{ext_param_name}' not found in workflow output")
     
-    # Color palette for different parameters
-    colors = plt.cm.tab10(np.linspace(0, 1, len(int_params)))
+    # Color palette for different parameters (+1 for combined metric)
+    colors = plt.cm.tab10(np.linspace(0, 1, len(int_params) + 1))
     
     # Plot each internal parameter
     for idx, int_param_name in enumerate(int_params):
         ext_list = []
-        sigma_list = []
+        metric_list = []
         
         for result in results_summary:
             task_key = result['task_key']
@@ -46,116 +48,259 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, ax=None
             parts = task_key.split('_')
             ext_idx = int(parts[-1])
             
-            # Get sigma value for specified parameter
-            sigma_key = f'{int_param_name}_sigma'
-            sigma = result.get(sigma_key)
+            # Get metric value for specified parameter
+            if metric == 'std':
+                metric_key = f'{int_param_name}_sigma'
+            elif metric == 'rel_error':
+                metric_key = f'{int_param_name}_rel_error'
+            else:
+                raise ValueError(f"Unknown metric: {metric}")
             
-            if sigma is not None:
+            value = result.get(metric_key)
+            
+            if value is not None:
                 # Handle both scalar and array values
-                if isinstance(sigma, (list, np.ndarray)):
-                    sigma_val = float(sigma[0]) if len(sigma) > 0 else None
+                if isinstance(value, (list, np.ndarray)):
+                    metric_val = float(value[0]) if len(value) > 0 else None
                 else:
-                    sigma_val = float(sigma)
+                    metric_val = float(value)
                 
-                if sigma_val is not None and np.isfinite(sigma_val):
+                if metric_val is not None and np.isfinite(metric_val):
                     ext_value = ext_values[ext_idx]
                     ext_list.append(ext_value)
-                    sigma_list.append(sigma_val)
+                    metric_list.append(metric_val)
         
-        if not sigma_list:
-            print(f"Warning: No finite sigma values found for parameter '{int_param_name}'")
+        if not metric_list:
+            print(f"Warning: No finite {metric} values found for parameter '{int_param_name}'")
             continue
         
-        # Scatter plot for this parameter
-        ax.scatter(ext_list, sigma_list, alpha=0.6, s=50, 
-                edgecolors='black', linewidth=0.5, 
-                label=int_param_name, color=colors[idx])
+        # Scatter plot for this parameter with improved styling
+        ax.scatter(ext_list, metric_list, alpha=0.5, s=60, 
+                   edgecolors=colors[idx], linewidth=0.5, 
+                   label=int_param_name, color=colors[idx], zorder=2)
+    
+    # Plot combined metric if multiple parameters
+    if len(int_params) > 1:
+        combined_ext_list = []
+        combined_metric_list = []
+        
+        for result in results_summary:
+            task_key = result['task_key']
+            
+            # Parse task_key format: "int_{int_idx}_ext_{ext_idx}"
+            parts = task_key.split('_')
+            ext_idx = int(parts[-1])
+            
+            # Collect all metric values for this result
+            metrics_combined = []
+            all_finite = True
+            
+            for int_param_name in int_params:
+                if metric == 'std':
+                    metric_key = f'{int_param_name}_sigma'
+                elif metric == 'rel_error':
+                    metric_key = f'{int_param_name}_rel_error'
+                
+                value = result.get(metric_key)
+                
+                if value is not None:
+                    if isinstance(value, (list, np.ndarray)):
+                        metric_val = float(value[0]) if len(value) > 0 else None
+                    else:
+                        metric_val = float(value)
+                    
+                    if metric_val is not None and np.isfinite(metric_val):
+                        metrics_combined.append(metric_val)
+                    else:
+                        all_finite = False
+                        break
+                else:
+                    all_finite = False
+                    break
+            
+            # Compute combined metric (L2 norm of individual metrics)
+            if all_finite and len(metrics_combined) == len(int_params):
+                combined_metric = np.sqrt(np.sum(np.array(metrics_combined) ** 2))
+                combined_metric_list.append(combined_metric)
+                ext_value = ext_values[ext_idx]
+                combined_ext_list.append(ext_value)
+        
+        if combined_metric_list:
+            # Scatter plot of combined metric with distinct marker style
+            ax.scatter(combined_ext_list, combined_metric_list, 
+                       alpha=0.6, s=100,
+                       edgecolors=colors[-1], linewidth=1,
+                       marker='D',  # Diamond marker for distinction
+                       label=f'Combined (L2 norm)', 
+                       color=colors[-1], zorder=3)
     
     ax.set_xlabel(f'External Parameter {ext_param_name}', fontsize=12)
-    ax.set_ylabel('Sigma (Hessian Std. Error)', fontsize=12)
-    ax.set_title(f'Standard Error vs {ext_param_name} (Multiple Parameters)', fontsize=14, fontweight='bold')
+    
+    if metric == 'std':
+        ax.set_ylabel('Sigma (Hessian Std. Error)', fontsize=12)
+        title_suffix = 'Standard Error'
+    else:
+        ax.set_ylabel('Relative Error (L2 norm)', fontsize=12)
+        ax.set_yscale('log')
+        title_suffix = 'Relative Error'
+    
+    ax.set_title(f'{title_suffix} vs {ext_param_name} (Multiple Parameters)', 
+                 fontsize=14, fontweight='bold')
     
     # Use log scale for common parameters (A, w0, etc.)
     if ext_param_name in ['A', 'w0', 'omega']:
         ax.set_xscale('log')
     
-    ax.grid(True, alpha=0.3)
-    ax.legend(fontsize=11)
+    ax.grid(True, alpha=0.3, zorder=1)
+    ax.legend(fontsize=11, loc='best')
     
     return ax
 
 
-def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_name, ax=None):
+def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_name, metric='std', ax=None):
     """
-    Plot sigma vs size of external parameter vector for cumulative inference runs.
+    Plot metric vs size of external parameter vector for cumulative inference runs.
     Multiple internal parameters plotted on same axis for comparison.
+    
+    Plots all individual samples (no mean/std aggregation) with improved marker styling.
+    Also plots combined metric (L2 norm) alongside individual metrics.
     
     Args:
         workflow_outputs: List of workflow output dicts from workflow_elastic_viscous_general
         int_params: List of internal parameter names (e.g., ['Sp4', 'Beta', 'eta'])
+        metric: 'std' for Hessian standard error, 'rel_error' for relative error (L2 norm)
         ax: Matplotlib axis (creates new figure if None)
     
     Returns:
         Matplotlib axis object
     """
     if ax is None:
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(14, 7))
     
     # Color palette for different parameters
-    colors = plt.cm.tab10(np.linspace(0, 1, len(int_params)))
+    colors = plt.cm.tab10(np.linspace(0, 1, len(int_params) + 1))  # +1 for combined metric
+    
+    # Detect external parameter name from first workflow
+    ext_param_ranges = workflow_outputs[0]['ext_param_ranges']
     
     # Plot each internal parameter
     for param_idx, int_param_name in enumerate(int_params):
-        ext_vec_sizes = []
-        sigma_all = []
         ext_vec_size_scatter = []
+        metric_all = []
         
         for k, workflow_output in enumerate(workflow_outputs):
             results_summary = workflow_output['results_summary']
             ext_param_ranges = workflow_output['ext_param_ranges']
-            
             ext_vec = ext_param_ranges[ext_param_name]
             ext_vec_size = len(ext_vec)
             
-            # Extract all sigma values from this run
-            sigmas_k = []
+            # Extract all metric values from this run
             for result in results_summary:
-                sigma_key = f'{int_param_name}_sigma'
-                sigma = result.get(sigma_key)
+                if metric == 'std':
+                    metric_key = f'{int_param_name}_sigma'
+                elif metric == 'rel_error':
+                    metric_key = f'{int_param_name}_rel_error'
+                else:
+                    raise ValueError(f"Unknown metric: {metric}")
                 
-                if sigma is not None:
+                value = result.get(metric_key)
+                
+                if value is not None:
                     # Handle both scalar and array values
-                    if isinstance(sigma, (list, np.ndarray)):
-                        sigma_val = float(sigma[0]) if len(sigma) > 0 else None
+                    if isinstance(value, (list, np.ndarray)):
+                        metric_val = float(value[0]) if len(value) > 0 else None
                     else:
-                        sigma_val = float(sigma)
+                        metric_val = float(value)
                     
                     # Skip infinite values (inference failures)
-                    if sigma_val is not None and np.isfinite(sigma_val):
-                        sigmas_k.append(sigma_val)
-                        sigma_all.append(sigma_val)
+                    if metric_val is not None and np.isfinite(metric_val):
+                        metric_all.append(metric_val)
                         ext_vec_size_scatter.append(ext_vec_size)
-            
-            if sigmas_k:
-                ext_vec_sizes.append(ext_vec_size)
         
-        if not sigma_all:
-            print(f"Warning: No finite sigma values found for parameter '{int_param_name}'")
+        if not metric_all:
+            print(f"Warning: No finite {metric} values found for parameter '{int_param_name}'")
             continue
         
         # Scatter plot of all individual points for this parameter
-        ax.scatter(ext_vec_size_scatter, sigma_all, alpha=0.3, s=30, 
-                edgecolors='none', color=colors[param_idx])
+        # Use better marker styling: larger, semi-transparent, with subtle edges
+        ax.scatter(ext_vec_size_scatter, metric_all, 
+                    alpha=0.5, s=60, 
+                    edgecolors=colors[param_idx], linewidth=0.5,
+                    color=colors[param_idx], 
+                    label=int_param_name, 
+                    zorder=2)
+    
+    # Plot combined metric if multiple parameters
+    if len(int_params) > 1:
+        combined_metric_all = []
+        combined_ext_vec_size_scatter = []
         
+        for k, workflow_output in enumerate(workflow_outputs):
+            results_summary = workflow_output['results_summary']
+            ext_param_ranges = workflow_output['ext_param_ranges']
+            ext_vec = ext_param_ranges[ext_param_name]
+            ext_vec_size = len(ext_vec)
+            
+            for result in results_summary:
+                # Collect all metric values for this result
+                metrics_combined = []
+                all_finite = True
+                
+                for int_param_name in int_params:
+                    if metric == 'std':
+                        metric_key = f'{int_param_name}_sigma'
+                    elif metric == 'rel_error':
+                        metric_key = f'{int_param_name}_rel_error'
+                    
+                    value = result.get(metric_key)
+                    
+                    if value is not None:
+                        if isinstance(value, (list, np.ndarray)):
+                            metric_val = float(value[0]) if len(value) > 0 else None
+                        else:
+                            metric_val = float(value)
+                        
+                        if metric_val is not None and np.isfinite(metric_val):
+                            metrics_combined.append(metric_val)
+                        else:
+                            all_finite = False
+                            break
+                    else:
+                        all_finite = False
+                        break
+                
+                # Compute combined metric (L2 norm of individual metrics)
+                if all_finite and len(metrics_combined) == len(int_params):
+                    combined_metric = np.sqrt(np.sum(np.array(metrics_combined) ** 2))
+                    combined_metric_all.append(combined_metric)
+                    combined_ext_vec_size_scatter.append(ext_vec_size)
+        
+        if combined_metric_all:
+            # Scatter plot of combined metric with distinct marker style
+            ax.scatter(combined_ext_vec_size_scatter, combined_metric_all, 
+                    alpha=0.6, s=100,  # Larger and more visible
+                    edgecolors=colors[-1], linewidth=1,
+                    marker='D',  # Diamond marker for distinction
+                    color=colors[-1], 
+                    label=f'Combined (L2 norm)',
+                    zorder=3)
+    
     ax.set_xlabel(f'Size of {ext_param_name} vector (number of points)', fontsize=12)
-    ax.set_ylabel('Sigma (Hessian Std. Error)', fontsize=12)
-    ax.set_title(f'Standard Error vs {ext_param_name} Vector Size (Cumulative, Multiple Parameters)', fontsize=14, fontweight='bold')
-    ax.grid(True, alpha=0.3)
-    ax.legend(fontsize=11)
+    
+    if metric == 'std':
+        ax.set_ylabel('Sigma (Hessian Std. Error)', fontsize=12)
+        title_suffix = 'Standard Error'
+    else:
+        ax.set_ylabel('Relative Error (L2 norm)', fontsize=12)
+        ax.set_yscale('log')
+        title_suffix = 'Relative Error'
+    
+    ax.set_title(f'{title_suffix} vs {ext_param_name} Vector Size (All Samples)', 
+                fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3, zorder=1)
+    ax.legend(fontsize=11, loc='best')
     
     return ax
-
-
 
 
 # Usage
@@ -180,7 +325,11 @@ if __name__ == "__main__":
         checkpoint_str=checkpoint_str,
         )
 
-    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4'], ext_param_name='A')
+    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4'], ext_param_name='A', metric='std')
+    plt.tight_layout()
+    plt.show()
+
+    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4'], ext_param_name='A', metric='rel_error')
     plt.tight_layout()
     plt.show()
 
@@ -200,10 +349,13 @@ if __name__ == "__main__":
             checkpoint_str=checkpoint_str,
             ))
     
-    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4'], ext_param_name='A')
+    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4'], ext_param_name='A', metric = 'std')
     plt.tight_layout()
     plt.show()
 
+    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4'], ext_param_name='A', metric = 'rel_error')
+    plt.tight_layout()
+    plt.show()
 
     # Shear Elasticity - Beta
 
@@ -225,7 +377,11 @@ if __name__ == "__main__":
         checkpoint_str=checkpoint_str,
         )
 
-    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['Beta'], ext_param_name='A')
+    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['Beta'], ext_param_name='A', metric = 'std')
+    plt.tight_layout()
+    plt.show()    
+
+    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['Beta'], ext_param_name='A', metric = 'rel_error')
     plt.tight_layout()
     plt.show()        
 
@@ -245,9 +401,13 @@ if __name__ == "__main__":
             checkpoint_str=checkpoint_str,
             ))
 
-    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Beta'], ext_param_name = 'A')
+    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Beta'], ext_param_name = 'A', metric = 'std')
     plt.tight_layout()
     plt.show()
+
+    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Beta'], ext_param_name = 'A', metric = 'rel_error')
+    plt.tight_layout()
+    plt.show()    
 
     # Bending & Shear Elasticities - Sp4, Beta
 
@@ -269,7 +429,11 @@ if __name__ == "__main__":
         checkpoint_str=checkpoint_str,
         )
 
-    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4', 'Beta'], ext_param_name = 'A')
+    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4', 'Beta'], ext_param_name = 'A', metric = 'std')
+    plt.tight_layout()
+    plt.show() 
+
+    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4', 'Beta'], ext_param_name = 'A', metric = 'rel_error')
     plt.tight_layout()
     plt.show()    
 
@@ -289,7 +453,11 @@ if __name__ == "__main__":
             checkpoint_str=checkpoint_str,
             ))
     
-    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4', 'Beta'], ext_param_name='A')
+    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4', 'Beta'], ext_param_name='A', metric = 'std')
+    plt.tight_layout()
+    plt.show()
+
+    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4', 'Beta'], ext_param_name='A', metric = 'rel_error')
     plt.tight_layout()
     plt.show()
 
@@ -315,7 +483,11 @@ if __name__ == "__main__":
         checkpoint_str=checkpoint_str,
         )
     
-    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b'], ext_param_name='w0')
+    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b'], ext_param_name='w0', metric = 'std')
+    plt.tight_layout()
+    plt.show()    
+
+    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b'], ext_param_name='w0', metric = 'rel_error')
     plt.tight_layout()
     plt.show()        
 
@@ -335,10 +507,13 @@ if __name__ == "__main__":
             checkpoint_str=checkpoint_str,
             ))
 
-    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b'], ext_param_name='w0')
+    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b'], ext_param_name='w0', metric = 'std')
     plt.tight_layout()
     plt.show()
 
+    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b'], ext_param_name='w0', metric = 'rel_error')
+    plt.tight_layout()
+    plt.show()
 
     # Shear Viscosity (Fixed Bending Elasticity & Shear Elasticity)
 
@@ -361,7 +536,12 @@ if __name__ == "__main__":
         checkpoint_str=checkpoint_str,
         )
 
-    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_s'], ext_param_name='w0')
+    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_s'], ext_param_name='w0', metric = 'std')
+    plt.tight_layout()
+    plt.show()    
+
+
+    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_s'], ext_param_name='w0', metric = 'rel_error')
     plt.tight_layout()
     plt.show()    
 
@@ -381,7 +561,12 @@ if __name__ == "__main__":
             checkpoint_str=checkpoint_str,
             ))
 
-    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_s'], ext_param_name='w0')
+    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_s'], ext_param_name='w0', metric = 'std')
+    plt.tight_layout()
+    plt.show()
+
+
+    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_s'], ext_param_name='w0', metric = 'rel_error')
     plt.tight_layout()
     plt.show()
 
@@ -407,7 +592,11 @@ if __name__ == "__main__":
         checkpoint_str=checkpoint_str,
         )
 
-    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0')
+    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'std')
+    plt.tight_layout()
+    plt.show()    
+
+    ax = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'rel_error')
     plt.tight_layout()
     plt.show()    
 
@@ -427,6 +616,10 @@ if __name__ == "__main__":
             checkpoint_str=checkpoint_str,
             ))
 
-    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b', 'tau_s'], ext_param_name='w0')
+    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'std')
+    plt.tight_layout()
+    plt.show()
+
+    ax = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'rel_error')
     plt.tight_layout()
     plt.show()
