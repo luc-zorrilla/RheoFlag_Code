@@ -517,7 +517,6 @@ class Inference:
     # ========== Hessian & Uncertainty ==========
     """Compute Hessian and covariance for parameter uncertainty estimation."""
 
-
     def _compute_hessian(self, param_keys: Tuple[str, ...]):
         """
         Compute Hessian numerically via finite differences.
@@ -545,13 +544,145 @@ class Inference:
                 x = self.result.x,
             ).ddf
         
-
         # Invert Hessian to get covariance
         try:
             self.covariance = np.linalg.inv(self.hessian)
         except np.linalg.LinAlgError:
             print(f"Warning: Hessian singular at optimum for {param_keys}, covariance unavailable.")
             self.covariance = np.ones_like(self.hessian) * np.inf
+
+    def _use_optimiser_hessian(self):
+        """
+        Use Hessian or Hessian inverse from optimizer if numerical computation failed.
+        
+        For global optimizers (e.g., basinhopping), attempts to extract from:
+        1. Global optimizer's hess_inv or hess
+        2. Local optimizer's (lowest_optimization_result) hess_inv or hess
+        
+        Falls back to infinite covariance if no valid estimate exists.
+        """
+        # Try to get optimizer result (handle both direct OptimizeResult and global optimizers)
+        opt_result = self.result
+        local_opt_result = getattr(opt_result, 'lowest_optimization_result', None)
+        
+        # Try global optimizer first, then local optimizer
+        for result_name, result in [("global optimizer", opt_result), ("local optimizer", local_opt_result)]:
+            if result is None:
+                continue
+            
+            # Try hess_inv first (preferred as it's already inverted)
+            hess_inv = getattr(result, 'hess_inv', None)
+            if hess_inv is not None and self._is_valid_hessian(hess_inv, is_inverse=True):
+                self._populate_from_hess_inv(hess_inv, result_name)
+                return
+            
+            # Try hess (Hessian matrix)
+            else:
+                hess = getattr(result, 'hess', None)
+                if hess is not None and self._is_valid_hessian(hess, is_inverse=False):
+                    self._populate_from_hess(hess, result_name)
+                    return
+        
+        # No valid Hessian found in optimizer
+        print(
+            f"Warning: Hessian computation failed and no valid hess/hess_inv found in "
+            f"global or local optimizer. Covariance unavailable."
+        )
+        self.covariance = np.ones(len(self.result.x)) * np.inf
+        self.hessian = np.zeros((len(self.result.x), len(self.result.x)))
+
+    def _is_valid_hessian(self, hess_matrix, is_inverse: bool) -> bool:
+        """
+        Check if Hessian or Hessian inverse is valid for use.
+        
+        Args:
+            hess_matrix: The Hessian or Hessian inverse (ndarray or LinearOperator)
+            is_inverse: True if hess_matrix is Hessian inverse, False if Hessian
+        
+        Returns:
+            True if valid and usable, False otherwise
+        """
+        try:
+            # Convert to dense array if needed
+            if hasattr(hess_matrix, 'toarray'):
+                hess_array = hess_matrix.toarray()
+            else:
+                hess_array = np.asarray(hess_matrix)
+            
+            # Check for zero matrix
+            if np.allclose(hess_array, 0):
+                return False
+            
+            # Check for all finite values
+            if not np.all(np.isfinite(hess_array)):
+                return False
+            
+            # For Hessian inverse, check that diagonal is non-negative (variance requirement)
+            if is_inverse:
+                diag = np.diag(hess_array)
+                if not np.all(diag >= 0):
+                    return False
+            
+            return True
+        
+        except (ValueError, TypeError, AttributeError):
+            return False
+
+    def _populate_from_hess_inv(self, hess_inv, source: str):
+        """
+        Populate covariance and Hessian from Hessian inverse.
+        
+        Args:
+            hess_inv: Hessian inverse (ndarray or LinearOperator)
+            source: Description of source (e.g., "global optimizer" or "local optimizer")
+        """
+        try:
+            if hasattr(hess_inv, 'toarray'):
+                self.covariance = hess_inv.toarray()
+            else:
+                self.covariance = np.asarray(hess_inv)
+            
+            # Invert to get Hessian for consistency
+            try:
+                self.hessian = np.linalg.inv(self.covariance)
+            except np.linalg.LinAlgError:
+                self.hessian = np.zeros_like(self.covariance)
+            
+            print(f"Using hess_inv from {source} for covariance estimate.")
+        
+        except (ValueError, TypeError) as e:
+            print(f"Warning: Failed to extract hess_inv from {source}: {e}")
+            self.covariance = np.ones(len(self.result.x)) * np.inf
+            self.hessian = np.zeros((len(self.result.x), len(self.result.x)))
+
+    def _populate_from_hess(self, hess, source: str):
+        """
+        Populate Hessian and covariance from Hessian matrix.
+        
+        Args:
+            hess: Hessian matrix (ndarray or LinearOperator)
+            source: Description of source (e.g., "global optimizer" or "local optimizer")
+        """
+        try:
+            if hasattr(hess, 'toarray'):
+                self.hessian = hess.toarray()
+            else:
+                self.hessian = np.asarray(hess)
+            
+            # Invert to get covariance
+            try:
+                self.covariance = np.linalg.inv(self.hessian)
+            except np.linalg.LinAlgError:
+                print(f"Warning: Could not invert Hessian from {source}. Covariance unavailable.")
+                self.covariance = np.ones_like(self.hessian) * np.inf
+            
+            print(f"Using hess from {source} for covariance estimate.")
+        
+        except (ValueError, TypeError) as e:
+            print(f"Warning: Failed to extract hess from {source}: {e}")
+            self.covariance = np.ones(len(self.result.x)) * np.inf
+            self.hessian = np.zeros((len(self.result.x), len(self.result.x)))
+
 
     # ========== Parameter Inference ==========
     """Run optimization to infer parameters from ground truths."""
@@ -593,6 +724,11 @@ class Inference:
         # Compute Hessian and Covariance if optimisation succeeded
         if self.result.success:
             self._compute_hessian(param_keys)
+
+            # Fallback to optimizer's Hessian if numerical computation failed
+            if np.allclose(self.hessian, 0) or not np.all(np.isfinite(self.covariance)):
+                self._use_optimiser_hessian()
+
         else: 
             self.hessian = np.zeros(len(param_keys))
             self.covariance = np.ones(len(param_keys)) * np.inf

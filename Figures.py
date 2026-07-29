@@ -76,8 +76,8 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
         
         # Scatter plot for this parameter with improved styling
         ax.scatter(ext_list, metric_list, alpha=0.5, s=60, 
-                   edgecolors=colors[idx], linewidth=0.5, 
-                   label=int_param_name, color=colors[idx], zorder=2)
+                edgecolors=colors[idx], linewidth=0.5, 
+                label=int_param_name, color=colors[idx], zorder=2)
     
     # Plot combined metric if multiple parameters
     if len(int_params) > 1:
@@ -128,11 +128,11 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
         if combined_metric_list:
             # Scatter plot of combined metric with distinct marker style
             ax.scatter(combined_ext_list, combined_metric_list, 
-                       alpha=0.6, s=100,
-                       edgecolors=colors[-1], linewidth=1,
-                       marker='D',  # Diamond marker for distinction
-                       label=f'Combined (L2 norm)', 
-                       color=colors[-1], zorder=3)
+                    alpha=0.6, s=100,
+                    edgecolors=colors[-1], linewidth=1,
+                    marker='D',  # Diamond marker for distinction
+                    label=f'Combined (L2 norm)', 
+                    color=colors[-1], zorder=3)
     
     ax.set_xlabel(f'External Parameter {ext_param_name}', fontsize=12)
     
@@ -145,7 +145,7 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
         title_suffix = 'Relative Error'
     
     ax.set_title(f'{title_suffix} vs {ext_param_name} (Multiple Parameters)', 
-                 fontsize=14, fontweight='bold')
+                fontsize=14, fontweight='bold')
     
     # Use log scale for common parameters (A, w0, etc.)
     if ext_param_name in ['A', 'w0', 'omega']:
@@ -359,7 +359,7 @@ if __name__ == "__main__":
 
     # Shear Elasticity - Beta
 
-    int_param_ranges = {'Beta': [1.0]}
+    int_param_ranges = {'Beta': [1e-3, 1e0, 1e3]}
     A_vec = np.pow(10, np.linspace(start = -6, stop = -1, num = 6))
     ext_param_ranges = {'A': A_vec}
     elastic_params_list = ['Beta']
@@ -466,7 +466,7 @@ if __name__ == "__main__":
 
     int_param_ranges = {'tau_b': [1.0]}
     A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 7))
+    w0_vec = np.pow(10, -np.linspace(start = -4, stop = 2, num = 7))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_b']
@@ -494,7 +494,7 @@ if __name__ == "__main__":
     inference_mode = "cumulative_inference"  
     workflow_outputs = [] 
     for l in range(7):
-        w0_vec_l = np.pow(10, -np.linspace(start = -3, stop = -3+l, num = l+1))
+        w0_vec_l = np.pow(10, -np.linspace(start = -4, stop = -4+l, num = l+1))
         ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
         checkpoint_str = f"./Results/BendingViscosity/BendingViscosity_{l}"
 
@@ -519,7 +519,7 @@ if __name__ == "__main__":
 
     int_param_ranges = {'tau_s': [1.0], 'Beta':[1.0]}
     A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 7))
+    w0_vec = np.pow(10, -np.linspace(start = -4, stop = 2, num = 7))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_s']
@@ -548,7 +548,7 @@ if __name__ == "__main__":
     inference_mode = "cumulative_inference"   
     workflow_outputs = []
     for l in range(7):
-        w0_vec_l = np.pow(10, -np.linspace(start = -3, stop = -3+l, num = l+1))
+        w0_vec_l = np.pow(10, -np.linspace(start = -4, stop = -4+l, num = l+1))
         ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
         checkpoint_str = f"./Results/ShearViscosity/ShearViscosity_{l}"
 
@@ -573,9 +573,9 @@ if __name__ == "__main__":
 
     # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
 
-    int_param_ranges = {'tau_b': [1.0], 'tau_s':[1.0], 'Beta':[1.0]}
+    int_param_ranges = {'tau_b': [1.0], 'tau_s':[1e-3, 1e0, 1e3], 'Beta':[1.0]}
     A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 7))
+    w0_vec = np.pow(10, -np.linspace(start = -4, stop = 2, num = 7))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_b', 'tau_s']
@@ -603,7 +603,7 @@ if __name__ == "__main__":
     inference_mode = "cumulative_inference"   
     workflow_outputs = []
     for l in range(7):
-        w0_vec_l = np.pow(10, -np.linspace(start = -3, stop = -3+l, num = l+1))
+        w0_vec_l = np.pow(10, -np.linspace(start = -4, stop = -4+l, num = l+1))
         ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
         checkpoint_str = f"./Results/BendingShearViscosity/BendingShearViscosity_{l}"
 

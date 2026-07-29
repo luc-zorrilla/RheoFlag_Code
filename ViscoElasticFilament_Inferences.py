@@ -66,7 +66,7 @@ def basinhopping_optimizer(
                 'jac': '3-point',  # Jacobian specification
                 'options':{
                     'ftol':1e-8, 
-                    'gtol':1e-8, 
+                    'gtol':1e-6, 
                     'eps': 1e-8, 
                     'finite_diff_rel_step':None,
                     }
@@ -99,7 +99,7 @@ def basinhopping_optimizer(
         'jac': '3-point',  # Jacobian specification
         'options':{
             'ftol':1e-8,  # Functional tolerance for local minimizer
-            'gtol':1e-8,  # Gradient tolerance for local minimizer
+            'gtol':1e-6,  # Gradient tolerance for local minimizer
             'eps': 1e-8,  # ?
             'finite_diff_rel_step':None, # ?
         }
@@ -126,7 +126,7 @@ def basinhopping_optimizer(
     options = local_minimizer_kwargs.pop(
         'options', {
             'ftol':1e-8, 
-            'gtol':1e-8, 
+            'gtol':1e-6, 
             'eps': 1e-8, 
             'finite_diff_rel_step':None,
         })
@@ -403,7 +403,7 @@ def make_optimizer_kwargs(
         'jac': '3-point',
         'options': {
             'ftol': 1e-8,
-            'gtol': 1e-8,
+            'gtol': 1e-6,
             'eps': 1e-8,
             'finite_diff_rel_step': None,
         },
@@ -1298,7 +1298,7 @@ def _compute_inference_results_general(
             result_entry[f'{param_key}_true'] = true_value
             result_entry[f'{param_key}_inferred'] = inferred_value
             result_entry[f'{param_key}_rel_error'] = rel_error
-            result_entry[f'{param_key}_sigma'] = sigma_value  # ← Add sigma from Hessian
+            result_entry[f'{param_key}_sigma'] = sigma_value 
             
             if rel_error >= rel_error_threshold:
                 all_within_threshold = False
