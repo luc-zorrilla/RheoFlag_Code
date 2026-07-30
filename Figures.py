@@ -231,11 +231,11 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
     
     return ax
 
-
 def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_name, metric='std', ax=None):
     """
     Plot metric vs size of external parameter vector for cumulative inference runs.
     Multiple internal parameters plotted on same axis for comparison.
+    Color-codes by internal parameter values when they vary.
     
     Plots all individual samples (no mean/std aggregation) with improved marker styling.
     Also plots combined metric (L2 norm) alongside individual metrics.
@@ -243,6 +243,7 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
     Args:
         workflow_outputs: List of workflow output dicts from workflow_elastic_viscous_general
         int_params: List of internal parameter names (e.g., ['Sp4', 'Beta', 'eta'])
+        ext_param_name: Name of external parameter vector
         metric: 'std' for Hessian standard error, 'rel_error' for relative error (L2 norm)
         ax: Matplotlib axis (creates new figure if None)
     
@@ -252,16 +253,34 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
     if ax is None:
         fig, ax = plt.subplots(figsize=(14, 7))
     
-    # Color palette for different parameters
-    colors = plt.cm.tab10(np.linspace(0, 1, len(int_params) + 1))  # +1 for combined metric
+    # Get int_param_ranges from first workflow (assumes consistent across all runs)
+    int_param_ranges = workflow_outputs[0]['int_param_ranges']
     
-    # Detect external parameter name from first workflow
-    ext_param_ranges = workflow_outputs[0]['ext_param_ranges']
+    # Identify which internal parameters vary (have >1 value)
+    varying_params = {
+        name: values for name, values in int_param_ranges.items()
+        if name in int_params and len(values) > 1
+    }
+    fixed_params = {
+        name: values for name, values in int_param_ranges.items()
+        if name in int_params and len(values) == 1
+    }
+    
+    # Build color palette for each varying parameter
+    param_color_palettes = {}
+    for param_name in varying_params:
+        num_values = len(varying_params[param_name])
+        param_color_palettes[param_name] = plt.cm.viridis(np.linspace(0, 1, num_values))
+    
+    # Color palette for fixed parameters
+    fixed_param_colors = plt.cm.tab20(np.linspace(0, 1, len(fixed_params) + 1))
     
     # Plot each internal parameter
     for param_idx, int_param_name in enumerate(int_params):
         ext_vec_size_scatter = []
         metric_all = []
+        color_list = []
+        label_to_handle = {}  # Track unique labels to avoid duplicates in legend
         
         for k, workflow_output in enumerate(workflow_outputs):
             results_summary = workflow_output['results_summary']
@@ -271,6 +290,12 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
             
             # Extract all metric values from this run
             for result in results_summary:
+                task_key = result['task_key']
+                
+                # Parse task_key format: "int_{int_idx}_ext_{ext_idx}"
+                parts = task_key.split('_')
+                int_idx = int(parts[1])
+                
                 if metric == 'std':
                     metric_key = f'{int_param_name}_sigma'
                 elif metric == 'rel_error':
@@ -291,24 +316,61 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
                     if metric_val is not None and np.isfinite(metric_val):
                         metric_all.append(metric_val)
                         ext_vec_size_scatter.append(ext_vec_size)
+                        
+                        # Determine color and label based on parameter type
+                        if int_param_name in varying_params:
+                            # Color by internal parameter value
+                            param_values = varying_params[int_param_name]
+                            color = param_color_palettes[int_param_name][int_idx]
+                            param_value = param_values[int_idx]
+                            # Format legend label with parameter value
+                            if param_value >= 1e3 or (param_value < 1e-2 and param_value > 0):
+                                label = f'{int_param_name}={param_value:.1e}'
+                            else:
+                                label = f'{int_param_name}={param_value}'
+                        else:
+                            # Fixed parameter—use fixed color
+                            color = fixed_param_colors[param_idx]
+                            param_value = fixed_params[int_param_name][0]
+                            if param_value >= 1e3 or (param_value < 1e-2 and param_value > 0):
+                                label = f'{int_param_name}={param_value:.1e}'
+                            else:
+                                label = f'{int_param_name}={param_value}'
+                        
+                        color_list.append((color, label))
+                        # Track unique labels for legend
+                        if label not in label_to_handle:
+                            label_to_handle[label] = color
         
         if not metric_all:
             print(f"Warning: No finite {metric} values found for parameter '{int_param_name}'")
             continue
         
-        # Scatter plot of all individual points for this parameter
-        # Use better marker styling: larger, semi-transparent, with subtle edges
-        ax.scatter(ext_vec_size_scatter, metric_all, 
-                    alpha=0.5, s=60, 
-                    edgecolors=colors[param_idx], linewidth=0.5,
-                    color=colors[param_idx], 
-                    label=int_param_name, 
-                    zorder=2)
+        # Group by color/label to avoid duplicate legend entries
+        color_to_data = {}
+        for ext_size, metric_val, (color, label) in zip(ext_vec_size_scatter, metric_all, color_list):
+            color_tuple = tuple(color)  # Convert to tuple for hashing
+            if color_tuple not in color_to_data:
+                color_to_data[color_tuple] = {'ext_size': [], 'metric': [], 'label': label}
+            color_to_data[color_tuple]['ext_size'].append(ext_size)
+            color_to_data[color_tuple]['metric'].append(metric_val)
+        
+        # Plot each color group separately (one legend entry per color)
+        for color_tuple, data in color_to_data.items():
+            ax.scatter(
+                data['ext_size'], data['metric'],
+                alpha=0.5, s=60,
+                color=np.array(color_tuple).reshape(1, -1)[0],
+                edgecolors='black', linewidth=0.5,
+                label=data['label'],
+                zorder=2
+            )
     
     # Plot combined metric if multiple parameters
     if len(int_params) > 1:
         combined_metric_all = []
         combined_ext_vec_size_scatter = []
+        combined_color_list = []
         
         for k, workflow_output in enumerate(workflow_outputs):
             results_summary = workflow_output['results_summary']
@@ -317,6 +379,12 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
             ext_vec_size = len(ext_vec)
             
             for result in results_summary:
+                task_key = result['task_key']
+                
+                # Parse task_key
+                parts = task_key.split('_')
+                int_idx = int(parts[1])
+                
                 # Collect all metric values for this result
                 metrics_combined = []
                 all_finite = True
@@ -349,31 +417,46 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
                     combined_metric = np.sqrt(np.sum(np.array(metrics_combined) ** 2))
                     combined_metric_all.append(combined_metric)
                     combined_ext_vec_size_scatter.append(ext_vec_size)
+                    
+                    # Determine color for combined metric
+                    # Priority: use first varying parameter, or first fixed parameter
+                    if varying_params:
+                        # Use first varying parameter for color
+                        first_varying = list(varying_params.keys())[0]
+                        param_values = varying_params[first_varying]
+                        color = param_color_palettes[first_varying][int_idx]
+                    else:
+                        # Use first fixed parameter (all have same value, so use gray)
+                        color = 'gray'
+                    
+                    combined_color_list.append(color)
         
         if combined_metric_all:
             # Scatter plot of combined metric with distinct marker style
-            ax.scatter(combined_ext_vec_size_scatter, combined_metric_all, 
-                    alpha=0.6, s=100,  # Larger and more visible
-                    edgecolors=colors[-1], linewidth=1,
-                    marker='D',  # Diamond marker for distinction
-                    color=colors[-1], 
-                    label=f'Combined (L2 norm)',
-                    zorder=3)
+            ax.scatter(
+                combined_ext_vec_size_scatter, combined_metric_all,
+                alpha=0.6, s=100,  # Larger and more visible
+                c=combined_color_list,
+                edgecolors='black', linewidth=1,
+                marker='D',  # Diamond marker for distinction
+                label='Combined (L2 norm)',
+                zorder=3
+            )
     
-    ax.set_xlabel(f'Size of {ext_param_name} vector (number of points)', fontsize=12)
+    ax.set_xlabel(f'Size of {ext_param_name} vector (number of points)', fontsize=12, fontweight='bold')
     
     if metric == 'std':
-        ax.set_ylabel('Sigma (Hessian Std. Error)', fontsize=12)
+        ax.set_ylabel('Sigma (Hessian Std. Error)', fontsize=12, fontweight='bold')
         title_suffix = 'Standard Error'
     else:
-        ax.set_ylabel('Relative Error (L2 norm)', fontsize=12)
+        ax.set_ylabel('Relative Error (L2 norm)', fontsize=12, fontweight='bold')
         ax.set_yscale('log')
         title_suffix = 'Relative Error'
     
     ax.set_title(f'{title_suffix} vs {ext_param_name} Vector Size (All Samples)', 
                 fontsize=14, fontweight='bold')
     ax.grid(True, alpha=0.3, zorder=1)
-    ax.legend(fontsize=11, loc='best')
+    ax.legend(fontsize=11, loc='best', framealpha=0.95)
     
     return ax
 
