@@ -1,0 +1,44 @@
+{
+  "stage": "inference",
+  "timestamp": "2026-07-30 09:12:30.924112",
+  "simulation_entries": {
+    "int_0_pair_all": {
+      "task_key": "int_0_pair_all",
+      "completed": true,
+      "timestamp": "2026-07-29 22:03:26.409297",
+      "filepath": "artifacts/models/int_0_pair_all.pkl"
+    },
+    "int_1_pair_all": {
+      "task_key": "int_1_pair_all",
+      "completed": true,
+      "timestamp": "2026-07-29 22:03:26.574182",
+      "filepath": "artifacts/models/int_1_pair_all.pkl"
+    },
+    "int_2_pair_all": {
+      "task_key": "int_2_pair_all",
+      "completed": true,
+      "timestamp": "2026-07-29 22:03:26.738802",
+      "filepath": "artifacts/models/int_2_pair_all.pkl"
+    }
+  },
+  "inference_entries": {
+    "int_000_cumulative": {
+      "task_key": "int_000_cumulative",
+      "completed": true,
+      "timestamp": "2026-07-29 22:05:50.702194",
+      "filepath": "artifacts/inference/int_000_cumulative.pkl"
+    },
+    "int_001_cumulative": {
+      "task_key": "int_001_cumulative",
+      "completed": true,
+      "timestamp": "2026-07-29 22:08:05.163207",
+      "filepath": "artifacts/inference/int_001_cumulative.pkl"
+    },
+    "int_002_cumulative": {
+      "task_key": "int_002_cumulative",
+      "completed": true,
+      "timestamp": "2026-07-30 09:12:30.924101",
+      "filepath": "artifacts/inference/int_002_cumulative.pkl"
+    }
+  }
+}

@@ -561,12 +561,21 @@ class Inference:
         
         Falls back to infinite covariance if no valid estimate exists.
         """
+        # DEBUG
+        print("use_optimiser_hessian")
+        # DEBUG
+
         # Try to get optimizer result (handle both direct OptimizeResult and global optimizers)
         opt_result = self.result
         local_opt_result = getattr(opt_result, 'lowest_optimization_result', None)
         
         # Try global optimizer first, then local optimizer
         for result_name, result in [("global optimizer", opt_result), ("local optimizer", local_opt_result)]:
+            
+            # DEBUG
+            print(result_name)
+            # DEBUG
+            
             if result is None:
                 continue
             
@@ -574,6 +583,11 @@ class Inference:
             hess_inv = getattr(result, 'hess_inv', None)
             if hess_inv is not None and self._is_valid_hessian(hess_inv, is_inverse=True):
                 self._populate_from_hess_inv(hess_inv, result_name)
+
+                # DEBUG
+                print("hess_inv = ", hess_inv)
+                # DEBUG
+
                 return
             
             # Try hess (Hessian matrix)
@@ -581,14 +595,19 @@ class Inference:
                 hess = getattr(result, 'hess', None)
                 if hess is not None and self._is_valid_hessian(hess, is_inverse=False):
                     self._populate_from_hess(hess, result_name)
+
+                    # DEBUG
+                    print("hess = ", hess)
+                    # DEBUG
+
                     return
-        
+                
         # No valid Hessian found in optimizer
         print(
             f"Warning: Hessian computation failed and no valid hess/hess_inv found in "
             f"global or local optimizer. Covariance unavailable."
         )
-        self.covariance = np.ones(len(self.result.x)) * np.inf
+        self.covariance = np.ones((len(self.result.x), len(self.result.x))) * np.inf
         self.hessian = np.zeros((len(self.result.x), len(self.result.x)))
 
     def _is_valid_hessian(self, hess_matrix, is_inverse: bool) -> bool:
@@ -730,8 +749,18 @@ class Inference:
                 self._use_optimiser_hessian()
 
         else: 
-            self.hessian = np.zeros(len(param_keys))
-            self.covariance = np.ones(len(param_keys)) * np.inf
+            self.hessian = np.zeros((len(param_keys), len(param_keys)))
+            self.covariance = np.ones((len(param_keys), len(param_keys))) * np.inf
+
+        # Ensure covariance diagonal is non-negative (clip numerical noise)
+        if self.covariance is not None and np.all(np.isfinite(self.covariance)):
+            diag = np.diag(self.covariance)
+            if np.any(diag < 0):
+                print(
+                    f"Warning: Covariance matrix has negative diagonal elements "
+                    f"(min: {np.min(diag):.2e}). Clipping to zero."
+                )
+                np.fill_diagonal(self.covariance, np.maximum(diag, 0))
 
         # Reconstruct optimal parameters
         optimal_params = {key: self.result.x[i] for i, key in enumerate(param_keys)}
