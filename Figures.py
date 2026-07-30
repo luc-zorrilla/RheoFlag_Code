@@ -544,7 +544,7 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
 if __name__ == "__main__":
 
     # Bending Elasticity - Sp4
-    int_param_ranges = {'Sp4': [1.0]}
+    int_param_ranges = {'Sp4': [1e-3, 1e0, 1e3]}
     A_vec = np.pow(10, np.linspace(start=-6, stop=-1, num=6))
     ext_param_ranges = {'A': A_vec}
     elastic_params_list = ['Sp4']
@@ -568,31 +568,31 @@ if __name__ == "__main__":
     fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4'], ext_param_name='A', metric='rel_error')
     fig.show()
 
-    inference_mode = "cumulative_inference"
-    workflow_outputs = []
-    for k in range(6):
-        A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
-        ext_param_ranges = {'A': A_vec_k}
-        checkpoint_str = f"./Results/BendingElasticity/BendingElasticity_{k}"
+    # inference_mode = "cumulative_inference"
+    # workflow_outputs = []
+    # for k in range(6):
+    #     A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
+    #     ext_param_ranges = {'A': A_vec_k}
+    #     checkpoint_str = f"./Results/BendingElasticity/BendingElasticity_{k}"
 
-        workflow_outputs.append(workflow_elastic_viscous_general(
-            int_param_ranges=int_param_ranges,
-            ext_param_ranges=ext_param_ranges,
-            elastic_params_list = elastic_params_list,
-            viscous_params_list = viscous_params_list,
-            inference_mode = inference_mode,
-            checkpoint_str=checkpoint_str,
-            ))
+    #     workflow_outputs.append(workflow_elastic_viscous_general(
+    #         int_param_ranges=int_param_ranges,
+    #         ext_param_ranges=ext_param_ranges,
+    #         elastic_params_list = elastic_params_list,
+    #         viscous_params_list = viscous_params_list,
+    #         inference_mode = inference_mode,
+    #         checkpoint_str=checkpoint_str,
+    #         ))
     
-    fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4'], ext_param_name='A', metric = 'std')
-    fig.show()
+    # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4'], ext_param_name='A', metric = 'std')
+    # fig.show()
 
-    fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4'], ext_param_name='A', metric = 'rel_error')
-    fig.show()
+    # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4'], ext_param_name='A', metric = 'rel_error')
+    # fig.show()
 
     # Shear Elasticity - Beta
 
-    int_param_ranges = {'Beta': [1e-3, 1e0, 1e3]}
+    int_param_ranges = {'Beta': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
     A_vec = np.pow(10, np.linspace(start = -6, stop = -1, num = 6))
     ext_param_ranges = {'A': A_vec}
     elastic_params_list = ['Beta']
@@ -616,27 +616,29 @@ if __name__ == "__main__":
     fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Beta'], ext_param_name='A', metric = 'rel_error')
     fig.show()        
 
-    inference_mode = "cumulative_inference"   
-    workflow_outputs = []
-    for k in range(6):
-        A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
-        ext_param_ranges = {'A': A_vec_k}
-        checkpoint_str = f"./Results/ShearElasticity/ShearElasticity_{k}"
+    # inference_mode = "cumulative_inference"   
+    # workflow_outputs = []
+    # for k in range(6):
+    #     A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
+    #     ext_param_ranges = {'A': A_vec_k}
+    #     checkpoint_str = f"./Results/ShearElasticity/ShearElasticity_{k}"
 
-        workflow_outputs.append(workflow_elastic_viscous_general(
-            int_param_ranges=int_param_ranges,
-            ext_param_ranges=ext_param_ranges,
-            elastic_params_list = elastic_params_list,
-            viscous_params_list = viscous_params_list,
-            inference_mode = inference_mode,
-            checkpoint_str=checkpoint_str,
-            ))
+    #     workflow_outputs.append(workflow_elastic_viscous_general(
+    #         int_param_ranges=int_param_ranges,
+    #         ext_param_ranges=ext_param_ranges,
+    #         elastic_params_list = elastic_params_list,
+    #         viscous_params_list = viscous_params_list,
+    #         inference_mode = inference_mode,
+    #         checkpoint_str=checkpoint_str,
+    #         ))
 
-    fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Beta'], ext_param_name = 'A', metric = 'std')
-    fig.show()
+    # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Beta'], ext_param_name = 'A', metric = 'std')
+    # fig.show()
 
-    fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Beta'], ext_param_name = 'A', metric = 'rel_error')
-    fig.show()    
+    # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Beta'], ext_param_name = 'A', metric = 'rel_error')
+    # fig.show()    
+
+    exit()
 
     # Bending & Shear Elasticities - Sp4, Beta
 
@@ -664,34 +666,34 @@ if __name__ == "__main__":
     fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4', 'Beta'], ext_param_name = 'A', metric = 'rel_error')
     fig.show()    
 
-    inference_mode = "cumulative_inference"   
-    workflow_outputs = []
-    for k in range(6):
-        A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
-        ext_param_ranges = {'A': A_vec_k}
-        checkpoint_str = f"./Results/BendingShearElasticity/BendingShearElasticity_{k}"
+    # inference_mode = "cumulative_inference"   
+    # workflow_outputs = []
+    # for k in range(6):
+    #     A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
+    #     ext_param_ranges = {'A': A_vec_k}
+    #     checkpoint_str = f"./Results/BendingShearElasticity/BendingShearElasticity_{k}"
 
-        workflow_outputs.append(workflow_elastic_viscous_general(
-            int_param_ranges=int_param_ranges,
-            ext_param_ranges=ext_param_ranges,
-            elastic_params_list = elastic_params_list,
-            viscous_params_list = viscous_params_list,
-            inference_mode = inference_mode,
-            checkpoint_str=checkpoint_str,
-            ))
+    #     workflow_outputs.append(workflow_elastic_viscous_general(
+    #         int_param_ranges=int_param_ranges,
+    #         ext_param_ranges=ext_param_ranges,
+    #         elastic_params_list = elastic_params_list,
+    #         viscous_params_list = viscous_params_list,
+    #         inference_mode = inference_mode,
+    #         checkpoint_str=checkpoint_str,
+    #         ))
     
-    fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4', 'Beta'], ext_param_name='A', metric = 'std')
-    fig.show()
+    # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4', 'Beta'], ext_param_name='A', metric = 'std')
+    # fig.show()
 
-    fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4', 'Beta'], ext_param_name='A', metric = 'rel_error')
-    fig.show()
+    # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4', 'Beta'], ext_param_name='A', metric = 'rel_error')
+    # fig.show()
 
 
     # Bending Viscosity (Fixed Bending Elasticity)
 
-    int_param_ranges = {'tau_b': [1.0]}
+    int_param_ranges = {'tau_b': [1e-3, 1e0, 1e3]}
     A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -4, stop = 2, num = 7))
+    w0_vec = np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_b']
@@ -714,33 +716,33 @@ if __name__ == "__main__":
     fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b'], ext_param_name='w0', metric = 'rel_error')
     fig.show()        
 
-    inference_mode = "cumulative_inference"  
-    workflow_outputs = [] 
-    for l in range(7):
-        w0_vec_l = np.pow(10, -np.linspace(start = -4, stop = -4+l, num = l+1))
-        ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
-        checkpoint_str = f"./Results/BendingViscosity/BendingViscosity_{l}"
+    # inference_mode = "cumulative_inference"  
+    # workflow_outputs = [] 
+    # for l in range(10):
+    #     w0_vec_l = np.pow(10, -np.linspace(start = -4, stop = -4+l, num = l+1))
+    #     ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
+    #     checkpoint_str = f"./Results/BendingViscosity/BendingViscosity_{l}"
 
-        workflow_outputs.append(workflow_elastic_viscous_general(
-            int_param_ranges=int_param_ranges,
-            ext_param_ranges=ext_param_ranges,
-            elastic_params_list = elastic_params_list,
-            viscous_params_list = viscous_params_list,
-            inference_mode = inference_mode,
-            checkpoint_str=checkpoint_str,
-            ))
+    #     workflow_outputs.append(workflow_elastic_viscous_general(
+    #         int_param_ranges=int_param_ranges,
+    #         ext_param_ranges=ext_param_ranges,
+    #         elastic_params_list = elastic_params_list,
+    #         viscous_params_list = viscous_params_list,
+    #         inference_mode = inference_mode,
+    #         checkpoint_str=checkpoint_str,
+    #         ))
 
-    fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b'], ext_param_name='w0', metric = 'std')
-    fig.show()
+    # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b'], ext_param_name='w0', metric = 'std')
+    # fig.show()
 
-    fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b'], ext_param_name='w0', metric = 'rel_error')
-    fig.show()
+    # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b'], ext_param_name='w0', metric = 'rel_error')
+    # fig.show()
 
     # Shear Viscosity (Fixed Bending Elasticity & Shear Elasticity)
 
-    int_param_ranges = {'tau_s': [1.0], 'Beta':[1.0]}
+    int_param_ranges = {'tau_s': [1e-3, 1e0, 1e3], 'Beta':[1.0]}
     A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -4, stop = 2, num = 7))
+    w0_vec = np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_s']
@@ -763,35 +765,35 @@ if __name__ == "__main__":
     fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_s'], ext_param_name='w0', metric = 'rel_error')
     fig.show()    
 
-    inference_mode = "cumulative_inference"   
-    workflow_outputs = []
-    for l in range(7):
-        w0_vec_l = np.pow(10, -np.linspace(start = -4, stop = -4+l, num = l+1))
-        ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
-        checkpoint_str = f"./Results/ShearViscosity/ShearViscosity_{l}"
+    # inference_mode = "cumulative_inference"   
+    # workflow_outputs = []
+    # for l in range(10):
+    #     w0_vec_l = np.pow(10, -np.linspace(start = -4, stop = -4+l, num = l+1))
+    #     ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
+    #     checkpoint_str = f"./Results/ShearViscosity/ShearViscosity_{l}"
 
-        workflow_outputs.append(workflow_elastic_viscous_general(
-            int_param_ranges=int_param_ranges,
-            ext_param_ranges=ext_param_ranges,
-            elastic_params_list = elastic_params_list,
-            viscous_params_list = viscous_params_list,
-            inference_mode = inference_mode,
-            checkpoint_str=checkpoint_str,
-            ))
+    #     workflow_outputs.append(workflow_elastic_viscous_general(
+    #         int_param_ranges=int_param_ranges,
+    #         ext_param_ranges=ext_param_ranges,
+    #         elastic_params_list = elastic_params_list,
+    #         viscous_params_list = viscous_params_list,
+    #         inference_mode = inference_mode,
+    #         checkpoint_str=checkpoint_str,
+    #         ))
 
-    fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_s'], ext_param_name='w0', metric = 'std')
-    fig.show()
+    # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_s'], ext_param_name='w0', metric = 'std')
+    # fig.show()
 
 
-    fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_s'], ext_param_name='w0', metric = 'rel_error')
-    fig.show()
+    # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_s'], ext_param_name='w0', metric = 'rel_error')
+    # fig.show()
 
 
     # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
 
-    int_param_ranges = {'tau_b': [1.0], 'tau_s':[1e-3, 1e0, 1e3], 'Beta':[1.0]}
+    int_param_ranges = {'tau_b': [1.0], 'tau_s':[1e0], 'Beta':[1.0]}
     A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -4, stop = 2, num = 7))
+    w0_vec = np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_b', 'tau_s']
@@ -814,24 +816,24 @@ if __name__ == "__main__":
     fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'rel_error')
     fig.show()    
 
-    inference_mode = "cumulative_inference"   
-    workflow_outputs = []
-    for l in range(7):
-        w0_vec_l = np.pow(10, -np.linspace(start = -4, stop = -4+l, num = l+1))
-        ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
-        checkpoint_str = f"./Results/BendingShearViscosity/BendingShearViscosity_{l}"
+    # inference_mode = "cumulative_inference"   
+    # workflow_outputs = []
+    # for l in range(10):
+    #     w0_vec_l = np.pow(10, -np.linspace(start = -4, stop = -4+l, num = l+1))
+    #     ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
+    #     checkpoint_str = f"./Results/BendingShearViscosity/BendingShearViscosity_{l}"
 
-        workflow_outputs.append(workflow_elastic_viscous_general(
-            int_param_ranges=int_param_ranges,
-            ext_param_ranges=ext_param_ranges,
-            elastic_params_list = elastic_params_list,
-            viscous_params_list = viscous_params_list,
-            inference_mode = inference_mode,
-            checkpoint_str=checkpoint_str,
-            ))
+    #     workflow_outputs.append(workflow_elastic_viscous_general(
+    #         int_param_ranges=int_param_ranges,
+    #         ext_param_ranges=ext_param_ranges,
+    #         elastic_params_list = elastic_params_list,
+    #         viscous_params_list = viscous_params_list,
+    #         inference_mode = inference_mode,
+    #         checkpoint_str=checkpoint_str,
+    #         ))
 
-    fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'std')
-    fig.show()
+    # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'std')
+    # fig.show()
 
-    fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'rel_error')
-    fig.show()
+    # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'rel_error')
+    # fig.show()
