@@ -66,7 +66,7 @@ def basinhopping_optimizer(
                 'jac': '3-point',  # Jacobian specification
                 'options':{
                     'ftol':1e-8, 
-                    'gtol':1e-6, 
+                    'gtol':1e-4, 
                     'eps': 1e-8, 
                     'finite_diff_rel_step':None,
                     }
@@ -79,7 +79,7 @@ def basinhopping_optimizer(
                 'niter': 49,  # Basin-hopping iterations
                 'stepsize': 5,  # Maximum step size for perturbations
                 'T': 1,  # Temperature for Metropolis acceptance
-                'tol': 1e-10,  # Early stopping tolerance --> Not in basinhopping function
+                'tol': 1e-8,  # Early stopping tolerance --> Not in basinhopping function
                 'stepwise_factor':1-1e-16, # Stepsize multiplication/division factor
             }
     
@@ -99,7 +99,7 @@ def basinhopping_optimizer(
         'jac': '3-point',  # Jacobian specification
         'options':{
             'ftol':1e-8,  # Functional tolerance for local minimizer
-            'gtol':1e-6,  # Gradient tolerance for local minimizer
+            'gtol':1e-4,  # Gradient tolerance for local minimizer
             'eps': 1e-8,  # ?
             'finite_diff_rel_step':None, # ?
         }
@@ -109,7 +109,7 @@ def basinhopping_optimizer(
         'niter': 49,  # Basin-hopping iterations
         'stepsize': 10,  # Maximum step size for perturbations
         'T': 1,  # Temperature for Metropolis acceptance
-        'tol': 1e-10,  # Early stopping tolerance
+        'tol': 1e-8,  # Early stopping tolerance
         'stepwise_factor':1 - 1e-16, # Stepsize multiplication factor per update
     }
     
@@ -118,7 +118,7 @@ def basinhopping_optimizer(
     T = global_minimizer_kwargs.pop('T', 1)
     stepsize = global_minimizer_kwargs.pop('stepsize', 10)
     stepwise_factor = global_minimizer_kwargs.pop('stepwise_factor', 1-1e-16)
-    tol = global_minimizer_kwargs.pop('tol', 1e-10)
+    tol = global_minimizer_kwargs.pop('tol', 1e-8)
     
     # --- Extract local minimizer parameters ---
     method = local_minimizer_kwargs.pop('method', "L-BFGS-B")
@@ -126,7 +126,7 @@ def basinhopping_optimizer(
     options = local_minimizer_kwargs.pop(
         'options', {
             'ftol':1e-8, 
-            'gtol':1e-6, 
+            'gtol':1e-4, 
             'eps': 1e-8, 
             'finite_diff_rel_step':None,
         })
@@ -403,7 +403,7 @@ def make_optimizer_kwargs(
         'jac': '3-point',
         'options': {
             'ftol': 1e-8,
-            'gtol': 1e-6,
+            'gtol': 1e-4,
             'eps': 1e-8,
             'finite_diff_rel_step': None,
         },
@@ -413,7 +413,7 @@ def make_optimizer_kwargs(
         'T': 1,
         'stepsize': 10,
         'stepwise_factor':1-1e-16,
-        'tol': 1e-10,
+        'tol': 1e-8,
     },
 ):
     return {

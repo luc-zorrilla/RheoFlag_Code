@@ -525,6 +525,10 @@ class Inference:
         Args:
             param_keys: Parameter names corresponding to optimization variables
         """
+        # DEBUG
+        print("compute_hessian")
+        # DEBUG
+
         n_params = len(param_keys)
         vec_func = Vectorize_Functional( # TODO: can't I vectorize it always?? This could speed up computation.
                 lambda x: self.objective(x, param_keys), 
@@ -550,6 +554,10 @@ class Inference:
         except np.linalg.LinAlgError:
             print(f"Warning: Hessian singular at optimum for {param_keys}, covariance unavailable.")
             self.covariance = np.ones_like(self.hessian) * np.inf
+
+        # DEBUG
+        print("hessian = ", self.hessian)
+        # DEBUG
 
     def _use_optimiser_hessian(self):
         """
