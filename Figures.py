@@ -3,7 +3,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 
-
+import itertools
 import numpy as np
 from pathlib import Path
 from ViscoElasticFilament_Inferences import workflow_elastic_viscous_general
@@ -15,9 +15,10 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
     """
     Plot metric vs external parameter value for a single inference run.
     Multiple internal parameters plotted on same axis for comparison.
-    Color-codes by internal parameter values when they vary.
+    Color-codes by unique combinations of internal parameter values.
     
-    Also plots combined metric (L2 norm) alongside individual metrics.
+    Also plots combined metric (L2 norm) alongside individual metrics,
+    with the same color as the corresponding parameter combination.
     
     Args:
         workflow_output: Workflow output dict from workflow_elastic_viscous_general
@@ -44,20 +45,25 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
         if name in int_params and len(values) == 1
     }
     
-    # Build color palette for each varying parameter
-    viridis = px.colors.sequential.Viridis
-    param_color_palettes = {}
-    for param_name in varying_params:
-        num_values = len(varying_params[param_name])
-        param_color_palettes[param_name] = [
-            viridis[int(i * (len(viridis) - 1) / (num_values - 1))] if num_values > 1 else viridis[0]
-            for i in range(num_values)
-        ]
-    
-    # Color palette for fixed parameters
-    tab20_colors = px.colors.qualitative.Light24
-    
-    fig = go.Figure()
+    # Build color palette for parameter combinations
+    # Generate all unique combinations from varying parameters
+    varying_param_names = list(varying_params.keys())
+    if varying_param_names:
+        param_combinations = list(itertools.product(*[varying_params[name] for name in varying_param_names]))
+        num_combinations = len(param_combinations)
+        
+        # Use a color palette with enough distinct colors
+        if num_combinations <= 10:
+            color_palette = px.colors.qualitative.Light24[:num_combinations]
+        elif num_combinations <= 24:
+            color_palette = px.colors.qualitative.Light24
+        else:
+            # For more combinations, cycle through palette
+            color_palette = px.colors.qualitative.Light24
+        
+        combination_colors = {combo: color_palette[i % len(color_palette)] for i, combo in enumerate(param_combinations)}
+    else:
+        combination_colors = {tuple(): px.colors.qualitative.Light24[0]}
     
     # Helper function to format parameter values
     def format_value(val):
@@ -68,19 +74,50 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
                 return f'{val}'
         return str(val)
     
+    # Helper function to get internal parameter indices from task_key
+    def parse_task_key(task_key, int_param_ranges):
+        """
+        Parse task_key format: "int_{int_idx}_ext_{ext_idx}" and return
+        a mapping of int_param_name to its index value.
+        """
+        parts = task_key.split('_')
+        int_idx = int(parts[1])
+        ext_idx = int(parts[3])
+        
+        # Convert linear int_idx to multi-dimensional indices
+        int_param_names = list(int_param_ranges.keys())
+        int_param_counts = [len(int_param_ranges[name]) for name in int_param_names]
+        
+        # Unravel the linear index into multi-dimensional indices
+        multi_idx = np.unravel_index(int_idx, tuple(int_param_counts))
+        
+        idx_mapping = {name: multi_idx[i] for i, name in enumerate(int_param_names)}
+        return idx_mapping, ext_idx
+    
+    # Helper function to get parameter combination tuple
+    def get_param_combination(idx_mapping, int_params, int_param_ranges):
+        """Extract the parameter combination tuple for int_params in the requested order."""
+        combo = tuple(
+            int_param_ranges[param_name][idx_mapping[param_name]]
+            for param_name in int_params
+            if param_name in varying_params
+        )
+        return combo
+    
+    fig = go.Figure()
+    
+    # Track which combinations have been added to legend
+    legend_added = set()
+    
     # Plot each internal parameter
     for param_idx, int_param_name in enumerate(int_params):
-        ext_param_scatter = []
-        metric_all = []
         label_to_data = {}  # Track data grouped by unique label
         
         for result in results_summary:
             task_key = result['task_key']
             
-            # Parse task_key format: "int_{int_idx}_ext_{ext_idx}"
-            parts = task_key.split('_')
-            int_idx = int(parts[1])
-            ext_idx = int(parts[3])
+            # Parse task_key to get indices for all internal parameters
+            idx_mapping, ext_idx = parse_task_key(task_key, int_param_ranges)
             
             if metric == 'std':
                 metric_key = f'{int_param_name}_sigma'
@@ -102,31 +139,41 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
                 if metric_val is not None and np.isfinite(metric_val):
                     ext_param_val = ext_param_vec[ext_idx]
                     
-                    # Determine color and label based on parameter type
-                    if int_param_name in varying_params:
-                        # Color by internal parameter value
-                        param_values = varying_params[int_param_name]
-                        color = param_color_palettes[int_param_name][int_idx]
-                        param_value = param_values[int_idx]
-                        label = f'{int_param_name}={format_value(param_value)}'
-                    else:
-                        # Fixed parameter
-                        color = tab20_colors[param_idx % len(tab20_colors)]
-                        param_value = fixed_params[int_param_name][0]
-                        label = f'{int_param_name}={format_value(param_value)}'
+                    # Get the parameter combination for color coding
+                    param_combo = get_param_combination(idx_mapping, int_params, int_param_ranges)
+                    color = combination_colors[param_combo]
+                    
+                    # Build label with all int_params in the combination
+                    label_parts = []
+                    for pname in int_params:
+                        if pname in varying_params:
+                            pidx = idx_mapping[pname]
+                            pval = varying_params[pname][pidx]
+                            label_parts.append(f'{pname}={format_value(pval)}')
+                        else:
+                            pval = fixed_params[pname][0]
+                            label_parts.append(f'{pname}={format_value(pval)}')
+                    
+                    label = ', '.join(label_parts)
                     
                     # Group data by label for legend deduplication
                     if label not in label_to_data:
                         label_to_data[label] = {
                             'ext_param': [],
                             'metric': [],
-                            'color': color
+                            'color': color,
+                            'combo': param_combo
                         }
                     label_to_data[label]['ext_param'].append(ext_param_val)
                     label_to_data[label]['metric'].append(metric_val)
         
         # Plot each label group separately (one legend entry per label)
         for label, data in label_to_data.items():
+            combo_key = data['combo']
+            show_legend = combo_key not in legend_added
+            if show_legend:
+                legend_added.add(combo_key)
+            
             fig.add_trace(go.Scatter(
                 x=data['ext_param'],
                 y=data['metric'],
@@ -139,21 +186,19 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
                     line=dict(color='black', width=0.5)
                 ),
                 legendgroup=label,
-                showlegend=True,
+                showlegend=show_legend,
                 hovertemplate=f'<b>{label}</b><br>Ext param: %{{x}}<br>Metric: %{{y:.4e}}<extra></extra>'
             ))
     
     # Plot combined metric if multiple parameters
     if len(int_params) > 1:
-        combined_data_by_label = {}
+        combined_data_by_combo = {}
         
         for result in results_summary:
             task_key = result['task_key']
             
             # Parse task_key
-            parts = task_key.split('_')
-            int_idx = int(parts[1])
-            ext_idx = int(parts[3])
+            idx_mapping, ext_idx = parse_task_key(task_key, int_param_ranges)
             
             # Collect all metric values for this result
             metrics_combined = []
@@ -187,34 +232,40 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
                 combined_metric = np.sqrt(np.sum(np.array(metrics_combined) ** 2))
                 ext_param_val = ext_param_vec[ext_idx]
                 
-                # Determine color for combined metric
-                # Priority: use first varying parameter, or first fixed parameter
-                if varying_params:
-                    first_varying = list(varying_params.keys())[0]
-                    param_values = varying_params[first_varying]
-                    color = param_color_palettes[first_varying][int_idx]
-                    param_value = param_values[int_idx]
-                    label = f'Combined ({first_varying}={format_value(param_value)})'
-                else:
-                    color = '#808080'  # Gray
-                    label = 'Combined (L2 norm)'
+                # Get parameter combination and color
+                param_combo = get_param_combination(idx_mapping, int_params, int_param_ranges)
+                color = combination_colors[param_combo]
                 
-                if label not in combined_data_by_label:
-                    combined_data_by_label[label] = {
+                # Build label for combined metric
+                label_parts = []
+                for pname in int_params:
+                    if pname in varying_params:
+                        pidx = idx_mapping[pname]
+                        pval = varying_params[pname][pidx]
+                        label_parts.append(f'{pname}={format_value(pval)}')
+                    else:
+                        pval = fixed_params[pname][0]
+                        label_parts.append(f'{pname}={format_value(pval)}')
+                
+                label = 'Combined (' + ', '.join(label_parts) + ')'
+                
+                if param_combo not in combined_data_by_combo:
+                    combined_data_by_combo[param_combo] = {
                         'ext_param': [],
                         'metric': [],
-                        'color': color
+                        'color': color,
+                        'label': label
                     }
-                combined_data_by_label[label]['ext_param'].append(ext_param_val)
-                combined_data_by_label[label]['metric'].append(combined_metric)
+                combined_data_by_combo[param_combo]['ext_param'].append(ext_param_val)
+                combined_data_by_combo[param_combo]['metric'].append(combined_metric)
         
         # Plot combined metric with diamond marker
-        for label, data in combined_data_by_label.items():
+        for param_combo, data in combined_data_by_combo.items():
             fig.add_trace(go.Scatter(
                 x=data['ext_param'],
                 y=data['metric'],
                 mode='markers',
-                name=label,
+                name=data['label'],
                 marker=dict(
                     size=10,
                     color=data['color'],
@@ -222,9 +273,9 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
                     symbol='diamond',
                     line=dict(color='black', width=1)
                 ),
-                legendgroup=label,
+                legendgroup=data['label'],
                 showlegend=True,
-                hovertemplate=f'<b>{label}</b><br>Ext param: %{{x}}<br>Combined: %{{y:.4e}}<extra></extra>'
+                hovertemplate=f'<b>{data["label"]}</b><br>Ext param: %{{x}}<br>Combined: %{{y:.4e}}<extra></extra>'
             ))
     
     # Determine x-axis scaling
@@ -279,10 +330,11 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
     """
     Plot metric vs size of external parameter vector for cumulative inference runs.
     Multiple internal parameters plotted on same axis for comparison.
-    Color-codes by internal parameter values when they vary.
+    Color-codes by unique combinations of internal parameter values.
     
     Plots all individual samples (no mean/std aggregation) with improved marker styling.
-    Also plots combined metric (L2 norm) alongside individual metrics.
+    Also plots combined metric (L2 norm) alongside individual metrics,
+    with the same color as the corresponding parameter combination.
     
     Args:
         workflow_outputs: List of workflow output dicts from workflow_elastic_viscous_general
@@ -306,18 +358,24 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
         if name in int_params and len(values) == 1
     }
     
-    # Build color palette for each varying parameter
-    viridis = px.colors.sequential.Viridis
-    param_color_palettes = {}
-    for param_name in varying_params:
-        num_values = len(varying_params[param_name])
-        param_color_palettes[param_name] = [
-            viridis[int(i * (len(viridis) - 1) / (num_values - 1))] if num_values > 1 else viridis[0]
-            for i in range(num_values)
-        ]
-    
-    # Color palette for fixed parameters
-    tab20_colors = px.colors.qualitative.Light24
+    # Build color palette for parameter combinations
+    varying_param_names = list(varying_params.keys())
+    if varying_param_names:
+        param_combinations = list(itertools.product(*[varying_params[name] for name in varying_param_names]))
+        num_combinations = len(param_combinations)
+        
+        # Use a color palette with enough distinct colors
+        if num_combinations <= 10:
+            color_palette = px.colors.qualitative.Light24[:num_combinations]
+        elif num_combinations <= 24:
+            color_palette = px.colors.qualitative.Light24
+        else:
+            # For more combinations, cycle through palette
+            color_palette = px.colors.qualitative.Light24
+        
+        combination_colors = {combo: color_palette[i % len(color_palette)] for i, combo in enumerate(param_combinations)}
+    else:
+        combination_colors = {tuple(): px.colors.qualitative.Light24[0]}
     
     fig = go.Figure()
     
@@ -329,6 +387,30 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
             else:
                 return f'{val}'
         return str(val)
+    
+    # Helper function to get parameter combination tuple
+    def get_param_combination(int_idx, int_params, int_param_ranges, varying_params):
+        """
+        Extract the parameter combination tuple for int_params in the requested order.
+        int_idx is the linear index into the int_param grid.
+        """
+        int_param_names = list(int_param_ranges.keys())
+        int_param_counts = [len(int_param_ranges[name]) for name in int_param_names]
+        
+        # Unravel the linear index into multi-dimensional indices
+        multi_idx = np.unravel_index(int_idx, tuple(int_param_counts))
+        idx_mapping = {name: multi_idx[i] for i, name in enumerate(int_param_names)}
+        
+        # Build combo tuple with only varying params in the int_params order
+        combo = tuple(
+            int_param_ranges[param_name][idx_mapping[param_name]]
+            for param_name in int_params
+            if param_name in varying_params
+        )
+        return combo, idx_mapping
+    
+    # Track which combinations have been added to legend
+    legend_added = set()
     
     # Plot each internal parameter
     for param_idx, int_param_name in enumerate(int_params):
@@ -366,31 +448,41 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
                     
                     # Skip infinite values (inference failures)
                     if metric_val is not None and np.isfinite(metric_val):
-                        # Determine color and label based on parameter type
-                        if int_param_name in varying_params:
-                            # Color by internal parameter value
-                            param_values = varying_params[int_param_name]
-                            color = param_color_palettes[int_param_name][int_idx]
-                            param_value = param_values[int_idx]
-                            label = f'{int_param_name}={format_value(param_value)}'
-                        else:
-                            # Fixed parameter—use fixed color
-                            color = tab20_colors[param_idx % len(tab20_colors)]
-                            param_value = fixed_params[int_param_name][0]
-                            label = f'{int_param_name}={format_value(param_value)}'
+                        # Get parameter combination and color
+                        param_combo, idx_mapping = get_param_combination(int_idx, int_params, int_param_ranges, varying_params)
+                        color = combination_colors[param_combo]
+                        
+                        # Build label with all int_params in the combination
+                        label_parts = []
+                        for pname in int_params:
+                            if pname in varying_params:
+                                pidx = idx_mapping[pname]
+                                pval = varying_params[pname][pidx]
+                                label_parts.append(f'{pname}={format_value(pval)}')
+                            else:
+                                pval = fixed_params[pname][0]
+                                label_parts.append(f'{pname}={format_value(pval)}')
+                        
+                        label = ', '.join(label_parts)
                         
                         # Group data by label for legend deduplication
                         if label not in label_to_data:
                             label_to_data[label] = {
                                 'ext_size': [],
                                 'metric': [],
-                                'color': color
+                                'color': color,
+                                'combo': param_combo
                             }
                         label_to_data[label]['ext_size'].append(ext_vec_size)
                         label_to_data[label]['metric'].append(metric_val)
         
         # Plot each label group separately (one legend entry per label)
         for label, data in label_to_data.items():
+            combo_key = data['combo']
+            show_legend = combo_key not in legend_added
+            if show_legend:
+                legend_added.add(combo_key)
+            
             fig.add_trace(go.Scatter(
                 x=data['ext_size'],
                 y=data['metric'],
@@ -403,13 +495,13 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
                     line=dict(color='black', width=0.5)
                 ),
                 legendgroup=label,
-                showlegend=True,
+                showlegend=show_legend,
                 hovertemplate=f'<b>{label}</b><br>Vector size: %{{x}}<br>Metric: %{{y:.4e}}<extra></extra>'
             ))
     
     # Plot combined metric if multiple parameters
     if len(int_params) > 1:
-        combined_data_by_label = {}
+        combined_data_by_combo = {}
         
         for k, workflow_output in enumerate(workflow_outputs):
             results_summary = workflow_output['results_summary']
@@ -455,35 +547,40 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
                 if all_finite and len(metrics_combined) == len(int_params):
                     combined_metric = np.sqrt(np.sum(np.array(metrics_combined) ** 2))
                     
-                    # Determine color for combined metric
-                    # Priority: use first varying parameter, or first fixed parameter
-                    if varying_params:
-                        # Use first varying parameter for color
-                        first_varying = list(varying_params.keys())[0]
-                        param_values = varying_params[first_varying]
-                        color = param_color_palettes[first_varying][int_idx]
-                        param_value = param_values[int_idx]
-                        label = f'Combined ({first_varying}={format_value(param_value)})'
-                    else:
-                        color = '#808080'  # Gray
-                        label = 'Combined (L2 norm)'
+                    # Get parameter combination and color
+                    param_combo, idx_mapping = get_param_combination(int_idx, int_params, int_param_ranges, varying_params)
+                    color = combination_colors[param_combo]
                     
-                    if label not in combined_data_by_label:
-                        combined_data_by_label[label] = {
+                    # Build label for combined metric
+                    label_parts = []
+                    for pname in int_params:
+                        if pname in varying_params:
+                            pidx = idx_mapping[pname]
+                            pval = varying_params[pname][pidx]
+                            label_parts.append(f'{pname}={format_value(pval)}')
+                        else:
+                            pval = fixed_params[pname][0]
+                            label_parts.append(f'{pname}={format_value(pval)}')
+                    
+                    label = 'Combined (' + ', '.join(label_parts) + ')'
+                    
+                    if param_combo not in combined_data_by_combo:
+                        combined_data_by_combo[param_combo] = {
                             'ext_size': [],
                             'metric': [],
-                            'color': color
+                            'color': color,
+                            'label': label
                         }
-                    combined_data_by_label[label]['ext_size'].append(ext_vec_size)
-                    combined_data_by_label[label]['metric'].append(combined_metric)
+                    combined_data_by_combo[param_combo]['ext_size'].append(ext_vec_size)
+                    combined_data_by_combo[param_combo]['metric'].append(combined_metric)
         
         # Plot combined metric with diamond marker
-        for label, data in combined_data_by_label.items():
+        for param_combo, data in combined_data_by_combo.items():
             fig.add_trace(go.Scatter(
                 x=data['ext_size'],
                 y=data['metric'],
                 mode='markers',
-                name=label,
+                name=data['label'],
                 marker=dict(
                     size=10,
                     color=data['color'],
@@ -491,9 +588,9 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
                     symbol='diamond',
                     line=dict(color='black', width=1)
                 ),
-                legendgroup=label,
+                legendgroup=data['label'],
                 showlegend=True,
-                hovertemplate=f'<b>{label}</b><br>Vector size: %{{x}}<br>Combined: %{{y:.4e}}<extra></extra>'
+                hovertemplate=f'<b>{data["label"]}</b><br>Vector size: %{{x}}<br>Combined: %{{y:.4e}}<extra></extra>'
             ))
     
     # Set axis labels and title
@@ -540,7 +637,6 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
     
     return fig
 
-# Usage
 if __name__ == "__main__":
 
     # Bending Elasticity - Sp4
