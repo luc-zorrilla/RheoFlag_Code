@@ -24,7 +24,8 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
         workflow_output: Workflow output dict from workflow_elastic_viscous_general
         int_params: List of internal parameter names (e.g., ['Sp4', 'Beta', 'eta'])
         ext_param_name: Name of external parameter (e.g., 'A', 'w0')
-        metric: 'std' for Hessian standard error, 'rel_error' for relative error
+        metric: 'std' for Hessian standard error (relative to ground truth), 
+                'rel_error' for relative error
     
     Returns:
         Plotly figure object
@@ -119,10 +120,13 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
             # Parse task_key to get indices for all internal parameters
             idx_mapping, ext_idx = parse_task_key(task_key, int_param_ranges)
             
+            # Determine metric key and compute relative value
             if metric == 'std':
                 metric_key = f'{int_param_name}_sigma'
+                ground_truth_key = f'{int_param_name}_truth'
             elif metric == 'rel_error':
                 metric_key = f'{int_param_name}_rel_error'
+                ground_truth_key = None
             else:
                 raise ValueError(f"Unknown metric: {metric}")
             
@@ -134,6 +138,20 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
                     metric_val = float(value[0]) if len(value) > 0 else None
                 else:
                     metric_val = float(value)
+                
+                # For 'std' metric, compute relative std error
+                if metric == 'std' and metric_val is not None:
+                    ground_truth_val = result.get(ground_truth_key)
+                    if ground_truth_val is not None:
+                        if isinstance(ground_truth_val, (list, np.ndarray)):
+                            gt_val = float(ground_truth_val[0]) if len(ground_truth_val) > 0 else None
+                        else:
+                            gt_val = float(ground_truth_val)
+                        
+                        if gt_val is not None and gt_val != 0:
+                            metric_val = metric_val / abs(gt_val)
+                        else:
+                            metric_val = None
                 
                 # Skip infinite values (inference failures)
                 if metric_val is not None and np.isfinite(metric_val):
@@ -207,8 +225,10 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
             for int_param_name in int_params:
                 if metric == 'std':
                     metric_key = f'{int_param_name}_sigma'
+                    ground_truth_key = f'{int_param_name}_truth'
                 elif metric == 'rel_error':
                     metric_key = f'{int_param_name}_rel_error'
+                    ground_truth_key = None
                 
                 value = result.get(metric_key)
                 
@@ -217,6 +237,20 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
                         metric_val = float(value[0]) if len(value) > 0 else None
                     else:
                         metric_val = float(value)
+                    
+                    # For 'std' metric, compute relative std error
+                    if metric == 'std' and metric_val is not None:
+                        ground_truth_val = result.get(ground_truth_key)
+                        if ground_truth_val is not None:
+                            if isinstance(ground_truth_val, (list, np.ndarray)):
+                                gt_val = float(ground_truth_val[0]) if len(ground_truth_val) > 0 else None
+                            else:
+                                gt_val = float(ground_truth_val)
+                            
+                            if gt_val is not None and gt_val != 0:
+                                metric_val = metric_val / abs(gt_val)
+                            else:
+                                metric_val = None
                     
                     if metric_val is not None and np.isfinite(metric_val):
                         metrics_combined.append(metric_val)
@@ -283,9 +317,9 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
     
     # Set axis labels and title
     if metric == 'std':
-        y_label = 'Sigma (Hessian Std. Error)'
-        title_suffix = 'Standard Error'
-        y_logscale = False
+        y_label = 'Relative Sigma (Std. Error / Ground Truth)'
+        title_suffix = 'Relative Standard Error'
+        y_logscale = True
     else:
         y_label = 'Relative Error (L2 norm)'
         title_suffix = 'Relative Error'
@@ -316,8 +350,10 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
         height=600,
         font=dict(size=11),
         legend=dict(
-            x=0.02,
-            y=0.98,
+            x=1.02,
+            y=1,
+            xanchor='left',
+            yanchor='top',
             bgcolor='rgba(255, 255, 255, 0.8)',
             bordercolor='black',
             borderwidth=1
@@ -340,7 +376,8 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
         workflow_outputs: List of workflow output dicts from workflow_elastic_viscous_general
         int_params: List of internal parameter names (e.g., ['Sp4', 'Beta', 'eta'])
         ext_param_name: Name of external parameter vector
-        metric: 'std' for Hessian standard error, 'rel_error' for relative error (L2 norm)
+        metric: 'std' for Hessian standard error (relative to ground truth),
+                'rel_error' for relative error (L2 norm)
     
     Returns:
         Plotly figure object
@@ -432,8 +469,10 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
                 
                 if metric == 'std':
                     metric_key = f'{int_param_name}_sigma'
+                    ground_truth_key = f'{int_param_name}_truth'
                 elif metric == 'rel_error':
                     metric_key = f'{int_param_name}_rel_error'
+                    ground_truth_key = None
                 else:
                     raise ValueError(f"Unknown metric: {metric}")
                 
@@ -445,6 +484,20 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
                         metric_val = float(value[0]) if len(value) > 0 else None
                     else:
                         metric_val = float(value)
+                    
+                    # For 'std' metric, compute relative std error
+                    if metric == 'std' and metric_val is not None:
+                        ground_truth_val = result.get(ground_truth_key)
+                        if ground_truth_val is not None:
+                            if isinstance(ground_truth_val, (list, np.ndarray)):
+                                gt_val = float(ground_truth_val[0]) if len(ground_truth_val) > 0 else None
+                            else:
+                                gt_val = float(ground_truth_val)
+                            
+                            if gt_val is not None and gt_val != 0:
+                                metric_val = metric_val / abs(gt_val)
+                            else:
+                                metric_val = None
                     
                     # Skip infinite values (inference failures)
                     if metric_val is not None and np.isfinite(metric_val):
@@ -523,8 +576,10 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
                 for int_param_name in int_params:
                     if metric == 'std':
                         metric_key = f'{int_param_name}_sigma'
+                        ground_truth_key = f'{int_param_name}_truth'
                     elif metric == 'rel_error':
                         metric_key = f'{int_param_name}_rel_error'
+                        ground_truth_key = None
                     
                     value = result.get(metric_key)
                     
@@ -533,6 +588,20 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
                             metric_val = float(value[0]) if len(value) > 0 else None
                         else:
                             metric_val = float(value)
+                        
+                        # For 'std' metric, compute relative std error
+                        if metric == 'std' and metric_val is not None:
+                            ground_truth_val = result.get(ground_truth_key)
+                            if ground_truth_val is not None:
+                                if isinstance(ground_truth_val, (list, np.ndarray)):
+                                    gt_val = float(ground_truth_val[0]) if len(ground_truth_val) > 0 else None
+                                else:
+                                    gt_val = float(ground_truth_val)
+                                
+                                if gt_val is not None and gt_val != 0:
+                                    metric_val = metric_val / abs(gt_val)
+                                else:
+                                    metric_val = None
                         
                         if metric_val is not None and np.isfinite(metric_val):
                             metrics_combined.append(metric_val)
@@ -595,9 +664,9 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
     
     # Set axis labels and title
     if metric == 'std':
-        y_label = 'Sigma (Hessian Std. Error)'
-        title_suffix = 'Standard Error'
-        y_logscale = False
+        y_label = 'Relative Sigma (Std. Error / Ground Truth)'
+        title_suffix = 'Relative Standard Error'
+        y_logscale = True
     else:
         y_label = 'Relative Error (L2 norm)'
         title_suffix = 'Relative Error'
@@ -627,8 +696,10 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
         height=600,
         font=dict(size=11),
         legend=dict(
-            x=0.02,
-            y=0.98,
+            x=1.02,
+            y=1,
+            xanchor='left',
+            yanchor='top',
             bgcolor='rgba(255, 255, 255, 0.8)',
             bordercolor='black',
             borderwidth=1
