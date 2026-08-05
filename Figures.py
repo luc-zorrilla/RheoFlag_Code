@@ -24,7 +24,7 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
         workflow_output: Workflow output dict from workflow_elastic_viscous_general
         int_params: List of internal parameter names (e.g., ['Sp4', 'Beta', 'eta'])
         ext_param_name: Name of external parameter (e.g., 'A', 'w0')
-        metric: 'std' for Hessian standard error (relative to ground truth), 
+        metric: 'std' for Hessian standard error (normalized by internal parameter), 
                 'rel_error' for relative error
     
     Returns:
@@ -47,19 +47,16 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
     }
     
     # Build color palette for parameter combinations
-    # Generate all unique combinations from varying parameters
     varying_param_names = list(varying_params.keys())
     if varying_param_names:
         param_combinations = list(itertools.product(*[varying_params[name] for name in varying_param_names]))
         num_combinations = len(param_combinations)
         
-        # Use a color palette with enough distinct colors
         if num_combinations <= 10:
             color_palette = px.colors.qualitative.Light24[:num_combinations]
         elif num_combinations <= 24:
             color_palette = px.colors.qualitative.Light24
         else:
-            # For more combinations, cycle through palette
             color_palette = px.colors.qualitative.Light24
         
         combination_colors = {combo: color_palette[i % len(color_palette)] for i, combo in enumerate(param_combinations)}
@@ -75,7 +72,7 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
                 return f'{val}'
         return str(val)
     
-    # Helper function to get internal parameter indices from task_key
+    # Helper function to parse task_key and extract internal parameter indices
     def parse_task_key(task_key, int_param_ranges):
         """
         Parse task_key format: "int_{int_idx}_ext_{ext_idx}" and return
@@ -85,96 +82,103 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
         int_idx = int(parts[1])
         ext_idx = int(parts[3])
         
-        # Convert linear int_idx to multi-dimensional indices
         int_param_names = list(int_param_ranges.keys())
         int_param_counts = [len(int_param_ranges[name]) for name in int_param_names]
         
-        # Unravel the linear index into multi-dimensional indices
         multi_idx = np.unravel_index(int_idx, tuple(int_param_counts))
         
         idx_mapping = {name: multi_idx[i] for i, name in enumerate(int_param_names)}
         return idx_mapping, ext_idx
     
-    # Helper function to get parameter combination tuple
-    def get_param_combination(idx_mapping, int_params, int_param_ranges):
-        """Extract the parameter combination tuple for int_params in the requested order."""
+    # Helper function to get parameter combination tuple and ground truth values
+    def get_param_combination_with_values(idx_mapping, int_params, int_param_ranges):
+        """
+        Extract the parameter combination tuple for int_params in the requested order.
+        Returns (combo_tuple, ground_truth_dict) where ground_truth_dict maps 
+        param_name -> actual parameter value.
+        """
         combo = tuple(
             int_param_ranges[param_name][idx_mapping[param_name]]
             for param_name in int_params
             if param_name in varying_params
         )
-        return combo
+        
+        ground_truth_dict = {
+            param_name: int_param_ranges[param_name][idx_mapping[param_name]]
+            for param_name in int_params
+        }
+        
+        return combo, ground_truth_dict
+    
+    # Helper function to normalize a single metric value
+    def normalize_metric(metric_val, ground_truth_val):
+        """Normalize metric by ground truth value."""
+        if metric_val is None or not np.isfinite(metric_val):
+            return None
+        
+        if isinstance(ground_truth_val, (list, np.ndarray)):
+            gt_val = float(ground_truth_val[0]) if len(ground_truth_val) > 0 else None
+        else:
+            gt_val = float(ground_truth_val)
+        
+        if gt_val is not None and gt_val != 0:
+            return metric_val / abs(gt_val)
+        return None
     
     fig = go.Figure()
-    
-    # Track which combinations have been added to legend
     legend_added = set()
     
     # Plot each internal parameter
     for param_idx, int_param_name in enumerate(int_params):
-        label_to_data = {}  # Track data grouped by unique label
+        label_to_data = {}
         
         for result in results_summary:
             task_key = result['task_key']
-            
-            # Parse task_key to get indices for all internal parameters
             idx_mapping, ext_idx = parse_task_key(task_key, int_param_ranges)
             
-            # Determine metric key and compute relative value
+            # Get parameter combination and ground truth values
+            param_combo, ground_truth_dict = get_param_combination_with_values(
+                idx_mapping, int_params, int_param_ranges
+            )
+            
+            # Extract metric key
             if metric == 'std':
                 metric_key = f'{int_param_name}_sigma'
-                ground_truth_key = f'{int_param_name}_truth'
             elif metric == 'rel_error':
                 metric_key = f'{int_param_name}_rel_error'
-                ground_truth_key = None
             else:
                 raise ValueError(f"Unknown metric: {metric}")
             
             value = result.get(metric_key)
             
             if value is not None:
-                # Handle both scalar and array values
                 if isinstance(value, (list, np.ndarray)):
                     metric_val = float(value[0]) if len(value) > 0 else None
                 else:
                     metric_val = float(value)
                 
-                # For 'std' metric, compute relative std error
+                # Normalize by corresponding internal parameter (ground truth)
                 if metric == 'std' and metric_val is not None:
-                    ground_truth_val = result.get(ground_truth_key)
-                    if ground_truth_val is not None:
-                        if isinstance(ground_truth_val, (list, np.ndarray)):
-                            gt_val = float(ground_truth_val[0]) if len(ground_truth_val) > 0 else None
-                        else:
-                            gt_val = float(ground_truth_val)
-                        
-                        if gt_val is not None and gt_val != 0:
-                            metric_val = metric_val / abs(gt_val)
-                        else:
-                            metric_val = None
+                    ground_truth_val = ground_truth_dict[int_param_name]
+                    metric_val = normalize_metric(metric_val, ground_truth_val)
                 
-                # Skip infinite values (inference failures)
+                # Skip non-finite values
                 if metric_val is not None and np.isfinite(metric_val):
                     ext_param_val = ext_param_vec[ext_idx]
-                    
-                    # Get the parameter combination for color coding
-                    param_combo = get_param_combination(idx_mapping, int_params, int_param_ranges)
                     color = combination_colors[param_combo]
                     
-                    # Build label with all int_params in the combination
+                    # Build label with all int_params
                     label_parts = []
                     for pname in int_params:
                         if pname in varying_params:
-                            pidx = idx_mapping[pname]
-                            pval = varying_params[pname][pidx]
+                            pval = ground_truth_dict[pname]
                             label_parts.append(f'{pname}={format_value(pval)}')
                         else:
-                            pval = fixed_params[pname][0]
+                            pval = ground_truth_dict[pname]
                             label_parts.append(f'{pname}={format_value(pval)}')
                     
                     label = ', '.join(label_parts)
                     
-                    # Group data by label for legend deduplication
                     if label not in label_to_data:
                         label_to_data[label] = {
                             'ext_param': [],
@@ -185,7 +189,7 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
                     label_to_data[label]['ext_param'].append(ext_param_val)
                     label_to_data[label]['metric'].append(metric_val)
         
-        # Plot each label group separately (one legend entry per label)
+        # Plot each label group
         for label, data in label_to_data.items():
             combo_key = data['combo']
             show_legend = combo_key not in legend_added
@@ -214,21 +218,22 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
         
         for result in results_summary:
             task_key = result['task_key']
-            
-            # Parse task_key
             idx_mapping, ext_idx = parse_task_key(task_key, int_param_ranges)
             
-            # Collect all metric values for this result
-            metrics_combined = []
+            # Get parameter combination and ground truth values
+            param_combo, ground_truth_dict = get_param_combination_with_values(
+                idx_mapping, int_params, int_param_ranges
+            )
+            
+            # Collect normalized metric values for all parameters
+            normalized_metrics = []
             all_finite = True
             
             for int_param_name in int_params:
                 if metric == 'std':
                     metric_key = f'{int_param_name}_sigma'
-                    ground_truth_key = f'{int_param_name}_truth'
                 elif metric == 'rel_error':
                     metric_key = f'{int_param_name}_rel_error'
-                    ground_truth_key = None
                 
                 value = result.get(metric_key)
                 
@@ -238,22 +243,13 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
                     else:
                         metric_val = float(value)
                     
-                    # For 'std' metric, compute relative std error
+                    # Normalize by corresponding internal parameter
                     if metric == 'std' and metric_val is not None:
-                        ground_truth_val = result.get(ground_truth_key)
-                        if ground_truth_val is not None:
-                            if isinstance(ground_truth_val, (list, np.ndarray)):
-                                gt_val = float(ground_truth_val[0]) if len(ground_truth_val) > 0 else None
-                            else:
-                                gt_val = float(ground_truth_val)
-                            
-                            if gt_val is not None and gt_val != 0:
-                                metric_val = metric_val / abs(gt_val)
-                            else:
-                                metric_val = None
+                        ground_truth_val = ground_truth_dict[int_param_name]
+                        metric_val = normalize_metric(metric_val, ground_truth_val)
                     
                     if metric_val is not None and np.isfinite(metric_val):
-                        metrics_combined.append(metric_val)
+                        normalized_metrics.append(metric_val)
                     else:
                         all_finite = False
                         break
@@ -261,24 +257,20 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
                     all_finite = False
                     break
             
-            # Compute combined metric (L2 norm of individual metrics)
-            if all_finite and len(metrics_combined) == len(int_params):
-                combined_metric = np.sqrt(np.sum(np.array(metrics_combined) ** 2))
+            # Compute combined metric as L2 norm of normalized metrics
+            if all_finite and len(normalized_metrics) == len(int_params):
+                combined_metric = np.sqrt(np.sum(np.array(normalized_metrics) ** 2))
                 ext_param_val = ext_param_vec[ext_idx]
-                
-                # Get parameter combination and color
-                param_combo = get_param_combination(idx_mapping, int_params, int_param_ranges)
                 color = combination_colors[param_combo]
                 
                 # Build label for combined metric
                 label_parts = []
                 for pname in int_params:
                     if pname in varying_params:
-                        pidx = idx_mapping[pname]
-                        pval = varying_params[pname][pidx]
+                        pval = ground_truth_dict[pname]
                         label_parts.append(f'{pname}={format_value(pval)}')
                     else:
-                        pval = fixed_params[pname][0]
+                        pval = ground_truth_dict[pname]
                         label_parts.append(f'{pname}={format_value(pval)}')
                 
                 label = 'Combined (' + ', '.join(label_parts) + ')'
@@ -317,8 +309,8 @@ def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric=
     
     # Set axis labels and title
     if metric == 'std':
-        y_label = 'Relative Sigma (Std. Error / Ground Truth)'
-        title_suffix = 'Relative Standard Error'
+        y_label = 'Normalized Sigma (Std. Error / Internal Parameter)'
+        title_suffix = 'Normalized Standard Error'
         y_logscale = True
     else:
         y_label = 'Relative Error (L2 norm)'
@@ -376,7 +368,7 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
         workflow_outputs: List of workflow output dicts from workflow_elastic_viscous_general
         int_params: List of internal parameter names (e.g., ['Sp4', 'Beta', 'eta'])
         ext_param_name: Name of external parameter vector
-        metric: 'std' for Hessian standard error (relative to ground truth),
+        metric: 'std' for Hessian standard error (normalized by internal parameter),
                 'rel_error' for relative error (L2 norm)
     
     Returns:
@@ -401,13 +393,11 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
         param_combinations = list(itertools.product(*[varying_params[name] for name in varying_param_names]))
         num_combinations = len(param_combinations)
         
-        # Use a color palette with enough distinct colors
         if num_combinations <= 10:
             color_palette = px.colors.qualitative.Light24[:num_combinations]
         elif num_combinations <= 24:
             color_palette = px.colors.qualitative.Light24
         else:
-            # For more combinations, cycle through palette
             color_palette = px.colors.qualitative.Light24
         
         combination_colors = {combo: color_palette[i % len(color_palette)] for i, combo in enumerate(param_combinations)}
@@ -425,12 +415,15 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
                 return f'{val}'
         return str(val)
     
-    # Helper function to get parameter combination tuple
-    def get_param_combination(int_idx, int_params, int_param_ranges, varying_params):
+    # Helper function to parse task_key and extract internal parameter indices
+    def parse_task_key_to_indices(task_key, int_param_ranges):
         """
-        Extract the parameter combination tuple for int_params in the requested order.
-        int_idx is the linear index into the int_param grid.
+        Parse task_key format: "int_{int_idx}_ext_{ext_idx}" and return
+        mapping of int_param_name to its index value.
         """
+        parts = task_key.split('_')
+        int_idx = int(parts[1])
+        
         int_param_names = list(int_param_ranges.keys())
         int_param_counts = [len(int_param_ranges[name]) for name in int_param_names]
         
@@ -438,20 +431,49 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
         multi_idx = np.unravel_index(int_idx, tuple(int_param_counts))
         idx_mapping = {name: multi_idx[i] for i, name in enumerate(int_param_names)}
         
-        # Build combo tuple with only varying params in the int_params order
+        return idx_mapping
+    
+    # Helper function to get parameter combination tuple and ground truth values
+    def get_param_combination_with_values(idx_mapping, int_params, int_param_ranges, varying_params):
+        """
+        Extract the parameter combination tuple for int_params in the requested order.
+        Returns (combo_tuple, ground_truth_dict) where ground_truth_dict maps 
+        param_name -> actual parameter value.
+        """
         combo = tuple(
             int_param_ranges[param_name][idx_mapping[param_name]]
             for param_name in int_params
             if param_name in varying_params
         )
-        return combo, idx_mapping
+        
+        ground_truth_dict = {
+            param_name: int_param_ranges[param_name][idx_mapping[param_name]]
+            for param_name in int_params
+        }
+        
+        return combo, ground_truth_dict
+    
+    # Helper function to normalize a single metric value
+    def normalize_metric(metric_val, ground_truth_val):
+        """Normalize metric by ground truth value."""
+        if metric_val is None or not np.isfinite(metric_val):
+            return None
+        
+        if isinstance(ground_truth_val, (list, np.ndarray)):
+            gt_val = float(ground_truth_val[0]) if len(ground_truth_val) > 0 else None
+        else:
+            gt_val = float(ground_truth_val)
+        
+        if gt_val is not None and gt_val != 0:
+            return metric_val / abs(gt_val)
+        return None
     
     # Track which combinations have been added to legend
     legend_added = set()
     
     # Plot each internal parameter
     for param_idx, int_param_name in enumerate(int_params):
-        label_to_data = {}  # Track data grouped by unique label
+        label_to_data = {}
         
         for k, workflow_output in enumerate(workflow_outputs):
             results_summary = workflow_output['results_summary']
@@ -459,66 +481,54 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
             ext_vec = ext_param_ranges[ext_param_name]
             ext_vec_size = len(ext_vec)
             
-            # Extract all metric values from this run
             for result in results_summary:
                 task_key = result['task_key']
                 
-                # Parse task_key format: "int_{int_idx}_ext_{ext_idx}"
-                parts = task_key.split('_')
-                int_idx = int(parts[1])
+                # Parse task_key to get indices
+                idx_mapping = parse_task_key_to_indices(task_key, int_param_ranges)
                 
+                # Get parameter combination and ground truth values
+                param_combo, ground_truth_dict = get_param_combination_with_values(
+                    idx_mapping, int_params, int_param_ranges, varying_params
+                )
+                
+                # Extract metric key
                 if metric == 'std':
                     metric_key = f'{int_param_name}_sigma'
-                    ground_truth_key = f'{int_param_name}_truth'
                 elif metric == 'rel_error':
                     metric_key = f'{int_param_name}_rel_error'
-                    ground_truth_key = None
                 else:
                     raise ValueError(f"Unknown metric: {metric}")
                 
                 value = result.get(metric_key)
                 
                 if value is not None:
-                    # Handle both scalar and array values
                     if isinstance(value, (list, np.ndarray)):
                         metric_val = float(value[0]) if len(value) > 0 else None
                     else:
                         metric_val = float(value)
                     
-                    # For 'std' metric, compute relative std error
+                    # Normalize by corresponding internal parameter (ground truth)
                     if metric == 'std' and metric_val is not None:
-                        ground_truth_val = result.get(ground_truth_key)
-                        if ground_truth_val is not None:
-                            if isinstance(ground_truth_val, (list, np.ndarray)):
-                                gt_val = float(ground_truth_val[0]) if len(ground_truth_val) > 0 else None
-                            else:
-                                gt_val = float(ground_truth_val)
-                            
-                            if gt_val is not None and gt_val != 0:
-                                metric_val = metric_val / abs(gt_val)
-                            else:
-                                metric_val = None
+                        ground_truth_val = ground_truth_dict[int_param_name]
+                        metric_val = normalize_metric(metric_val, ground_truth_val)
                     
-                    # Skip infinite values (inference failures)
+                    # Skip non-finite values
                     if metric_val is not None and np.isfinite(metric_val):
-                        # Get parameter combination and color
-                        param_combo, idx_mapping = get_param_combination(int_idx, int_params, int_param_ranges, varying_params)
                         color = combination_colors[param_combo]
                         
-                        # Build label with all int_params in the combination
+                        # Build label with all int_params
                         label_parts = []
                         for pname in int_params:
                             if pname in varying_params:
-                                pidx = idx_mapping[pname]
-                                pval = varying_params[pname][pidx]
+                                pval = ground_truth_dict[pname]
                                 label_parts.append(f'{pname}={format_value(pval)}')
                             else:
-                                pval = fixed_params[pname][0]
+                                pval = ground_truth_dict[pname]
                                 label_parts.append(f'{pname}={format_value(pval)}')
                         
                         label = ', '.join(label_parts)
                         
-                        # Group data by label for legend deduplication
                         if label not in label_to_data:
                             label_to_data[label] = {
                                 'ext_size': [],
@@ -565,21 +575,23 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
             for result in results_summary:
                 task_key = result['task_key']
                 
-                # Parse task_key
-                parts = task_key.split('_')
-                int_idx = int(parts[1])
+                # Parse task_key to get indices
+                idx_mapping = parse_task_key_to_indices(task_key, int_param_ranges)
                 
-                # Collect all metric values for this result
-                metrics_combined = []
+                # Get parameter combination and ground truth values
+                param_combo, ground_truth_dict = get_param_combination_with_values(
+                    idx_mapping, int_params, int_param_ranges, varying_params
+                )
+                
+                # Collect normalized metric values for all parameters
+                normalized_metrics = []
                 all_finite = True
                 
                 for int_param_name in int_params:
                     if metric == 'std':
                         metric_key = f'{int_param_name}_sigma'
-                        ground_truth_key = f'{int_param_name}_truth'
                     elif metric == 'rel_error':
                         metric_key = f'{int_param_name}_rel_error'
-                        ground_truth_key = None
                     
                     value = result.get(metric_key)
                     
@@ -589,22 +601,13 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
                         else:
                             metric_val = float(value)
                         
-                        # For 'std' metric, compute relative std error
+                        # Normalize by corresponding internal parameter
                         if metric == 'std' and metric_val is not None:
-                            ground_truth_val = result.get(ground_truth_key)
-                            if ground_truth_val is not None:
-                                if isinstance(ground_truth_val, (list, np.ndarray)):
-                                    gt_val = float(ground_truth_val[0]) if len(ground_truth_val) > 0 else None
-                                else:
-                                    gt_val = float(ground_truth_val)
-                                
-                                if gt_val is not None and gt_val != 0:
-                                    metric_val = metric_val / abs(gt_val)
-                                else:
-                                    metric_val = None
+                            ground_truth_val = ground_truth_dict[int_param_name]
+                            metric_val = normalize_metric(metric_val, ground_truth_val)
                         
                         if metric_val is not None and np.isfinite(metric_val):
-                            metrics_combined.append(metric_val)
+                            normalized_metrics.append(metric_val)
                         else:
                             all_finite = False
                             break
@@ -612,23 +615,19 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
                         all_finite = False
                         break
                 
-                # Compute combined metric (L2 norm of individual metrics)
-                if all_finite and len(metrics_combined) == len(int_params):
-                    combined_metric = np.sqrt(np.sum(np.array(metrics_combined) ** 2))
-                    
-                    # Get parameter combination and color
-                    param_combo, idx_mapping = get_param_combination(int_idx, int_params, int_param_ranges, varying_params)
+                # Compute combined metric as L2 norm of normalized metrics
+                if all_finite and len(normalized_metrics) == len(int_params):
+                    combined_metric = np.sqrt(np.sum(np.array(normalized_metrics) ** 2))
                     color = combination_colors[param_combo]
                     
                     # Build label for combined metric
                     label_parts = []
                     for pname in int_params:
                         if pname in varying_params:
-                            pidx = idx_mapping[pname]
-                            pval = varying_params[pname][pidx]
+                            pval = ground_truth_dict[pname]
                             label_parts.append(f'{pname}={format_value(pval)}')
                         else:
-                            pval = fixed_params[pname][0]
+                            pval = ground_truth_dict[pname]
                             label_parts.append(f'{pname}={format_value(pval)}')
                     
                     label = 'Combined (' + ', '.join(label_parts) + ')'
@@ -664,8 +663,8 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
     
     # Set axis labels and title
     if metric == 'std':
-        y_label = 'Relative Sigma (Std. Error / Ground Truth)'
-        title_suffix = 'Relative Standard Error'
+        y_label = 'Normalized Sigma (Std. Error / Internal Parameter)'
+        title_suffix = 'Normalized Standard Error'
         y_logscale = True
     else:
         y_label = 'Relative Error (L2 norm)'
