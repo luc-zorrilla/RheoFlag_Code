@@ -15,7 +15,7 @@ import copy
 import shutil
 
 import numpy as np
-from scipy.optimize import Bounds, minimize, dual_annealing
+from scipy.optimize import Bounds, minimize, dual_annealing, OptimizeResult
 from _basinhopping_mod import basinhopping # Custom Optimiser
 from joblib import Parallel, delayed
 
@@ -218,6 +218,63 @@ def basinhopping_optimizer(
     
     return ret
 
+def dual_annealing_wrapper(
+        func,
+        bounds,
+        x0,
+        maxiter,
+        minimizer_kwargs,
+        initial_temp,
+        restart_temp_ratio,
+        visit,
+        accept,
+        maxfun,
+        seed,
+        no_local_search,
+        callback,
+    ):
+    """
+    Wrapper around scipy.optimize.dual_annealing that returns an OptimizeResult
+    with success=False and fun=np.inf if the optimization fails or raises an exception.
+    
+    Parameters
+    ----------
+    *args, **kwargs
+        Passed to dual_annealing.
+    
+    Returns
+    -------
+    OptimizeResult
+        Result object with success, fun, x, message, and other fields populated.
+    """
+    
+    try:
+        return dual_annealing(
+            func=func,
+            bounds=bounds,
+            x0=x0,
+            maxiter=maxiter,
+            minimizer_kwargs=minimizer_kwargs,
+            initial_temp=initial_temp,
+            restart_temp_ratio=restart_temp_ratio,
+            visit=visit,
+            accept=accept,
+            maxfun=maxfun,
+            seed=seed,
+            no_local_search=no_local_search,
+            callback=callback,
+        )
+
+    except Exception as e:
+        return OptimizeResult(
+            x=x0,
+            success=False,
+            fun=np.inf,
+            message=f'dual_annealing failed: {str(e)}',
+            nit=0,
+            nfev=0,            
+        )
+
 def dual_annealing_optimizer(
     objective,
     x0,
@@ -307,7 +364,12 @@ def dual_annealing_optimizer(
             1: detection occurred in the local search process
             2: detection done in the dual annealing process
         """
-        print(f"context = {context}, x = {x}, f = {f}")
+        context_dict = {
+            0: 'minimum detected in the annealing process', 
+            1: 'detection occurred in the local search process', 
+            2: 'detection done in the dual annealing process'
+        }
+        print(f"context = {context_dict[context]}, x = {x}, f = {f}")
 
         if context == 1:  # Local search detected minimum
             X_local.append(copy.deepcopy(x))
@@ -361,7 +423,7 @@ def dual_annealing_optimizer(
     local_minimizer_kwargs['bounds'] = bounds
     
     # --- Run dual annealing ---
-    ret = dual_annealing(
+    ret = dual_annealing_wrapper(
         func=objective,
         bounds=bounds_list,
         x0=x0,
