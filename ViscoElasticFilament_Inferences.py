@@ -15,7 +15,7 @@ import copy
 import shutil
 
 import numpy as np
-from scipy.optimize import Bounds, minimize
+from scipy.optimize import Bounds, minimize, dual_annealing
 from _basinhopping_mod import basinhopping # Custom Optimiser
 from joblib import Parallel, delayed
 
@@ -218,6 +218,179 @@ def basinhopping_optimizer(
     
     return ret
 
+def dual_annealing_optimizer(
+    objective,
+    x0,
+    bounds=None,
+    local_minimizer_kwargs: Dict[str, Any] = None,
+    global_minimizer_kwargs: Dict[str, Any] = None,
+):
+    """
+    Dual annealing with optional post-optimization local minimization (L-BFGS-B by default).
+    
+    Combines global optimization (dual annealing) with optional local optimization (L-BFGS-B),
+    capturing optimization trajectories for analysis.
+    
+    Args (Individual):
+        objective: Callable(flat_array) -> scalar loss
+        x0: Initial guess (flat array)
+        bounds: Bounds object (scipy.optimize.Bounds or custom with .residual() method)
+    
+    Args (Local Minimizer):
+        local_minimizer_kwargs: Dict with L-BFGS-B configuration (applied post-annealing):
+            {
+                'method': 'L-BFGS-B',  # Local optimization method
+                'jac': '3-point',  # Jacobian specification
+                'options':{
+                    'ftol': 1e-8, 
+                    'gtol': 1e-4, 
+                    'eps': 1e-8, 
+                    'finite_diff_rel_step': None,
+                }
+                ... (other local optimizer options)
+            }
+    
+    Args (Global Minimizer):
+        global_minimizer_kwargs: Dict with dual annealing configuration:
+            {
+                'maxiter': 1000,  # Maximum iterations
+                'initial_temp': 5230.0,  # Initial temperature
+                'restart_temp_ratio': 2e-5,  # Restart temperature ratio
+                'visit': 2.62,  # Visit parameter
+                'accept': -5.0,  # Accept parameter
+                'maxfun':10000000, # Soft limit for the number of objective function calls
+                'seed': None,  # Random seed for reproducibility
+                'no_local_search':True, # Whether to apply local search or not
+                'tol': 1e-8,  # Early stopping tolerance
+            }
+    
+    Returns:
+        OptimizeResult with:
+        - x: Optimal parameters
+        - fun: Final loss value
+        - success: Convergence success flag
+        - nit: Number of dual annealing iterations
+        - X_global: Global search trajectory
+        - F_global: Function values along trajectory
+        - X_local: Local optimization trajectory (if enabled)
+        - F_local: Function values from local minimization (if enabled)
+    """
+    
+
+    # --- Trajectory tracking ---
+    X_global = []
+    F_global = []
+    X_local = []
+    F_local = []
+    context_global = []
+    early_stop = {'flag': False}  # Mutable container
+
+    # Convert Bounds object to list of finite tuples for dual_annealing
+    if hasattr(bounds, 'lb') and hasattr(bounds, 'ub'):
+        lb = np.asarray(bounds.lb)
+        ub = np.asarray(bounds.ub)
+        # Replace inf with a large finite value
+        lb = np.where(np.isinf(lb), -1e8, lb)
+        ub = np.where(np.isinf(ub), 1e8, ub)
+        # Convert Bounds object to list of tuples
+        bounds_list = list(zip(lb, ub))
+    else:
+        bounds_list = bounds  # Already a list of tuples    
+    
+    # --- Callback for dual annealing ---
+    def global_callback_function(x, f, context):
+        """
+        Capture minima from dual annealing.
+        
+        context:
+            0: minimum detected in the annealing process
+            1: detection occurred in the local search process
+            2: detection done in the dual annealing process
+        """
+        print(f"context = {context}, x = {x}, f = {f}")
+
+        if context == 1:  # Local search detected minimum
+            X_local.append(copy.deepcopy(x))
+            F_local.append(copy.deepcopy(f))
+        else:  # context == 0 or 2 (annealing or dual annealing process)
+            X_global.append(copy.deepcopy(x))
+            F_global.append(copy.deepcopy(f))
+            context_global.append(context)
+        
+        # Early stopping if tolerance reached
+        if f < tol:
+            early_stop['flag'] = True  # Modify the dict
+            return True
+        return False
+
+    # --- Set defaults for global minimizer ---
+    global_minimizer_kwargs = global_minimizer_kwargs or {
+        'maxiter': 1000,
+        'initial_temp': 5230.0,
+        'restart_temp_ratio': 2e-5,
+        'visit': 2.62,
+        'accept': -5.0,
+        'maxfun':10000000,
+        'seed': None,
+        'no_local_search':False,
+        'tol': 1e-8,
+    }
+    
+    # --- Extract global minimizer parameters ---
+    maxiter = global_minimizer_kwargs.pop('maxiter', 1000)
+    initial_temp = global_minimizer_kwargs.pop('initial_temp', 5230.0)
+    restart_temp_ratio = global_minimizer_kwargs.pop('restart_temp_ratio', 2e-5)
+    visit = global_minimizer_kwargs.pop('visit', 2.62)
+    accept = global_minimizer_kwargs.pop('accept', -5.0)
+    maxfun = global_minimizer_kwargs.pop('maxfun', 10000000)
+    seed = global_minimizer_kwargs.pop('seed', None)
+    no_local_search = global_minimizer_kwargs.pop('no_local_search', False)
+    tol = global_minimizer_kwargs.pop('tol', 1e-8)
+
+    # --- Set defaults for local minimizer ---
+    local_minimizer_kwargs = local_minimizer_kwargs or {
+        'method': 'L-BFGS-B',
+        'jac': '3-point',
+        'options': {
+            'ftol': 1e-8,
+            'gtol': 1e-4,
+            'eps': 1e-8,
+            'finite_diff_rel_step': None,
+        },
+    }
+    local_minimizer_kwargs['bounds'] = bounds
+    
+    # --- Run dual annealing ---
+    ret = dual_annealing(
+        func=objective,
+        bounds=bounds_list,
+        x0=x0,
+        maxiter=maxiter,
+        minimizer_kwargs=local_minimizer_kwargs,
+        initial_temp=initial_temp,
+        restart_temp_ratio=restart_temp_ratio,
+        visit=visit,
+        accept=accept,
+        maxfun=maxfun,
+        seed=seed,
+        no_local_search=no_local_search,
+        callback=global_callback_function,
+    )
+    
+    # --- Attach optimization history ---
+    ret.X_global = X_global
+    ret.F_global = F_global
+    ret.X_local = X_local
+    ret.F_local = F_local
+    ret.context_global = context_global
+
+
+    # --- Success if early stop ---
+    if early_stop['flag']:
+        ret.success = True
+    return ret
+
+
 ### Loss function
 
 def rel_mse_loss_fn() -> Callable:
@@ -397,8 +570,9 @@ def model_params_only_flow(
     return ComposedModel
 
 def make_optimizer_kwargs(
-    bounds = Bounds(lb=1e-6, ub=np.inf),
-    local_minimizer_kwargs = {
+    bounds=Bounds(lb=1e-6, ub=np.inf),
+    optimizer=None,
+    local_minimizer_kwargs={
         'method': 'L-BFGS-B',
         'jac': '3-point',
         'options': {
@@ -408,19 +582,57 @@ def make_optimizer_kwargs(
             'finite_diff_rel_step': None,
         },
     },
-    global_minimizer_kwargs = {
+    basinhopping_kwargs={
         'niter': 49,
         'T': 1,
         'stepsize': 10,
-        'stepwise_factor':1-1e-16,
+        'stepwise_factor': 1 - 1e-16,
+        'tol': 1e-8,
+    },
+    dual_annealing_kwargs={
+        'maxiter': 1000,
+        'initial_temp': 5230.0,
+        'restart_temp_ratio': 2e-5,
+        'visit': 2.62,
+        'accept': -5.0,
+        'maxfun': 10000000,
+        'seed': None,
+        'no_local_search': False,
         'tol': 1e-8,
     },
 ):
+    """
+    Generate optimizer kwargs for either basinhopping or dual_annealing.
+    
+    Args:
+        bounds: Bounds object for parameter constraints
+        optimizer: Callable optimizer function (basinhopping_optimizer or dual_annealing_optimizer)
+        local_minimizer_kwargs: L-BFGS-B config (used by both optimizers)
+        basinhopping_kwargs: Basinhopping-specific settings
+        dual_annealing_kwargs: Dual annealing-specific settings
+    
+    Returns:
+        Dict with bounds and optimizer-specific kwargs
+    """
+    if optimizer is None:
+        optimizer = basinhopping_optimizer
+    
+    if optimizer.__name__ == 'basinhopping_optimizer':
+        global_kwargs = basinhopping_kwargs
+    elif optimizer.__name__ == 'dual_annealing_optimizer':
+        global_kwargs = dual_annealing_kwargs
+    else:
+        raise ValueError(
+            f"Unknown optimizer {optimizer.__name__}. "
+            "Expected 'basinhopping_optimizer' or 'dual_annealing_optimizer'"
+        )
+    
     return {
         'bounds': bounds,
         'local_minimizer_kwargs': local_minimizer_kwargs,
-        'global_minimizer_kwargs': global_minimizer_kwargs,
+        'global_minimizer_kwargs': global_kwargs,
     }
+
 
 def _make_optimizer_bounds(param_keys_to_infer):
     """Create optimizer bounds for given parameter keys."""
@@ -1023,6 +1235,7 @@ def workflow_elastic_viscous_general(
     # Build optimizer_kwargs if not provided
     if optimizer_kwargs is None:
         optimizer_kwargs = make_optimizer_kwargs(
+            optimizer=optimizer,
             bounds=_make_optimizer_bounds(param_keys_to_infer),
         )
     
@@ -1413,6 +1626,7 @@ if __name__ == "__main__":
     workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
+        optimizer=dual_annealing_optimizer,
         elastic_params_list = elastic_params_list,
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,

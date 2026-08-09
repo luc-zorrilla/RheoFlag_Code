@@ -747,7 +747,7 @@ class Inference:
             x0,
             **self.optimizer_kwargs
         )
-        
+
         # Compute Hessian and Covariance if optimisation succeeded
         if self.result.success:
             self._compute_hessian(param_keys)

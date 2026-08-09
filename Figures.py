@@ -6,7 +6,7 @@ from plotly.subplots import make_subplots
 import itertools
 import numpy as np
 from pathlib import Path
-from ViscoElasticFilament_Inferences import workflow_elastic_viscous_general
+from ViscoElasticFilament_Inferences import workflow_elastic_viscous_general, basinhopping_optimizer, dual_annealing_optimizer
 
 import pickle
 import json
@@ -709,6 +709,8 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
 
 if __name__ == "__main__":
 
+    optimizer = dual_annealing_optimizer
+
     # Bending Elasticity - Sp4
     int_param_ranges = {'Sp4': [1e-3, 1e0, 1e3]}
     A_vec = np.pow(10, np.linspace(start=-6, stop=-1, num=6))
@@ -722,6 +724,7 @@ if __name__ == "__main__":
     workflow_output = workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
+        optimizer=optimizer,
         elastic_params_list = elastic_params_list,
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,
@@ -744,6 +747,7 @@ if __name__ == "__main__":
     #     workflow_outputs.append(workflow_elastic_viscous_general(
     #         int_param_ranges=int_param_ranges,
     #         ext_param_ranges=ext_param_ranges,
+    #         optimizer = optimizer,
     #         elastic_params_list = elastic_params_list,
     #         viscous_params_list = viscous_params_list,
     #         inference_mode = inference_mode,
@@ -770,6 +774,7 @@ if __name__ == "__main__":
     workflow_output = workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
+        optimizer = optimizer,        
         elastic_params_list = elastic_params_list,
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,
@@ -792,6 +797,7 @@ if __name__ == "__main__":
     #     workflow_outputs.append(workflow_elastic_viscous_general(
     #         int_param_ranges=int_param_ranges,
     #         ext_param_ranges=ext_param_ranges,
+    #         optimizer = optimizer,    
     #         elastic_params_list = elastic_params_list,
     #         viscous_params_list = viscous_params_list,
     #         inference_mode = inference_mode,
@@ -818,6 +824,7 @@ if __name__ == "__main__":
     workflow_output = workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
+        optimizer = optimizer,        
         elastic_params_list = elastic_params_list,
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,
@@ -840,6 +847,7 @@ if __name__ == "__main__":
     #     workflow_outputs.append(workflow_elastic_viscous_general(
     #         int_param_ranges=int_param_ranges,
     #         ext_param_ranges=ext_param_ranges,
+    #         optimizer = optimizer,    
     #         elastic_params_list = elastic_params_list,
     #         viscous_params_list = viscous_params_list,
     #         inference_mode = inference_mode,
@@ -852,11 +860,9 @@ if __name__ == "__main__":
     # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4', 'Beta'], ext_param_name='A', metric = 'rel_error')
     # fig.show()
 
-    exit()
-
     # Bending Viscosity (Fixed Bending Elasticity)
 
-    int_param_ranges = {'tau_b': [1e-3, 1e0, 1e3]}
+    int_param_ranges = {'tau_b': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
     A_vec = [1e-6]
     w0_vec = np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
@@ -869,6 +875,7 @@ if __name__ == "__main__":
     workflow_output = workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
+        optimizer = optimizer,
         elastic_params_list = elastic_params_list,
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,
@@ -891,6 +898,7 @@ if __name__ == "__main__":
     #     workflow_outputs.append(workflow_elastic_viscous_general(
     #         int_param_ranges=int_param_ranges,
     #         ext_param_ranges=ext_param_ranges,
+    #         optimizer = optimizer,
     #         elastic_params_list = elastic_params_list,
     #         viscous_params_list = viscous_params_list,
     #         inference_mode = inference_mode,
@@ -905,7 +913,7 @@ if __name__ == "__main__":
 
     # Shear Viscosity (Fixed Bending Elasticity & Shear Elasticity)
 
-    int_param_ranges = {'tau_s': [1e-3, 1e0, 1e3], 'Beta':[1.0]}
+    int_param_ranges = {'tau_s': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3], 'Beta':[1.0]}
     A_vec = [1e-6]
     w0_vec = np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
@@ -918,6 +926,7 @@ if __name__ == "__main__":
     workflow_output = workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
+        optimizer = optimizer,        
         elastic_params_list = elastic_params_list,
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,
@@ -940,6 +949,7 @@ if __name__ == "__main__":
     #     workflow_outputs.append(workflow_elastic_viscous_general(
     #         int_param_ranges=int_param_ranges,
     #         ext_param_ranges=ext_param_ranges,
+    #         optimizer = optimizer,
     #         elastic_params_list = elastic_params_list,
     #         viscous_params_list = viscous_params_list,
     #         inference_mode = inference_mode,
@@ -952,6 +962,8 @@ if __name__ == "__main__":
 
     # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_s'], ext_param_name='w0', metric = 'rel_error')
     # fig.show()
+
+    exit()
 
 
     # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
@@ -969,6 +981,7 @@ if __name__ == "__main__":
     workflow_output = workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
+        optimizer = optimizer,        
         elastic_params_list = elastic_params_list,
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,
@@ -991,6 +1004,7 @@ if __name__ == "__main__":
     #     workflow_outputs.append(workflow_elastic_viscous_general(
     #         int_param_ranges=int_param_ranges,
     #         ext_param_ranges=ext_param_ranges,
+    #         optimizer = optimizer,
     #         elastic_params_list = elastic_params_list,
     #         viscous_params_list = viscous_params_list,
     #         inference_mode = inference_mode,
