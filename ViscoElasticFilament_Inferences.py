@@ -264,10 +264,10 @@ def dual_annealing_wrapper(
             no_local_search=no_local_search,
             callback=callback,
         )
-
     except Exception as e:
+
         return OptimizeResult(
-            x=x0,
+            x=np.ones_like(x0)*np.nan,
             success=False,
             fun=np.inf,
             message=f'dual_annealing failed: {str(e)}',
@@ -347,8 +347,8 @@ def dual_annealing_optimizer(
         lb = np.asarray(bounds.lb)
         ub = np.asarray(bounds.ub)
         # Replace inf with a large finite value
-        lb = np.where(np.isinf(lb), -1e8, lb)
-        ub = np.where(np.isinf(ub), 1e8, ub)
+        lb = np.where(np.isinf(lb), -1e6, lb)
+        ub = np.where(np.isinf(ub), 1e6, ub)
         # Convert Bounds object to list of tuples
         bounds_list = list(zip(lb, ub))
     else:
@@ -369,12 +369,12 @@ def dual_annealing_optimizer(
             1: 'detection occurred in the local search process', 
             2: 'detection done in the dual annealing process'
         }
-        print(f"context = {context_dict[context]}, x = {x}, f = {f}")
+        print(f"context: {context_dict[context]}, x = {x}, f = {f}")
 
         if context == 1:  # Local search detected minimum
             X_local.append(copy.deepcopy(x))
             F_local.append(copy.deepcopy(f))
-        else:  # context == 0 or 2 (annealing or dual annealing process)
+        else: # context == 0 or 2 (annealing or dual annealing process)
             X_global.append(copy.deepcopy(x))
             F_global.append(copy.deepcopy(f))
             context_global.append(context)

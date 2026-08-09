@@ -1,6 +1,6 @@
 {
   "stage": "inference",
-  "timestamp": "2026-08-09 17:20:25.083618",
+  "timestamp": "2026-08-09 18:06:09.451747",
   "simulation_entries": {
     "int_0_pair_all": {
       "task_key": "int_0_pair_all",
@@ -69,6 +69,54 @@
       "completed": true,
       "timestamp": "2026-08-09 17:20:25.083608",
       "filepath": "artifacts/inference/int_001_ext_001.pkl"
+    },
+    "int_001_ext_002": {
+      "task_key": "int_001_ext_002",
+      "completed": true,
+      "timestamp": "2026-08-09 17:20:32.912165",
+      "filepath": "artifacts/inference/int_001_ext_002.pkl"
+    },
+    "int_001_ext_003": {
+      "task_key": "int_001_ext_003",
+      "completed": true,
+      "timestamp": "2026-08-09 17:21:00.192188",
+      "filepath": "artifacts/inference/int_001_ext_003.pkl"
+    },
+    "int_001_ext_004": {
+      "task_key": "int_001_ext_004",
+      "completed": true,
+      "timestamp": "2026-08-09 17:21:31.704181",
+      "filepath": "artifacts/inference/int_001_ext_004.pkl"
+    },
+    "int_001_ext_005": {
+      "task_key": "int_001_ext_005",
+      "completed": true,
+      "timestamp": "2026-08-09 17:22:29.786388",
+      "filepath": "artifacts/inference/int_001_ext_005.pkl"
+    },
+    "int_002_ext_000": {
+      "task_key": "int_002_ext_000",
+      "completed": true,
+      "timestamp": "2026-08-09 17:24:06.055564",
+      "filepath": "artifacts/inference/int_002_ext_000.pkl"
+    },
+    "int_002_ext_001": {
+      "task_key": "int_002_ext_001",
+      "completed": true,
+      "timestamp": "2026-08-09 17:26:11.387959",
+      "filepath": "artifacts/inference/int_002_ext_001.pkl"
+    },
+    "int_002_ext_002": {
+      "task_key": "int_002_ext_002",
+      "completed": true,
+      "timestamp": "2026-08-09 17:27:38.227236",
+      "filepath": "artifacts/inference/int_002_ext_002.pkl"
+    },
+    "int_002_ext_003": {
+      "task_key": "int_002_ext_003",
+      "completed": true,
+      "timestamp": "2026-08-09 18:06:09.451737",
+      "filepath": "artifacts/inference/int_002_ext_003.pkl"
     }
   }
 }

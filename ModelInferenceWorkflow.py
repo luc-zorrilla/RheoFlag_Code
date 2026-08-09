@@ -405,10 +405,6 @@ def parallel_infer_nested(
     
     if pending_tasks:
         
-        # Debug: Show which tasks are about to run
-        for task in pending_tasks:
-            print(f"  → {task.task_key}")
-
         print(f"Running {len(pending_tasks)} pending inferences...")
         Parallel(n_jobs=n_jobs)(
             delayed(run_single_inference)(task, model_lists, checkpoint_mgr)
