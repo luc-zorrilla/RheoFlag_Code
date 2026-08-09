@@ -1,6 +1,6 @@
 {
   "stage": "inference",
-  "timestamp": "2026-08-09 18:06:09.451747",
+  "timestamp": "2026-08-09 18:15:10.280037",
   "simulation_entries": {
     "int_0_pair_all": {
       "task_key": "int_0_pair_all",
@@ -117,6 +117,18 @@
       "completed": true,
       "timestamp": "2026-08-09 18:06:09.451737",
       "filepath": "artifacts/inference/int_002_ext_003.pkl"
+    },
+    "int_002_ext_004": {
+      "task_key": "int_002_ext_004",
+      "completed": true,
+      "timestamp": "2026-08-09 18:10:39.026915",
+      "filepath": "artifacts/inference/int_002_ext_004.pkl"
+    },
+    "int_002_ext_005": {
+      "task_key": "int_002_ext_005",
+      "completed": true,
+      "timestamp": "2026-08-09 18:15:10.280026",
+      "filepath": "artifacts/inference/int_002_ext_005.pkl"
     }
   }
 }

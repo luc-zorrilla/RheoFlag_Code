@@ -13,6 +13,9 @@ from pathlib import Path
 from itertools import product, zip_longest
 import copy
 import shutil
+import signal
+from contextlib import contextmanager
+
 
 import numpy as np
 from scipy.optimize import Bounds, minimize, dual_annealing, OptimizeResult
@@ -218,6 +221,23 @@ def basinhopping_optimizer(
     
     return ret
 
+class TimeoutException(Exception):
+    pass
+
+@contextmanager
+def timeout(seconds):
+    """Context manager that raises TimeoutException after specified seconds."""
+    def signal_handler(signum, frame):
+        raise TimeoutException(f'Optimization exceeded {seconds} seconds')
+    
+    # Set the signal handler and alarm
+    signal.signal(signal.SIGALRM, signal_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)  # Cancel the alarm
+
 def dual_annealing_wrapper(
         func,
         bounds,
@@ -232,6 +252,7 @@ def dual_annealing_wrapper(
         seed,
         no_local_search,
         callback,
+        timeout_seconds=600,
     ):
     """
     Wrapper around scipy.optimize.dual_annealing that returns an OptimizeResult
@@ -249,23 +270,23 @@ def dual_annealing_wrapper(
     """
     
     try:
-        return dual_annealing(
-            func=func,
-            bounds=bounds,
-            x0=x0,
-            maxiter=maxiter,
-            minimizer_kwargs=minimizer_kwargs,
-            initial_temp=initial_temp,
-            restart_temp_ratio=restart_temp_ratio,
-            visit=visit,
-            accept=accept,
-            maxfun=maxfun,
-            seed=seed,
-            no_local_search=no_local_search,
-            callback=callback,
-        )
+        with timeout(int(timeout_seconds)):
+            return dual_annealing(
+                func=func,
+                bounds=bounds,
+                x0=x0,
+                maxiter=maxiter,
+                minimizer_kwargs=minimizer_kwargs,
+                initial_temp=initial_temp,
+                restart_temp_ratio=restart_temp_ratio,
+                visit=visit,
+                accept=accept,
+                maxfun=maxfun,
+                seed=seed,
+                no_local_search=no_local_search,
+                callback=callback,
+            )
     except Exception as e:
-
         return OptimizeResult(
             x=np.ones_like(x0)*np.nan,
             success=False,
@@ -437,6 +458,7 @@ def dual_annealing_optimizer(
         seed=seed,
         no_local_search=no_local_search,
         callback=global_callback_function,
+        timeout_seconds=600,
     )
     
     # --- Attach optimization history ---

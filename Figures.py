@@ -760,8 +760,6 @@ if __name__ == "__main__":
     # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4'], ext_param_name='A', metric = 'rel_error')
     # fig.show()
 
-    exit()
-
     # Shear Elasticity - Beta
 
     int_param_ranges = {'Beta': [1e-3, 1e0, 1e3]}
@@ -861,6 +859,8 @@ if __name__ == "__main__":
 
     # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4', 'Beta'], ext_param_name='A', metric = 'rel_error')
     # fig.show()
+
+    exit()
 
     # Bending Viscosity (Fixed Bending Elasticity)
 
