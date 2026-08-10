@@ -810,6 +810,8 @@ if __name__ == "__main__":
     # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Beta'], ext_param_name = 'A', metric = 'rel_error')
     # fig.show()    
 
+    exit()
+    
     # Bending & Shear Elasticities - Sp4, Beta
 
     int_param_ranges = {'Sp4': [1e-3, 1e0, 1e3], 'Beta': [1e-3, 1e0, 1e3]}

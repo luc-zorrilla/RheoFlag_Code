@@ -15,10 +15,11 @@ import copy
 import shutil
 import signal
 from contextlib import contextmanager
-
+import pytest
 
 import numpy as np
 from scipy.optimize import Bounds, minimize, dual_annealing, OptimizeResult
+from scipy.special import erf, erfinv
 from _basinhopping_mod import basinhopping # Custom Optimiser
 from joblib import Parallel, delayed
 
@@ -287,6 +288,7 @@ def dual_annealing_wrapper(
                 callback=callback,
             )
     except Exception as e:
+        print(f"Exception: {e}")
         return OptimizeResult(
             x=np.ones_like(x0)*np.nan,
             success=False,
@@ -296,18 +298,260 @@ def dual_annealing_wrapper(
             nfev=0,            
         )
 
+def to_log10_scale(x, bounds):
+    """
+    Convert value(s) x within bounds (a, b) to log10 scale.
+    
+    Args:
+        x: Scalar or numpy array of values to convert (must be in (a, b) and > 0)
+        bounds: A tuple (a, b) where a and b can be finite, -inf, or inf
+        
+    Returns:
+        Tuple of (log10-scaled values, transformed bounds (log_a, log_b))
+        
+    Raises:
+        ValueError: If any x is not in valid range or is <= 0
+    """
+    a, b = bounds.lb, bounds.ub
+    
+    # Validate bounds
+    if a < 0:
+        raise ValueError(f"Lower bound a must be positive (got {a})")
+    if b <= 0 and not np.isinf(b):
+        raise ValueError(f"Upper bound b must be positive (got {b})")
+    
+    x = np.asarray(x, dtype=float)
+    
+    # Validate x values
+    # if np.any(x <= 0):
+    #     raise ValueError(f"All x values must be positive")
+    if np.any(x < a) or np.any(x > b):
+        raise ValueError(f"All x values must be in bounds ({a}, {b}), and yet x = {x}")
+    
+    # Transform bounds to log10 scale
+    log_a = np.log10(a) if a>0 else -np.inf
+    log_b = np.log10(b) if not np.isinf(b) else np.inf
+    
+    # Transform x to log10 scale
+    log_x = np.log10(x)
+    
+    return log_x, Bounds(log_a, log_b)
+
+
+def from_log10_scale(log_x, log_bounds):
+    """
+    Convert value(s) from log10 scale back to original scale.
+    
+    Args:
+        log_x: Scalar or numpy array of log10-scaled values
+        log_bounds: A tuple (log_a, log_b) of transformed bounds
+        
+    Returns:
+        Tuple of (original-scale values, original bounds (a, b))
+    """
+    log_a, log_b = log_bounds.lb, log_bounds.ub
+    
+    log_x = np.asarray(log_x, dtype=float)
+    
+    # Inverse transformation: 10^(log_x)
+    x = np.power(10.0, log_x)
+    
+    # Original bounds (for reference/validation)
+    a = np.power(10.0, log_a)
+    b = np.power(10.0, log_b) if not np.isinf(log_b) else np.inf
+    
+    return x, Bounds(a, b)
+
+def to_bounded_scale(x, bounds):
+    """
+    Transform value(s) x within bounds (a, b) to the interval (-1, 1).
+    
+    Transformation rules:
+    - Finite bounds (a, b): linear y = (x - (a+b)/2) / ((b-a)/2)
+    - Semi-finite (a, +inf): y = erf(ln(x - a))
+    - Semi-finite (-inf, b): y = erf(ln(b - x))
+    - Unbounded (-inf, +inf): y = erf(x)
+    
+    Args:
+        x: Scalar or numpy array of values to convert (must be in (a, b))
+        bounds: A tuple (a, b) where a and b can be finite, -inf, or inf
+        
+    Returns:
+        Tuple of (transformed values in (-1, 1), transformed bounds (-1, 1), transform_params)
+        where transform_params contains the parameters needed for the inverse transformation
+        
+    Raises:
+        ValueError: If x is not in valid range
+    """
+    a, b = bounds.lb, bounds.ub
+    
+    x = np.asarray(x, dtype=float)
+    
+    # Validate bounds and x
+    if not np.isinf(a) and not np.isinf(b):
+        if a >= b:
+            raise ValueError(f"Invalid bounds: a={a} must be < b={b}")
+        if np.any(x < a) or np.any(x > b):
+            raise ValueError(f"All x values must be in bounds ({a}, {b}), and yet x = {x}")
+        
+        # Finite bounds: linear transformation
+        midpoint = (a + b) / 2.0
+        half_width = (b - a) / 2.0
+        y = (x - midpoint) / half_width
+        transform_params = {'type': 'finite', 'a': a, 'b': b}
+        
+    elif np.isinf(a) and np.isinf(b):
+        # Unbounded: use erf
+        # if np.any(np.isinf(x)):
+        #     raise ValueError(f"x values cannot be infinite")
+        y = erf(x)
+        transform_params = {'type': 'unbounded'}
+        
+    elif np.isinf(b):
+        # Semi-finite: (a, +inf)
+        if a >= 0:
+            raise ValueError(f"Lower bound a must be < +inf")
+        if np.any(x < a): # or np.any(np.isinf(x)):
+            raise ValueError(f"All x values must be in bounds ({a}, +inf), and yet x = {x}")
+        y = erf(np.log(x - a))
+        transform_params = {'type': 'semi_finite_upper', 'a': a}
+        
+    else:
+        # Semi-finite: (-inf, b)
+        if b <= 0:
+            raise ValueError(f"Upper bound b must be > -inf")
+        if np.any(x > b): # or np.any(np.isinf(x)):
+            raise ValueError(f"All x values must be in bounds (-inf, {b}), and yet x = {x}")
+        y = -erf(np.log(b - x))
+        transform_params = {'type': 'semi_finite_lower', 'b': b}
+    
+    return y, Bounds(-1.0, 1.0), transform_params
+
+
+def from_bounded_scale(y, transform_params):
+    """
+    Convert value(s) from bounded scale (-1, 1) back to original scale.
+    
+    Args:
+        y: Scalar or numpy array of values in (-1, 1)
+        transform_params: Dictionary containing transformation parameters from to_bounded_scale
+        
+    Returns:
+        Tuple of (original-scale values, original bounds (a, b))
+        
+    Raises:
+        ValueError: If y is not in (-1, 1) or if transform_params is invalid
+    """
+    y = np.asarray(y, dtype=float)
+    
+    # Validate y is in (-1, 1)
+    if np.any(y < -1) or np.any(y > 1):
+        raise ValueError(f"All y values must be in (-1, 1)")
+    
+    transform_type = transform_params.get('type')
+    
+    if transform_type == 'finite':
+        a = transform_params['a']
+        b = transform_params['b']
+        midpoint = (a + b) / 2.0
+        half_width = (b - a) / 2.0
+        x = midpoint + y * half_width
+        bounds = Bounds(a, b)
+        
+    elif transform_type == 'unbounded':
+        x = erfinv(y)
+        bounds = Bounds(-np.inf, np.inf)
+        
+    elif transform_type == 'semi_finite_upper':
+        a = transform_params['a']
+        x = a + np.exp(erfinv(y))
+        bounds = Bounds(a, np.inf)
+        
+    elif transform_type == 'semi_finite_lower':
+        b = transform_params['b']
+        x = b - np.exp(erfinv(y))
+        bounds = Bounds(-np.inf, b)
+        
+    else:
+        raise ValueError(f"Unknown transform type: {transform_type}")
+    
+    return x, bounds
+
+def to_log10_bounded_scale(x, bounds):
+    """
+    Transform value(s) x within bounds (a, b) to (-1, 1) via two-stage process:
+    1. Convert to log10 scale using to_log10_scale()
+    2. Normalize log10 values to (-1, 1) using to_bounded_scale()
+    
+    Args:
+        x: Scalar or numpy array of positive values to convert (must be in (a, b))
+        bounds: A tuple (a, b) where a, b must be positive
+        
+    Returns:
+        Tuple of (transformed values in (-1, 1), transformed bounds (-1, 1), transform_params)
+        where transform_params contains all parameters needed for inverse transformation
+        
+    Raises:
+        ValueError: If bounds or x contain non-positive values or invalid ranges
+    """
+    # Stage 1: Convert to log10 scale
+    log10_x, log10_bounds = to_log10_scale(x, bounds)
+    
+    # Stage 2: Normalize log10 values to (-1, 1)
+    y, _, bounded_params = to_bounded_scale(log10_x, log10_bounds)
+    
+    # Combine parameters for inverse transformation
+    transform_params = {
+        'log10_bounds': log10_bounds,
+        'bounded_params': bounded_params
+    }
+    
+    return y, Bounds(-1.0, 1.0), transform_params
+
+
+def from_log10_bounded_scale(y, transform_params):
+    """
+    Convert values from (-1, 1) bounded scale back to original scale.
+    Reverses the two-stage process:
+    1. Convert from (-1, 1) back to log10 scale using from_bounded_scale()
+    2. Convert from log10 scale back to original scale using from_log10_scale()
+    
+    Args:
+        y: Scalar or numpy array of values in (-1, 1)
+        transform_params: Dictionary containing transformation parameters from to_log10_bounded_scale
+        
+    Returns:
+        Tuple of (original-scale values, original bounds (a, b))
+        
+    Raises:
+        ValueError: If y is not in (-1, 1) or if transform_params is invalid
+    """
+    # Stage 1: Convert from (-1, 1) back to log10 scale
+    bounded_params = transform_params['bounded_params']
+    log10_x, log10_bounds = from_bounded_scale(y, bounded_params)
+    
+    # Stage 2: Convert from log10 scale back to original scale
+    x, bounds = from_log10_scale(log10_x, log10_bounds)
+    
+    return x, bounds
+
+
 def dual_annealing_optimizer(
     objective,
     x0,
     bounds=None,
     local_minimizer_kwargs: Dict[str, Any] = None,
     global_minimizer_kwargs: Dict[str, Any] = None,
+    use_log10_bounded_transform: bool = True,
 ):
     """
     Dual annealing with optional post-optimization local minimization (L-BFGS-B by default).
     
     Combines global optimization (dual annealing) with optional local optimization (L-BFGS-B),
     capturing optimization trajectories for analysis.
+
+    Optionally applies log10 + tanh transformation to handle parameters across multiple
+    orders of magnitude and map bounded/semi-bounded domains to unbounded space.
     
     Args (Individual):
         objective: Callable(flat_array) -> scalar loss
@@ -341,6 +585,11 @@ def dual_annealing_optimizer(
                 'no_local_search':True, # Whether to apply local search or not
                 'tol': 1e-8,  # Early stopping tolerance
             }
+
+    Args (Transformation):
+        use_log10_tanh_transform: bool (default True)
+            If True, apply log10 + tanh transformation to bounded/semi-bounded domains
+            and optimize in bounded space. Provides better scaling for multi-magnitude parameters.
     
     Returns:
         OptimizeResult with:
@@ -353,7 +602,44 @@ def dual_annealing_optimizer(
         - X_local: Local optimization trajectory (if enabled)
         - F_local: Function values from local minimization (if enabled)
     """
-    
+
+    # --- Transform bounds and objective if requested ---
+    if use_log10_bounded_transform and bounds is not None:
+
+        # Transform initial guess to (-1, 1) space
+        y0, _, transform_params_x0 = to_log10_bounded_scale(x0, bounds)
+        
+        # Create bounds for the transformed space [-1, 1]^n
+        n_params = len(y0)
+        bounds_transformed = Bounds(
+            lb=np.full(n_params, -1.0),
+            ub=np.full(n_params, 1.0)
+        )
+        
+        # Wrap objective to transform from (-1, 1) back to original space
+        def objective_transformed(y):
+            x, _ = from_log10_bounded_scale(y, transform_params_x0)
+            return objective(x)
+
+        # Store transformation info for later use
+        transform_info = {
+            'enabled': True,
+            'bounds_original': (bounds.lb, bounds.ub),
+            'transform_params_template': transform_params_x0,
+        }        
+
+        # Use [-1, 1]^n bounds for optimization
+        bounds_opt = bounds_transformed
+        x0_opt = y0
+        objective_opt = objective_transformed
+
+    else:
+        # No transformation
+        bounds_opt = bounds
+        x0_opt = x0
+        objective_opt = objective
+        transform_info = {'enabled': False}            
+
 
     # --- Trajectory tracking ---
     X_global = []
@@ -365,33 +651,31 @@ def dual_annealing_optimizer(
 
     # Convert Bounds object to list of finite tuples for dual_annealing
     if hasattr(bounds, 'lb') and hasattr(bounds, 'ub'):
-        lb = np.asarray(bounds.lb)
-        ub = np.asarray(bounds.ub)
-        # Replace inf with a large finite value
-        lb = np.where(np.isinf(lb), -1e6, lb)
-        ub = np.where(np.isinf(ub), 1e6, ub)
+        lb = np.asarray(bounds_opt.lb)
+        ub = np.asarray(bounds_opt.ub)
         # Convert Bounds object to list of tuples
         bounds_list = list(zip(lb, ub))
     else:
-        bounds_list = bounds  # Already a list of tuples    
+        bounds_list = bounds_opt  # Already a list of tuples    
     
     # --- Callback for dual annealing ---
     def global_callback_function(x, f, context):
         """
         Capture minima from dual annealing.
-        
-        context:
-            0: minimum detected in the annealing process
-            1: detection occurred in the local search process
-            2: detection done in the dual annealing process
         """
         context_dict = {
             0: 'minimum detected in the annealing process', 
             1: 'detection occurred in the local search process', 
-            2: 'detection done in the dual annealing process'
+            2: 'detection done in the dual annealing process',
         }
-        print(f"context: {context_dict[context]}, x = {x}, f = {f}")
 
+        # Transform back to original space if transformation was applied
+        if transform_info['enabled']:
+            x_original, _ = from_log10_bounded_scale(x, transform_info['transform_params_template'])
+        else:
+            x_original = x
+
+        print(f"{context_dict[context]}, x = {x_original}, f = {f}")
         if context == 1:  # Local search detected minimum
             X_local.append(copy.deepcopy(x))
             F_local.append(copy.deepcopy(f))
@@ -409,8 +693,8 @@ def dual_annealing_optimizer(
     # --- Set defaults for global minimizer ---
     global_minimizer_kwargs = global_minimizer_kwargs or {
         'maxiter': 1000,
-        'initial_temp': 5230.0,
-        'restart_temp_ratio': 2e-5,
+        'initial_temp': 20,
+        'restart_temp_ratio': 1e-3,
         'visit': 2.62,
         'accept': -5.0,
         'maxfun':10000000,
@@ -441,11 +725,11 @@ def dual_annealing_optimizer(
             'finite_diff_rel_step': None,
         },
     }
-    local_minimizer_kwargs['bounds'] = bounds
+    local_minimizer_kwargs['bounds'] = bounds_opt
     
     # --- Run dual annealing ---
     ret = dual_annealing_wrapper(
-        func=objective,
+        func=objective_opt,
         bounds=bounds_list,
         x0=x0,
         maxiter=maxiter,
@@ -460,20 +744,23 @@ def dual_annealing_optimizer(
         callback=global_callback_function,
         timeout_seconds=600,
     )
-    
+
+    # --- Transform solution back to original space if needed ---
+    if transform_info['enabled']:
+        ret.x, _ = from_log10_bounded_scale(ret.x, transform_info['transform_params_template'])
+
     # --- Attach optimization history ---
     ret.X_global = X_global
     ret.F_global = F_global
     ret.X_local = X_local
     ret.F_local = F_local
     ret.context_global = context_global
-
+    ret.transform_info = transform_info
 
     # --- Success if early stop ---
     if early_stop['flag']:
         ret.success = True
     return ret
-
 
 ### Loss function
 
@@ -725,7 +1012,7 @@ def _make_optimizer_bounds(param_keys_to_infer):
         else (1e-6 if 'Sp4' in param_key else 0) 
         for param_key in param_keys_to_infer
     ]
-    ub = [np.inf] * len(param_keys_to_infer)
+    ub = [1e6] * len(param_keys_to_infer)
     return Bounds(lb=lb, ub=ub)
 
 def make_simple_inference_pipeline(model_list, **kwargs):
@@ -1486,35 +1773,6 @@ def _print_inference_tasks(inference_tasks, int_params_metadata, param_keys_to_i
         )
         print(f"       True: {param_str}")
 
-def _print_summary_statistics(results_summary, int_params_list, ext_params_list, num_a_values):
-    """Print summary statistics."""
-    print("\n" + "=" * 80)
-    print("Summary Statistics")
-    print("-" * 80)
-    
-    passed = sum(1 for res in results_summary if res['status'] == '✓ PASS')
-    failed = len(results_summary) - passed
-    
-    print(f"\nResults: {passed}/{len(results_summary)} cases passed")
-    print(f"  Passed: {passed}")
-    print(f"  Failed: {failed}")
-    
-    avg_sp4_error = sum(res['sp4_rel_error'] for res in results_summary) / len(results_summary)
-    avg_tau_b_error = sum(res['tau_b_rel_error'] for res in results_summary) / len(results_summary)
-    
-    print(f"\nAverage Relative Errors:")
-    print(f"  Sp4:   {avg_sp4_error:.4%}")
-    print(f"  tau_b: {avg_tau_b_error:.4%}")
-    
-    print(f"\nParameter Space Coverage:")
-    print(f"  Int_params combinations: {len(int_params_list)}")
-    print(f"  External param sets: {len(ext_params_list)}")
-    print(f"  Total models across all int_params: {len(int_params_list) * len(ext_params_list)}")
-    
-    print(f"\nTwo-Pass Strategy per Int-Params:")
-    print(f"  ✓ Pass 1 (Elastic): Optimizes Sp4 on {len([e for e in ext_params_list if e.get('w0') == 0.0])} models at w0=0")
-    print(f"  ✓ Pass 2 (Viscous): Optimizes tau_b on {len([e for e in ext_params_list if e.get('w0') > 0])} models at w0>0")
-
 def _compute_inference_results_general(
     inference_results,
     int_params_metadata,
@@ -1674,7 +1932,7 @@ def _print_summary_statistics_general(results_summary, int_params_list, ext_para
         errors = [res.get(error_key) for res in results_summary if res.get(error_key) is not None]
         
         if errors:
-            avg_error = sum(errors) / len(errors)
+            avg_error = np.nanmean(errors)
             print(f"  {param_key:>10}: {avg_error:.4%}")
         else:
             print(f"  {param_key:>10}: N/A")
@@ -1696,217 +1954,17 @@ def _print_summary_statistics_general(results_summary, int_params_list, ext_para
 
 if __name__ == "__main__":
 
-    # Bending Elasticity - Sp4
+    a = 0
+    b = 1e6
+    init_bounds = Bounds(a,b)
+    x_init = 5e5
 
-    int_param_ranges = {'Sp4': [1.0]}
-    A_vec = np.pow(10, np.linspace(start = -6, stop = -1, num = 6))
-    ext_param_ranges = {'A': A_vec}
-    elastic_params_list = ['Sp4']
-    viscous_params_list = []
+    print(f"init_bounds = {init_bounds}, x_init = {x_init}")
 
-    inference_mode = "single_inference"
-    checkpoint_str = "./Results/BendingElasticity/BendingElasticity"
+    log_x, log_bounds = to_log10_scale(x_init, init_bounds)
 
-    workflow_elastic_viscous_general(
-        int_param_ranges=int_param_ranges,
-        ext_param_ranges=ext_param_ranges,
-        optimizer=dual_annealing_optimizer,
-        elastic_params_list = elastic_params_list,
-        viscous_params_list = viscous_params_list,
-        inference_mode = inference_mode,
-        checkpoint_str=checkpoint_str,
-        )
+    print(f"log_bounds = {log_bounds}, log_x = {log_x}")
 
-    inference_mode = "cumulative_inference"   
-    for k in range(6):
-        A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
-        ext_param_ranges = {'A': A_vec_k}
-        checkpoint_str = f"./Results/BendingElasticity/BendingElasticity_{k}"
+    scaled_x, scaled_bounds, transform_params = to_bounded_scale(log_x, log_bounds)
 
-        workflow_elastic_viscous_general(
-            int_param_ranges=int_param_ranges,
-            ext_param_ranges=ext_param_ranges,
-            elastic_params_list = elastic_params_list,
-            viscous_params_list = viscous_params_list,
-            inference_mode = inference_mode,
-            checkpoint_str=checkpoint_str,
-            )
-
-    # Shear Elasticity - Beta
-
-    int_param_ranges = {'Beta': [1.0]}
-    A_vec = np.pow(10, np.linspace(start = -6, stop = -1, num = 6))
-    ext_param_ranges = {'A': A_vec}
-    elastic_params_list = ['Beta']
-    viscous_params_list = []
-
-    inference_mode = "single_inference"
-    checkpoint_str = "./Results/ShearElasticity/ShearElasticity"
-
-    workflow_elastic_viscous_general(
-        int_param_ranges=int_param_ranges,
-        ext_param_ranges=ext_param_ranges,
-        elastic_params_list = elastic_params_list,
-        viscous_params_list = viscous_params_list,
-        inference_mode = inference_mode,
-        checkpoint_str=checkpoint_str,
-        )
-
-    inference_mode = "cumulative_inference"   
-    for k in range(6):
-        A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
-        ext_param_ranges = {'A': A_vec_k}
-        checkpoint_str = f"./Results/ShearElasticity/ShearElasticity_{k}"
-
-        workflow_elastic_viscous_general(
-            int_param_ranges=int_param_ranges,
-            ext_param_ranges=ext_param_ranges,
-            elastic_params_list = elastic_params_list,
-            viscous_params_list = viscous_params_list,
-            inference_mode = inference_mode,
-            checkpoint_str=checkpoint_str,
-            )
-
-    # Bending & Shear Elasticities - Sp4, Beta
-
-    int_param_ranges = {'Sp4': [1.0], 'Beta': [1.0]}
-    A_vec = np.pow(10, np.linspace(start = -6, stop = -1, num = 6))
-    ext_param_ranges = {'A': A_vec}
-    elastic_params_list = ['Sp4', 'Beta']
-    viscous_params_list = []
-
-    inference_mode = "single_inference"
-    checkpoint_str = "./Results/BendingShearElasticity/BendingShearElasticity"
-
-    workflow_elastic_viscous_general(
-        int_param_ranges=int_param_ranges,
-        ext_param_ranges=ext_param_ranges,
-        elastic_params_list = elastic_params_list,
-        viscous_params_list = viscous_params_list,
-        inference_mode = inference_mode,
-        checkpoint_str=checkpoint_str,
-        )
-
-    inference_mode = "cumulative_inference"   
-    for k in range(6):
-        A_vec_k = np.pow(10, np.linspace(start = -6, stop = -6+k, num = k+1))
-        ext_param_ranges = {'A': A_vec_k}
-        checkpoint_str = f"./Results/BendingShearElasticity/BendingShearElasticity_{k}"
-
-        workflow_elastic_viscous_general(
-            int_param_ranges=int_param_ranges,
-            ext_param_ranges=ext_param_ranges,
-            elastic_params_list = elastic_params_list,
-            viscous_params_list = viscous_params_list,
-            inference_mode = inference_mode,
-            checkpoint_str=checkpoint_str,
-            )
-
-    # Bending Viscosity (Fixed Bending Elasticity)
-
-    int_param_ranges = {'tau_b': [1.0]}
-    A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 7))
-    ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
-    elastic_params_list = []
-    viscous_params_list = ['tau_b']
-
-    inference_mode = "single_inference"
-    checkpoint_str = "./Results/BendingViscosity/BendingViscosity"
-
-    workflow_elastic_viscous_general(
-        int_param_ranges=int_param_ranges,
-        ext_param_ranges=ext_param_ranges,
-        elastic_params_list = elastic_params_list,
-        viscous_params_list = viscous_params_list,
-        inference_mode = inference_mode,
-        checkpoint_str=checkpoint_str,
-        )
-
-    inference_mode = "cumulative_inference"   
-    for l in range(7):
-        w0_vec_l = np.pow(10, -np.linspace(start = -3, stop = -3+l, num = l+1))
-        ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
-        checkpoint_str = f"./Results/BendingViscosity/BendingViscosity_{l}"
-
-        workflow_elastic_viscous_general(
-            int_param_ranges=int_param_ranges,
-            ext_param_ranges=ext_param_ranges,
-            elastic_params_list = elastic_params_list,
-            viscous_params_list = viscous_params_list,
-            inference_mode = inference_mode,
-            checkpoint_str=checkpoint_str,
-            )
-
-    # Shear Viscosity (Fixed Bending Elasticity & Shear Elasticity)
-
-    int_param_ranges = {'tau_s': [1.0], 'Beta':[1.0]}
-    A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 7))
-    ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
-    elastic_params_list = []
-    viscous_params_list = ['tau_s']
-
-    inference_mode = "single_inference"
-    checkpoint_str = "./Results/ShearViscosity/ShearViscosity"
-
-    workflow_elastic_viscous_general(
-        int_param_ranges=int_param_ranges,
-        ext_param_ranges=ext_param_ranges,
-        elastic_params_list = elastic_params_list,
-        viscous_params_list = viscous_params_list,
-        inference_mode = inference_mode,
-        checkpoint_str=checkpoint_str,
-        )
-
-    inference_mode = "cumulative_inference"   
-    for l in range(7):
-        w0_vec_l = np.pow(10, -np.linspace(start = -3, stop = -3+l, num = l+1))
-        ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
-        checkpoint_str = f"./Results/ShearViscosity/ShearViscosity_{l}"
-
-        workflow_elastic_viscous_general(
-            int_param_ranges=int_param_ranges,
-            ext_param_ranges=ext_param_ranges,
-            elastic_params_list = elastic_params_list,
-            viscous_params_list = viscous_params_list,
-            inference_mode = inference_mode,
-            checkpoint_str=checkpoint_str,
-            )
-    
-
-    # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
-
-    int_param_ranges = {'tau_b': [1.0], 'tau_s':[1.0], 'Beta':[1.0]}
-    A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 7))
-    ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
-    elastic_params_list = []
-    viscous_params_list = ['tau_b', 'tau_s']
-
-    inference_mode = "single_inference"
-    checkpoint_str = "./Results/BendingShearViscosity/BendingShearViscosity"
-
-    workflow_elastic_viscous_general(
-        int_param_ranges=int_param_ranges,
-        ext_param_ranges=ext_param_ranges,
-        elastic_params_list = elastic_params_list,
-        viscous_params_list = viscous_params_list,
-        inference_mode = inference_mode,
-        checkpoint_str=checkpoint_str,
-        )
-
-    inference_mode = "cumulative_inference"   
-    for l in range(7):
-        w0_vec_l = np.pow(10, -np.linspace(start = -3, stop = -3+l, num = l+1))
-        ext_param_ranges = {'A': A_vec, 'w0':w0_vec_l}
-        checkpoint_str = f"./Results/BendingShearViscosity/BendingShearViscosity_{l}"
-
-        workflow_elastic_viscous_general(
-            int_param_ranges=int_param_ranges,
-            ext_param_ranges=ext_param_ranges,
-            elastic_params_list = elastic_params_list,
-            viscous_params_list = viscous_params_list,
-            inference_mode = inference_mode,
-            checkpoint_str=checkpoint_str,
-            )
+    print(f"scaled_bounds = {scaled_bounds}, scaled_x = {scaled_x}, transform_params = {transform_params}")    

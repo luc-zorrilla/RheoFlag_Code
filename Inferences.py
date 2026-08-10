@@ -15,8 +15,6 @@ from Models import Model, SimpleModel
 # FUNCTIONS
 # ============================================================================
 
-# TODO: turn bounded optimisation algorithm into unbounded algorithms using such transform
-
 def transform_to_unbounded(t, bounds):
     """
     Transform unbounded R^n to bounded/semi-bounded domain.

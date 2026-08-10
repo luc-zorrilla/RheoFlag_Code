@@ -1,23 +1,23 @@
 {
   "stage": "inference",
-  "timestamp": "2026-08-09 18:17:49.941205",
+  "timestamp": "2026-08-10 11:36:04.200843",
   "simulation_entries": {
     "int_0_pair_all": {
       "task_key": "int_0_pair_all",
       "completed": true,
-      "timestamp": "2026-08-09 18:16:47.512802",
+      "timestamp": "2026-08-10 11:27:22.871336",
       "filepath": "artifacts/models/int_0_pair_all.pkl"
     },
     "int_1_pair_all": {
       "task_key": "int_1_pair_all",
       "completed": true,
-      "timestamp": "2026-08-09 18:16:48.875025",
+      "timestamp": "2026-08-10 11:27:23.746790",
       "filepath": "artifacts/models/int_1_pair_all.pkl"
     },
     "int_2_pair_all": {
       "task_key": "int_2_pair_all",
       "completed": true,
-      "timestamp": "2026-08-09 18:16:49.265785",
+      "timestamp": "2026-08-10 11:27:23.990944",
       "filepath": "artifacts/models/int_2_pair_all.pkl"
     }
   },
@@ -25,32 +25,26 @@
     "int_000_ext_000": {
       "task_key": "int_000_ext_000",
       "completed": true,
-      "timestamp": "2026-08-09 18:17:04.935914",
+      "timestamp": "2026-08-10 11:34:45.247167",
       "filepath": "artifacts/inference/int_000_ext_000.pkl"
     },
     "int_000_ext_001": {
       "task_key": "int_000_ext_001",
       "completed": true,
-      "timestamp": "2026-08-09 18:17:14.363930",
+      "timestamp": "2026-08-10 11:35:31.085459",
       "filepath": "artifacts/inference/int_000_ext_001.pkl"
     },
     "int_000_ext_002": {
       "task_key": "int_000_ext_002",
       "completed": true,
-      "timestamp": "2026-08-09 18:17:24.011749",
+      "timestamp": "2026-08-10 11:35:41.208472",
       "filepath": "artifacts/inference/int_000_ext_002.pkl"
     },
     "int_000_ext_003": {
       "task_key": "int_000_ext_003",
       "completed": true,
-      "timestamp": "2026-08-09 18:17:37.300014",
+      "timestamp": "2026-08-10 11:36:04.200830",
       "filepath": "artifacts/inference/int_000_ext_003.pkl"
-    },
-    "int_000_ext_004": {
-      "task_key": "int_000_ext_004",
-      "completed": true,
-      "timestamp": "2026-08-09 18:17:49.941188",
-      "filepath": "artifacts/inference/int_000_ext_004.pkl"
     }
   }
 }
