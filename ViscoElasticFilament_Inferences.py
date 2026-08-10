@@ -298,6 +298,12 @@ def dual_annealing_wrapper(
             nfev=0,            
         )
 
+def log10_or_inf(x):
+    result = np.full_like(x, -np.inf, dtype=float)
+    mask = x != 0
+    result[mask] = np.log10(x[mask])
+    return result
+
 def to_log10_scale(x, bounds):
     """
     Convert value(s) x within bounds (a, b) to log10 scale.
@@ -315,25 +321,23 @@ def to_log10_scale(x, bounds):
     a, b = bounds.lb, bounds.ub
     
     # Validate bounds
-    if a < 0:
+    if np.any(a < 0):
         raise ValueError(f"Lower bound a must be positive (got {a})")
-    if b <= 0 and not np.isinf(b):
+    if np.any(b <= 0) and np.any(not np.isinf(b)):
         raise ValueError(f"Upper bound b must be positive (got {b})")
     
     x = np.asarray(x, dtype=float)
     
     # Validate x values
-    # if np.any(x <= 0):
-    #     raise ValueError(f"All x values must be positive")
     if np.any(x < a) or np.any(x > b):
         raise ValueError(f"All x values must be in bounds ({a}, {b}), and yet x = {x}")
     
     # Transform bounds to log10 scale
-    log_a = np.log10(a) if a>0 else -np.inf
-    log_b = np.log10(b) if not np.isinf(b) else np.inf
+    log_a = log10_or_inf(a)
+    log_b = log10_or_inf(b)
     
     # Transform x to log10 scale
-    log_x = np.log10(x)
+    log_x = log10_or_inf(x)
     
     return log_x, Bounds(log_a, log_b)
 
@@ -388,8 +392,8 @@ def to_bounded_scale(x, bounds):
     x = np.asarray(x, dtype=float)
     
     # Validate bounds and x
-    if not np.isinf(a) and not np.isinf(b):
-        if a >= b:
+    if np.all(not np.isinf(a)) and np.all(not np.isinf(b)):
+        if np.any(a >= b):
             raise ValueError(f"Invalid bounds: a={a} must be < b={b}")
         if np.any(x < a) or np.any(x > b):
             raise ValueError(f"All x values must be in bounds ({a}, {b}), and yet x = {x}")
