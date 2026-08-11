@@ -781,6 +781,19 @@ def dual_annealing_optimizer(
 
 ### Loss function
 
+def rel_mse(predicted: np.ndarray, ground_truth: np.ndarray) -> float:
+    
+    if predicted is None:
+        return np.inf
+    # Flatten arrays
+    pred_flat = np.asarray(predicted).flatten()
+    truth_flat = np.asarray(ground_truth).flatten()
+    
+    # Truncate to match lengths
+    min_len = min(len(pred_flat), len(truth_flat))
+    return np.linalg.norm(pred_flat[:min_len] - truth_flat[:min_len])**2 / np.linalg.norm(truth_flat[:min_len])**2
+
+
 def rel_mse_loss_fn() -> Callable:
     """
     Define Relative Mean Square Error loss function.
@@ -1421,6 +1434,156 @@ def make_inference_tasks_two_pass(
 # =====================
 # === Main Function ===
 # ===================== 
+
+def workflow_elastic_viscous_simulation(
+    int_param_ranges: Dict[str, list] = None,
+    ext_param_ranges: Dict[str, list] = None,
+    param_keys_to_infer: list = None,
+    n_jobs_simulation: int = 1,
+    checkpoint_str: str = "./test_checkpoints_simulations_only",
+) -> Dict[str, Any]:
+    """
+    Generalized simulation-only workflow with flexible parameter configuration.
+    
+    Runs simulations for all combinations of internal and external parameters,
+    returning ModelList objects without any inference.
+    
+    Args:
+        int_param_ranges: Dict mapping param names to lists of values.
+            E.g., {'Sp4': [1e-3, 1e0, 1e3], 'Beta': [0.5, 1.0]}
+            Default: {'Sp4': [1.0]}
+        
+        ext_param_ranges: Dict mapping param names to lists of values.
+            E.g., {'A': [1e-6, 1e-5], 'w0': [0.0, 1.0]}
+            Default: {'A': [1e-6]}
+        
+        param_keys_to_infer: List of parameters to track (used for model reduction).
+            E.g., ['Sp4', 'Beta']
+            Default: All keys from int_param_ranges
+        
+        n_jobs_simulation: Parallelization for simulation phase (-1 = all cores).
+            Default: 1
+        
+        checkpoint_str: Base path for checkpoint directory.
+    
+    Returns:
+        Dict containing:
+            - model_lists: List[ModelList] for each internal param combination
+            - int_param_ranges: Input internal parameter ranges
+            - ext_param_ranges: Input external parameter ranges
+            - int_params_metadata: Metadata for each internal param combination
+            - ext_params_list: List of all external parameter dicts
+            - total_models: Total number of models generated
+    """
+    
+    if int_param_ranges is None:
+        int_param_ranges = {'Sp4': [1.0]}
+    
+    if ext_param_ranges is None:
+        ext_param_ranges = {'A': [1e-6]}
+    
+    if param_keys_to_infer is None:
+        param_keys_to_infer = list(int_param_ranges.keys())
+    
+    checkpoint_dir = Path(checkpoint_str + "_simulations_only")
+    workflow = SimulationInferenceWorkflow(checkpoint_dir=checkpoint_dir)
+    
+    print("\n" + "=" * 80)
+    print("SIMULATION-ONLY WORKFLOW")
+    print("=" * 80)
+    
+    print("\nPHASE 0: Parameter Space Setup")
+    print("-" * 80)
+    
+    # Generate internal parameter combinations
+    int_param_names = list(int_param_ranges.keys())
+    int_param_values = [int_param_ranges[name] for name in int_param_names]
+    int_params_list = [
+        dict(zip(int_param_names, combo))
+        for combo in product(*int_param_values)
+    ]
+    
+    int_params_list = [make_ground_truth_int_params(**int_params) for int_params in int_params_list]
+    
+    int_params_metadata = [
+        {name: params[name] for name in int_param_names}
+        for params in int_params_list
+    ]
+    
+    print(f"\nInternal Parameters (Cartesian product):")
+    for name, values in int_param_ranges.items():
+        print(f"  {name}: {values} ({len(values)} values)")
+    print(f"  Total combinations: {len(int_params_list)}")
+    
+    # Generate external parameter combinations
+    ext_param_names = list(ext_param_ranges.keys())
+    ext_param_values = [ext_param_ranges[name] for name in ext_param_names]
+    
+    ext_params_list = [
+        dict(zip(ext_param_names, combo))
+        for combo in product(*ext_param_values)
+    ]
+    ext_params_list = [make_ground_truth_ext_params(**ext_params) for ext_params in ext_params_list]
+    
+    # Generate simulation parameters
+    if 'w0' in ext_param_ranges:
+        sim_params_list = []
+        for ext_params in ext_params_list:
+            w0_value = ext_params.get('w0')
+            sim_params = make_sim_params_for_w0(w0_value)
+            sim_params_list.append(sim_params)
+    else:
+        w0_value = 0
+        sim_params_list = [make_sim_params_for_w0(w0_value) for _ in ext_params_list]
+    
+    print(f"\nExternal Parameters:")
+    for name, values in ext_param_ranges.items():
+        print(f"  {name}: {values} ({len(values)} values)")
+    print(f"  Total external parameter sets: {len(ext_params_list)}")
+    
+    print(f"\nParameters to track: {param_keys_to_infer}")
+    
+    print("\n" + "=" * 80)
+    print("PHASE 1: Running Simulations for All Int-Params Combinations")
+    print("-" * 80)
+    
+    # Create reduced model class
+    ReducedModel = model_params_only_flow(
+        int_params_list[0],
+        param_keys_to_infer,
+    )
+    
+    # Run simulations
+    model_lists = workflow.run_simulations(
+        int_params_list=int_params_list,
+        ext_params_list=ext_params_list,
+        sim_params_list=sim_params_list,
+        model_class=ReducedModel,
+        n_jobs=n_jobs_simulation,
+    )
+    
+    print(f"\n✓ Simulations complete")
+    print(f"  Total ModelLists created: {len(model_lists)}")
+    print(f"  Expected: {len(int_params_list)}")
+    print(f"  Total models generated: {len(model_lists) * len(ext_params_list)}")
+    
+    assert len(model_lists) == len(int_params_list)
+    
+    print("\n" + "=" * 80)
+    print("✓ SIMULATION-ONLY WORKFLOW COMPLETE!")
+    print("=" * 80)
+    
+    return {
+        'model_lists': model_lists,
+        'int_param_ranges': int_param_ranges,
+        'ext_param_ranges': ext_param_ranges,
+        'int_params_metadata': int_params_metadata,
+        'ext_params_list': ext_params_list,
+        'param_keys_to_infer': param_keys_to_infer,
+        'num_int_params': len(int_params_list),
+        'num_ext_params': len(ext_params_list),
+        'total_models': len(model_lists) * len(ext_params_list),
+    }
 
 def workflow_elastic_viscous_general(
     int_param_ranges: Dict[str, list] = None,

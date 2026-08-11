@@ -2,14 +2,382 @@
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
+import matplotlib.pyplot as plt # TODO: remove when replaced by plotly
 
 import itertools
 import numpy as np
 from pathlib import Path
-from ViscoElasticFilament_Inferences import workflow_elastic_viscous_general, basinhopping_optimizer, dual_annealing_optimizer
+
+from ViscoElasticFilament_Models import X3N
+from ViscoElasticFilament_Inferences import workflow_elastic_viscous_simulation, workflow_elastic_viscous_general, basinhopping_optimizer, dual_annealing_optimizer, rel_mse
 
 import pickle
 import json
+
+def plot_model_distance_comparison(
+    model_lists: Dict[int, ModelList],  # Changed from List to Dict
+    reference_model_list: ModelList,
+    distance_fn: Callable[[Dict[str, Any], Dict[str, Any]], float],
+    int_param_name: str,
+    int_params_metadata: List[Dict[str, Any]],
+    ext_param_name: Optional[str] = None,
+    ext_param_index: int = 0,
+    title: Optional[str] = None,
+    y_label: str = "Distance",
+    log_scale: bool = False,
+) -> go.Figure:
+    """
+    Plot the distance between simulations across varying internal parameters.
+    
+    Args:
+        model_lists: Dict of ModelList objects {idx: ModelList}.
+        reference_model_list: Reference ModelList to compare against.
+        distance_fn: Function(sim_output_1, sim_output_2) -> float.
+        int_param_name: Name of internal parameter to vary on x-axis (e.g., 'Sp4').
+        int_params_metadata: List of metadata dicts, one per model_list.
+        ext_param_name: Name of external parameter to filter/label by.
+        ext_param_index: Index of external parameter set to plot (default 0).
+        title: Plot title. If None, auto-generated.
+        y_label: Label for y-axis.
+        log_scale: If True, use log scale for both axes.
+    
+    Returns:
+        plotly.graph_objects.Figure
+    """
+    
+    # Extract internal parameter values and compute distances
+    int_param_values = [metadata[int_param_name] for metadata in int_params_metadata]
+    distances = []
+    
+    ref_model = reference_model_list.models[ext_param_index]
+    ref_output = ref_model.sim_output
+    
+    # Iterate through dict values in sorted key order
+    for idx in sorted(model_lists.keys()):
+        model_list = model_lists[idx]
+        model = model_list.models[ext_param_index]
+        model_output = model.sim_output
+        
+        distance = distance_fn(model_output['value'], ref_output['value'])
+        distances.append(distance)
+    
+    # Create figure
+    fig = go.Figure()
+    
+    # Add scatter plot
+    fig.add_trace(go.Scatter(
+        x=int_param_values,
+        y=distances,
+        mode='lines+markers',
+        name='Distance',
+        line=dict(color='#0072B2', width=2),
+        marker=dict(size=8, symbol='circle'),
+        hovertemplate=(
+            f"<b>{int_param_name}:</b> %{{x:.3e}}<br>"
+            f"<b>{y_label}:</b> %{{y:.3e}}<br>"
+            "<extra></extra>"
+        ),
+    ))
+    
+    # Update layout
+    if title is None:
+        title = f"Distance vs {int_param_name}"
+    
+    fig.update_layout(
+        title=title,
+        xaxis_title=int_param_name,
+        yaxis_title=y_label,
+        template='plotly_white',
+        hovermode='closest',
+        width=900,
+        height=600,
+    )
+    
+    if log_scale:
+        fig.update_xaxes(type='log')
+        fig.update_yaxes(type='log')
+    
+    return fig
+
+def plot_model_distance_multi_external(
+    model_lists: Dict[int, ModelList],  # Changed from List to Dict
+    reference_model_list: ModelList,
+    distance_fn: Callable[[Dict[str, Any], Dict[str, Any]], float],
+    int_param_name: str,
+    int_params_metadata: List[Dict[str, Any]],
+    ext_params_list: List[Dict[str, Any]],
+    ext_param_name: Optional[str] = None,
+    title: Optional[str] = None,
+    y_label: str = "Distance",
+    log_scale: bool = False,
+) -> go.Figure:
+    """
+    Plot distance across internal parameters for multiple external parameter values.
+    
+    Args:
+        model_lists: Dict of ModelList objects {idx: ModelList}.
+        reference_model_list: Reference ModelList to compare against.
+        distance_fn: Function(sim_output_1, sim_output_2) -> float.
+        int_param_name: Internal parameter name for x-axis.
+        int_params_metadata: Metadata for each int param combo.
+        ext_params_list: List of external parameter dicts.
+        ext_param_name: External parameter name to vary across lines.
+        title: Plot title. If None, auto-generated.
+        y_label: Label for y-axis.
+        log_scale: Use log scale for both axes.
+    
+    Returns:
+        plotly.graph_objects.Figure
+    """
+    
+    fig = go.Figure()
+    
+    # Extract internal parameter values
+    int_param_values = [metadata[int_param_name] for metadata in int_params_metadata]
+    
+    # Get reference model outputs for all external params
+    ref_models_outputs = [model.sim_output for model in reference_model_list.models]
+    
+    # Iterate through each external parameter set
+    num_ext_params = len(ext_params_list)
+    colors = [
+        '#0072B2', '#E69F00', '#CC79A7', '#56B4E9',
+        '#009E73', '#F0E442', '#D55E00', '#999999'
+    ]
+    
+    for ext_idx in range(num_ext_params):
+        distances = []
+        
+        ref_output = ref_models_outputs[ext_idx]
+        
+        # Iterate through dict values in sorted key order
+        for idx in sorted(model_lists.keys()):
+            model_list = model_lists[idx]
+            model = model_list.models[ext_idx]
+            model_output = model.sim_output
+            distance = distance_fn(model_output['value'], ref_output['value'])
+            distances.append(distance)
+        
+        # Create legend label
+        if ext_param_name and ext_param_name in ext_params_list[ext_idx]:
+            ext_value = ext_params_list[ext_idx][ext_param_name]
+            label = f"{ext_param_name} = {ext_value:.3e}"
+        else:
+            label = f"External Set {ext_idx}"
+        
+        # Add trace
+        fig.add_trace(go.Scatter(
+            x=int_param_values,
+            y=distances,
+            mode='lines+markers',
+            name=label,
+            line=dict(color=colors[ext_idx % len(colors)], width=2),
+            marker=dict(size=6, symbol='circle'),
+            hovertemplate=(
+                f"<b>{int_param_name}:</b> %{{x:.3e}}<br>"
+                f"<b>{y_label}:</b> %{{y:.3e}}<br>"
+                f"<b>{label}</b><extra></extra>"
+            ),
+        ))
+    
+    # Update layout
+    if title is None:
+        title = f"Distance vs {int_param_name} (Multiple External Parameters)"
+    
+    fig.update_layout(
+        title=title,
+        xaxis_title=int_param_name,
+        yaxis_title=y_label,
+        template='plotly_white',
+        hovermode='closest',
+        width=1000,
+        height=650,
+        legend=dict(x=0.02, y=0.98, bgcolor='rgba(255,255,255,0.8)'),
+    )
+    
+    if log_scale:
+        fig.update_xaxes(type='log')
+        fig.update_yaxes(type='log')
+    
+    return fig
+
+# def plot_final_output_vs_sp4_single_external(
+#     model_lists: Dict[int, ModelList],
+#     int_params_metadata: Dict[str, Any],
+#     ext_param_index: int,
+#     ext_params_list: List[float],
+#     int_param_name: str = 'Sp4',
+#     ext_param_name: str = 'A',
+#     title: Optional[str] = None,
+#     y_label: str = "X[-1]",
+#     log_scale: bool = False,
+# ) -> go.Figure:
+#     """
+#     Plot X[-1] vs Sp4 for a single external parameter (A).
+    
+#     Args:
+#         model_lists: Dictionary mapping indices to ModelList objects
+#         int_params_metadata: Metadata about internal parameters (e.g., values at each index)
+#         ext_param_index: Index of the external parameter (e.g., A) to plot
+#         ext_params_list: List of external parameter values for labeling
+#         output_key: Key in sim_output dict (default 'X')
+#         title: Plot title
+#         y_label: Y-axis label
+#         log_scale: Whether to use log scale for y-axis
+    
+#     Returns:
+#         Plotly Figure
+#     """
+#     # Extract internal parameter values
+#     int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]    
+    
+#     # Extract X[-1] for all internal parameter indices at this external parameter
+#     x_vals = []
+#     y_vals = []
+    
+#     for idx in sorted(model_lists.keys()):
+#         model_list = model_lists[idx]
+#         if ext_param_index < len(model_list.models):
+#             model = model_list.models[ext_param_index]
+#             if model.sim_output is not None:
+#                 output_data = model.sim_output
+#                 # Handle both array and dict outputs
+#                 if isinstance(output_data, dict) and 'value' in output_data:
+#                     output_data = output_data['value']
+                
+#                 output_array = np.array(output_data)
+#                 final_value = X3N(output_array) if len(output_array) > 0 else np.nan
+                
+#                 N = final_value.shape[0]//3
+#                 x_vals.append(ext_param_values[ext_param_index])
+#                 y_vals.append(final_value[N:int(2*N)][-1,0])
+    
+#     if not x_vals:
+#         raise ValueError(f"No valid output found at ext_param_index={ext_param_index}")
+    
+#     # Create scatter plot
+#     fig = go.Figure()
+#     fig.add_trace(go.Scatter(
+#         x=x_vals,
+#         y=y_vals,
+#         mode='lines+markers',
+#         name=f"A = {ext_params_list[ext_param_index][ext_param_name]:.2e}",
+#         hovertemplate=f"<b>{int_param_name}</b>: %{{x:.4e}}<br><b>{y_label}</b>: %{{y:.6e}}<extra></extra>",
+#         line=dict(width=2),
+#         marker=dict(size=8),
+#     ))
+    
+#     fig.update_xaxes(title=int_param_name, type='log')
+#     if log_scale:
+#         fig.update_yaxes(title=y_label, type='log')
+#     else:
+#         fig.update_yaxes(title=y_label)
+    
+#     if title is None:
+#         title = f"{y_label} vs {int_param_name} (A = {ext_params_list[ext_param_index][ext_param_name]:.2e})"
+    
+#     fig.update_layout(title=title, hovermode='closest')
+    
+#     return fig
+
+def plot_final_output_vs_sp4_multi_external(
+    model_lists: Dict[int, ModelList],
+    int_params_metadata: List[Dict[str, Any]],
+    ext_params_list: List[Dict[str, Any]],
+    int_param_name: str = 'Sp4',
+    ext_param_name: str = 'A',
+    title: Optional[str] = None,
+    y_label: str = "y",
+    log_scale: bool = False,
+    colorscale: str = 'Viridis',
+) -> go.Figure:
+    """
+    Plot y vs A (external parameter) with multiple lines, one for each Sp4 value.
+    Color-coded by internal parameter (Sp4).
+    
+    Args:
+        model_lists: Dictionary mapping indices to ModelList objects
+        int_params_metadata: List of dicts, each containing internal parameter values
+        ext_params_list: List of external parameter dicts (each with 'A' key)
+        int_param_name: Name of the internal parameter for coloring (e.g., 'Sp4')
+        ext_param_name: Name of the external parameter on x-axis (e.g., 'A')
+        title: Plot title
+        y_label: Y-axis label
+        log_scale: Whether to use log scale for y-axis
+        colorscale: Plotly colorscale name (e.g., 'Viridis', 'Blues', 'Reds')
+    
+    Returns:
+        Plotly Figure
+    """
+    # Extract internal parameter values
+    int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
+    # Extract external parameter values
+    ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
+
+    fig = go.Figure()
+    
+    # Create a color scale for internal parameters
+    n_internal = len(int_param_values)
+    colors = px.colors.sample_colorscale(colorscale, [n / (n_internal - 1) for n in range(n_internal)])
+
+    # Plot one line per internal parameter (Sp4)
+    for int_idx in sorted(model_lists.keys()):
+        x_vals = []
+        y_vals = []
+        
+        model_list = model_lists[int_idx]
+        
+        # Iterate through all external parameters
+        for ext_idx in range(len(model_list.models)):
+            model = model_list.models[ext_idx]
+            
+            if model.sim_output is not None:
+                output_data = model.sim_output
+                # Handle both array and dict outputs
+                if isinstance(output_data, dict) and 'value' in output_data:
+                    output_data = output_data['value']
+                
+                output_array = np.array(output_data)
+                
+                if output_array.size > 1:
+                    # Apply X3N transformation
+                    X_3N = X3N(output_array)
+                    N = X_3N.shape[0] // 3
+                    
+                    # Extract final y value: last element of [N:2*N]
+                    final_y = X_3N[N:int(2*N)][-1, 0]
+                    
+                    x_vals.append(ext_param_values[ext_idx] * int_param_values[int_idx])
+                    y_vals.append(final_y)
+        
+        if x_vals:
+            fig.add_trace(go.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode='lines',
+                name=f"{int_param_name} = {int_param_values[int_idx]:.4f}",
+                hovertemplate=f"<b>{ext_param_name}</b>: %{{x:.2e}}<br><b>{y_label}</b>: %{{y:.6e}}<br><b>{int_param_name}</b>: {int_param_values[int_idx]:.4f}<extra></extra>",
+                line=dict(width=2, color=colors[int_idx]),
+                marker=dict(size=6, color=colors[int_idx]),
+            ))
+    
+    fig.update_xaxes(title=ext_param_name, type='log')
+    if log_scale:
+        fig.update_yaxes(title=y_label, type='log')
+    else:
+        fig.update_yaxes(title=y_label)
+    
+    if title is None:
+        title = f"{y_label} vs {ext_param_name} (color-coded by {int_param_name})"
+    
+    fig.update_layout(
+        title=title,
+        hovermode='closest',
+        legend=dict(title=int_param_name)
+    )
+    
+    return fig
+
 
 def plot_sigma_vs_ext_param(workflow_output, int_params, ext_param_name, metric='std'):
     """
@@ -708,6 +1076,90 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
     return fig
 
 if __name__ == "__main__":
+
+    # --------------------------- #
+    # -------- Simulations ------ #
+    # --------------------------- #
+
+    # Small logarithmic perturbations around 1
+    epsilon = 0.01  # log-scale offset (in powers of 10)
+    n_points = 5  # number of points on each side of 1
+    log_offsets = np.linspace(-epsilon, epsilon, num=2*n_points + 1)
+    Sp4_vec =  np.power(10, log_offsets)  
+    int_param_ranges = {'Sp4': Sp4_vec}
+
+    A_vec = np.pow(10, np.linspace(start=-6, stop=-1, num = 12))
+    ext_param_ranges = {'A': A_vec}
+
+    # Simulate
+    simulation_output = workflow_elastic_viscous_simulation(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        param_keys_to_infer=['Sp4'],
+        n_jobs_simulation=-1,
+        checkpoint_str = "./distance",
+    )
+
+    model_lists = simulation_output['model_lists']
+    int_params_metadata = simulation_output['int_params_metadata']
+    ext_params_list = simulation_output['ext_params_list']
+
+    # Plot
+
+    # # Find the index where Sp4 = 1 (should be the middle point)
+    Sp4_star = 1
+    reference_index = np.argmin(np.abs(Sp4_vec - Sp4_star))
+    reference_model_list = model_lists[reference_index]
+
+    fig2 = plot_model_distance_multi_external(
+        model_lists=model_lists,
+        reference_model_list=reference_model_list,
+        distance_fn=rel_mse,
+        int_param_name='Sp4',
+        int_params_metadata=int_params_metadata,
+        ext_params_list=ext_params_list,
+        ext_param_name='A',
+        title="Distance vs Sp4 (All Amplitudes)",
+        y_label="Relative L2 Error",
+        log_scale=False,
+    )
+    fig2.show()
+
+    log_offsets = np.linspace(-3, 3, num=7)
+    Sp4_vec =  np.power(10, log_offsets)  
+    int_param_ranges = {'Sp4': Sp4_vec}
+
+    A_vec = np.pow(10, np.linspace(start=-6, stop=-1, num = 12))
+    ext_param_ranges = {'A': A_vec}
+
+    # Simulate
+    simulation_output = workflow_elastic_viscous_simulation(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        param_keys_to_infer=['Sp4'],
+        n_jobs_simulation=-1,
+        checkpoint_str = "./tip",
+    )
+    model_lists = simulation_output['model_lists']
+    int_params_metadata = simulation_output['int_params_metadata']
+    ext_params_list = simulation_output['ext_params_list']    
+
+    # All external parameters on one plot
+    fig2 = plot_final_output_vs_sp4_multi_external(
+        model_lists=model_lists,
+        int_params_metadata=int_params_metadata,
+        ext_params_list=ext_params_list,
+        int_param_name='Sp4',
+        colorscale='Viridis',
+        log_scale=True,
+    )
+    fig2.show()
+
+    exit()
+
+    # --------------------------- #
+    # --------- Inferences ------ #
+    # --------------------------- #
 
     optimizer = dual_annealing_optimizer
 
