@@ -860,8 +860,6 @@ if __name__ == "__main__":
     # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['Sp4', 'Beta'], ext_param_name='A', metric = 'rel_error')
     # fig.show()
 
-    exit()
-
     # Bending Viscosity (Fixed Bending Elasticity)
 
     int_param_ranges = {'tau_b': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
@@ -965,12 +963,9 @@ if __name__ == "__main__":
     # fig = plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params=['tau_s'], ext_param_name='w0', metric = 'rel_error')
     # fig.show()
 
-    exit()
-
-
     # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
 
-    int_param_ranges = {'tau_b': [1.0], 'tau_s':[1e0], 'Beta':[1.0]}
+    int_param_ranges = {'tau_b': [1e-3, 1e0, 1e3], 'tau_s':[1e-3, 1e0, 1e3], 'Beta':[1.0]}
     A_vec = [1e-6]
     w0_vec = np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}

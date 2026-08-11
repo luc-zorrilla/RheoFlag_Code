@@ -322,15 +322,15 @@ def to_log10_scale(x, bounds):
     
     # Validate bounds
     if np.any(a < 0):
-        raise ValueError(f"Lower bound a must be positive (got {a})")
+        raise ValueError(f"Lower bound a must be strictly positive (got {a})")
     if np.any(b <= 0) and np.any(not np.isinf(b)):
         raise ValueError(f"Upper bound b must be positive (got {b})")
     
     x = np.asarray(x, dtype=float)
     
-    # Validate x values
+    # Validate x values and clip them otherwise
     if np.any(x < a) or np.any(x > b):
-        raise ValueError(f"All x values must be in bounds ({a}, {b}), and yet x = {x}")
+        x = np.clip(x, a, b)
     
     # Transform bounds to log10 scale
     log_a = log10_or_inf(a)
@@ -362,7 +362,7 @@ def from_log10_scale(log_x, log_bounds):
     
     # Original bounds (for reference/validation)
     a = np.power(10.0, log_a)
-    b = np.power(10.0, log_b) if not np.isinf(log_b) else np.inf
+    b = np.power(10.0, log_b)
     
     return x, Bounds(a, b)
 
@@ -390,46 +390,52 @@ def to_bounded_scale(x, bounds):
     a, b = bounds.lb, bounds.ub
     
     x = np.asarray(x, dtype=float)
+    y = np.zeros_like(x)
+    transform_params = []
     
     # Validate bounds and x
-    if np.all(not np.isinf(a)) and np.all(not np.isinf(b)):
-        if np.any(a >= b):
-            raise ValueError(f"Invalid bounds: a={a} must be < b={b}")
-        if np.any(x < a) or np.any(x > b):
-            raise ValueError(f"All x values must be in bounds ({a}, {b}), and yet x = {x}")
+    for l in range(bounds.lb.shape[0]):
+
+        a = bounds.lb[l]
+        b = bounds.ub[l]
+        x_l = x[l]
         
-        # Finite bounds: linear transformation
-        midpoint = (a + b) / 2.0
-        half_width = (b - a) / 2.0
-        y = (x - midpoint) / half_width
-        transform_params = {'type': 'finite', 'a': a, 'b': b}
-        
-    elif np.isinf(a) and np.isinf(b):
-        # Unbounded: use erf
-        # if np.any(np.isinf(x)):
-        #     raise ValueError(f"x values cannot be infinite")
-        y = erf(x)
-        transform_params = {'type': 'unbounded'}
-        
-    elif np.isinf(b):
-        # Semi-finite: (a, +inf)
-        if a >= 0:
-            raise ValueError(f"Lower bound a must be < +inf")
-        if np.any(x < a): # or np.any(np.isinf(x)):
-            raise ValueError(f"All x values must be in bounds ({a}, +inf), and yet x = {x}")
-        y = erf(np.log(x - a))
-        transform_params = {'type': 'semi_finite_upper', 'a': a}
-        
-    else:
-        # Semi-finite: (-inf, b)
-        if b <= 0:
-            raise ValueError(f"Upper bound b must be > -inf")
-        if np.any(x > b): # or np.any(np.isinf(x)):
-            raise ValueError(f"All x values must be in bounds (-inf, {b}), and yet x = {x}")
-        y = -erf(np.log(b - x))
-        transform_params = {'type': 'semi_finite_lower', 'b': b}
+        if (not np.isinf(a)) and (not np.isinf(b)):
+            if a >= b:
+                raise ValueError(f"Invalid bounds: a={a} must be < b={b}")
+            if x_l < a or x_l > b:
+                raise ValueError(f"x_l value must be in bounds ({a}, {b}), and yet x_l = {x_l}")
+            
+            # Finite bounds: linear transformation
+            midpoint = (a + b) / 2.0
+            half_width = (b - a) / 2.0
+            y[l] = (x_l - midpoint) / half_width
+            transform_params.append({'type': 'finite', 'a': a, 'b': b})
+            
+        elif np.isinf(a) and np.isinf(b):
+            # Unbounded: use erf
+            y[l] = erf(x_l)
+            transform_params.append({'type': 'unbounded'})
+            
+        elif np.isinf(b):
+            # Semi-finite: (a, +inf)
+            if a >= 0:
+                raise ValueError(f"Lower bound a must be < +inf")
+            if np.any(x_l < a):
+                raise ValueError(f"x_l value must be in bounds ({a}, +inf), and yet x_l = {x_l}")
+            y[l] = erf(np.log(x_l - a))
+            transform_params.append({'type': 'semi_finite_upper', 'a': a})
+            
+        else:
+            # Semi-finite: (-inf, b)
+            if b <= 0:
+                raise ValueError(f"Upper bound b must be > -inf")
+            if x_l > b:
+                raise ValueError(f"x_l value must be in bounds (-inf, {b}), and yet x_l = {x_l}")
+            y[l] = -erf(np.log(b - x_l))
+            transform_params.append({'type': 'semi_finite_lower', 'b': b})
     
-    return y, Bounds(-1.0, 1.0), transform_params
+    return y, Bounds(-1.0, 1.0), transform_params # TODO: check whether this works for multidimensional bounds
 
 
 def from_bounded_scale(y, transform_params):
@@ -447,38 +453,45 @@ def from_bounded_scale(y, transform_params):
         ValueError: If y is not in (-1, 1) or if transform_params is invalid
     """
     y = np.asarray(y, dtype=float)
+    x = np.zeros_like(y)
+    A = np.zeros_like(y)
+    B = np.zeros_like(y)
     
     # Validate y is in (-1, 1)
     if np.any(y < -1) or np.any(y > 1):
         raise ValueError(f"All y values must be in (-1, 1)")
     
-    transform_type = transform_params.get('type')
+    for l in range(y.shape[0]):
+        
+        y_l = y[l]
+        transform_type = transform_params[l].get('type')
+        
+        if transform_type == 'finite':
+            a = transform_params[l]['a']
+            b = transform_params[l]['b']
+            midpoint = (a + b) / 2.0
+            half_width = (b - a) / 2.0
+            x[l] = midpoint + y_l * half_width
+            A[l], B[l] = a, b
+            
+        elif transform_type == 'unbounded':
+            x[l] = erfinv(y_l)
+            A[l], B[l] = -np.inf, np.inf
+            
+        elif transform_type == 'semi_finite_upper':
+            a = transform_params[l]['a']
+            x[l] = a + np.exp(erfinv(y_l))
+            A[l], B[l] = a, np.inf
+            
+        elif transform_type == 'semi_finite_lower':
+            b = transform_params[l]['b']
+            x[l] = b - np.exp(erfinv(y_l))
+            A[l], B[l] = -np.inf, b
+            
+        else:
+            raise ValueError(f"Unknown transform type: {transform_type}")
     
-    if transform_type == 'finite':
-        a = transform_params['a']
-        b = transform_params['b']
-        midpoint = (a + b) / 2.0
-        half_width = (b - a) / 2.0
-        x = midpoint + y * half_width
-        bounds = Bounds(a, b)
-        
-    elif transform_type == 'unbounded':
-        x = erfinv(y)
-        bounds = Bounds(-np.inf, np.inf)
-        
-    elif transform_type == 'semi_finite_upper':
-        a = transform_params['a']
-        x = a + np.exp(erfinv(y))
-        bounds = Bounds(a, np.inf)
-        
-    elif transform_type == 'semi_finite_lower':
-        b = transform_params['b']
-        x = b - np.exp(erfinv(y))
-        bounds = Bounds(-np.inf, b)
-        
-    else:
-        raise ValueError(f"Unknown transform type: {transform_type}")
-    
+    bounds = Bounds(A, B)
     return x, bounds
 
 def to_log10_bounded_scale(x, bounds):
@@ -580,8 +593,8 @@ def dual_annealing_optimizer(
         global_minimizer_kwargs: Dict with dual annealing configuration:
             {
                 'maxiter': 1000,  # Maximum iterations
-                'initial_temp': 5230.0,  # Initial temperature
-                'restart_temp_ratio': 2e-5,  # Restart temperature ratio
+                'initial_temp': 40,  # Initial temperature
+                'restart_temp_ratio': 1e-3,  # Restart temperature ratio
                 'visit': 2.62,  # Visit parameter
                 'accept': -5.0,  # Accept parameter
                 'maxfun':10000000, # Soft limit for the number of objective function calls
@@ -615,7 +628,7 @@ def dual_annealing_optimizer(
         
         # Create bounds for the transformed space [-1, 1]^n
         n_params = len(y0)
-        bounds_transformed = Bounds(
+        bounds_transformed = Bounds( # TODO: this might not be necessary as it could be replaced by Bounds(-1, 1)
             lb=np.full(n_params, -1.0),
             ub=np.full(n_params, 1.0)
         )
@@ -697,7 +710,7 @@ def dual_annealing_optimizer(
     # --- Set defaults for global minimizer ---
     global_minimizer_kwargs = global_minimizer_kwargs or {
         'maxiter': 1000,
-        'initial_temp': 20,
+        'initial_temp': 40,
         'restart_temp_ratio': 1e-3,
         'visit': 2.62,
         'accept': -5.0,
@@ -709,8 +722,8 @@ def dual_annealing_optimizer(
     
     # --- Extract global minimizer parameters ---
     maxiter = global_minimizer_kwargs.pop('maxiter', 1000)
-    initial_temp = global_minimizer_kwargs.pop('initial_temp', 5230.0)
-    restart_temp_ratio = global_minimizer_kwargs.pop('restart_temp_ratio', 2e-5)
+    initial_temp = global_minimizer_kwargs.pop('initial_temp', 40)
+    restart_temp_ratio = global_minimizer_kwargs.pop('restart_temp_ratio', 1e-3)
     visit = global_minimizer_kwargs.pop('visit', 2.62)
     accept = global_minimizer_kwargs.pop('accept', -5.0)
     maxfun = global_minimizer_kwargs.pop('maxfun', 10000000)
@@ -966,8 +979,8 @@ def make_optimizer_kwargs(
     },
     dual_annealing_kwargs={
         'maxiter': 1000,
-        'initial_temp': 5230.0,
-        'restart_temp_ratio': 2e-5,
+        'initial_temp': 40,
+        'restart_temp_ratio': 1e-3,
         'visit': 2.62,
         'accept': -5.0,
         'maxfun': 10000000,
@@ -1012,7 +1025,7 @@ def make_optimizer_kwargs(
 def _make_optimizer_bounds(param_keys_to_infer):
     """Create optimizer bounds for given parameter keys."""
     lb = [
-        0 if ('Beta' in param_key or 'tau_b' in param_key or 'tau_s' in param_key) 
+        1e-6 if ('Beta' in param_key or 'tau_b' in param_key or 'tau_s' in param_key) 
         else (1e-6 if 'Sp4' in param_key else 0) 
         for param_key in param_keys_to_infer
     ]
@@ -1955,20 +1968,3 @@ def _print_summary_statistics_general(results_summary, int_params_list, ext_para
     print(f"  ✓ Pass 2 (Viscous): Optimizes on {w0_pos_count} models at w0>0")
     
     print("=" * 80)
-
-if __name__ == "__main__":
-
-    a = 0
-    b = 1e6
-    init_bounds = Bounds(a,b)
-    x_init = 5e5
-
-    print(f"init_bounds = {init_bounds}, x_init = {x_init}")
-
-    log_x, log_bounds = to_log10_scale(x_init, init_bounds)
-
-    print(f"log_bounds = {log_bounds}, log_x = {log_x}")
-
-    scaled_x, scaled_bounds, transform_params = to_bounded_scale(log_x, log_bounds)
-
-    print(f"scaled_bounds = {scaled_bounds}, scaled_x = {scaled_x}, transform_params = {transform_params}")    

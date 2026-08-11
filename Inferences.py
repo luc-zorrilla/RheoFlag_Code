@@ -764,9 +764,10 @@ class Inference:
             if np.any(diag < 0):
                 print(
                     f"Warning: Covariance matrix has negative diagonal elements "
-                    f"(min: {np.min(diag):.2e}). Clipping to zero."
+                    f"(min: {np.min(diag):.2e}). Clipping to infinity."
                 )
-                np.fill_diagonal(self.covariance, np.maximum(diag, 0))
+                self.hessian = np.zeros_like(self.hessian)
+                self.covariance = np.ones_like(self.covariance) * np.inf
 
         # Reconstruct optimal parameters
         optimal_params = {key: self.result.x[i] for i, key in enumerate(param_keys)}
