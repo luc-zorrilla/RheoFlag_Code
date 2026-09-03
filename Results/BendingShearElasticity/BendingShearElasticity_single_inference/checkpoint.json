@@ -1,6 +1,6 @@
 {
   "stage": "inference",
-  "timestamp": "2026-08-10 17:41:13.163362",
+  "timestamp": "2026-08-12 16:13:48.966048",
   "simulation_entries": {
     "int_0_pair_all": {
       "task_key": "int_0_pair_all",
@@ -129,12 +129,6 @@
       "completed": true,
       "timestamp": "2026-08-10 14:39:44.972995",
       "filepath": "artifacts/inference/int_002_ext_000.pkl"
-    },
-    "int_002_ext_001": {
-      "task_key": "int_002_ext_001",
-      "completed": true,
-      "timestamp": "2026-08-10 14:42:43.258228",
-      "filepath": "artifacts/inference/int_002_ext_001.pkl"
     },
     "int_002_ext_002": {
       "task_key": "int_002_ext_002",
@@ -376,10 +370,16 @@
       "timestamp": "2026-08-10 17:16:34.790961",
       "filepath": "artifacts/inference/int_003_ext_003.pkl"
     },
+    "int_002_ext_001": {
+      "task_key": "int_002_ext_001",
+      "completed": true,
+      "timestamp": "2026-08-12 15:35:45.754808",
+      "filepath": "artifacts/inference/int_002_ext_001.pkl"
+    },
     "int_006_ext_003": {
       "task_key": "int_006_ext_003",
       "completed": true,
-      "timestamp": "2026-08-10 17:41:13.163346",
+      "timestamp": "2026-08-12 16:13:48.966029",
       "filepath": "artifacts/inference/int_006_ext_003.pkl"
     }
   }

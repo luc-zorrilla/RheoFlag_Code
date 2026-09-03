@@ -825,10 +825,13 @@ def make_ground_truth_int_params(
     gamma = 2,
     n_L = [0,0],
     m_L = 0,
-    X_0 = StraightLine(10),
+    X_0 = None,
 ):
+    if X_0 is None:
+        X_0 = StraightLine(N)
+    else:
+        assert X_0.shape[0] == N+2, f"{X_0.shape[0]} is not of shape {N+2}"
 
-    assert X_0.shape[0] == N+2, f"{X_0.shape[0]} is not of shape {N+2}"
     return {
         'Sp4': Sp4,           # Ground truth to recover
         'N': N,            
@@ -840,17 +843,16 @@ def make_ground_truth_int_params(
         'gamma': gamma,         
         'n_L': n_L,            
         'm_L': m_L,             
-        'X_0': X_0,  # Initial state
+        'X_0': X_0,
     }
 
 def make_ground_truth_ext_params(
-    Lambdas = [[0,0]]*10,
-    Zetas = [0]*10,
+    Lambdas = None,
+    Zetas = None,
     A = 1e-6,
     w0 = 0, # Static flow
-    psi = np.pi/2,    
+    psi = np.pi/2,
 ):
-    assert abs(len(Lambdas) - len(Zetas)) == 0, f"{abs(len(Lambdas) - len(Zetas))} != 0"
     return {
         "Lambdas": Lambdas,
         "Zetas": Zetas,
@@ -1504,7 +1506,6 @@ def workflow_elastic_viscous_simulation(
     ]
     
     int_params_list = [make_ground_truth_int_params(**int_params) for int_params in int_params_list]
-    
     int_params_metadata = [
         {name: params[name] for name in int_param_names}
         for params in int_params_list
@@ -1548,17 +1549,17 @@ def workflow_elastic_viscous_simulation(
     print("-" * 80)
     
     # Create reduced model class
-    ReducedModel = model_params_only_flow(
-        int_params_list[0],
+    ReducedModel_list = [model_params_only_flow(
+        int_params_list[int_idx],
         param_keys_to_infer,
-    )
+    ) for int_idx in range(len(int_params_list))]
     
     # Run simulations
     model_lists = workflow.run_simulations(
         int_params_list=int_params_list,
         ext_params_list=ext_params_list,
         sim_params_list=sim_params_list,
-        model_class=ReducedModel,
+        model_class_list=ReducedModel_list,
         n_jobs=n_jobs_simulation,
     )
     
@@ -1572,7 +1573,7 @@ def workflow_elastic_viscous_simulation(
     print("\n" + "=" * 80)
     print("✓ SIMULATION-ONLY WORKFLOW COMPLETE!")
     print("=" * 80)
-    
+
     return {
         'model_lists': model_lists,
         'int_param_ranges': int_param_ranges,
@@ -1752,16 +1753,18 @@ def workflow_elastic_viscous_general(
     print("PHASE 1: Running Simulations for All Int-Params Combinations")
     print("-" * 80)
     
-    ReducedModel = model_params_only_flow(
-        int_params_list[0],
+    # Create reduced model class
+    ReducedModel_list = [model_params_only_flow(
+        int_params_list[int_idx],
         param_keys_to_infer,
-    )
+    ) for int_idx in range(len(int_params_list))]
+    
     
     model_lists = workflow.run_simulations(
         int_params_list=int_params_list,
         ext_params_list=ext_params_list,
         sim_params_list=sim_params_list,
-        model_class=ReducedModel,
+        model_class_list=ReducedModel_list,
         n_jobs=n_jobs_simulation,
     )
     

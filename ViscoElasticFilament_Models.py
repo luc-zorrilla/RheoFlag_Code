@@ -549,6 +549,13 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
     Returns: {"value": np.ndarray, "shape": tuple} # Is shape necessary?
     """
 
+    # Modify Lambdas and Zetas if they are None
+    N = int_params['N']
+    if ext_params['Lambdas'] is None:
+        ext_params['Lambdas'] = [[0, 0]] * N
+    if ext_params['Zetas'] is None:
+        ext_params['Zetas'] = [0] * N
+
     Args = (
         # Internal parameters
         int_params['Sp4'],
@@ -643,6 +650,7 @@ class ViscoElasticFilament(Model):
         """
         Run forward simulation for a single instance of the viscoelastic filament.
         """
+        
         res = ViscoElasticFilament_Simulate(self.int_params, self.ext_params, self.sim_params)
         self.sim_output = res
         return res

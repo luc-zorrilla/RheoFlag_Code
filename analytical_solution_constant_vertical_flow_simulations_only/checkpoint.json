@@ -1,0 +1,127 @@
+{
+  "stage": "simulation",
+  "timestamp": "2026-09-03 16:28:54.230984",
+  "simulation_entries": {
+    "int_0_pair_all": {
+      "task_key": "int_0_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:26:33.915743",
+      "filepath": "artifacts/models/int_0_pair_all.pkl"
+    },
+    "int_1_pair_all": {
+      "task_key": "int_1_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:26:34.265813",
+      "filepath": "artifacts/models/int_1_pair_all.pkl"
+    },
+    "int_2_pair_all": {
+      "task_key": "int_2_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:26:35.721810",
+      "filepath": "artifacts/models/int_2_pair_all.pkl"
+    },
+    "int_3_pair_all": {
+      "task_key": "int_3_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:26:36.614027",
+      "filepath": "artifacts/models/int_3_pair_all.pkl"
+    },
+    "int_4_pair_all": {
+      "task_key": "int_4_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:26:37.593011",
+      "filepath": "artifacts/models/int_4_pair_all.pkl"
+    },
+    "int_5_pair_all": {
+      "task_key": "int_5_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:26:40.827321",
+      "filepath": "artifacts/models/int_5_pair_all.pkl"
+    },
+    "int_6_pair_all": {
+      "task_key": "int_6_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:26:44.812167",
+      "filepath": "artifacts/models/int_6_pair_all.pkl"
+    },
+    "int_7_pair_all": {
+      "task_key": "int_7_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:26:49.587247",
+      "filepath": "artifacts/models/int_7_pair_all.pkl"
+    },
+    "int_8_pair_all": {
+      "task_key": "int_8_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:26:57.478104",
+      "filepath": "artifacts/models/int_8_pair_all.pkl"
+    },
+    "int_10_pair_all": {
+      "task_key": "int_10_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:27:05.213822",
+      "filepath": "artifacts/models/int_10_pair_all.pkl"
+    },
+    "int_9_pair_all": {
+      "task_key": "int_9_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:27:09.480173",
+      "filepath": "artifacts/models/int_9_pair_all.pkl"
+    },
+    "int_11_pair_all": {
+      "task_key": "int_11_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:27:14.531341",
+      "filepath": "artifacts/models/int_11_pair_all.pkl"
+    },
+    "int_12_pair_all": {
+      "task_key": "int_12_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:27:26.925579",
+      "filepath": "artifacts/models/int_12_pair_all.pkl"
+    },
+    "int_13_pair_all": {
+      "task_key": "int_13_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:27:40.740568",
+      "filepath": "artifacts/models/int_13_pair_all.pkl"
+    },
+    "int_14_pair_all": {
+      "task_key": "int_14_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:27:53.439566",
+      "filepath": "artifacts/models/int_14_pair_all.pkl"
+    },
+    "int_15_pair_all": {
+      "task_key": "int_15_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:28:09.601334",
+      "filepath": "artifacts/models/int_15_pair_all.pkl"
+    },
+    "int_16_pair_all": {
+      "task_key": "int_16_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:28:24.936333",
+      "filepath": "artifacts/models/int_16_pair_all.pkl"
+    },
+    "int_17_pair_all": {
+      "task_key": "int_17_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:28:38.076694",
+      "filepath": "artifacts/models/int_17_pair_all.pkl"
+    },
+    "int_18_pair_all": {
+      "task_key": "int_18_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:28:47.173000",
+      "filepath": "artifacts/models/int_18_pair_all.pkl"
+    },
+    "int_19_pair_all": {
+      "task_key": "int_19_pair_all",
+      "completed": true,
+      "timestamp": "2026-09-03 16:28:54.230964",
+      "filepath": "artifacts/models/int_19_pair_all.pkl"
+    }
+  },
+  "inference_entries": {}
+}
