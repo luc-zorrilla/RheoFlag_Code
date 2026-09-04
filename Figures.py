@@ -1310,10 +1310,10 @@ def plot_fig_S1(
     n_internal = len(int_param_values)
     
     # Create plot
-    fig = go.Figure()
+    fig_S1_a = go.Figure()
 
     # Second figure: L2 error between simulation and analytical solution for small uniform vertical flow
-    fig2 = go.Figure()
+    fig_S1_b = go.Figure()
     
     if len(int_param_values) > 1:
         # Normalize internal parameter values for colormap
@@ -1386,7 +1386,7 @@ def plot_fig_S1(
                     if 'Beta' in int_param_name:
                         y_trajectory *= 1
                     
-                    fig.add_trace(
+                    fig_S1_a.add_trace(
                         go.Scatter(
                             x=x_trajectory,
                             y=y_trajectory,
@@ -1401,7 +1401,7 @@ def plot_fig_S1(
                             marker=dict(size=4, color=colors_int[int_idx]),
                         ),
                     )
-                    fig.add_trace(
+                    fig_S1_a.add_trace(
                         go.Scatter(
                             x=x_eq_trajectory,
                             y=y_eq_trajectory,
@@ -1418,7 +1418,7 @@ def plot_fig_S1(
 
     N_array = np.array(N_array)
     error_array = np.array(error_array)
-    fig2.add_trace(
+    fig_S1_b.add_trace(
         go.Scatter(
             x = 1/N_array,
             y = error_array,
@@ -1427,22 +1427,21 @@ def plot_fig_S1(
             marker=dict(size=4, color="black"),
         )
     )
-    fig2.update_xaxes(type = "log")
-    fig2.update_yaxes(type = "log")
-    fig2.show()
+    fig_S1_b.update_xaxes(type = "log")
+    fig_S1_b.update_yaxes(type = "log")
     
     # Update axes
-    fig.update_xaxes(title_text=x_label)
-    fig.update_yaxes(title_text=y_label)
+    fig_S1_a.update_xaxes(title_text=x_label)
+    fig_S1_a.update_yaxes(title_text=y_label)
     
     if log_scale:
-        fig.update_xaxes(type='log')
-        fig.update_yaxes(type='log')
+        fig_S1_a.update_xaxes(type='log')
+        fig_S1_a.update_yaxes(type='log')
     
     if title is None:
         title = f"Phase-Space Trajectories color-coded by {int_param_name})"
     
-    fig.update_layout(
+    fig_S1_a.update_layout(
         title=title,
         hovermode='closest',
         legend=dict(title=int_param_name),
@@ -1450,7 +1449,7 @@ def plot_fig_S1(
         width=1400,
     )
     
-    return fig    
+    return fig_S1_a, fig_S1_b  
 
 
 def CheckEquilibrium(N, A, gamma, Sp4, n_L = [0,0], Lambdas=[[0,0]], conditions = "None", n_eq = 1000):
@@ -1524,7 +1523,7 @@ if __name__ == "__main__":
     N_vec =  np.array([5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100])
     int_param_ranges = {'N': N_vec}
 
-    A_vec = np.array([1e-6, 1e-10]) # "A" quantifies the strength of the flow compared to the elastic forces, on one segment. It does not guarantee no movement at the whole filament scale, though. TODO: check Deborah number
+    A_vec = np.array([1e-10]) # "A" quantifies the strength of the flow compared to the elastic forces, on one segment. It does not guarantee no movement at the whole filament scale, though.
     ext_param_ranges = {'A': A_vec}
 
     # Simulate
@@ -1540,15 +1539,52 @@ if __name__ == "__main__":
     int_params_metadata = simulation_output['int_params_metadata']
     ext_params_list = simulation_output['ext_params_list']
 
-    fig = plot_fig_S1(
+    fig_S1_a, fig_S1_b = plot_fig_S1(
         model_lists, int_params_metadata, ext_params_list,
         int_param_name='N', ext_param_name='A',
         x_label='x', y_label='y',
         colorscale='Viridis', log_scale=False
     )
-    fig.write_image("Figures/analytical_solution_constant_vertical_flow.svg")
-    fig.write_html("Figures/analytical_solution_constant_vertical_flow.html")
-    fig.show()
+    fig_S1_a.write_image("Figures/analytical_solution_constant_vertical_flow_a.svg")
+    fig_S1_a.write_html("Figures/analytical_solution_constant_vertical_flow_a.html")
+    fig_S1_a.show()
+    fig_S1_b.write_image("Figures/analytical_solution_constant_vertical_flow_b.svg")
+    fig_S1_b.write_html("Figures/analytical_solution_constant_vertical_flow_b.html")
+    fig_S1_b.show()
+
+    # --------------------- #
+    # Figure 1: Counterbend #
+    # --------------------- #
+
+    Beta_vec = np.array([1e-1, 1e0, 1e1])
+    int_param_ranges = {'Beta': Beta_vec}
+
+    A_vec = np.array([1e-10])
+    ext_param_ranges = {'A': A_vec}
+
+    # Simulate
+    simulation_output = workflow_elastic_viscous_simulation(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        param_keys_to_infer=[],
+        n_jobs_simulation=-1,
+        checkpoint_str = "./counterbend",
+    )
+
+    model_lists = simulation_output['model_lists']
+    int_params_metadata = simulation_output['int_params_metadata']
+    ext_params_list = simulation_output['ext_params_list']
+
+
+    fig_1 = plot_fig_1(
+        model_lists, int_params_metadata, ext_params_list,
+        int_param_name='Beta', ext_param_name='A',
+        x_label='x', y_label='y',
+        colorscale='Viridis', log_scale=False
+    )
+    fig_1.write_image("Figures/counterbend.svg")
+    fig_1.write_html("Figures/counterbend.html")
+    fig_1.show()
 
 if __name__ is None:
     
