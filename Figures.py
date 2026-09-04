@@ -1619,14 +1619,14 @@ def plot_fig_1(
                     fig_1_b.add_trace(
                         go.Heatmap(
                             x=np.linspace(0, 1, len(theta_trajectory)),
-                            y=[np.log10(int_param_val)],
+                            y=[int_param_val],
                             z=[np.log10(theta_trajectory)],
-                            colorscale=colorscale,
-                            zmin = -20,
+                            colorscale="RdBu",
+                            zmin = -25,
                             zmax = 0,
                             hovertemplate=(
                                 f"<b>s</b>: %{{x:.4f}}<br>"
-                                f"<b>log_{10}{int_param_name}</b>: %{{y:.4f}}<br>"
+                                f"<b>{int_param_name}</b>: %{{y:.4f}}<br>"
                                 f"<b>Theta</b>: %{{z:.6e}}<extra></extra>"
                             ),
                             colorbar=dict(title="Theta"),
@@ -1648,11 +1648,11 @@ def plot_fig_1(
         width=1400,
     )
 
-    theta_min = 1e-20 # np.min([np.min(theta_traj) for theta_traj in all_theta_trajectories])
+    theta_min = 1e-25 # np.min([np.min(theta_traj) for theta_traj in all_theta_trajectories])
     theta_max = 1e0 # np.max([np.max(theta_traj) for theta_traj in all_theta_trajectories])
     for k in range(len(fig_1_b.data)):
         fig_1_b.data[k].update(zmin=np.log10(theta_min), zmax=np.log10(theta_max))
-    # fig_1_b.update_yaxes(type = "log")
+    fig_1_b.update_yaxes(type = "log")
     fig_1_b.update_layout(
         title=f"log10 theta(s, {int_param_name})",
         xaxis_title="s",
