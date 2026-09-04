@@ -17,7 +17,7 @@ def StraightLine(N):
 
 def Bend(N, k = 2, phi = np.pi / 4):
     """ A bend (of the kth segment). k = 2 and phi = pi/4 corresponds to ProximalBend """
-    X_0 = np.zeros(N+2, np.double)
+    X_0 = np.zeros(N+2, dtype = np.double)
     X_0[k] = phi
     return X_0
 
@@ -471,11 +471,10 @@ def g(
     if callable(InterpFlow):
         X_flow = InterpFlow(t) # Only t-dependent component
     else:
-        if type(InterpFlow) == float:
+        if type(InterpFlow) == float or type(InterpFlow) == int:
             X_flow = np.array([0])
         elif InterpFlow.size == 2: 
             X_flow = InterpFlow
-        
     X_dot_flow = Flow(X_3N, X_flow)
 
     # --- BFlow ---
@@ -662,7 +661,6 @@ def FlowParams_to_InterpFlow(int_params, ext_params, sim_params):
     ## Intermediate parameters
     T_eval = sim_params['T_eval']
     X_flow_field_string, X_flow_field = CreateFlowField(ext_params['A'], ext_params['w0'], ext_params['psi'], T_eval)
-
     ## Final parameters # TODO: modify so that one gets an interpolated flow in time except when "CONSTANT FLOW" (len(T_eval)==1)
     if ("NO FLOW" in X_flow_field_string):
         InterpFlow = 0

@@ -11,7 +11,7 @@ import json
 import numpy as np
 from scipy.spatial.distance import directed_hausdorff
 
-from ViscoElasticFilament_Models import X3N
+from ViscoElasticFilament_Models import X3N, Bend, StraightLine
 from ViscoElasticFilament_Inferences import workflow_elastic_viscous_simulation, workflow_elastic_viscous_general, basinhopping_optimizer, dual_annealing_optimizer, rel_mse
 
 def plot_model_distance_comparison(
@@ -1275,6 +1275,64 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
     
     return fig
 
+
+def CheckEquilibrium(N, A, gamma, Sp4, n_L = [0,0], Lambdas=[[0,0]], conditions = "None", n_eq = 1000):
+
+    """ Returns a figure with equilibrium position of a shape dynamics and computes analytical solution for small deflection: 
+    - vertical point force at tip - "vertical_point_tip"
+    - vertical density force on tip - "vertical_density_tip"
+    - vertical uniform density force along the beam - "vertical_density_uniform"
+    - vertical uniform flow - "vertical_flow_uniform"
+
+    All analytical solutions are computed in the case of an initial horizontal beam, assuming equilibrium and small deflection.
+    References for analytical solutions: [Felgner et. al. , Journal of Cell Science, 1996]
+    
+    Remark: total filament length = N but only N-1 segments are represented (N first points). 
+
+    Returns X_eq with 2 * n_eq points:
+        - n_eq points for x = s (small deflection approximation), such that s in [0,N] -> [0,L]
+        - n_eq points for y, 
+    """
+
+    ## Analytical equilibrium solution
+    X_eq = np.zeros((2*n_eq))
+    theta_eq = np.zeros((n_eq))
+
+    X_eq[:n_eq] = np.linspace(start = 0, stop = N, num = n_eq) # Arclength = horizontal position in the small amplitude regime
+    x_eq_neq = N
+
+    # For a vertical point force at distal end
+    if conditions == "vertical_point_tip":
+        F = n_L[1]
+        X_eq[n_eq:] = (3 * (X_eq[:n_eq]/(N))**2 - (X_eq[:n_eq]/(N))**3 ) * F * ((N)**3) / 6
+        y_eq_neq = (3 * (x_eq_neq/(N))**2 - (x_eq_neq/(N))**3 ) * F * ((N)**3) / 6
+
+    # For a density force at distal segment
+    elif conditions == "vertical_density_tip":
+        F = Lambdas[-1][1]
+        X_eq[n_eq:] = (3 * (X_eq[:n_eq]/N)**2 - (X_eq[:n_eq]/N)**3) * F * (N**3) / 6
+        y_eq_neq = (3 * (x_eq_neq/N)**2 - (x_eq_neq/N)**3) * F * (N**3) / 6
+
+    # For a uniform vertical force
+    elif conditions == "vertical_density_uniform":
+        f = Lambdas[0][1]
+        X_eq[n_eq:] = ( (X_eq[:n_eq]/N)**4 - 4*(X_eq[:n_eq]/N)**3 + 6*(X_eq[:n_eq]/N)**2 ) * f * (N**4) / 24
+        y_eq_neq = ( (x_eq_neq/N)**4 - 4*(x_eq_neq/N)**3 + 6*(x_eq_neq/N)**2 ) * f * (N**4) / 24
+
+    # For a uniform small vertical flow
+    elif conditions == "vertical_flow_uniform":
+        X_eq[n_eq:] = ( (X_eq[:n_eq]/N)**4 - 4*(X_eq[:n_eq]/N)**3 + 6*(X_eq[:n_eq]/N)**2 ) * A * gamma * Sp4 *(N**4) / 24
+        y_eq_neq = ( (x_eq_neq/N)**4 - 4*(x_eq_neq/N)**3 + 6*(x_eq_neq/N)**2 ) * A * gamma * Sp4 *(N**4) / 24
+        
+    else:
+        print("No condition for exact solution has been specified.")
+        return NameError
+    
+    theta_eq[:-1] = np.arctan2(X_eq[n_eq+1:], X_eq[1:n_eq])
+    theta_eq[-1] = np.arctan2(y_eq_neq, x_eq_neq)
+    X_3N_eq = np.vstack((X_eq.reshape((-1,1)), theta_eq.reshape(-1,1))) # Thetas are filled to zero here!
+    return X_3N_eq
+
 def plot_fig_S1(
     model_lists: Dict[int, ModelList],
     int_params_metadata: List[Dict[str, Any]],
@@ -1452,63 +1510,158 @@ def plot_fig_S1(
     return fig_S1_a, fig_S1_b  
 
 
-def CheckEquilibrium(N, A, gamma, Sp4, n_L = [0,0], Lambdas=[[0,0]], conditions = "None", n_eq = 1000):
-
-    """ Returns a figure with equilibrium position of a shape dynamics and computes analytical solution for small deflection: 
-    - vertical point force at tip - "vertical_point_tip"
-    - vertical density force on tip - "vertical_density_tip"
-    - vertical uniform density force along the beam - "vertical_density_uniform"
-    - vertical uniform flow - "vertical_flow_uniform"
-
-    All analytical solutions are computed in the case of an initial horizontal beam, assuming equilibrium and small deflection.
-    References for analytical solutions: [Felgner et. al. , Journal of Cell Science, 1996]
-    
-    Remark: total filament length = N but only N-1 segments are represented (N first points). 
-
-    Returns X_eq with 2 * n_eq points:
-        - n_eq points for x = s (small deflection approximation), such that s in [0,N] -> [0,L]
-        - n_eq points for y, 
+def plot_fig_1(
+    model_lists: Dict[int, ModelList],
+    int_params_metadata: List[Dict[str, Any]],
+    ext_params_list: List[Dict[str, Any]],
+    int_param_name: str = 'Sp4',
+    ext_param_name: str = 'A',
+    title: Optional[str] = None,
+    x_label: str = "x",
+    y_label: str = "y",
+    colorscale: str = 'Viridis',
+) -> go.Figure:
     """
-
-    ## Analytical equilibrium solution
-    X_eq = np.zeros((2*n_eq))
-    theta_eq = np.zeros((n_eq))
-
-    X_eq[:n_eq] = np.linspace(start = 0, stop = N, num = n_eq) # Arclength = horizontal position in the small amplitude regime
-    x_eq_neq = N
-
-    # For a vertical point force at distal end
-    if conditions == "vertical_point_tip":
-        F = n_L[1]
-        X_eq[n_eq:] = (3 * (X_eq[:n_eq]/(N))**2 - (X_eq[:n_eq]/(N))**3 ) * F * ((N)**3) / 6
-        y_eq_neq = (3 * (x_eq_neq/(N))**2 - (x_eq_neq/(N))**3 ) * F * ((N)**3) / 6
-
-    # For a density force at distal segment
-    elif conditions == "vertical_density_tip":
-        F = Lambdas[-1][1]
-        X_eq[n_eq:] = (3 * (X_eq[:n_eq]/N)**2 - (X_eq[:n_eq]/N)**3) * F * (N**3) / 6
-        y_eq_neq = (3 * (x_eq_neq/N)**2 - (x_eq_neq/N)**3) * F * (N**3) / 6
-
-    # For a uniform vertical force
-    elif conditions == "vertical_density_uniform":
-        f = Lambdas[0][1]
-        X_eq[n_eq:] = ( (X_eq[:n_eq]/N)**4 - 4*(X_eq[:n_eq]/N)**3 + 6*(X_eq[:n_eq]/N)**2 ) * f * (N**4) / 24
-        y_eq_neq = ( (x_eq_neq/N)**4 - 4*(x_eq_neq/N)**3 + 6*(x_eq_neq/N)**2 ) * f * (N**4) / 24
-
-    # For a uniform small vertical flow
-    elif conditions == "vertical_flow_uniform":
-        X_eq[n_eq:] = ( (X_eq[:n_eq]/N)**4 - 4*(X_eq[:n_eq]/N)**3 + 6*(X_eq[:n_eq]/N)**2 ) * A * gamma * Sp4 *(N**4) / 24
-        y_eq_neq = ( (x_eq_neq/N)**4 - 4*(x_eq_neq/N)**3 + 6*(x_eq_neq/N)**2 ) * A * gamma * Sp4 *(N**4) / 24
-        
-    else:
-        print("No condition for exact solution has been specified.")
-        return NameError
+    Args:
+        model_lists: Dictionary mapping indices to ModelList objects
+        int_params_metadata: List of dicts, each containing internal parameter values
+        ext_params_list: List of external parameter dicts (each with 'A' key)
+        int_param_name: Name of the internal parameter for subplots (e.g., 'Sp4')
+        ext_param_name: Name of the external parameter for coloring (e.g., 'A')
+        title: Plot title
+        x_label: X-axis label
+        y_label: Y-axis label
+        log_scale: Whether to use log scale for axes
+        colorscale: Plotly colorscale name (e.g., 'Viridis', 'Blues', 'Reds')
     
-    theta_eq[:-1] = np.arctan2(X_eq[n_eq+1:], X_eq[1:n_eq])
-    theta_eq[-1] = np.arctan2(y_eq_neq, x_eq_neq)
-    X_3N_eq = np.vstack((X_eq.reshape((-1,1)), theta_eq.reshape(-1,1))) # Thetas are filled to zero here!
-    return X_3N_eq
+    Returns:
+        Plotly Figure with subplots
+    """
+    # Extract internal and external parameter values
+    int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
+    ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
+    
+    n_internal = len(int_param_values)
+    
+    # Create plot
+    fig_1_a = go.Figure()
+    fig_1_b = go.Figure()
 
+    if len(int_param_values) > 1:
+        # Normalize internal parameter values for colormap
+        int_param_min = min(int_param_values)
+        int_param_max = max(int_param_values)
+        int_param_norm = [
+            (val - int_param_min) / (int_param_max - int_param_min) 
+            for val in int_param_values
+        ]
+    else: # Only one internal parameter
+        int_param_norm = [0]
+
+    # Get colors for external parameters
+    colors_int = px.colors.sample_colorscale(
+        colorscale, 
+        int_param_norm,
+    )
+
+    all_theta_trajectories = []
+    # Plot one trace per external parameter in each subplot
+    for int_idx in sorted(model_lists.keys()):
+        model_list = model_lists[int_idx]
+        int_param_val = int_param_values[int_idx]
+        
+        # Iterate through all external parameters
+        for ext_idx in range(len(model_list.models)):
+            model = model_list.models[ext_idx]
+            ext_param_val = ext_param_values[ext_idx]
+            
+            if model.sim_output is not None:
+                output_data = model.sim_output
+                # Handle both array and dict outputs
+                if isinstance(output_data, dict) and 'value' in output_data:
+                    output_data = output_data['value']
+                
+                output_array = np.array(output_data)
+                
+                if output_array.size > 1:
+                    output_array = np.atleast_1d(output_array)
+                    
+                    # Apply X3N transformation
+                    X_3N = X3N(output_array)
+                    N = X_3N.shape[0] // 3
+                    
+                    # Extract alpha, x and y, and theta trajectories
+                    # alpha_trajectory = output_array[2:]
+                    x_trajectory = X_3N[:N, 0]/N
+                    y_trajectory = X_3N[N:int(2*N), 0]/N
+                    theta_trajectory = X_3N[int(2*N):int(3*N), 0]
+
+                    all_theta_trajectories.append(theta_trajectory)
+
+                    if 'Beta' in int_param_name:
+                        y_trajectory *= int_param_val
+                    
+                    fig_1_a.add_trace(
+                        go.Scatter(
+                            x = x_trajectory,
+                            y = y_trajectory,
+                            mode='lines',
+                            hovertemplate=(
+                                f"<b>{x_label}</b>: %{{x:.6e}}<br>"
+                                f"<b>{y_label}</b>: %{{y:.6e}}<br>"
+                                f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
+                                f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
+                            ),
+                            line=dict(width=2, color=colors_int[int_idx]),
+                        ),
+                    )
+
+                    fig_1_b.add_trace(
+                        go.Heatmap(
+                            x=np.linspace(0, 1, len(theta_trajectory)),
+                            y=[np.log10(int_param_val)],
+                            z=[np.log10(theta_trajectory)],
+                            colorscale=colorscale,
+                            zmin = -20,
+                            zmax = 0,
+                            hovertemplate=(
+                                f"<b>s</b>: %{{x:.4f}}<br>"
+                                f"<b>log_{10}{int_param_name}</b>: %{{y:.4f}}<br>"
+                                f"<b>Theta</b>: %{{z:.6e}}<extra></extra>"
+                            ),
+                            colorbar=dict(title="Theta"),
+                        )
+                    )              
+
+    # Update axes
+    fig_1_a.update_xaxes(title_text=x_label)
+    fig_1_a.update_yaxes(title_text=y_label)
+    
+    if title is None:
+        title = f"Trajectories color-coded by {int_param_name})"
+    
+    fig_1_a.update_layout(
+        title=title,
+        hovermode='closest',
+        legend=dict(title=int_param_name),
+        height=800,
+        width=1400,
+    )
+
+    theta_min = 1e-20 # np.min([np.min(theta_traj) for theta_traj in all_theta_trajectories])
+    theta_max = 1e0 # np.max([np.max(theta_traj) for theta_traj in all_theta_trajectories])
+    for k in range(len(fig_1_b.data)):
+        fig_1_b.data[k].update(zmin=np.log10(theta_min), zmax=np.log10(theta_max))
+    # fig_1_b.update_yaxes(type = "log")
+    fig_1_b.update_layout(
+        title=f"log10 theta(s, {int_param_name})",
+        xaxis_title="s",
+        yaxis_title=int_param_name,
+        height=600,
+        width=1000,
+    )
+    
+    return fig_1_a, fig_1_b
 
 if __name__ == "__main__":
     
@@ -1545,22 +1698,28 @@ if __name__ == "__main__":
         x_label='x', y_label='y',
         colorscale='Viridis', log_scale=False
     )
-    fig_S1_a.write_image("Figures/analytical_solution_constant_vertical_flow_a.svg")
-    fig_S1_a.write_html("Figures/analytical_solution_constant_vertical_flow_a.html")
-    fig_S1_a.show()
-    fig_S1_b.write_image("Figures/analytical_solution_constant_vertical_flow_b.svg")
-    fig_S1_b.write_html("Figures/analytical_solution_constant_vertical_flow_b.html")
-    fig_S1_b.show()
+    # fig_S1_a.write_image("Figures/analytical_solution_constant_vertical_flow_a.svg")
+    # fig_S1_a.write_html("Figures/analytical_solution_constant_vertical_flow_a.html")
+    # fig_S1_a.show()
+    # fig_S1_b.write_image("Figures/analytical_solution_constant_vertical_flow_b.svg")
+    # fig_S1_b.write_html("Figures/analytical_solution_constant_vertical_flow_b.html")
+    # fig_S1_b.show()
 
     # --------------------- #
     # Figure 1: Counterbend #
     # --------------------- #
 
-    Beta_vec = np.array([1e-1, 1e0, 1e1])
-    int_param_ranges = {'Beta': Beta_vec}
-
-    A_vec = np.array([1e-10])
-    ext_param_ranges = {'A': A_vec}
+    N = 100
+    N_vec = np.array([N])
+    Beta_vec = np.logspace(start = -1, stop = 1, num = 100)
+    X_0 = [StraightLine(N)]
+    int_param_ranges = {'N': N_vec, 'Beta': Beta_vec, 'X_0':X_0}
+    
+    Zetas = [0]*N
+    Zetas[N//2] = 1e-2
+    Zetas_vec = [Zetas]
+    A_vec = np.array([0])
+    ext_param_ranges = {'A':A_vec, 'Zetas':Zetas_vec}
 
     # Simulate
     simulation_output = workflow_elastic_viscous_simulation(
@@ -1575,16 +1734,19 @@ if __name__ == "__main__":
     int_params_metadata = simulation_output['int_params_metadata']
     ext_params_list = simulation_output['ext_params_list']
 
-
-    fig_1 = plot_fig_1(
+    fig_1_a, fig_1_b = plot_fig_1(
         model_lists, int_params_metadata, ext_params_list,
         int_param_name='Beta', ext_param_name='A',
         x_label='x', y_label='y',
-        colorscale='Viridis', log_scale=False
+        colorscale='Viridis',
     )
-    fig_1.write_image("Figures/counterbend.svg")
-    fig_1.write_html("Figures/counterbend.html")
-    fig_1.show()
+
+    fig_1_a.write_image("Figures/counterbend_a.svg")
+    fig_1_a.write_html("Figures/counterbend_a.html")
+    fig_1_a.show()
+    fig_1_b.write_image("Figures/counterbend_b.svg")
+    fig_1_b.write_html("Figures/counterbend_b.html")
+    fig_1_b.show()
 
 if __name__ is None:
     
