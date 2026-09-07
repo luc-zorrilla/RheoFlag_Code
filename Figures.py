@@ -1565,6 +1565,9 @@ def plot_fig_1(
     )
 
     all_theta_trajectories = []
+    theta_matrix = []  # List to store rows for the heatmap
+    y_axis_values = []  # Store corresponding int_param_values
+
     # Plot one trace per external parameter in each subplot
     for int_idx in sorted(model_lists.keys()):
         model_list = model_lists[int_idx]
@@ -1616,22 +1619,9 @@ def plot_fig_1(
                         ),
                     )
 
-                    fig_1_b.add_trace(
-                        go.Heatmap(
-                            x=np.linspace(0, 1, len(theta_trajectory)),
-                            y=[int_param_val],
-                            z=[np.log10(theta_trajectory)],
-                            colorscale="RdBu",
-                            zmin = -25,
-                            zmax = 0,
-                            hovertemplate=(
-                                f"<b>s</b>: %{{x:.4f}}<br>"
-                                f"<b>{int_param_name}</b>: %{{y:.4f}}<br>"
-                                f"<b>Theta</b>: %{{z:.6e}}<extra></extra>"
-                            ),
-                            colorbar=dict(title="Theta"),
-                        )
-                    )              
+                    # Store data for heatmap (only add once per int_param_val)
+                    theta_matrix.append(np.log10(theta_trajectory))
+                    y_axis_values.append(int_param_val)
 
     # Update axes
     fig_1_a.update_xaxes(title_text=x_label)
@@ -1648,15 +1638,32 @@ def plot_fig_1(
         width=1400,
     )
 
-    theta_min = 1e-25 # np.min([np.min(theta_traj) for theta_traj in all_theta_trajectories])
-    theta_max = 1e0 # np.max([np.max(theta_traj) for theta_traj in all_theta_trajectories])
-    for k in range(len(fig_1_b.data)):
-        fig_1_b.data[k].update(zmin=np.log10(theta_min), zmax=np.log10(theta_max))
+    # theta_min = 1e-25 # np.min([np.min(theta_traj) for theta_traj in all_theta_trajectories])
+    # theta_max = 1e0 # np.max([np.max(theta_traj) for theta_traj in all_theta_trajectories])
+
+    fig_1_b.add_trace(
+            go.Heatmap(
+                x=np.linspace(0, 1, len(theta_matrix[0])) if theta_matrix else [],
+                y=y_axis_values,
+                z=theta_matrix,
+                colorscale="RdBu",
+                # zmin=np.log10(theta_min),
+                # zmax=np.log10(theta_max),
+                hovertemplate=(
+                    f"<b>s</b>: %{{x:.4f}}<br>"
+                    f"<b>{int_param_name}</b>: %{{y:.4f}}<br>"
+                    f"<b>log10(Theta)</b>: %{{z:.2f}}<extra></extra>"
+                ),
+                colorbar=dict(title="log10(Theta)"),
+            )
+        )
+
     fig_1_b.update_yaxes(type = "log")
     fig_1_b.update_layout(
         title=f"log10 theta(s, {int_param_name})",
         xaxis_title="s",
         yaxis_title=int_param_name,
+        autosize = False,
         height=600,
         width=1000,
     )
