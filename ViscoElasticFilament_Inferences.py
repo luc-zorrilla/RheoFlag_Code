@@ -1440,6 +1440,7 @@ def make_inference_tasks_two_pass(
 def workflow_elastic_viscous_simulation(
     int_param_ranges: Dict[str, list] = None,
     ext_param_ranges: Dict[str, list] = None,
+    sim_param_ranges: Dict[str, list] = None,
     param_keys_to_infer: list = None,
     n_jobs_simulation: int = 1,
     checkpoint_str: str = "./test_checkpoints_simulations_only",
@@ -1527,15 +1528,25 @@ def workflow_elastic_viscous_simulation(
     ext_params_list = [make_ground_truth_ext_params(**ext_params) for ext_params in ext_params_list]
     
     # Generate simulation parameters
-    if 'w0' in ext_param_ranges:
-        sim_params_list = []
-        for ext_params in ext_params_list:
-            w0_value = ext_params.get('w0')
-            sim_params = make_sim_params_for_w0(w0_value)
-            sim_params_list.append(sim_params)
+    if sim_param_ranges is None:
+        if 'w0' in ext_param_ranges:
+            sim_params_list = []
+            for ext_params in ext_params_list:
+                w0_value = ext_params.get('w0')
+                sim_params = make_sim_params_for_w0(w0_value)
+                sim_params_list.append(sim_params)
+        else:
+            w0_value = 0
+            sim_params_list = [make_sim_params_for_w0(w0_value) for _ in ext_params_list]
+        
     else:
-        w0_value = 0
-        sim_params_list = [make_sim_params_for_w0(w0_value) for _ in ext_params_list]
+        # Generate simulation parameter combinations
+        sim_param_names = list(sim_param_ranges.keys())
+        sim_param_values = [sim_param_ranges[name] for name in sim_param_names]
+        sim_params_list = [
+            dict(zip(sim_param_names, combo))
+            for combo in product(*sim_param_values)
+        ]
     
     print(f"\nExternal Parameters:")
     for name, values in ext_param_ranges.items():
@@ -1580,6 +1591,8 @@ def workflow_elastic_viscous_simulation(
         'ext_param_ranges': ext_param_ranges,
         'int_params_metadata': int_params_metadata,
         'ext_params_list': ext_params_list,
+        'sim_param_ranges': sim_param_ranges,
+        'sim_params_list': sim_params_list,
         'param_keys_to_infer': param_keys_to_infer,
         'num_int_params': len(int_params_list),
         'num_ext_params': len(ext_params_list),

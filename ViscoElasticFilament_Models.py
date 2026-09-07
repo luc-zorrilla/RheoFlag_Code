@@ -232,24 +232,28 @@ def CreateFlowField(A = 0., w0 = 0., psi = 0., T_meas = [], filename = ""):
     X_flow_field = 0
     return_string = "NO FLOW"
 
-    if filename == "": # Cases 1,2,3
-        if len(T_meas)==0 or A == 0: # Case 1
-            return return_string, X_flow_field
-        else: # Cases 2,3
+    if filename == "":
+        if len(T_meas)<=1:
+            if A == 0: # Case 1 - No Flow
+                print("Case 1")
+                return return_string, X_flow_field
             
-            if w0==0 and len(T_meas)==1: # Case 2 # TODO: test this case
+            elif A>0 and w0 == 0: # Case 2 - A>0, Constant Flow
                 X_flow_field = A * np.array([np.cos(psi), np.sin(psi)]).reshape((2,1))
                 return_string = "CONSTANT FLOW: (psi, A) = (" + str(psi) + ", " + str(A) + ")"
                 return return_string, X_flow_field
+            
+            else:
+                raise ValueError(f"w0 > 0 but there T_span is 0-dimensional. w0 = {w0}")
 
-            else: # Case 3
-                if w0 == 0:
-                    X_flow_field = A * np.array([np.cos(psi), np.sin(psi)]).reshape((2,1)) @ np.ones((1, len(T_meas)))
-                else:
-                    X_flow_field = A * np.array([np.cos(psi), np.sin(psi)]).reshape((2,1)) @ np.sin(w0*T_meas[:]).reshape((1,-1))
-                return_string = "SINE FLOW: (psi, A, w0) = (" + str(psi) + ", " + str(A) + ", " + str(w0) + ")"
+        else: # Case 3
+            if w0 == 0:
+                X_flow_field = A * np.array([np.cos(psi), np.sin(psi)]).reshape((2,1)) @ np.ones((1, len(T_meas)))
+            else:
+                X_flow_field = A * np.array([np.cos(psi), np.sin(psi)]).reshape((2,1)) @ np.sin(w0*T_meas[:]).reshape((1,-1))
+            return_string = "SINE FLOW: (psi, A, w0) = (" + str(psi) + ", " + str(A) + ", " + str(w0) + ")"
 
-                return return_string, X_flow_field
+            return return_string, X_flow_field
 
     else: # Case 4
         # Import field from filename (Change later) # TODO: include experimental data
@@ -629,7 +633,7 @@ def ViscoElasticFilament_Simulate(int_params, ext_params, sim_params):
     except Exception as ex:
         T_sim = np.inf
         mistake = np.array([str(ex)])
-        # print(mistake)
+        print(mistake)
         sim_output = {"value": np.nan, "shape": np.nan}
 
     return sim_output
@@ -668,7 +672,7 @@ def FlowParams_to_InterpFlow(int_params, ext_params, sim_params):
         InterpFlow = X_flow_field # TODO: To be completed
     else:         
         InterpFlow = interp1d(np.array(T_eval).reshape(len(T_eval),), X_flow_field, axis=1, fill_value="extrapolate")
-
+    
     return {'Lambdas': ext_params['Lambdas'], 'Zetas': ext_params['Zetas'], 'InterpFlow': InterpFlow}
     
 # Define the ViscoElasticFilament_FlowParams class by composing the ViscoElasticFilament class

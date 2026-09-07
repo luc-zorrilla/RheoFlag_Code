@@ -11,7 +11,7 @@ import json
 import numpy as np
 from scipy.spatial.distance import directed_hausdorff
 
-from ViscoElasticFilament_Models import X3N, Bend, StraightLine
+from ViscoElasticFilament_Models import X3N, Bend, StraightLine, SecondBend
 from ViscoElasticFilament_Inferences import workflow_elastic_viscous_simulation, workflow_elastic_viscous_general, basinhopping_optimizer, dual_annealing_optimizer, rel_mse
 
 def plot_model_distance_comparison(
@@ -1509,7 +1509,6 @@ def plot_fig_S1(
     
     return fig_S1_a, fig_S1_b  
 
-
 def plot_fig_1(
     model_lists: Dict[int, ModelList],
     int_params_metadata: List[Dict[str, Any]],
@@ -1670,6 +1669,131 @@ def plot_fig_1(
     
     return fig_1_a, fig_1_b
 
+
+def plot_fig_2(
+    model_lists: Dict[int, ModelList],
+    int_params_metadata: List[Dict[str, Any]],
+    ext_params_list: List[Dict[str, Any]],
+    sim_params_list: List[Dict[str, Any]],
+    int_param_name: str = 'Sp4',
+    ext_param_name: str = 'A',
+    sim_param_name: str = 'T_eval',
+    title: Optional[str] = None,
+    x_label: str = "x",
+    y_label: str = "y",
+    colorscale: str = 'Viridis',
+) -> go.Figure:
+    """
+    Args:
+        model_lists: Dictionary mapping indices to ModelList objects
+        int_params_metadata: List of dicts, each containing internal parameter values
+        ext_params_list: List of external parameter dicts (each with 'A' key)
+        int_param_name: Name of the internal parameter for subplots (e.g., 'Sp4')
+        ext_param_name: Name of the external parameter for coloring (e.g., 'A')
+        title: Plot title
+        x_label: X-axis label
+        y_label: Y-axis label
+        log_scale: Whether to use log scale for axes
+        colorscale: Plotly colorscale name (e.g., 'Viridis', 'Blues', 'Reds')
+    
+    Returns:
+        Plotly Figure with subplots
+    """
+    # Extract internal and external parameter values
+    int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
+    ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
+    sim_param_values = [sim_dict[sim_param_name] for sim_dict in sim_params_list]
+    
+    n_internal = len(int_param_values)
+    
+    # Create plot
+    fig_2 = go.Figure()
+
+    if len(int_param_values) > 1:
+        # Normalize internal parameter values for colormap
+        int_param_min = min(int_param_values)
+        int_param_max = max(int_param_values)
+        int_param_norm = [
+            (val - int_param_min) / (int_param_max - int_param_min) 
+            for val in int_param_values
+        ]
+    else: # Only one internal parameter
+        int_param_norm = [0]
+
+    # Get colors for external parameters
+    colors_int = px.colors.sample_colorscale(
+        colorscale, 
+        int_param_norm,
+    )
+
+    # Plot one trace per external parameter in each subplot
+    for int_idx in sorted(model_lists.keys()):
+        model_list = model_lists[int_idx]
+        int_param_val = int_param_values[int_idx]
+        
+        # Iterate through all external parameters
+        for ext_idx in range(len(model_list.models)):
+            model = model_list.models[ext_idx]
+            ext_param_val = ext_param_values[ext_idx]
+            sim_param_val = sim_param_values[ext_idx] # sim params depend on ext_params
+            
+            if model.sim_output is not None:
+                output_data = model.sim_output
+                # Handle both array and dict outputs
+                if isinstance(output_data, dict) and 'value' in output_data:
+                    output_data = output_data['value']
+                
+                output_array = np.array(output_data)
+                
+                if output_array.size > 1:
+                    output_array = np.atleast_1d(output_array)
+
+                    # Apply X3N transformation
+                    X_3N = np.transpose(np.array([X3N(output_array[:,t]) for t in range(output_array.shape[1])]).squeeze())
+                    
+                    N = X_3N.shape[0] // 3
+                    
+                    # Extract time and tip trajectory
+                    y_tip = X_3N[int(2*N-1), :]/X_3N[int(2*N-1), 0]
+                    T_eval = sim_param_val
+                    
+                    # tau_b = int_param_val
+                    # tau_eh = 1.45e3 # Elasto-hydrodynamic timescale
+                    # timescale = tau_b + tau_eh
+
+                    fig_2.add_trace(
+                        go.Scatter(
+                            x = T_eval, # /timescale,
+                            y = y_tip,
+                            mode='lines',
+                            hovertemplate=(
+                                f"<b>{x_label}</b>: %{{x:.6e}}<br>"
+                                f"<b>{y_label}</b>: %{{y:.6e}}<br>"
+                                f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
+                                f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
+                            ),
+                            line=dict(width=2, color=colors_int[int_idx]),
+                        ),
+                    )
+
+    # Update axes
+    fig_2.update_xaxes(title_text=x_label)
+    fig_2.update_yaxes(title_text=y_label, type = 'log')
+    
+    if title is None:
+        title = f"Trajectories color-coded by {int_param_name})"
+    
+    fig_2.update_layout(
+        title=title,
+        hovermode='closest',
+        legend=dict(title=int_param_name),
+        height=800,
+        width=1400,
+    )
+
+    return fig_2
+
+
 if __name__ == "__main__":
     
     # ---------------------------------- #
@@ -1748,12 +1872,108 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    fig_1_a.write_image("Figures/counterbend_a.svg")
-    fig_1_a.write_html("Figures/counterbend_a.html")
-    fig_1_a.show()
-    fig_1_b.write_image("Figures/counterbend_b.svg")
-    fig_1_b.write_html("Figures/counterbend_b.html")
-    fig_1_b.show()
+    # fig_1_a.write_image("Figures/counterbend_a.svg")
+    # fig_1_a.write_html("Figures/counterbend_a.html")
+    # fig_1_a.show()
+    # fig_1_b.write_image("Figures/counterbend_b.svg")
+    # fig_1_b.write_html("Figures/counterbend_b.html")
+    # fig_1_b.show()
+
+    # ------------------------------------------ #
+    # Figure 2: Relaxation of a bending filament #
+    # ------------------------------------------ #
+
+    # Take X_0 the solution to a bending problem
+
+
+    N = 10
+    N_vec =  np.array([N])
+    int_param_ranges = {'N': N_vec}
+
+    A_vec = np.array([1e-3])
+    ext_param_ranges = {'A': A_vec}
+
+    # Simulate
+    simulation_output = workflow_elastic_viscous_simulation(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        param_keys_to_infer=[],
+        n_jobs_simulation=-1,
+        checkpoint_str = "./bending_problem_to_get_X0",
+    )
+
+    model_lists = simulation_output['model_lists']
+    int_params_metadata = simulation_output['int_params_metadata']
+    ext_params_list = simulation_output['ext_params_list']
+
+    # Extract X_0 here
+    int_param_name = 'N'
+    ext_param_name = 'A'
+    int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
+    ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
+    for int_idx in sorted(model_lists.keys()):
+            model_list = model_lists[int_idx]
+            int_param_val = int_param_values[int_idx]
+
+            if int_param_val == N:
+
+                # Iterate through all external parameters
+                for ext_idx in range(len(model_list.models)):
+                    model = model_list.models[ext_idx]
+                    ext_param_val = ext_param_values[ext_idx]
+                    
+                    if model.sim_output is not None:
+                        output_data = model.sim_output
+                        # Handle both array and dict outputs
+                        if isinstance(output_data, dict) and 'value' in output_data:
+                            output_data = output_data['value']
+                        
+                        output_array = np.array(output_data)
+                            
+                        if output_array.size > 1:
+                            output_array = np.atleast_1d(output_array)
+                            X_0_fig_2 = output_array
+
+    N_vec = np.array([N])
+    tau_b_vec = np.array([0, 1e0, 1e1, 1e2, 1e3, 1e4, 1e5])
+    X_0 = [X_0_fig_2]
+    int_param_ranges = {'N': N_vec, 'tau_b': tau_b_vec, 'X_0':X_0}
+    
+    A_vec = np.array([0])
+    ext_param_ranges = {'A':A_vec}
+
+    T_span_vec = np.array([(1e3, 1e4)])
+    T_eval_vec = np.array([np.linspace(1e3, 1e4, int(1e2))])
+    method_vec = np.array(['BDF'])
+    T_sim_max_vec = np.array([360])
+    sim_param_ranges = {'T_span':T_span_vec, 'T_eval':T_eval_vec, 'method':method_vec, 'T_sim_max':T_sim_max_vec}
+
+    # Simulate
+    simulation_output = workflow_elastic_viscous_simulation(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        sim_param_ranges=sim_param_ranges,
+        param_keys_to_infer=[],
+        n_jobs_simulation=-1,
+        checkpoint_str = "./bending_relaxation",
+    )
+
+    model_lists = simulation_output['model_lists']
+    int_params_metadata = simulation_output['int_params_metadata']
+    ext_params_list = simulation_output['ext_params_list']
+    sim_params_list = simulation_output['sim_params_list']
+
+    fig_2 = plot_fig_2(
+        model_lists, int_params_metadata, ext_params_list, sim_params_list,
+        int_param_name='tau_b', ext_param_name='A',
+        x_label='x', y_label='y',
+        colorscale='Viridis',
+    )
+
+    fig_2.write_image("Figures/relaxation.svg")
+    fig_2.write_html("Figures/relaxation.html")
+    fig_2.show()
+
 
 if __name__ is None:
     
