@@ -10,6 +10,7 @@ import json
 
 import numpy as np
 from scipy.spatial.distance import directed_hausdorff
+from scipy import stats
 
 from ViscoElasticFilament_Models import X3N, Bend, StraightLine, SecondBend
 from ViscoElasticFilament_Inferences import workflow_elastic_viscous_simulation, workflow_elastic_viscous_general, basinhopping_optimizer, dual_annealing_optimizer, rel_mse
@@ -1706,8 +1707,9 @@ def plot_fig_2(
     
     n_internal = len(int_param_values)
     
-    # Create plot
-    fig_2 = go.Figure()
+    # Create plots
+    fig_2_a = go.Figure()
+    fig_2_b = go.Figure()
 
     if len(int_param_values) > 1:
         # Normalize internal parameter values for colormap
@@ -1725,6 +1727,9 @@ def plot_fig_2(
         colorscale, 
         int_param_norm,
     )
+
+    tau_b_list = []
+    tau_fit_list = []
 
     # Plot one trace per external parameter in each subplot
     for int_idx in sorted(model_lists.keys()):
@@ -1756,12 +1761,17 @@ def plot_fig_2(
                     # Extract time and tip trajectory
                     y_tip = X_3N[int(2*N-1), :]/X_3N[int(2*N-1), 0]
                     T_eval = sim_param_val
-                    
-                    # tau_b = int_param_val
-                    # tau_eh = 1.45e3 # Elasto-hydrodynamic timescale
-                    # timescale = tau_b + tau_eh
 
-                    fig_2.add_trace(
+                    # Extract timescales: log(y_tip) = -(1/tau) * T_eval + intercept
+                    log_y_tip = np.log(y_tip)
+                    slope, intercept, r_value, p_value, std_err = stats.linregress(T_eval, log_y_tip)
+                    tau_fit_list.append(-1 / slope)
+
+                    # print(f"Timescale tau: {tau_fit:.6e}")
+
+                    tau_b_list.append(int_param_val)
+
+                    fig_2_a.add_trace(
                         go.Scatter(
                             x = T_eval, # /timescale,
                             y = y_tip,
@@ -1775,15 +1785,54 @@ def plot_fig_2(
                             line=dict(width=2, color=colors_int[int_idx]),
                         ),
                     )
+        
+        fig_2_b.add_trace(
+            go.Scatter(
+                x = tau_b_list,
+                y = tau_fit_list,
+                mode='markers',
+            ),
+        )
+
+        tau_b_array = np.logspace(-3, 9, int(1e3))
+        tau_eh_array = np.ones_like(tau_b_array) * tau_fit_list[0]
+        tau_sum_array = tau_b_array + tau_eh_array
+
+        fig_2_b.add_trace(
+            go.Scatter(
+                x = tau_b_array,
+                y = tau_eh_array,
+                mode='lines',
+            ),
+        )
+
+        fig_2_b.add_trace(
+            go.Scatter(
+                x = tau_b_array,
+                y = tau_b_array,
+                mode='lines',
+            ),
+        )
+
+        fig_2_b.add_trace(
+            go.Scatter(
+                x = tau_b_array,
+                y = tau_sum_array,
+                mode='lines',
+            ),
+        )
 
     # Update axes
-    fig_2.update_xaxes(title_text=x_label)
-    fig_2.update_yaxes(title_text=y_label, type = 'log')
+    fig_2_a.update_xaxes(title_text=x_label)
+    fig_2_a.update_yaxes(title_text=y_label, type = 'log')
+
+    fig_2_b.update_xaxes(type = 'log')
+    fig_2_b.update_yaxes(type = 'log')    
     
     if title is None:
         title = f"Trajectories color-coded by {int_param_name})"
     
-    fig_2.update_layout(
+    fig_2_a.update_layout(
         title=title,
         hovermode='closest',
         legend=dict(title=int_param_name),
@@ -1791,7 +1840,7 @@ def plot_fig_2(
         width=1400,
     )
 
-    return fig_2
+    return fig_2_a, fig_2_b
 
 
 if __name__ == "__main__":
@@ -1963,16 +2012,20 @@ if __name__ == "__main__":
     ext_params_list = simulation_output['ext_params_list']
     sim_params_list = simulation_output['sim_params_list']
 
-    fig_2 = plot_fig_2(
+    fig_2_a, fig_2_b = plot_fig_2(
         model_lists, int_params_metadata, ext_params_list, sim_params_list,
         int_param_name='tau_b', ext_param_name='A',
         x_label='x', y_label='y',
         colorscale='Viridis',
     )
 
-    fig_2.write_image("Figures/relaxation.svg")
-    fig_2.write_html("Figures/relaxation.html")
-    fig_2.show()
+    fig_2_a.write_image("Figures/relaxation.svg")
+    fig_2_a.write_html("Figures/relaxation.html")
+    fig_2_a.show()
+
+    fig_2_b.write_image("Figures/relaxation_timescale.svg")
+    fig_2_b.write_html("Figures/relaxation_timescale.html")
+    fig_2_b.show()
 
 
 if __name__ is None:
