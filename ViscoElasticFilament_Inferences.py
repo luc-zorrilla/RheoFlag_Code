@@ -876,25 +876,28 @@ def make_ground_truth_sim_params(
 
 def make_sim_params_for_w0(w0):
     """Create simulation parameters based on w0 value."""
+
     if w0 == 0.0:
         sim_params_dict = {
             "T_span": (1e6, 2e6),
             "T_eval": np.linspace(1e6, 2e6, int(1e0)),
             "method": "hybr",
         }
-    else:
 
+    else:
         T0 = 2*np.pi/w0
 
         T_start = 10.0 * T0
         T_end = 20.0 * T0
         dT = (1 / 10.0) * T0
         N_T = int((T_end-T_start)/dT) + 1
+
         sim_params_dict =  {
             "T_span": (T_start, T_end),
             "T_eval": np.linspace(T_start, T_end, N_T),
             "method": "BDF",
         }
+        
     return make_ground_truth_sim_params(**sim_params_dict)
 
 def make_ground_truth_data_list(
