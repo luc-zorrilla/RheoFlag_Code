@@ -883,9 +883,12 @@ def make_sim_params_for_w0(w0):
             "method": "hybr",
         }
     else:
-        T_start = 10.0 / w0
-        T_end = 20.0 / w0
-        dT = (1 / 10.0) / w0
+
+        T0 = 2*np.pi/w0
+
+        T_start = 10.0 * T0
+        T_end = 20.0 * T0
+        dT = (1 / 10.0) * T0
         N_T = int((T_end-T_start)/dT) + 1
         sim_params_dict =  {
             "T_span": (T_start, T_end),

@@ -11,6 +11,8 @@ import json
 import numpy as np
 from scipy.spatial.distance import directed_hausdorff
 from scipy import stats
+from scipy.optimize import curve_fit
+from scipy.signal import find_peaks
 
 from ViscoElasticFilament_Models import X3N, Bend, StraightLine, SecondBend
 from ViscoElasticFilament_Inferences import workflow_elastic_viscous_simulation, workflow_elastic_viscous_general, basinhopping_optimizer, dual_annealing_optimizer, rel_mse
@@ -1276,7 +1278,6 @@ def plot_sigma_vs_ext_param_vec_size(workflow_outputs, int_params, ext_param_nam
     
     return fig
 
-
 def CheckEquilibrium(N, A, gamma, Sp4, n_L = [0,0], Lambdas=[[0,0]], conditions = "None", n_eq = 1000):
 
     """ Returns a figure with equilibrium position of a shape dynamics and computes analytical solution for small deflection: 
@@ -1670,7 +1671,6 @@ def plot_fig_1(
     
     return fig_1_a, fig_1_b
 
-
 def plot_fig_2(
     model_lists: Dict[int, ModelList],
     int_params_metadata: List[Dict[str, Any]],
@@ -1842,6 +1842,206 @@ def plot_fig_2(
 
     return fig_2_a, fig_2_b
 
+def plot_fig_3(
+    model_lists: Dict[int, ModelList],
+    int_params_metadata: List[Dict[str, Any]],
+    ext_params_list: List[Dict[str, Any]],
+    sim_params_list: List[Dict[str, Any]],
+    int_param_name: str = 'Sp4',
+    ext_param_name: str = 'A',
+    sim_param_name: str = 'T_eval',
+    title: Optional[str] = None,
+    x_label: str = "x",
+    y_label: str = "y",
+    colorscale: str = 'Viridis',
+) -> go.Figure:
+    """
+    Args:
+        model_lists: Dictionary mapping indices to ModelList objects
+        int_params_metadata: List of dicts, each containing internal parameter values
+        ext_params_list: List of external parameter dicts (each with 'A' key)
+        int_param_name: Name of the internal parameter for subplots (e.g., 'Sp4')
+        ext_param_name: Name of the external parameter for coloring (e.g., 'A')
+        title: Plot title
+        x_label: X-axis label
+        y_label: Y-axis label
+        log_scale: Whether to use log scale for axes
+        colorscale: Plotly colorscale name (e.g., 'Viridis', 'Blues', 'Reds')
+    
+    Returns:
+        Plotly Figure with subplots
+    """
+    # Extract internal and external parameter values
+    int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
+    ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
+    sim_param_values = [sim_dict[sim_param_name] for sim_dict in sim_params_list]
+    
+    n_internal = len(int_param_values)
+    
+    # Create plot
+    fig_3_a = go.Figure()
+    fig_3_b = go.Figure()
+
+    if len(int_param_values) > 1:
+        # Normalize internal parameter values for colormap
+        int_param_min = min(int_param_values)
+        int_param_max = max(int_param_values)
+        int_param_norm = [
+            (val - int_param_min) / (int_param_max - int_param_min) 
+            for val in int_param_values
+        ]
+    else: # Only one internal parameter
+        int_param_norm = [0]
+
+    # Get colors for external parameters
+    colors_int = px.colors.sample_colorscale(
+        colorscale, 
+        int_param_norm,
+    )
+
+    # Fit to 1/sqrt(1+(tau*w)²)
+    def f(x, tau):
+        return 1 / np.sqrt(1 + (tau * x)**2)
+
+    tau_b_list = []
+    tau_list = []
+    # Plot one trace per external parameter in each subplot
+    for int_idx in sorted(model_lists.keys()):
+        model_list = model_lists[int_idx]
+        int_param_val = int_param_values[int_idx]
+        tau_b_list.append(int_param_val)
+
+        w0_list = []
+        max_y_tip_list = []        
+        
+        # Iterate through all external parameters
+        for ext_idx in range(len(model_list.models)):
+            model = model_list.models[ext_idx]
+            ext_param_val = ext_param_values[ext_idx]
+            sim_param_val = sim_param_values[ext_idx] # sim params depend on ext_params
+            
+            if model.sim_output is not None:
+                output_data = model.sim_output
+                T_eval = sim_param_val
+
+                # Handle both array and dict outputs
+                if isinstance(output_data, dict) and 'value' in output_data:
+                    output_data = output_data['value']
+                
+                output_array = np.array(output_data)
+                
+                if output_array.size > 1:
+                    output_array = np.atleast_1d(output_array)
+                    
+                    # Apply X3N transformation
+                    X_3N = np.transpose(np.array([X3N(output_array[:,t]) for t in range(output_array.shape[1])]).squeeze())
+                    N = X_3N.shape[0] // 3
+                    y_tip = X_3N[int(2*N)-1, :]/N
+                    
+                    # Extract w0, max_y_tip
+                    w0_list.append(ext_param_val)
+                    max_y_tip = np.max(np.abs(y_tip))
+
+                    if np.abs(ext_param_val-1e-3) < 1e-12 and np.abs(int_param_val-1e0) < 1e-6:
+                        fig = go.Figure()
+                        fig.add_scatter(x = T_eval, y = y_tip)
+                        fig.show()
+                        print(f"w0 = {ext_param_val} and tau_b = {int_param_val}")
+                        
+                    # Alternative max_y_tip (more precise?)
+                    d = 10
+                    peaks, properties = find_peaks(y_tip, distance=d)
+                    print(f"peaks = {peaks}")
+
+                    # Get the M highest peaks
+                    M = 10 # 10 flow periods
+                    top_peak_indices = peaks[np.argsort(y_tip[peaks])[-M:][::-1]]
+                    print(f"top_peak_indices = {top_peak_indices}")
+                    
+                    top_peak_values = y_tip[top_peak_indices]
+                    mean_max_y_tip = np.mean(top_peak_values)
+                    mean_max_y_tip_idx = np.mean(np.diff(top_peak_indices))
+
+                    print(f"max_y_tip = {max_y_tip}")
+                    print(f"mean_max_y_tip = {mean_max_y_tip}")
+                    print(f"mean_max_y_tip_idx = {mean_max_y_tip_idx}")
+                    # exit()
+
+                    max_y_tip_list.append(max_y_tip)                   
+        
+        w0_array = np.array(w0_list)
+        max_y_tip_array = np.array(max_y_tip_list) / np.max(max_y_tip_list)
+        fig_3_a.add_trace(
+            go.Scatter(
+                x = w0_array,
+                y = max_y_tip_array,
+                mode='markers',
+                hovertemplate=(
+                    f"<b>{x_label}</b>: %{{x:.6e}}<br>"
+                    f"<b>{y_label}</b>: %{{y:.6e}}<br>"
+                    f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
+                ),
+                marker=dict(size=4, color=colors_int[int_idx]),
+            ),
+        )
+
+        # Curve fitting
+        popt, pcov = curve_fit(f, w0_array, max_y_tip_array)
+        tau = popt[0]
+        tau_list.append(tau)
+        # tau_err = np.sqrt(pcov[0, 0])     
+
+        # Generate smooth curve for plotting
+        x_fit = np.logspace(np.log10(w0_array.min()), np.log10(w0_array.max()), 1000)
+        y_fit = f(x_fit, tau)
+
+        fig_3_a.add_trace(
+            go.Scatter(
+                x = x_fit,
+                y = y_fit,
+                mode='lines',
+                hovertemplate=(
+                    f"<b>{x_label}</b>: %{{x:.6e}}<br>"
+                    f"<b>{y_label}</b>: %{{y:.6e}}<br>"
+                    f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
+                    f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
+                ),
+                line=dict(width=4, color=colors_int[int_idx]),
+            ),
+        )
+
+    # Update axes
+    fig_3_a.update_xaxes(title_text=x_label, type = "log")
+    fig_3_a.update_yaxes(title_text=y_label, type = "log")
+    
+    if title is None:
+        title = f"Trajectories color-coded by {int_param_name})"
+    
+    fig_3_a.update_layout(
+        title=title,
+        hovermode='closest',
+        legend=dict(title=int_param_name),
+        height=800,
+        width=1400,
+    )
+
+    tau_array = np.array(tau_list)
+    tau_b_array = np.array(tau_b_list)
+
+    fig_3_b.add_trace(
+            go.Scatter(
+                x = tau_b_array,
+                y = tau_array,
+                mode='markers',
+                marker=dict(size=4, color="black"),
+            ),
+        )
+    # Update axes
+    fig_3_b.update_xaxes(title_text=x_label, type = "log")
+    fig_3_b.update_yaxes(title_text=y_label, type = "log")
+    
+    return fig_3_a, fig_3_b
+
 
 if __name__ == "__main__":
     
@@ -1934,7 +2134,6 @@ if __name__ == "__main__":
 
     # Take X_0 the solution to a bending problem
 
-
     N = 10
     N_vec =  np.array([N])
     int_param_ranges = {'N': N_vec}
@@ -2019,13 +2218,56 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    fig_2_a.write_image("Figures/relaxation.svg")
-    fig_2_a.write_html("Figures/relaxation.html")
-    fig_2_a.show()
+    # fig_2_a.write_image("Figures/relaxation.svg")
+    # fig_2_a.write_html("Figures/relaxation.html")
+    # fig_2_a.show()
 
-    fig_2_b.write_image("Figures/relaxation_timescale.svg")
-    fig_2_b.write_html("Figures/relaxation_timescale.html")
-    fig_2_b.show()
+    # fig_2_b.write_image("Figures/relaxation_timescale.svg")
+    # fig_2_b.write_html("Figures/relaxation_timescale.html")
+    # fig_2_b.show()
+
+    # ------------------------------------------------- #
+    # -------- II. Spring-Dashpot Simplification ------ #
+    # ------------------------------------------------- #
+
+    # ---------------------------------------------------------------- #
+    # Figure 3: Harmonic tip amplitude response for a bending filament #
+    # ---------------------------------------------------------------- #
+
+    tau_b_vec = np.logspace(start = 0, stop = 6, num = 7)
+    int_param_ranges = {'tau_b': tau_b_vec}
+    
+    A_vec = np.array([1e-5])
+    w0_vec = np.logspace(start = -9, stop = 0, num = 10)
+    ext_param_ranges = {'A':A_vec, 'w0':w0_vec}
+
+    # Simulate
+    simulation_output = workflow_elastic_viscous_simulation(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        param_keys_to_infer=[],
+        n_jobs_simulation=-1,
+        checkpoint_str = "./harmonic_response_tip_amplitude",
+    )
+
+    model_lists = simulation_output['model_lists']
+    int_params_metadata = simulation_output['int_params_metadata']
+    ext_params_list = simulation_output['ext_params_list']
+    sim_params_list = simulation_output['sim_params_list']
+
+    fig_3_a, fig_3_b = plot_fig_3(
+        model_lists, int_params_metadata, ext_params_list, sim_params_list,
+        int_param_name='tau_b', ext_param_name='w0',
+        x_label='x', y_label='y',
+        colorscale='Viridis',
+    )
+
+    fig_3_a.write_image("Figures/harmonic_response_tip_amplitude.svg")
+    fig_3_a.write_html("Figures/harmonic_response_tip_amplitude.html")
+    fig_3_a.show()
+    fig_3_b.write_image("Figures/harmonic_response_tip_amplitude_fit.svg")
+    fig_3_b.write_html("Figures/harmonic_response_tip_amplitude_fit.html")
+    fig_3_b.show()    
 
 
 if __name__ is None:
