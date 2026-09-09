@@ -1941,34 +1941,30 @@ def plot_fig_3(
                     # Extract w0, max_y_tip
                     w0_list.append(ext_param_val)
                     max_y_tip = np.max(np.abs(y_tip))
-
-                    if np.abs(ext_param_val-1e-3) < 1e-12 and np.abs(int_param_val-1e0) < 1e-6:
-                        fig = go.Figure()
-                        fig.add_scatter(x = T_eval, y = y_tip)
-                        fig.show()
-                        print(f"w0 = {ext_param_val} and tau_b = {int_param_val}")
+                    print(f"max_y_tip = {max_y_tip}")
                         
                     # Alternative max_y_tip (more precise?)
-                    d = 10
-                    peaks, properties = find_peaks(y_tip, distance=d)
+                    # d = 10
+                    peaks, properties = find_peaks(np.abs(y_tip)) # , distance=d)
                     print(f"peaks = {peaks}")
 
                     # Get the M highest peaks
-                    M = 10 # 10 flow periods
-                    top_peak_indices = peaks[np.argsort(y_tip[peaks])[-M:][::-1]]
+                    M = 2*10 # 10 flow periods
+                    top_peak_indices = peaks[np.argsort(np.abs(y_tip)[peaks])[-M:][::-1]]
                     print(f"top_peak_indices = {top_peak_indices}")
                     
-                    top_peak_values = y_tip[top_peak_indices]
+                    top_peak_values = np.abs(y_tip)[top_peak_indices]
+
                     mean_max_y_tip = np.mean(top_peak_values)
-                    mean_max_y_tip_idx = np.mean(np.diff(top_peak_indices))
 
                     print(f"max_y_tip = {max_y_tip}")
                     print(f"mean_max_y_tip = {mean_max_y_tip}")
-                    print(f"mean_max_y_tip_idx = {mean_max_y_tip_idx}")
-                    # exit()
 
-                    max_y_tip_list.append(max_y_tip)                   
-        
+                    if np.isnan(mean_max_y_tip):
+                        max_y_tip_list.append(max_y_tip)  
+                    else:
+                        max_y_tip_list.append(mean_max_y_tip)
+                        
         w0_array = np.array(w0_list)
         max_y_tip_array = np.array(max_y_tip_list) / np.max(max_y_tip_list)
         fig_3_a.add_trace(
@@ -1986,7 +1982,11 @@ def plot_fig_3(
         )
 
         # Curve fitting
-        popt, pcov = curve_fit(f, w0_array, max_y_tip_array)
+        # Remove NaN values from both arrays
+        print(f"max_y_tip_array = {max_y_tip_array}")
+        mask = ~np.isnan(max_y_tip_array)
+
+        popt, pcov = curve_fit(f, w0_array[mask], max_y_tip_array[mask])
         tau = popt[0]
         tau_list.append(tau)
         # tau_err = np.sqrt(pcov[0, 0])     
@@ -2238,7 +2238,7 @@ if __name__ == "__main__":
     int_param_ranges = {'tau_b': tau_b_vec}
     
     A_vec = np.array([1e-5])
-    w0_vec = np.logspace(start = -9, stop = 0, num = 10)
+    w0_vec = np.logspace(start = -9, stop = 0, num = 100)
     ext_param_ranges = {'A':A_vec, 'w0':w0_vec}
 
     # Simulate
