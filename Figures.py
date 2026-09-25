@@ -2035,6 +2035,236 @@ def plot_fig_3(
     
     return fig_3_a, fig_3_b
 
+def plot_fig_5(
+    workflow_output_1, workflow_output_2, workflow_output_3
+) -> tuple[go.Figure, go.Figure]:
+    """
+    Create two figures comparing standard error and signed relative error across three workflows.
+    
+    Args:
+        workflow_output_1: Bending elasticity workflow output
+        workflow_output_2: Shear elasticity workflow output
+        workflow_output_3: Combined bending-shear elasticity workflow output
+    
+    Returns:
+        Tuple of (fig_std, fig_signed_rel_err) - standard error and signed relative error figures
+    """
+    
+    def compute_signed_rel_error(measured_val, ground_truth_val):
+        """Compute signed relative error: (measured - ground_truth) / ground_truth"""
+        if ground_truth_val is None or ground_truth_val == 0:
+            return None
+        
+        measured = float(measured_val[0]) if isinstance(measured_val, (list, np.ndarray)) else float(measured_val)
+        gt = float(ground_truth_val[0]) if isinstance(ground_truth_val, (list, np.ndarray)) else float(ground_truth_val)
+        
+        if gt == 0:
+            return None
+        
+        return (measured - gt) / gt
+    
+    # Extract results from each workflow
+    results_1 = workflow_output_1['results_summary']
+    results_2 = workflow_output_2['results_summary']
+    results_3 = workflow_output_3['results_summary']
+    
+    ext_param_ranges_1 = workflow_output_1['ext_param_ranges']['A']
+    ext_param_ranges_2 = workflow_output_2['ext_param_ranges']['A']
+    ext_param_ranges_3 = workflow_output_3['ext_param_ranges']['A']
+    
+    # Ground truth values
+    sp4_gt = 1e0
+    beta_gt = 1e0
+    
+    # ============================================================================
+    # FIGURE 1: STANDARD ERROR (unchanged from before)
+    # ============================================================================
+    fig_std = go.Figure()
+    
+    # Plot standard error for workflow 1 (Bending - Sp4)
+    sp4_std_1 = [r.get('Sp4_sigma') for r in results_1]
+    sp4_std_1 = [float(v[0]) if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v for v in sp4_std_1]
+    sp4_norm_std_1 = [v / abs(sp4_gt) if v is not None and np.isfinite(v) else None for v in sp4_std_1]
+    
+    fig_std.add_trace(go.Scatter(
+        x=ext_param_ranges_1,
+        y=sp4_norm_std_1,
+        mode='markers+lines',
+        name='Bending (Sp4)',
+        marker=dict(size=8, color='#1f77b4', opacity=0.7),
+        line=dict(color='#1f77b4', width=2)
+    ))
+    
+    # Plot standard error for workflow 2 (Shear - Beta)
+    beta_std_2 = [r.get('Beta_sigma') for r in results_2]
+    beta_std_2 = [float(v[0]) if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v for v in beta_std_2]
+    beta_norm_std_2 = [v / abs(beta_gt) if v is not None and np.isfinite(v) else None for v in beta_std_2]
+    
+    fig_std.add_trace(go.Scatter(
+        x=ext_param_ranges_2,
+        y=beta_norm_std_2,
+        mode='markers+lines',
+        name='Shear (Beta)',
+        marker=dict(size=8, color='#ff7f0e', opacity=0.7),
+        line=dict(color='#ff7f0e', width=2)
+    ))
+    
+    # Plot standard error for workflow 3 (Bending-Shear - Combined)
+    sp4_std_3 = [r.get('Sp4_sigma') for r in results_3]
+    sp4_std_3 = [float(v[0]) if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v for v in sp4_std_3]
+    beta_std_3 = [r.get('Beta_sigma') for r in results_3]
+    beta_std_3 = [float(v[0]) if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v for v in beta_std_3]
+    
+    sp4_norm_std_3 = [v / abs(sp4_gt) if v is not None and np.isfinite(v) else None for v in sp4_std_3]
+    beta_norm_std_3 = [v / abs(beta_gt) if v is not None and np.isfinite(v) else None for v in beta_std_3]
+    combined_norm_std_3 = [
+        np.sqrt(sp4**2 + beta**2) if sp4 is not None and beta is not None and np.isfinite(sp4) and np.isfinite(beta) else None
+        for sp4, beta in zip(sp4_norm_std_3, beta_norm_std_3)
+    ]
+    
+    fig_std.add_trace(go.Scatter(
+        x=ext_param_ranges_3,
+        y=combined_norm_std_3,
+        mode='markers+lines',
+        name='Combined (Sp4+Beta)',
+        marker=dict(size=8, color='#2ca02c', opacity=0.7, symbol='diamond'),
+        line=dict(color='#2ca02c', width=2, dash='dash')
+    ))
+    
+    fig_std.update_layout(
+        title=dict(
+            text='Normalized Standard Error vs External Parameter A',
+            font=dict(size=16, color='black')
+        ),
+        xaxis=dict(
+            title=dict(text='A', font=dict(size=12)),
+            type='log',
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        yaxis=dict(
+            title=dict(text='Normalized Sigma (Std. Error / Internal Parameter)', font=dict(size=12)),
+            type='log',
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        hovermode='closest',
+        template='plotly_white',
+        width=1000,
+        height=600,
+        font=dict(size=11),
+        legend=dict(
+            x=1.02, y=1,
+            xanchor='left', yanchor='top',
+            bgcolor='rgba(255, 255, 255, 0.8)',
+            bordercolor='black',
+            borderwidth=1
+        )
+    )
+    
+    # ===============================
+    # FIGURE 2: SIGNED RELATIVE ERROR
+    # ===============================
+    fig_signed_rel_err = go.Figure()
+    
+    # Workflow 1 (Bending - Sp4)
+    sp4_measured_1 = [r.get('Sp4_inferred') for r in results_1]
+    sp4_signed_rel_err_1 = [
+        compute_signed_rel_error(measured, sp4_gt)
+        if measured is not None else None
+        for measured in sp4_measured_1
+    ]
+    
+    fig_signed_rel_err.add_trace(go.Scatter(
+        x=ext_param_ranges_1,
+        y=sp4_signed_rel_err_1,
+        mode='markers+lines',
+        name='Bending (Sp4)',
+        marker=dict(size=8, color='#1f77b4', opacity=0.7),
+        line=dict(color='#1f77b4', width=2)
+    ))
+    
+    # Workflow 2 (Shear - Beta)
+    beta_measured_2 = [r.get('Beta_inferred') for r in results_2]
+    beta_signed_rel_err_2 = [
+        compute_signed_rel_error(measured, beta_gt)
+        if measured is not None else None
+        for measured in beta_measured_2
+    ]
+    
+    fig_signed_rel_err.add_trace(go.Scatter(
+        x=ext_param_ranges_2,
+        y=beta_signed_rel_err_2,
+        mode='markers+lines',
+        name='Shear (Beta)',
+        marker=dict(size=8, color='#ff7f0e', opacity=0.7),
+        line=dict(color='#ff7f0e', width=2)
+    ))
+    
+    # Workflow 3 (Bending-Shear - Combined)
+    sp4_measured_3 = [r.get('Sp4_inferred') for r in results_3]
+    sp4_signed_rel_err_3 = [
+        compute_signed_rel_error(measured, sp4_gt)
+        if measured is not None else None
+        for measured in sp4_measured_3
+    ]
+    
+    beta_measured_3 = [r.get('Beta_inferred') for r in results_3]
+    beta_signed_rel_err_3 = [
+        compute_signed_rel_error(measured, beta_gt)
+        if measured is not None else None
+        for measured in beta_measured_3
+    ]
+    
+    combined_signed_rel_err_3 = [
+        np.sqrt(sp4**2 + beta**2) if sp4 is not None and beta is not None and np.isfinite(sp4) and np.isfinite(beta) else None
+        for sp4, beta in zip(sp4_signed_rel_err_3, beta_signed_rel_err_3)
+    ]
+    
+    fig_signed_rel_err.add_trace(go.Scatter(
+        x=ext_param_ranges_3,
+        y=combined_signed_rel_err_3,
+        mode='markers+lines',
+        name='Combined (Sp4+Beta)',
+        marker=dict(size=8, color='#2ca02c', opacity=0.7, symbol='diamond'),
+        line=dict(color='#2ca02c', width=2, dash='dash')
+    ))
+    
+    fig_signed_rel_err.update_layout(
+        title=dict(
+            text='Signed Relative Error vs External Parameter A',
+            font=dict(size=16, color='black')
+        ),
+        xaxis=dict(
+            title=dict(text='A', font=dict(size=12)),
+            type='log',
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        yaxis=dict(
+            title=dict(text='Signed Relative Error', font=dict(size=12)),
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        hovermode='closest',
+        template='plotly_white',
+        width=1000,
+        height=600,
+        font=dict(size=11),
+        legend=dict(
+            x=1.02, y=1,
+            xanchor='left', yanchor='top',
+            bgcolor='rgba(255, 255, 255, 0.8)',
+            bordercolor='black',
+            borderwidth=1
+        )
+    )
+    
+    return fig_std, fig_signed_rel_err
 
 if __name__ == "__main__":
     
@@ -2292,7 +2522,7 @@ if __name__ == "__main__":
     inference_mode = "single_inference"
     checkpoint_str = "./Results/BendingElasticity/BendingElasticity"
 
-    workflow_output = workflow_elastic_viscous_general(
+    workflow_output_bending = workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
         optimizer=optimizer,
@@ -2301,16 +2531,6 @@ if __name__ == "__main__":
         inference_mode = inference_mode,
         checkpoint_str=checkpoint_str,
         )
-
-    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4'], ext_param_name='A', metric='std')
-    fig.write_image("Figures/std_Sp4_vs_A.svg")
-    fig.write_html("Figures/std_Sp4_vs_A.html")
-    fig.show()
-
-    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4'], ext_param_name='A', metric='rel_error')
-    fig.write_image("Figures/err_Sp4_vs_A.svg")
-    fig.write_html("Figures/err_Sp4_vs_A.html")
-    fig.show()
 
     # Shear Elasticity - Beta
 
@@ -2323,7 +2543,7 @@ if __name__ == "__main__":
     inference_mode = "single_inference"
     checkpoint_str = "./Results/ShearElasticity/ShearElasticity"
 
-    workflow_output = workflow_elastic_viscous_general(
+    workflow_output_shear = workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
         optimizer = optimizer,        
@@ -2331,17 +2551,7 @@ if __name__ == "__main__":
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,
         checkpoint_str=checkpoint_str,
-        )
-
-    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Beta'], ext_param_name='A', metric = 'std')
-    fig.write_image("Figures/std_Beta_vs_A.svg")
-    fig.write_html("Figures/std_Beta_vs_A.html")
-    fig.show()    
-
-    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Beta'], ext_param_name='A', metric = 'rel_error')
-    fig.write_image("Figures/err_Beta_vs_A.svg")
-    fig.write_html("Figures/err_Beta_vs_A.html")
-    fig.show()        
+        )     
 
     # Bending & Shear Elasticities - Sp4, Beta
 
@@ -2354,7 +2564,7 @@ if __name__ == "__main__":
     inference_mode = "single_inference"
     checkpoint_str = "./Results/BendingShearElasticity/BendingShearElasticity"
 
-    workflow_output = workflow_elastic_viscous_general(
+    workflow_output_bending_shear = workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
         optimizer = optimizer,        
@@ -2364,25 +2574,29 @@ if __name__ == "__main__":
         checkpoint_str=checkpoint_str,
         )
 
-    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4', 'Beta'], ext_param_name = 'A', metric = 'std')
-    fig.write_image("Figures/std_Sp4_Beta_vs_A.svg")
-    fig.write_html("Figures/std_Sp4_Beta_vs_A.html")
-    fig.show() 
+    fig_5_a, fig_5_b = plot_fig_5(
+        workflow_output_bending, 
+        workflow_output_shear, 
+        workflow_output_bending_shear
+        )
 
-    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4', 'Beta'], ext_param_name = 'A', metric = 'rel_error')
-    fig.write_image("Figures/err_Sp4_Beta_vs_A.svg")
-    fig.write_html("Figures/err_Sp4_Beta_vs_A.html")
-    fig.show()
-
+    fig_5_a.write_image("Figures/elastic_inference_standard_error.svg")
+    fig_5_a.write_html("Figures/elastic_inference_standard_error.html")
+    fig_5_a.show()
+    fig_5_b.write_image("Figures/elastic_inference_rel_error.svg")
+    fig_5_b.write_html("Figures/harmonic_response_rel_error.html")
+    fig_5_b.show()
 
     # --------------------------------------------- #
     # Figure S4:  #
     # --------------------------------------------- #
     # TODO
+
     # --------------------------------------------- #
     # Figure S5:  #
     # --------------------------------------------- #
     # TODO
+    
     # --------------------- #
     # B. Viscous Inferences #
     # --------------------- #
