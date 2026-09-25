@@ -1362,7 +1362,7 @@ def make_inference_tasks_two_pass(
     elastic_params_list: list[str],
     viscous_params_list: list[str],
     make_sim_params_fn,
-    model_class,
+    model_class_list,
     loss_fn,
     optimizer,
     optimizer_kwargs,
@@ -1382,6 +1382,8 @@ def make_inference_tasks_two_pass(
     
     if mode == 'single_inference':
         for int_idx, int_params in enumerate(int_params_list):
+            model_class = model_class_list[int_idx]
+
             for ext_idx, (ext_params, sim_params) in enumerate(zip(ext_params_list, sim_params_list)):
                 task_key = f"int_{int_idx:03d}_ext_{ext_idx:03d}"
                 
@@ -1411,6 +1413,8 @@ def make_inference_tasks_two_pass(
     
     elif mode == 'cumulative_inference':
         for int_idx, int_params in enumerate(int_params_list):
+            model_class = model_class_list[int_idx]
+            
             task_key = f"int_{int_idx:03d}_cumulative"
             
             # Factory with all ext_params
@@ -1822,7 +1826,7 @@ def workflow_elastic_viscous_general(
         elastic_params_list=elastic_params_list,
         viscous_params_list=viscous_params_list,
         make_sim_params_fn=make_sim_params_for_w0,
-        model_class=ReducedModel,
+        model_class_list=ReducedModel_list,
         loss_fn=loss_fn,
         optimizer=optimizer,
         optimizer_kwargs=optimizer_kwargs,

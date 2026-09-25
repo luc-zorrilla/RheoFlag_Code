@@ -1941,24 +1941,18 @@ def plot_fig_3(
                     # Extract w0, max_y_tip
                     w0_list.append(ext_param_val)
                     max_y_tip = np.max(np.abs(y_tip))
-                    print(f"max_y_tip = {max_y_tip}")
                         
                     # Alternative max_y_tip (more precise?)
                     # d = 10
                     peaks, properties = find_peaks(np.abs(y_tip)) # , distance=d)
-                    print(f"peaks = {peaks}")
 
                     # Get the M highest peaks
                     M = 2*10 # 10 flow periods
                     top_peak_indices = peaks[np.argsort(np.abs(y_tip)[peaks])[-M:][::-1]]
-                    print(f"top_peak_indices = {top_peak_indices}")
                     
                     top_peak_values = np.abs(y_tip)[top_peak_indices]
 
                     mean_max_y_tip = np.mean(top_peak_values)
-
-                    print(f"max_y_tip = {max_y_tip}")
-                    print(f"mean_max_y_tip = {mean_max_y_tip}")
 
                     if np.isnan(mean_max_y_tip):
                         max_y_tip_list.append(max_y_tip)  
@@ -1983,7 +1977,6 @@ def plot_fig_3(
 
         # Curve fitting
         # Remove NaN values from both arrays
-        print(f"max_y_tip_array = {max_y_tip_array}")
         mask = ~np.isnan(max_y_tip_array)
 
         popt, pcov = curve_fit(f, w0_array[mask], max_y_tip_array[mask])
@@ -2269,6 +2262,131 @@ if __name__ == "__main__":
     fig_3_b.write_html("Figures/harmonic_response_tip_amplitude_fit.html")
     fig_3_b.show()    
 
+    # ----------------------------------------- #
+    # -------- II. Algorithmic Inversion ------ #
+    # ----------------------------------------- #
+
+    # --------------------------------------------- #
+    # Figure 4: Schematics of the Inference Process #
+    # --------------------------------------------- #
+
+    # Made in excalidraw
+
+    # --------------------- #
+    # A. Elastic Inferences #
+    # --------------------- #
+
+    # ----------------------------------- #
+    # Figure 5: Inference standard errors #
+    # ----------------------------------- #
+
+    optimizer = dual_annealing_optimizer
+
+    # Bending Elasticity - Sp4
+    int_param_ranges = {'Sp4': [1e0]}
+    A_vec = np.pow(10, np.linspace(start=-6, stop=-1, num=6))
+    ext_param_ranges = {'A': A_vec}
+    elastic_params_list = ['Sp4']
+    viscous_params_list = []
+
+    inference_mode = "single_inference"
+    checkpoint_str = "./Results/BendingElasticity/BendingElasticity"
+
+    workflow_output = workflow_elastic_viscous_general(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        optimizer=optimizer,
+        elastic_params_list = elastic_params_list,
+        viscous_params_list = viscous_params_list,
+        inference_mode = inference_mode,
+        checkpoint_str=checkpoint_str,
+        )
+
+    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4'], ext_param_name='A', metric='std')
+    fig.write_image("Figures/std_Sp4_vs_A.svg")
+    fig.write_html("Figures/std_Sp4_vs_A.html")
+    fig.show()
+
+    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4'], ext_param_name='A', metric='rel_error')
+    fig.write_image("Figures/err_Sp4_vs_A.svg")
+    fig.write_html("Figures/err_Sp4_vs_A.html")
+    fig.show()
+
+    # Shear Elasticity - Beta
+
+    int_param_ranges = {'Beta': [1e0]}
+    A_vec = np.pow(10, np.linspace(start = -6, stop = -1, num = 6))
+    ext_param_ranges = {'A': A_vec}
+    elastic_params_list = ['Beta']
+    viscous_params_list = []
+
+    inference_mode = "single_inference"
+    checkpoint_str = "./Results/ShearElasticity/ShearElasticity"
+
+    workflow_output = workflow_elastic_viscous_general(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        optimizer = optimizer,        
+        elastic_params_list = elastic_params_list,
+        viscous_params_list = viscous_params_list,
+        inference_mode = inference_mode,
+        checkpoint_str=checkpoint_str,
+        )
+
+    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Beta'], ext_param_name='A', metric = 'std')
+    fig.write_image("Figures/std_Beta_vs_A.svg")
+    fig.write_html("Figures/std_Beta_vs_A.html")
+    fig.show()    
+
+    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Beta'], ext_param_name='A', metric = 'rel_error')
+    fig.write_image("Figures/err_Beta_vs_A.svg")
+    fig.write_html("Figures/err_Beta_vs_A.html")
+    fig.show()        
+
+    # Bending & Shear Elasticities - Sp4, Beta
+
+    int_param_ranges = {'Sp4': [1e0], 'Beta': [1e0]}
+    A_vec = np.pow(10, np.linspace(start = -6, stop = -1, num = 6))
+    ext_param_ranges = {'A': A_vec}
+    elastic_params_list = ['Sp4', 'Beta']
+    viscous_params_list = []
+
+    inference_mode = "single_inference"
+    checkpoint_str = "./Results/BendingShearElasticity/BendingShearElasticity"
+
+    workflow_output = workflow_elastic_viscous_general(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        optimizer = optimizer,        
+        elastic_params_list = elastic_params_list,
+        viscous_params_list = viscous_params_list,
+        inference_mode = inference_mode,
+        checkpoint_str=checkpoint_str,
+        )
+
+    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4', 'Beta'], ext_param_name = 'A', metric = 'std')
+    fig.write_image("Figures/std_Sp4_Beta_vs_A.svg")
+    fig.write_html("Figures/std_Sp4_Beta_vs_A.html")
+    fig.show() 
+
+    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['Sp4', 'Beta'], ext_param_name = 'A', metric = 'rel_error')
+    fig.write_image("Figures/err_Sp4_Beta_vs_A.svg")
+    fig.write_html("Figures/err_Sp4_Beta_vs_A.html")
+    fig.show()
+
+
+    # --------------------------------------------- #
+    # Figure S4:  #
+    # --------------------------------------------- #
+    # TODO
+    # --------------------------------------------- #
+    # Figure S5:  #
+    # --------------------------------------------- #
+    # TODO
+    # --------------------- #
+    # B. Viscous Inferences #
+    # --------------------- #
+    # TODO
 
 if __name__ is None:
     
