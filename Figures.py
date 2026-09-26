@@ -2587,28 +2587,11 @@ if __name__ == "__main__":
     fig_5_b.write_html("Figures/harmonic_response_rel_error.html")
     fig_5_b.show()
 
-    # --------------------------------------------- #
-    # Figure S4:  #
-    # --------------------------------------------- #
-    # TODO
+    # TODO: make figure functions.
 
-    # --------------------------------------------- #
-    # Figure S5:  #
-    # --------------------------------------------- #
-    # TODO
-    
-    # --------------------- #
-    # B. Viscous Inferences #
-    # --------------------- #
-    # TODO
-
-if __name__ is None:
-    
-    # --------------------------- #
-    # -------- Simulations ------ #
-    # --------------------------- #
-
-    # Bending Elasticity
+    # ------------------------------------------------ #
+    # Figure S4: Hessian decrease for bending filament #
+    # ------------------------------------------------ #
 
     # Small logarithmic perturbations around 1
     epsilon = 0.01  # log-scale offset (in powers of 10)
@@ -2640,7 +2623,7 @@ if __name__ is None:
     reference_index = np.argmin(np.abs(Sp4_vec - Sp4_star))
     reference_model_list = model_lists[reference_index]
 
-    fig = plot_model_distance_multi_external(
+    fig_S4a = plot_model_distance_multi_external(
         model_lists=model_lists,
         reference_model_list=reference_model_list,
         distance_fn=rel_mse,
@@ -2652,9 +2635,9 @@ if __name__ is None:
         y_label="Relative L2 Error",
         log_scale=False,
     )
-    fig.write_image("Figures/loss_vs_Sp4_color_A.svg")
-    fig.write_html("Figures/loss_vs_Sp4_color_A.html")
-    fig.show()
+    fig_S4a.write_image("Figures/loss_vs_Sp4_color_A.svg")
+    fig_S4a.write_html("Figures/loss_vs_Sp4_color_A.html")
+    fig_S4a.show()
 
     log_offsets = np.linspace(-3, 3, num=7)
     Sp4_vec =  np.power(10, log_offsets)  
@@ -2676,7 +2659,7 @@ if __name__ is None:
     ext_params_list = simulation_output['ext_params_list']    
 
     # All external parameters on one plot
-    fig = plot_final_output_vs_ext_param_color_int_param(
+    fig_S4b = plot_final_output_vs_ext_param_color_int_param(
         model_lists=model_lists,
         int_params_metadata=int_params_metadata,
         ext_params_list=ext_params_list,
@@ -2685,11 +2668,13 @@ if __name__ is None:
         colorscale='Viridis',
         log_scale=True,
     )
-    fig.write_image("Figures/tip_vs_A_color_Sp4.svg")
-    fig.write_html("Figures/tip_vs_A_color_Sp4.html")
-    fig.show()
+    fig_S4b.write_image("Figures/tip_vs_A_color_Sp4.svg")
+    fig_S4b.write_html("Figures/tip_vs_A_color_Sp4.html")
+    fig_S4b.show()
 
-    # Shear Elasticity
+    # ---------------------------------------------- #
+    # Figure S5: Hessian decrease for shear filament #
+    # ---------------------------------------------- #
 
     # Small logarithmic perturbations around 1
     epsilon = 0.01  # log-scale offset (in powers of 10)
@@ -2721,7 +2706,7 @@ if __name__ is None:
     reference_index = np.argmin(np.abs(Beta_vec - Beta_star))
     reference_model_list = model_lists[reference_index]
 
-    fig = plot_model_distance_multi_external(
+    fig_S5a = plot_model_distance_multi_external(
         model_lists=model_lists,
         reference_model_list=reference_model_list,
         distance_fn=rel_mse,
@@ -2733,11 +2718,45 @@ if __name__ is None:
         y_label="Relative L2 Error",
         log_scale=False,
     )
-    fig.write_image("Figures/loss_vs_Beta_color_A.svg")
-    fig.write_html("Figures/loss_vs_Beta_color_A.html")
-    fig.show()
+    fig_S5a.write_image("Figures/loss_vs_Beta_color_A.svg")
+    fig_S5a.write_html("Figures/loss_vs_Beta_color_A.html")
+    fig_S5a.show()
 
-    # Plot full trajectories for varying ext_param, one subplot per int_param
+    # Plot last element of X for varying int_params and ext_params
+    log_offsets = np.linspace(-3, 3, num=70)
+    Beta_vec = np.power(10, log_offsets)  
+    int_param_ranges = {'Beta': Beta_vec}
+
+    A_vec = np.pow(10, np.linspace(start=-4, stop=1, num = 12))
+    ext_param_ranges = {'A': A_vec}
+
+    # Simulate
+    simulation_output = workflow_elastic_viscous_simulation(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        param_keys_to_infer=['Beta'],
+        n_jobs_simulation=-1,
+        checkpoint_str = "./shear_tip",
+    )
+    model_lists = simulation_output['model_lists']
+    int_params_metadata = simulation_output['int_params_metadata']
+    ext_params_list = simulation_output['ext_params_list']    
+
+    # All external parameters on one plot
+    fig_S5b = plot_final_output_vs_ext_param_color_int_param(
+        model_lists=model_lists,
+        int_params_metadata=int_params_metadata,
+        ext_params_list=ext_params_list,
+        int_param_name='Beta',
+        ext_param_name='A',
+        colorscale='Viridis',
+        log_scale=True,
+    )
+    fig_S5b.write_image("Figures/tip_vs_A_color_Beta.svg")
+    fig_S5b.write_html("Figures/tip_vs_A_color_Beta.html")
+    fig_S5b.show()
+
+    # Plot full trajectories for varying ext_param, one frame per int_param # TODO: video
 
     # Small logarithmic perturbations around 1
     epsilon = 0.1  # log-scale offset (in powers of 10)
@@ -2761,59 +2780,237 @@ if __name__ is None:
     int_params_metadata = simulation_output['int_params_metadata']
     ext_params_list = simulation_output['ext_params_list']        
 
-    fig = plot_output_trajectory_subplots_int_param(
+    video_S5c = plot_output_trajectory_subplots_ext_param(
         model_lists, int_params_metadata, ext_params_list,
         int_param_name='Beta', ext_param_name='A',
         x_label='x', y_label='y',
         colorscale='Viridis', log_scale=False
     )
-    fig.write_image("Figures/filament_color_A_subplot_Beta.svg")
-    fig.write_html("Figures/filament_color_A_subplot_Beta.html")
-    fig.show()
+    video_S5c.write_image("Figures/filament_color_Beta_subplot_A.svg")
+    video_S5c.write_html("Figures/filament_color_Beta_subplot_A.html")
+    video_S5c.show()    
 
-    fig = plot_output_trajectory_subplots_ext_param(
-        model_lists, int_params_metadata, ext_params_list,
-        int_param_name='Beta', ext_param_name='A',
-        x_label='x', y_label='y',
-        colorscale='Viridis', log_scale=False
-    )
-    fig.write_image("Figures/filament_color_Beta_subplot_A.svg")
-    fig.write_html("Figures/filament_color_Beta_subplot_A.html")
-    fig.show()
+    # --------------------- #
+    # B. Viscous Inferences #
+    # --------------------- #
 
-    # Plot last element of X for varying int_params and ext_params
-    log_offsets = np.linspace(-3, 3, num=70)
-    Beta_vec = np.power(10, log_offsets)  
-    int_param_ranges = {'Beta': Beta_vec}
+    # ----------- #
+    # Figure 6: ? #
+    # ----------- #
+    # TODO
 
-    A_vec = np.pow(10, np.linspace(start=-4, stop=1, num = 12))
-    ext_param_ranges = {'A': A_vec}
+if __name__ is None:
+    
+    # --------------------------- #
+    # -------- Simulations ------ #
+    # --------------------------- #
 
-    # Simulate
-    simulation_output = workflow_elastic_viscous_simulation(
-        int_param_ranges=int_param_ranges,
-        ext_param_ranges=ext_param_ranges,
-        param_keys_to_infer=['Beta'],
-        n_jobs_simulation=-1,
-        checkpoint_str = "./shear_tip",
-    )
-    model_lists = simulation_output['model_lists']
-    int_params_metadata = simulation_output['int_params_metadata']
-    ext_params_list = simulation_output['ext_params_list']    
+    # Bending Elasticity
 
-    # All external parameters on one plot
-    fig = plot_final_output_vs_ext_param_color_int_param(
-        model_lists=model_lists,
-        int_params_metadata=int_params_metadata,
-        ext_params_list=ext_params_list,
-        int_param_name='Beta',
-        ext_param_name='A',
-        colorscale='Viridis',
-        log_scale=True,
-    )
-    fig.write_image("Figures/tip_vs_A_color_Beta.svg")
-    fig.write_html("Figures/tip_vs_A_color_Beta.html")
-    fig.show()
+    # # Small logarithmic perturbations around 1
+    # epsilon = 0.01  # log-scale offset (in powers of 10)
+    # n_points = 5  # number of points on each side of 1
+    # log_offsets = np.linspace(-epsilon, epsilon, num=2*n_points + 1)
+    # Sp4_vec =  np.power(10, log_offsets)  
+    # int_param_ranges = {'Sp4': Sp4_vec}
+
+    # A_vec = np.pow(10, np.linspace(start=-6, stop=-1, num = 12))
+    # ext_param_ranges = {'A': A_vec}
+
+    # # Simulate
+    # simulation_output = workflow_elastic_viscous_simulation(
+    #     int_param_ranges=int_param_ranges,
+    #     ext_param_ranges=ext_param_ranges,
+    #     param_keys_to_infer=['Sp4'],
+    #     n_jobs_simulation=-1,
+    #     checkpoint_str = "./bending_distance",
+    # )
+
+    # model_lists = simulation_output['model_lists']
+    # int_params_metadata = simulation_output['int_params_metadata']
+    # ext_params_list = simulation_output['ext_params_list']
+
+    # # Plot
+
+    # # # Find the index where Sp4 = 1 (should be the middle point)
+    # Sp4_star = 1
+    # reference_index = np.argmin(np.abs(Sp4_vec - Sp4_star))
+    # reference_model_list = model_lists[reference_index]
+
+    # fig = plot_model_distance_multi_external(
+    #     model_lists=model_lists,
+    #     reference_model_list=reference_model_list,
+    #     distance_fn=rel_mse,
+    #     int_param_name='Sp4',
+    #     int_params_metadata=int_params_metadata,
+    #     ext_params_list=ext_params_list,
+    #     ext_param_name='A',
+    #     title="Distance vs Sp4 (All Amplitudes)",
+    #     y_label="Relative L2 Error",
+    #     log_scale=False,
+    # )
+    # fig.write_image("Figures/loss_vs_Sp4_color_A.svg")
+    # fig.write_html("Figures/loss_vs_Sp4_color_A.html")
+    # fig.show()
+
+    # log_offsets = np.linspace(-3, 3, num=7)
+    # Sp4_vec =  np.power(10, log_offsets)  
+    # int_param_ranges = {'Sp4': Sp4_vec}
+
+    # A_vec = np.pow(10, np.linspace(start=-6, stop=-1, num = 12))
+    # ext_param_ranges = {'A': A_vec}
+
+    # # Simulate
+    # simulation_output = workflow_elastic_viscous_simulation(
+    #     int_param_ranges=int_param_ranges,
+    #     ext_param_ranges=ext_param_ranges,
+    #     param_keys_to_infer=['Sp4'],
+    #     n_jobs_simulation=-1,
+    #     checkpoint_str = "./bending_tip",
+    # )
+    # model_lists = simulation_output['model_lists']
+    # int_params_metadata = simulation_output['int_params_metadata']
+    # ext_params_list = simulation_output['ext_params_list']    
+
+    # # All external parameters on one plot
+    # fig = plot_final_output_vs_ext_param_color_int_param(
+    #     model_lists=model_lists,
+    #     int_params_metadata=int_params_metadata,
+    #     ext_params_list=ext_params_list,
+    #     int_param_name='Sp4',
+    #     ext_param_name='A',
+    #     colorscale='Viridis',
+    #     log_scale=True,
+    # )
+    # fig.write_image("Figures/tip_vs_A_color_Sp4.svg")
+    # fig.write_html("Figures/tip_vs_A_color_Sp4.html")
+    # fig.show()
+
+    # Shear Elasticity
+
+    # # Small logarithmic perturbations around 1
+    # epsilon = 0.01  # log-scale offset (in powers of 10)
+    # n_points = 5  # number of points on each side of 1
+    # log_offsets = np.linspace(-epsilon, epsilon, num=2*n_points + 1)
+    # Beta_vec =  np.power(10, log_offsets)  
+    # int_param_ranges = {'Beta': Beta_vec}
+
+    # A_vec = np.pow(10, np.linspace(start=-4, stop=1, num = 12))
+    # ext_param_ranges = {'A': A_vec}
+
+    # # Simulate
+    # simulation_output = workflow_elastic_viscous_simulation(
+    #     int_param_ranges=int_param_ranges,
+    #     ext_param_ranges=ext_param_ranges,
+    #     param_keys_to_infer=['Beta'],
+    #     n_jobs_simulation=-1,
+    #     checkpoint_str = "./shear_distance",
+    # )
+
+    # model_lists = simulation_output['model_lists']
+    # int_params_metadata = simulation_output['int_params_metadata']
+    # ext_params_list = simulation_output['ext_params_list']
+
+    # # Plot
+
+    # # # Find the index where Beta = 1 (should be the middle point)
+    # Beta_star = 1
+    # reference_index = np.argmin(np.abs(Beta_vec - Beta_star))
+    # reference_model_list = model_lists[reference_index]
+
+    # fig = plot_model_distance_multi_external(
+    #     model_lists=model_lists,
+    #     reference_model_list=reference_model_list,
+    #     distance_fn=rel_mse,
+    #     int_param_name='Beta',
+    #     int_params_metadata=int_params_metadata,
+    #     ext_params_list=ext_params_list,
+    #     ext_param_name='A',
+    #     title="Distance vs Beta (All Amplitudes)",
+    #     y_label="Relative L2 Error",
+    #     log_scale=False,
+    # )
+    # fig.write_image("Figures/loss_vs_Beta_color_A.svg")
+    # fig.write_html("Figures/loss_vs_Beta_color_A.html")
+    # fig.show()
+
+    # # Plot full trajectories for varying ext_param, one subplot per int_param
+
+    # # Small logarithmic perturbations around 1
+    # epsilon = 0.1  # log-scale offset (in powers of 10)
+    # n_points = 5  # number of points on each side of 1
+    # log_offsets = np.linspace(-epsilon, epsilon, num=2*n_points + 1)
+    # Beta_vec =  np.power(10, log_offsets)  
+    # int_param_ranges = {'Beta': Beta_vec}
+
+    # A_vec = np.pow(10, np.linspace(start=-4, stop=0, num = 16))
+    # ext_param_ranges = {'A': A_vec}
+
+    # # Simulate
+    # simulation_output = workflow_elastic_viscous_simulation(
+    #     int_param_ranges=int_param_ranges,
+    #     ext_param_ranges=ext_param_ranges,
+    #     param_keys_to_infer=['Beta'],
+    #     n_jobs_simulation=-1,
+    #     checkpoint_str = "./shear_trajectory",
+    # )
+    # model_lists = simulation_output['model_lists']
+    # int_params_metadata = simulation_output['int_params_metadata']
+    # ext_params_list = simulation_output['ext_params_list']        
+
+    # fig = plot_output_trajectory_subplots_int_param(
+    #     model_lists, int_params_metadata, ext_params_list,
+    #     int_param_name='Beta', ext_param_name='A',
+    #     x_label='x', y_label='y',
+    #     colorscale='Viridis', log_scale=False
+    # )
+    # fig.write_image("Figures/filament_color_A_subplot_Beta.svg")
+    # fig.write_html("Figures/filament_color_A_subplot_Beta.html")
+    # fig.show()
+
+    # fig = plot_output_trajectory_subplots_ext_param(
+    #     model_lists, int_params_metadata, ext_params_list,
+    #     int_param_name='Beta', ext_param_name='A',
+    #     x_label='x', y_label='y',
+    #     colorscale='Viridis', log_scale=False
+    # )
+    # fig.write_image("Figures/filament_color_Beta_subplot_A.svg")
+    # fig.write_html("Figures/filament_color_Beta_subplot_A.html")
+    # fig.show()
+
+    # # Plot last element of X for varying int_params and ext_params
+    # log_offsets = np.linspace(-3, 3, num=70)
+    # Beta_vec = np.power(10, log_offsets)  
+    # int_param_ranges = {'Beta': Beta_vec}
+
+    # A_vec = np.pow(10, np.linspace(start=-4, stop=1, num = 12))
+    # ext_param_ranges = {'A': A_vec}
+
+    # # Simulate
+    # simulation_output = workflow_elastic_viscous_simulation(
+    #     int_param_ranges=int_param_ranges,
+    #     ext_param_ranges=ext_param_ranges,
+    #     param_keys_to_infer=['Beta'],
+    #     n_jobs_simulation=-1,
+    #     checkpoint_str = "./shear_tip",
+    # )
+    # model_lists = simulation_output['model_lists']
+    # int_params_metadata = simulation_output['int_params_metadata']
+    # ext_params_list = simulation_output['ext_params_list']    
+
+    # # All external parameters on one plot
+    # fig = plot_final_output_vs_ext_param_color_int_param(
+    #     model_lists=model_lists,
+    #     int_params_metadata=int_params_metadata,
+    #     ext_params_list=ext_params_list,
+    #     int_param_name='Beta',
+    #     ext_param_name='A',
+    #     colorscale='Viridis',
+    #     log_scale=True,
+    # )
+    # fig.write_image("Figures/tip_vs_A_color_Beta.svg")
+    # fig.write_html("Figures/tip_vs_A_color_Beta.html")
+    # fig.show()
 
     # --------------------------- #
     # --------- Inferences ------ #
