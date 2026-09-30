@@ -2446,7 +2446,6 @@ def plot_fig_S4(
     
     return fig_a, fig_b
 
-
 def plot_fig_S5(
     model_lists: Dict[int, ModelList],
     int_params_metadata: List[Dict[str, Any]],
@@ -2624,6 +2623,253 @@ def plot_fig_S5(
     )
     
     return fig_S5a, fig_S5b
+
+def plot_vid_S5c(
+    model_lists: Dict[int, ModelList],
+    int_params_metadata: List[Dict[str, Any]],
+    ext_params_list: List[Dict[str, Any]],
+    int_param_name: str = 'Beta',
+    ext_param_name: str = 'A',
+    title: Optional[str] = None,
+    x_label: str = "x",
+    y_label: str = "y",
+    log_scale: bool = False,
+    colorscale: str = 'Viridis',
+) -> go.Figure:
+    """
+    Create an animated 2D plot of phase-space trajectories with a slider.
+    Each frame corresponds to a different external parameter value.
+    All internal parameter trajectories are shown simultaneously, colored by internal parameter.
+    Axis ranges are fixed across all frames.
+    
+    Args:
+        model_lists: Dictionary mapping indices to ModelList objects
+        int_params_metadata: List of dicts, each containing internal parameter values
+        ext_params_list: List of external parameter dicts
+        int_param_name: Name of the internal parameter (e.g., 'Beta')
+        ext_param_name: Name of the external parameter for animation (e.g., 'A')
+        title: Plot title
+        x_label: X-axis label
+        y_label: Y-axis label
+        log_scale: Whether to use log scale for axes
+        colorscale: Plotly colorscale name (e.g., 'Viridis', 'Blues', 'Reds')
+    
+    Returns:
+        Plotly Figure with animation and slider
+    """
+    # Extract internal and external parameter values
+    int_param_values = np.array([params_dict[int_param_name] for params_dict in int_params_metadata])
+    ext_param_values = np.array([ext_dict[ext_param_name] for ext_dict in ext_params_list])
+    
+    # Normalize internal parameter values for colormap (log scale)
+    int_param_log = np.log10(int_param_values)
+    int_param_min = int_param_log.min()
+    int_param_max = int_param_log.max()
+    int_param_norm = (int_param_log - int_param_min) / (int_param_max - int_param_min)
+    
+    # Get colors for internal parameters
+    colors_int = px.colors.sample_colorscale(
+        colorscale, 
+        int_param_norm.tolist()
+    )
+    
+    # Pre-compute global axis ranges across all frames
+    x_min, x_max = np.inf, -np.inf
+    y_min, y_max = np.inf, -np.inf
+    sorted_int_indices = sorted(model_lists.keys())
+    
+    for ext_idx in range(len(ext_param_values)):
+        ext_param_val = ext_param_values[ext_idx]
+        for int_idx in sorted_int_indices:
+            model_list = model_lists[int_idx]
+            model = model_list.models[ext_idx]
+            
+            if model.sim_output is not None:
+                output_data = model.sim_output
+                if isinstance(output_data, dict) and 'value' in output_data:
+                    output_data = output_data['value']
+                
+                output_array = np.array(output_data)
+                
+                if output_array.size > 1:
+                    output_array = np.atleast_1d(output_array)
+                    X_3N = X3N(output_array)
+                    N = X_3N.shape[0] // 3
+                    
+                    x_trajectory = X_3N[:N, 0] / N
+                    y_trajectory = X_3N[N:int(2*N), 0] / N
+
+                    if int_param_name == 'Beta':
+                        y_trajectory /= ext_param_val
+                    
+                    x_min = min(x_min, x_trajectory.min())
+                    x_max = max(x_max, x_trajectory.max())
+                    y_min = min(y_min, y_trajectory.min())
+                    y_max = max(y_max, y_trajectory.max())
+    
+    # Add small padding to the ranges
+    x_padding = (x_max - x_min) * 0.05
+    y_padding = (y_max - y_min) * 0.05
+    x_min -= x_padding
+    x_max += x_padding
+    y_min -= y_padding
+    y_max += y_padding
+    
+    # Create frames for animation
+    frames = []
+    
+    for ext_idx, ext_param_val in enumerate(ext_param_values):
+        frame_traces = []
+        
+        # Add trace for each internal parameter
+        for int_idx in sorted_int_indices:
+            model_list = model_lists[int_idx]
+            int_param_val = int_param_values[int_idx]
+            model = model_list.models[ext_idx]
+            
+            if model.sim_output is not None:
+                output_data = model.sim_output
+                if isinstance(output_data, dict) and 'value' in output_data:
+                    output_data = output_data['value']
+                
+                output_array = np.array(output_data)
+                
+                if output_array.size > 1:
+                    output_array = np.atleast_1d(output_array)
+                    
+                    X_3N = X3N(output_array)
+                    N = X_3N.shape[0] // 3
+                    
+                    x_trajectory = X_3N[:N, 0] / N
+                    y_trajectory = X_3N[N:int(2*N), 0] / N
+
+                    if int_param_name == 'Beta':
+                        y_trajectory /= ext_param_val
+                    
+                    frame_traces.append(
+                        go.Scatter(
+                            x=x_trajectory,
+                            y=y_trajectory,
+                            mode='lines+markers',
+                            name=f"{int_param_name} = {int_param_val:.4f}",
+                            legendgroup=f"int_{int_idx}",
+                            showlegend=(ext_idx == 0),  # Only show legend on first frame
+                            hovertemplate=(
+                                f"<b>{x_label}</b>: %{{x:.6e}}<br>"
+                                f"<b>{y_label}</b>: %{{y:.6e}}<br>"
+                                f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<br>"
+                                f"<b>{int_param_name}</b>: {int_param_val:.4f}<extra></extra>"
+                            ),
+                            line=dict(width=2, color=colors_int[int_idx]),
+                            marker=dict(size=4, color=colors_int[int_idx]),
+                        )
+                    )
+        
+        frames.append(go.Frame(data=frame_traces, name=str(ext_idx)))
+    
+    # Create initial figure with first frame
+    initial_traces = frames[0].data if frames else []
+    
+    fig = go.Figure(
+        data=initial_traces,
+        frames=frames,
+    )
+    
+    # Create slider steps
+    slider_steps = []
+    for ext_idx, ext_param_val in enumerate(ext_param_values):
+        slider_steps.append(
+            dict(
+                args=[[str(ext_idx)], {
+                    "frame": {"duration": 300, "redraw": True},
+                    "mode": "immediate",
+                    "transition": {"duration": 300},
+                }],
+                method="animate",
+                label=f"{ext_param_name} = {ext_param_val:.2e}",
+            )
+        )
+    
+    # Add slider
+    sliders = [
+        dict(
+            active=0,
+            yanchor="top",
+            y=0,
+            xanchor="left",
+            x=0.1,
+            len=0.8,
+            transition={"duration": 300},
+            pad={"b": 10, "t": 50},
+            currentvalue=dict(
+                prefix=f"<b>{ext_param_name} = </b>",
+                visible=True,
+                xanchor="right",
+                font=dict(size=12),
+            ),
+            steps=slider_steps,
+        )
+    ]
+    
+    if title is None:
+        title = f"Filament Trajectories Across {ext_param_name} (colored by {int_param_name})"
+    
+    # Configure 2D layout with fixed axis ranges
+    fig.update_layout(
+        title=title,
+        xaxis=dict(
+            title=x_label,
+            type='log' if log_scale else 'linear',
+            range=[np.log10(x_min) if log_scale else x_min, 
+                   np.log10(x_max) if log_scale else x_max],
+        ),
+        yaxis=dict(
+            title=y_label,
+            type='log' if log_scale else 'linear',
+            range=[np.log10(y_min) if log_scale else y_min, 
+                   np.log10(y_max) if log_scale else y_max],
+        ),
+        hovermode='closest',
+        legend=dict(title=int_param_name, x=0.02, y=0.98),
+        height=700,
+        width=900,
+        template='plotly_white',
+        updatemenus=[
+            dict(
+                type="buttons",
+                direction="left",
+                buttons=[
+                    dict(
+                        args=[None, {
+                            "frame": {"duration": 500, "redraw": True},
+                            "fromcurrent": True,
+                            "transition": {"duration": 300},
+                        }],
+                        label="▶ Play",
+                        method="animate",
+                    ),
+                    dict(
+                        args=[[None], {
+                            "frame": {"duration": 0, "redraw": True},
+                            "mode": "immediate",
+                            "transition": {"duration": 0},
+                        }],
+                        label="⏸ Pause",
+                        method="animate",
+                    ),
+                ],
+                pad={"t": 87},
+                showactive=True,
+                x=0.1,
+                xanchor="left",
+                y=1.15,
+                yanchor="top",
+            ),
+        ],
+        sliders=sliders,
+    )
+    
+    return fig
 
 
 if __name__ == "__main__":
@@ -3122,10 +3368,8 @@ if __name__ == "__main__":
     fig_S5b.show()
 
     # =========
-    # VIDEO S1 TODO
+    # VIDEO S5c
     # =========
-
-    # Plot full trajectories for varying ext_param, one frame per int_param 
 
     # Small logarithmic perturbations around 1
     epsilon = 0.1  # log-scale offset (in powers of 10)
@@ -3134,7 +3378,7 @@ if __name__ == "__main__":
     Beta_vec =  np.power(10, log_offsets)  
     int_param_ranges = {'Beta': Beta_vec}
 
-    A_vec = np.pow(10, np.linspace(start=-4, stop=0, num = 16))
+    A_vec = np.pow(10, np.linspace(start=-4, stop=0, num=16))
     ext_param_ranges = {'A': A_vec}
 
     # Simulate
@@ -3143,21 +3387,30 @@ if __name__ == "__main__":
         ext_param_ranges=ext_param_ranges,
         param_keys_to_infer=['Beta'],
         n_jobs_simulation=-1,
-        checkpoint_str = "./shear_trajectory",
+        checkpoint_str="./shear_trajectory",
     )
     model_lists = simulation_output['model_lists']
     int_params_metadata = simulation_output['int_params_metadata']
     ext_params_list = simulation_output['ext_params_list']        
 
-    video_S5c = plot_output_trajectory_subplots_ext_param(
-        model_lists, int_params_metadata, ext_params_list,
-        int_param_name='Beta', ext_param_name='A',
-        x_label='x', y_label='y',
-        colorscale='Viridis', log_scale=False
+    # Create figure
+    fig_S5c = plot_vid_S5c(
+        model_lists=model_lists,
+        int_params_metadata=int_params_metadata,
+        ext_params_list=ext_params_list,
+        int_param_name='Beta',
+        ext_param_name='A',
+        x_label='x',
+        y_label='y',
+        colorscale='Viridis',
+        log_scale=False,
     )
-    video_S5c.write_image("Figures/filament_color_Beta_subplot_A.svg")
-    video_S5c.write_html("Figures/filament_color_Beta_subplot_A.html")
-    video_S5c.show()    
+
+    # Save and display
+    fig_S5c.write_image("Figures/filament_color_Beta_subplot_A.svg")
+    fig_S5c.write_html("Figures/filament_color_Beta_subplot_A.html")
+    fig_S5c.show()
+
 
     # --------------------- #
     # B. Viscous Inferences #
