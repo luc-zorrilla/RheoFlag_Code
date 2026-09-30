@@ -2266,6 +2266,366 @@ def plot_fig_5(
     
     return fig_std, fig_signed_rel_err
 
+def plot_fig_S4(
+    model_lists: Dict[int, ModelList],
+    int_params_metadata: List[Dict[str, Any]],
+    ext_params_list: List[Dict[str, Any]],
+    reference_model_list: ModelList,
+    int_param_name: str = 'Sp4',
+    ext_param_name: str = 'A',
+    distance_fn: Callable[[Dict[str, Any], Dict[str, Any]], float] = rel_mse,
+    title_a: Optional[str] = None,
+    title_b: Optional[str] = None,
+    colorscale: str = 'Viridis',
+) -> tuple[go.Figure, go.Figure]:
+    """
+    Plot distance and final output across internal and external parameters.
+    Inspired by plot_fig_1, combining plot_model_distance_multi_external and
+    plot_final_output_vs_ext_param_color_int_param.
+    
+    Args:
+        model_lists: Dictionary mapping indices to ModelList objects
+        int_params_metadata: List of dicts, each containing internal parameter values
+        ext_params_list: List of external parameter dicts
+        reference_model_list: Reference ModelList to compare against
+        int_param_name: Name of the internal parameter (e.g., 'Sp4', 'Beta')
+        ext_param_name: Name of the external parameter (e.g., 'A')
+        distance_fn: Distance function(output_1, output_2) -> float
+        title_a: Title for distance figure
+        title_b: Title for final output figure
+        colorscale: Plotly colorscale name
+    
+    Returns:
+        Tuple of (fig_a, fig_b) where:
+            - fig_a: Distance vs internal parameter (multiple lines for each external param)
+            - fig_b: Final output vs external parameter (color-coded by internal param)
+    """
+    int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
+    ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
+    
+    n_internal = len(int_param_values)
+    num_ext_params = len(ext_params_list)
+    
+    # ============================================================================
+    # FIGURE A: DISTANCE VS INTERNAL PARAMETER (multiple lines for each A)
+    # ============================================================================
+    fig_a = go.Figure()
+    
+    colors_ext = [
+        '#0072B2', '#E69F00', '#CC79A7', '#56B4E9',
+        '#009E73', '#F0E442', '#D55E00', '#999999'
+    ]
+    
+    ref_models_outputs = [model.sim_output for model in reference_model_list.models]
+    
+    for ext_idx in range(num_ext_params):
+        distances = []
+        
+        ref_output = ref_models_outputs[ext_idx]
+        
+        for int_idx in sorted(model_lists.keys()):
+            model_list = model_lists[int_idx]
+            model = model_list.models[ext_idx]
+            model_output = model.sim_output
+            distance = distance_fn(model_output['value'], ref_output['value'])
+            distances.append(distance)
+        
+        ext_value = ext_param_values[ext_idx]
+        label = f"{ext_param_name} = {ext_value:.3e}"
+        
+        fig_a.add_trace(go.Scatter(
+            x=int_param_values,
+            y=distances,
+            mode='lines+markers',
+            name=label,
+            line=dict(color=colors_ext[ext_idx % len(colors_ext)], width=2),
+            marker=dict(size=6, symbol='circle'),
+            hovertemplate=(
+                f"<b>{int_param_name}:</b> %{{x:.3e}}<br>"
+                f"<b>Relative L2 Error:</b> %{{y:.3e}}<br>"
+                f"<b>{label}</b><extra></extra>"
+            ),
+        ))
+    
+    if title_a is None:
+        title_a = f"Distance vs {int_param_name} (All {ext_param_name} values)"
+    
+    fig_a.update_layout(
+        title=title_a,
+        xaxis_title=int_param_name,
+        yaxis_title="Relative L2 Error",
+        xaxis=dict(type='log'),
+        template='plotly_white',
+        hovermode='closest',
+        width=1000,
+        height=650,
+        legend=dict(x=0.02, y=0.98, bgcolor='rgba(255,255,255,0.8)'),
+    )
+    
+    # ============================================================================
+    # FIGURE B: FINAL OUTPUT VS EXTERNAL PARAMETER (color-coded by internal param)
+    # ============================================================================
+    fig_b = go.Figure()
+    
+    if len(int_param_values) > 1:
+        int_param_min = min(int_param_values)
+        int_param_max = max(int_param_values)
+        int_param_norm = [
+            (val - int_param_min) / (int_param_max - int_param_min) 
+            for val in int_param_values
+        ]
+    else:
+        int_param_norm = [0]
+    
+    colors_int = px.colors.sample_colorscale(colorscale, int_param_norm)
+    
+    for int_idx in sorted(model_lists.keys()):
+        x_vals = []
+        y_vals = []
+        
+        model_list = model_lists[int_idx]
+        int_param_val = int_param_values[int_idx]
+        
+        for ext_idx in range(len(model_list.models)):
+            model = model_list.models[ext_idx]
+            ext_param_val = ext_param_values[ext_idx]
+            
+            if model.sim_output is not None:
+                output_data = model.sim_output
+                if isinstance(output_data, dict) and 'value' in output_data:
+                    output_data = output_data['value']
+                
+                output_array = np.array(output_data)
+                
+                if output_array.size > 1:
+                    output_array = np.atleast_1d(output_array)
+                    
+                    X_3N = X3N(output_array)
+                    N = X_3N.shape[0] // 3
+                    
+                    final_y = X_3N[N:int(2*N)][-1, 0]
+                    
+                    if 'Beta' in int_param_name:
+                        final_x = ext_param_val / int_param_val
+                    else:  # Sp4 or other
+                        final_x = ext_param_val * int_param_val
+                    
+                    x_vals.append(final_x)
+                    y_vals.append(final_y)
+        
+        if x_vals:
+            fig_b.add_trace(go.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode='lines+markers',
+                name=f"{int_param_name} = {int_param_val:.4f}",
+                hovertemplate=(
+                    f"<b>{ext_param_name}</b>: %{{x:.2e}}<br>"
+                    f"<b>Tip Displacement</b>: %{{y:.6e}}<br>"
+                    f"<b>{int_param_name}</b>: {int_param_val:.4f}<extra></extra>"
+                ),
+                line=dict(width=2, color=colors_int[int_idx]),
+                marker=dict(size=6, color=colors_int[int_idx]),
+            ))
+    
+    if title_b is None:
+        title_b = f"Tip Displacement vs {ext_param_name} (color-coded by {int_param_name})"
+    
+    fig_b.update_layout(
+        title=title_b,
+        xaxis_title=ext_param_name,
+        yaxis_title="Tip Displacement",
+        xaxis=dict(type='log'),
+        yaxis=dict(type='log'),
+        template='plotly_white',
+        hovermode='closest',
+        width=1000,
+        height=650,
+        legend=dict(title=int_param_name, x=0.02, y=0.98, bgcolor='rgba(255,255,255,0.8)'),
+    )
+    
+    return fig_a, fig_b
+
+
+def plot_fig_S5(
+    model_lists: Dict[int, ModelList],
+    int_params_metadata: List[Dict[str, Any]],
+    ext_params_list: List[Dict[str, Any]],
+    reference_model_list: ModelList,
+    int_param_name: str = 'Beta',
+    ext_param_name: str = 'A',
+    distance_fn: Callable[[Dict[str, Any], Dict[str, Any]], float] = rel_mse,
+    title_a: Optional[str] = None,
+    title_b: Optional[str] = None,
+    colorscale: str = 'Viridis',
+) -> tuple[go.Figure, go.Figure]:
+    """
+    Plot distance and final output across internal and external parameters.
+    Inspired by plot_fig_1, combining plot_model_distance_multi_external and
+    plot_final_output_vs_ext_param_color_int_param.
+    
+    Args:
+        model_lists: Dictionary mapping indices to ModelList objects
+        int_params_metadata: List of dicts, each containing internal parameter values
+        ext_params_list: List of external parameter dicts
+        reference_model_list: Reference ModelList to compare against
+        int_param_name: Name of the internal parameter (e.g., 'Beta')
+        ext_param_name: Name of the external parameter (e.g., 'A')
+        distance_fn: Distance function(output_1, output_2) -> float
+        title_a: Title for distance figure
+        title_b: Title for final output figure
+        colorscale: Plotly colorscale name
+    
+    Returns:
+        Tuple of (fig_S5a, fig_S5b)
+    """
+    int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
+    ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
+    
+    n_internal = len(int_param_values)
+    num_ext_params = len(ext_params_list)
+    
+    # ============================================================================
+    # FIGURE S5A: DISTANCE VS INTERNAL PARAMETER (multiple lines for each A)
+    # ============================================================================
+    fig_S5a = go.Figure()
+    
+    colors_ext = [
+        '#0072B2', '#E69F00', '#CC79A7', '#56B4E9',
+        '#009E73', '#F0E442', '#D55E00', '#999999'
+    ]
+    
+    ref_models_outputs = [model.sim_output for model in reference_model_list.models]
+    
+    for ext_idx in range(num_ext_params):
+        distances = []
+        
+        ref_output = ref_models_outputs[ext_idx]
+        
+        for int_idx in sorted(model_lists.keys()):
+            model_list = model_lists[int_idx]
+            model = model_list.models[ext_idx]
+            model_output = model.sim_output
+            distance = distance_fn(model_output['value'], ref_output['value'])
+            distances.append(distance)
+        
+        ext_value = ext_param_values[ext_idx]
+        label = f"{ext_param_name} = {ext_value:.3e}"
+        
+        fig_S5a.add_trace(go.Scatter(
+            x=int_param_values,
+            y=distances,
+            mode='lines+markers',
+            name=label,
+            line=dict(color=colors_ext[ext_idx % len(colors_ext)], width=2),
+            marker=dict(size=6, symbol='circle'),
+            hovertemplate=(
+                f"<b>{int_param_name}:</b> %{{x:.3e}}<br>"
+                f"<b>Relative L2 Error:</b> %{{y:.3e}}<br>"
+                f"<b>{label}</b><extra></extra>"
+            ),
+        ))
+    
+    if title_a is None:
+        title_a = f"Distance vs {int_param_name} (All {ext_param_name} values)"
+    
+    fig_S5a.update_layout(
+        title=title_a,
+        xaxis_title=int_param_name,
+        yaxis_title="Relative L2 Error",
+        xaxis=dict(type='log'),
+        template='plotly_white',
+        hovermode='closest',
+        width=1000,
+        height=650,
+        legend=dict(x=0.02, y=0.98, bgcolor='rgba(255,255,255,0.8)'),
+    )
+    
+    # ============================================================================
+    # FIGURE S5B: FINAL OUTPUT VS EXTERNAL PARAMETER (color-coded by internal param)
+    # ============================================================================
+    fig_S5b = go.Figure()
+    
+    if len(int_param_values) > 1:
+        int_param_min = min(int_param_values)
+        int_param_max = max(int_param_values)
+        int_param_norm = [
+            (val - int_param_min) / (int_param_max - int_param_min) 
+            for val in int_param_values
+        ]
+    else:
+        int_param_norm = [0]
+    
+    colors_int = px.colors.sample_colorscale(colorscale, int_param_norm)
+    
+    for int_idx in sorted(model_lists.keys()):
+        x_vals = []
+        y_vals = []
+        
+        model_list = model_lists[int_idx]
+        int_param_val = int_param_values[int_idx]
+        
+        for ext_idx in range(len(model_list.models)):
+            model = model_list.models[ext_idx]
+            ext_param_val = ext_param_values[ext_idx]
+            
+            if model.sim_output is not None:
+                output_data = model.sim_output
+                if isinstance(output_data, dict) and 'value' in output_data:
+                    output_data = output_data['value']
+                
+                output_array = np.array(output_data)
+                
+                if output_array.size > 1:
+                    output_array = np.atleast_1d(output_array)
+                    
+                    X_3N = X3N(output_array)
+                    N = X_3N.shape[0] // 3
+                    
+                    final_y = X_3N[int(2*N)-1, 0]
+                    
+                    if 'Beta' in int_param_name:
+                        final_x = ext_param_val / int_param_val
+                    else:  # Sp4 or other
+                        final_x = ext_param_val * int_param_val
+                    
+                    x_vals.append(final_x)
+                    y_vals.append(final_y)
+        
+        if x_vals:
+            fig_S5b.add_trace(go.Scatter(
+                x=x_vals,
+                y=y_vals,
+                mode='lines+markers',
+                name=f"{int_param_name} = {int_param_val:.4f}",
+                hovertemplate=(
+                    f"<b>{ext_param_name}</b>: %{{x:.2e}}<br>"
+                    f"<b>Tip Displacement</b>: %{{y:.6e}}<br>"
+                    f"<b>{int_param_name}</b>: {int_param_val:.4f}<extra></extra>"
+                ),
+                line=dict(width=2, color=colors_int[int_idx]),
+                marker=dict(size=6, color=colors_int[int_idx]),
+            ))
+    
+    if title_b is None:
+        title_b = f"Tip Displacement vs {ext_param_name} (color-coded by {int_param_name})"
+    
+    fig_S5b.update_layout(
+        title=title_b,
+        xaxis_title=ext_param_name,
+        yaxis_title="Tip Displacement",
+        xaxis=dict(type='log'),
+        yaxis=dict(type='log'),
+        template='plotly_white',
+        hovermode='closest',
+        width=1000,
+        height=650,
+        legend=dict(title=int_param_name, x=0.02, y=0.98, bgcolor='rgba(255,255,255,0.8)'),
+    )
+    
+    return fig_S5a, fig_S5b
+
+
 if __name__ == "__main__":
     
     # ---------------------------------- #
@@ -2587,8 +2947,6 @@ if __name__ == "__main__":
     fig_5_b.write_html("Figures/harmonic_response_rel_error.html")
     fig_5_b.show()
 
-    # TODO: make figure functions.
-
     # ------------------------------------------------ #
     # Figure S4: Hessian decrease for bending filament #
     # ------------------------------------------------ #
@@ -2597,10 +2955,10 @@ if __name__ == "__main__":
     epsilon = 0.01  # log-scale offset (in powers of 10)
     n_points = 5  # number of points on each side of 1
     log_offsets = np.linspace(-epsilon, epsilon, num=2*n_points + 1)
-    Sp4_vec =  np.power(10, log_offsets)  
+    Sp4_vec = np.power(10, log_offsets)  
     int_param_ranges = {'Sp4': Sp4_vec}
 
-    A_vec = np.pow(10, np.linspace(start=-6, stop=-1, num = 12))
+    A_vec = np.pow(10, np.linspace(start=-6, stop=-1, num=12))
     ext_param_ranges = {'A': A_vec}
 
     # Simulate
@@ -2609,41 +2967,42 @@ if __name__ == "__main__":
         ext_param_ranges=ext_param_ranges,
         param_keys_to_infer=['Sp4'],
         n_jobs_simulation=-1,
-        checkpoint_str = "./bending_distance",
+        checkpoint_str="./bending_distance",
     )
 
     model_lists = simulation_output['model_lists']
     int_params_metadata = simulation_output['int_params_metadata']
     ext_params_list = simulation_output['ext_params_list']
 
-    # Plot
-
-    # # Find the index where Sp4 = 1 (should be the middle point)
+    # Find the index where Sp4 = 1 (should be the middle point)
     Sp4_star = 1
     reference_index = np.argmin(np.abs(Sp4_vec - Sp4_star))
     reference_model_list = model_lists[reference_index]
 
-    fig_S4a = plot_model_distance_multi_external(
+    fig_S4a, _ = plot_fig_S4(
         model_lists=model_lists,
-        reference_model_list=reference_model_list,
-        distance_fn=rel_mse,
-        int_param_name='Sp4',
         int_params_metadata=int_params_metadata,
         ext_params_list=ext_params_list,
+        reference_model_list=reference_model_list,
+        int_param_name='Sp4',
         ext_param_name='A',
-        title="Distance vs Sp4 (All Amplitudes)",
-        y_label="Relative L2 Error",
-        log_scale=False,
+        distance_fn=rel_mse,
+        title_a="Distance vs Sp4 (All Amplitudes)",
     )
+
     fig_S4a.write_image("Figures/loss_vs_Sp4_color_A.svg")
     fig_S4a.write_html("Figures/loss_vs_Sp4_color_A.html")
     fig_S4a.show()
 
+    # ============================================================================
+    # FIGURE S4B: Tip displacement vs A (color-coded by Sp4)
+    # ============================================================================
+
     log_offsets = np.linspace(-3, 3, num=7)
-    Sp4_vec =  np.power(10, log_offsets)  
+    Sp4_vec = np.power(10, log_offsets)  
     int_param_ranges = {'Sp4': Sp4_vec}
 
-    A_vec = np.pow(10, np.linspace(start=-6, stop=-1, num = 12))
+    A_vec = np.pow(10, np.linspace(start=-6, stop=-1, num=12))
     ext_param_ranges = {'A': A_vec}
 
     # Simulate
@@ -2652,22 +3011,24 @@ if __name__ == "__main__":
         ext_param_ranges=ext_param_ranges,
         param_keys_to_infer=['Sp4'],
         n_jobs_simulation=-1,
-        checkpoint_str = "./bending_tip",
+        checkpoint_str="./bending_tip",
     )
+
     model_lists = simulation_output['model_lists']
     int_params_metadata = simulation_output['int_params_metadata']
-    ext_params_list = simulation_output['ext_params_list']    
+    ext_params_list = simulation_output['ext_params_list']
 
-    # All external parameters on one plot
-    fig_S4b = plot_final_output_vs_ext_param_color_int_param(
+    _, fig_S4b = plot_fig_S4(
         model_lists=model_lists,
         int_params_metadata=int_params_metadata,
         ext_params_list=ext_params_list,
+        reference_model_list=reference_model_list,  # Not needed for fig B
         int_param_name='Sp4',
         ext_param_name='A',
+        title_b="Tip Displacement vs A (color-coded by Sp4)",
         colorscale='Viridis',
-        log_scale=True,
     )
+
     fig_S4b.write_image("Figures/tip_vs_A_color_Sp4.svg")
     fig_S4b.write_html("Figures/tip_vs_A_color_Sp4.html")
     fig_S4b.show()
@@ -2699,64 +3060,72 @@ if __name__ == "__main__":
     int_params_metadata = simulation_output['int_params_metadata']
     ext_params_list = simulation_output['ext_params_list']
 
-    # Plot
-
-    # # Find the index where Beta = 1 (should be the middle point)
+    # ============================================================================
+    # FIGURE S5A: Distance vs Beta (All Amplitudes)
+    # ============================================================================
     Beta_star = 1
     reference_index = np.argmin(np.abs(Beta_vec - Beta_star))
     reference_model_list = model_lists[reference_index]
 
-    fig_S5a = plot_model_distance_multi_external(
+    fig_S5a, _ = plot_fig_S5(
         model_lists=model_lists,
-        reference_model_list=reference_model_list,
-        distance_fn=rel_mse,
-        int_param_name='Beta',
         int_params_metadata=int_params_metadata,
         ext_params_list=ext_params_list,
+        reference_model_list=reference_model_list,
+        int_param_name='Beta',
         ext_param_name='A',
-        title="Distance vs Beta (All Amplitudes)",
-        y_label="Relative L2 Error",
-        log_scale=False,
+        distance_fn=rel_mse,
+        title_a="Distance vs Beta (All Amplitudes)",
+        colorscale='Viridis',
     )
+
     fig_S5a.write_image("Figures/loss_vs_Beta_color_A.svg")
     fig_S5a.write_html("Figures/loss_vs_Beta_color_A.html")
     fig_S5a.show()
 
-    # Plot last element of X for varying int_params and ext_params
+    # ============================================================================
+    # FIGURE S5B: Tip Displacement vs A (Color-coded by Beta)
+    # ============================================================================
     log_offsets = np.linspace(-3, 3, num=70)
     Beta_vec = np.power(10, log_offsets)  
     int_param_ranges = {'Beta': Beta_vec}
 
-    A_vec = np.pow(10, np.linspace(start=-4, stop=1, num = 12))
+    A_vec = np.pow(10, np.linspace(start=-4, stop=1, num=12))
     ext_param_ranges = {'A': A_vec}
 
-    # Simulate
     simulation_output = workflow_elastic_viscous_simulation(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
         param_keys_to_infer=['Beta'],
         n_jobs_simulation=-1,
-        checkpoint_str = "./shear_tip",
+        checkpoint_str="./shear_tip",
     )
     model_lists = simulation_output['model_lists']
     int_params_metadata = simulation_output['int_params_metadata']
-    ext_params_list = simulation_output['ext_params_list']    
+    ext_params_list = simulation_output['ext_params_list']
 
-    # All external parameters on one plot
-    fig_S5b = plot_final_output_vs_ext_param_color_int_param(
+
+    _, fig_S5b = plot_fig_S5(
         model_lists=model_lists,
         int_params_metadata=int_params_metadata,
         ext_params_list=ext_params_list,
+        reference_model_list=reference_model_list,
         int_param_name='Beta',
         ext_param_name='A',
+        distance_fn=rel_mse,
+        title_a="Distance vs Beta (All Amplitudes)",
         colorscale='Viridis',
-        log_scale=True,
     )
+
     fig_S5b.write_image("Figures/tip_vs_A_color_Beta.svg")
     fig_S5b.write_html("Figures/tip_vs_A_color_Beta.html")
     fig_S5b.show()
 
-    # Plot full trajectories for varying ext_param, one frame per int_param # TODO: video
+    # =========
+    # VIDEO S1 TODO
+    # =========
+
+    # Plot full trajectories for varying ext_param, one frame per int_param 
 
     # Small logarithmic perturbations around 1
     epsilon = 0.1  # log-scale offset (in powers of 10)
@@ -2921,7 +3290,6 @@ if __name__ is None:
     fig.show()    
 
     fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_s'], ext_param_name='w0', metric = 'rel_error')
-
 
     # Transform w0 -> tau_s * w0
     ## Extract tau_b values from legend entries
