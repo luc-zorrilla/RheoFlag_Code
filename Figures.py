@@ -2821,13 +2821,13 @@ def plot_vid_S5c(
             title=x_label,
             type='log' if log_scale else 'linear',
             range=[np.log10(x_min) if log_scale else x_min, 
-                   np.log10(x_max) if log_scale else x_max],
+                np.log10(x_max) if log_scale else x_max],
         ),
         yaxis=dict(
             title=y_label,
             type='log' if log_scale else 'linear',
             range=[np.log10(y_min) if log_scale else y_min, 
-                   np.log10(y_max) if log_scale else y_max],
+                np.log10(y_max) if log_scale else y_max],
         ),
         hovermode='closest',
         legend=dict(title=int_param_name, x=0.02, y=0.98),
@@ -2871,6 +2871,7 @@ def plot_vid_S5c(
     
     return fig
 
+# def plot_fig_6()
 
 if __name__ == "__main__":
     
@@ -3091,12 +3092,12 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    fig_3_a.write_image("Figures/harmonic_response_tip_amplitude.svg")
-    fig_3_a.write_html("Figures/harmonic_response_tip_amplitude.html")
-    fig_3_a.show()
-    fig_3_b.write_image("Figures/harmonic_response_tip_amplitude_fit.svg")
-    fig_3_b.write_html("Figures/harmonic_response_tip_amplitude_fit.html")
-    fig_3_b.show()    
+    # fig_3_a.write_image("Figures/harmonic_response_tip_amplitude.svg")
+    # fig_3_a.write_html("Figures/harmonic_response_tip_amplitude.html")
+    # fig_3_a.show()
+    # fig_3_b.write_image("Figures/harmonic_response_tip_amplitude_fit.svg")
+    # fig_3_b.write_html("Figures/harmonic_response_tip_amplitude_fit.html")
+    # fig_3_b.show()    
 
     # ----------------------------------------- #
     # -------- II. Algorithmic Inversion ------ #
@@ -3186,12 +3187,12 @@ if __name__ == "__main__":
         workflow_output_bending_shear
         )
 
-    fig_5_a.write_image("Figures/elastic_inference_standard_error.svg")
-    fig_5_a.write_html("Figures/elastic_inference_standard_error.html")
-    fig_5_a.show()
-    fig_5_b.write_image("Figures/elastic_inference_rel_error.svg")
-    fig_5_b.write_html("Figures/harmonic_response_rel_error.html")
-    fig_5_b.show()
+    # fig_5_a.write_image("Figures/elastic_inference_standard_error.svg")
+    # fig_5_a.write_html("Figures/elastic_inference_standard_error.html")
+    # fig_5_a.show()
+    # fig_5_b.write_image("Figures/elastic_inference_rel_error.svg")
+    # fig_5_b.write_html("Figures/harmonic_response_rel_error.html")
+    # fig_5_b.show()
 
     # ------------------------------------------------ #
     # Figure S4: Hessian decrease for bending filament #
@@ -3236,9 +3237,9 @@ if __name__ == "__main__":
         title_a="Distance vs Sp4 (All Amplitudes)",
     )
 
-    fig_S4a.write_image("Figures/loss_vs_Sp4_color_A.svg")
-    fig_S4a.write_html("Figures/loss_vs_Sp4_color_A.html")
-    fig_S4a.show()
+    # fig_S4a.write_image("Figures/loss_vs_Sp4_color_A.svg")
+    # fig_S4a.write_html("Figures/loss_vs_Sp4_color_A.html")
+    # fig_S4a.show()
 
     # ============================================================================
     # FIGURE S4B: Tip displacement vs A (color-coded by Sp4)
@@ -3275,9 +3276,9 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    fig_S4b.write_image("Figures/tip_vs_A_color_Sp4.svg")
-    fig_S4b.write_html("Figures/tip_vs_A_color_Sp4.html")
-    fig_S4b.show()
+    # fig_S4b.write_image("Figures/tip_vs_A_color_Sp4.svg")
+    # fig_S4b.write_html("Figures/tip_vs_A_color_Sp4.html")
+    # fig_S4b.show()
 
     # ---------------------------------------------- #
     # Figure S5: Hessian decrease for shear filament #
@@ -3325,9 +3326,9 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    fig_S5a.write_image("Figures/loss_vs_Beta_color_A.svg")
-    fig_S5a.write_html("Figures/loss_vs_Beta_color_A.html")
-    fig_S5a.show()
+    # fig_S5a.write_image("Figures/loss_vs_Beta_color_A.svg")
+    # fig_S5a.write_html("Figures/loss_vs_Beta_color_A.html")
+    # fig_S5a.show()
 
     # ============================================================================
     # FIGURE S5B: Tip Displacement vs A (Color-coded by Beta)
@@ -3363,9 +3364,9 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    fig_S5b.write_image("Figures/tip_vs_A_color_Beta.svg")
-    fig_S5b.write_html("Figures/tip_vs_A_color_Beta.html")
-    fig_S5b.show()
+    # fig_S5b.write_image("Figures/tip_vs_A_color_Beta.svg")
+    # fig_S5b.write_html("Figures/tip_vs_A_color_Beta.html")
+    # fig_S5b.show()
 
     # =========
     # VIDEO S5c
@@ -3407,10 +3408,9 @@ if __name__ == "__main__":
     )
 
     # Save and display
-    fig_S5c.write_image("Figures/filament_color_Beta_subplot_A.svg")
-    fig_S5c.write_html("Figures/filament_color_Beta_subplot_A.html")
-    fig_S5c.show()
-
+    # fig_S5c.write_image("Figures/filament_color_Beta_subplot_A.svg")
+    # fig_S5c.write_html("Figures/filament_color_Beta_subplot_A.html")
+    # fig_S5c.show()
 
     # --------------------- #
     # B. Viscous Inferences #
@@ -3419,21 +3419,14 @@ if __name__ == "__main__":
     # ----------- #
     # Figure 6: ? #
     # ----------- #
-    # TODO
-
-if __name__ is None:
-    
-    # --------------------------- #
-    # --------- Inferences ------ #
-    # --------------------------- #
 
     optimizer = dual_annealing_optimizer
 
     # Bending Viscosity (Fixed Bending Elasticity)
 
-    int_param_ranges = {'tau_b': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
+    int_param_ranges = {'tau_b': [1e-1, 1e0, 1e1]} # {'tau_b': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
     A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
+    w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 24))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_b']
@@ -3452,7 +3445,7 @@ if __name__ is None:
         )
     
     fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b'], ext_param_name='w0', metric = 'std')
-    
+
     # Transform w0 -> tau_b * w0
     ## Extract tau_b values from legend entries
     tau_b_values = {}
@@ -3472,7 +3465,7 @@ if __name__ is None:
 
     fig.write_image("Figures/std_tau_b_vs_w0.svg")
     fig.write_html("Figures/std_tau_b_vs_w0.html")
-    fig.show()    
+    fig.show()        
 
     fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b'], ext_param_name='w0', metric = 'rel_error')
 
@@ -3495,13 +3488,13 @@ if __name__ is None:
 
     fig.write_image("Figures/err_tau_b_vs_w0.svg")
     fig.write_html("Figures/err_tau_b_vs_w0.html")
-    fig.show()        
+    fig.show()
 
     # Shear Viscosity (Fixed Bending Elasticity & Shear Elasticity)
 
-    int_param_ranges = {'tau_s': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3], 'Beta':[1.0]}
+    int_param_ranges = {'tau_s': [1e-1, 1e0, 1e1], 'Beta':[1.0]} # {'tau_s': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3], 'Beta':[1.0]}
     A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
+    w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 24)) # np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_s']
@@ -3564,6 +3557,8 @@ if __name__ is None:
     fig.write_image("Figures/err_tau_s_vs_w0.svg")
     fig.write_html("Figures/err_tau_s_vs_w0.html")
     fig.show()    
+
+if __name__ is None:
 
     # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
 
