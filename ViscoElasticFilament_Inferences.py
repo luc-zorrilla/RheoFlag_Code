@@ -659,10 +659,11 @@ def dual_annealing_optimizer(
 
     # Repeat optimizer while global minimum is not reached or optimizer has been called x times
     repeat_loss = np.inf
+    n_repeat = 0
     max_repeat = 10
     repeat_tol = 1e-5
 
-    while repeat_loss > repeat_tol:
+    while repeat_loss > repeat_tol and n_repeat < max_repeat:
         
         # --- Trajectory tracking ---
         X_global = []
@@ -788,6 +789,8 @@ def dual_annealing_optimizer(
             repeat_loss = ret.fun
         else:
             repeat_loss = np.inf
+
+        n_repeat += 1
     return ret
 
 ### Loss function
