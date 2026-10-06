@@ -3425,7 +3425,7 @@ if __name__ == "__main__":
     # Bending Viscosity (Fixed Bending Elasticity)
 
     int_param_ranges = {'tau_b': [1e0]} # {'tau_b': [1e-1, 1e0, 1e1]} # {'tau_b': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
-    A_vec = [1e-6]
+    A_vec = [1e-5]
     w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 24))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
     elastic_params_list = []
@@ -3462,6 +3462,7 @@ if __name__ == "__main__":
             trace.x = tuple(x * tau_b for x in trace.x)
     ## Update x-axis label
     fig.update_xaxes(title_text="τ_b * w₀")
+    # fig.update_yaxes(type = 'linear')
 
     fig.write_image("Figures/std_tau_b_vs_w0.svg")
     fig.write_html("Figures/std_tau_b_vs_w0.html")

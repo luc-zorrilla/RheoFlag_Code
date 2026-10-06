@@ -799,6 +799,484 @@ def dual_annealing_optimizer(
     
     return ret
 
+def dual_annealing_optimizer_multistart(
+    objective,
+    bounds=None,
+    n_starts: int = 10,
+    local_minimizer_kwargs: Dict[str, Any] = None,
+    global_minimizer_kwargs: Dict[str, Any] = None,
+    use_log10_bounded_transform: bool = True,
+    n_jobs: int = -1,
+    seed: int = None,
+):
+    """
+    Multi-start dual annealing with parallel execution.
+    
+    Runs `n_starts` independent dual annealing optimizations with diverse initial guesses
+    in parallel, then returns the best result.
+    
+    Args:
+        objective: Callable(flat_array) -> scalar loss
+        bounds: Bounds object (scipy.optimize.Bounds with .lb, .ub attributes)
+        n_starts: Number of independent dual annealing runs (default 10)
+        local_minimizer_kwargs: L-BFGS-B configuration for dual annealing's internal search
+        global_minimizer_kwargs: Dual annealing configuration
+        use_log10_bounded_transform: If True, apply log10 + tanh transformation
+        n_jobs: Number of parallel jobs (-1 = all CPUs, 1 = serial)
+        seed: Random seed for reproducible initial guess generation
+    
+    Returns:
+        OptimizeResult with:
+        - x: Optimal parameters (best from all runs)
+        - fun: Final loss value (best from all runs)
+        - success: Convergence success flag
+        - nit: Number of iterations (from best run)
+        - X_global, F_global, X_local, F_local: Optimization history (best run)
+        - results_all_starts: List of OptimizeResult from all n_starts runs
+        - best_start_id: Index of the best run
+        - all_losses: Loss values from all n_starts runs
+    """
+
+    # --- Generate diverse initial guesses ---
+    x0_list = _generate_diverse_starts(bounds, n_starts, seed=seed)
+
+    print(f"\n[Multi-start] Generating {n_starts} diverse initial guesses...")
+    for i, x0 in enumerate(x0_list):
+        print(f"  Start {i}: x0 = {x0}, f(x0) = {objective(x0):.6e}")
+
+    # --- Run dual annealing in parallel ---
+    print(f"\n[Multi-start] Running {n_starts} dual annealing instances in parallel (n_jobs={n_jobs})...")
+    results_all_starts = Parallel(n_jobs=n_jobs)(
+        delayed(dual_annealing_optimizer)(
+            objective=objective,
+            x0=x0,
+            bounds=bounds,
+            local_minimizer_kwargs=local_minimizer_kwargs,
+            global_minimizer_kwargs=global_minimizer_kwargs,
+            use_log10_bounded_transform=use_log10_bounded_transform,
+        )
+        for x0 in x0_list
+    )
+
+    # --- Extract losses from all runs ---
+    all_losses = [ret.fun for ret in results_all_starts]
+    best_idx = np.argmin(all_losses)
+    result_best = results_all_starts[best_idx]
+
+    print(f"\n[Multi-start] Completed all {n_starts} runs.")
+    print(f"[Multi-start] Loss summary (all runs):")
+    for i, loss in enumerate(all_losses):
+        marker = " <-- BEST" if i == best_idx else ""
+        print(f"  Start {i}: f = {loss:.6e}{marker}")
+
+    # --- Attach metadata ---
+    result_best.results_all_starts = results_all_starts
+    result_best.best_start_id = best_idx
+    result_best.all_losses = all_losses
+    result_best.n_starts = n_starts
+
+    print(f"\n[Multi-start] Best result from start {best_idx}: f = {result_best.fun:.6e}")
+
+    return result_best
+
+def _generate_diverse_starts(bounds, n_starts: int, seed=None):
+    """
+    Generate `n_starts` diverse initial guesses using Latin hypercube sampling.
+    
+    Args:
+        bounds: scipy.optimize.Bounds with .lb, .ub attributes
+        n_starts: Number of samples
+        seed: Random seed
+    
+    Returns:
+        List of initial guesses (numpy arrays in original space)
+    """
+    from scipy.stats import qmc
+
+    rng = np.random.default_rng(seed)
+
+    # Extract bounds
+    lb = np.asarray(bounds.lb)
+    ub = np.asarray(bounds.ub)
+    n_params = len(lb)
+
+    # Latin hypercube sampling in [0, 1]^n
+    sampler = qmc.LatinHypercube(d=n_params, seed=rng)
+    samples_unit = sampler.random(n_starts)  # Shape: (n_starts, n_params)
+
+    # Scale to [lb, ub]
+    x0_list = [lb + (ub - lb) * sample for sample in samples_unit]
+
+    return x0_list
+
+def dual_annealing_optimizer_three_pass(
+    objective,
+    bounds=None,
+    local_minimizer_kwargs: Dict[str, Any] = None,
+    global_minimizer_kwargs: Dict[str, Any] = None,
+    n_starts_pass1: int = 10,
+    n_starts_pass2: int = 10,
+    n_jobs: int = -1,
+    seed: int = None,
+):
+    """
+    Three-pass optimization strategy:
+    
+    Pass 1: Global-local optimization with log-tanh transformation (n_starts=10)
+            → Select best result
+    
+    Pass 2: Global-local optimization WITHOUT log-tanh transformation (n_starts=10)
+            → Initialize from Pass 1 result + diverse perturbations
+            → Select best result
+    
+    Pass 3: Local optimization (L-BFGS-B) starting from Pass 2 result
+            → Final refinement with tight tolerances
+    
+    Args:
+        objective: Callable(flat_array) -> scalar loss
+        bounds: Bounds object (scipy.optimize.Bounds with .lb, .ub attributes)
+        local_minimizer_kwargs: L-BFGS-B config for dual annealing's internal search
+        global_minimizer_kwargs: Dual annealing configuration
+        n_starts_pass1: Number of trials in Pass 1 (default 10)
+        n_starts_pass2: Number of trials in Pass 2 (default 10)
+        n_jobs: Number of parallel jobs (-1 = all CPUs)
+        seed: Random seed for reproducibility
+    
+    Returns:
+        OptimizeResult with same structure as dual_annealing_optimizer:
+        - x: Final optimized parameters (from Pass 3)
+        - fun: Final loss value (from Pass 3)
+        - success: Overall convergence success
+        - nit: Total iterations across all passes
+        - X_global: Aggregated global search trajectory (all passes)
+        - F_global: Aggregated function values along global trajectory
+        - X_local: Aggregated local optimization trajectory (all passes)
+        - F_local: Aggregated function values from local optimization
+        - context_global: Aggregated context labels (all passes)
+        - transform_info: Transformation info from final pass
+        
+        Plus three-pass specific data:
+        - result_pass1: Full OptimizeResult from Pass 1
+        - result_pass2: Full OptimizeResult from Pass 2
+        - result_pass3: Full OptimizeResult from Pass 3
+        - pass1_losses: List of all final losses from Pass 1 runs
+        - pass2_losses: List of all final losses from Pass 2 runs
+        - all_results_pass1: All OptimizeResult objects from Pass 1
+        - all_results_pass2: All OptimizeResult objects from Pass 2
+    """
+
+    print("\n" + "="*70)
+    print("THREE-PASS OPTIMIZATION")
+    print("="*70)
+
+    # =========================================================================
+    # PASS 1: Global-local with log-tanh transformation
+    # =========================================================================
+    print("\n" + "-"*70)
+    print("PASS 1: Global-local optimization WITH log-tanh transformation")
+    print(f"        n_starts = {n_starts_pass1}")
+    print("-"*70)
+
+    result_pass1 = dual_annealing_optimizer_multistart(
+        objective=objective,
+        bounds=bounds,
+        n_starts=n_starts_pass1,
+        local_minimizer_kwargs=local_minimizer_kwargs,
+        global_minimizer_kwargs=global_minimizer_kwargs,
+        use_log10_bounded_transform=True,
+        n_jobs=n_jobs,
+        seed=seed,
+    )
+
+    x_best_pass1 = result_pass1.x
+    f_best_pass1 = result_pass1.fun
+    pass1_losses = result_pass1.all_losses
+    all_results_pass1 = result_pass1.all_results
+
+    print(f"\nPass 1 Result:")
+    print(f"  Best loss: {f_best_pass1:.6e}")
+    print(f"  Best x: {x_best_pass1}")
+    print(f"  Best start ID: {result_pass1.best_start_id}")
+
+    # =========================================================================
+    # PASS 2: Global-local WITHOUT log-tanh transformation
+    #         Initialize from Pass 1 result + diverse perturbations
+    # =========================================================================
+    print("\n" + "-"*70)
+    print("PASS 2: Global-local optimization WITHOUT log-tanh transformation")
+    print(f"        n_starts = {n_starts_pass2}")
+    print(f"        Initialized from Pass 1 result + perturbations")
+    print("-"*70)
+
+    # Generate initial guesses for Pass 2
+    x0_list_pass2 = _generate_pass2_starts(
+        x_best=x_best_pass1,
+        bounds=bounds,
+        n_starts=n_starts_pass2,
+        seed=seed,
+    )
+
+    print(f"\nPass 2 Initial guesses (Pass 1 result + perturbations):")
+    for i, x0 in enumerate(x0_list_pass2):
+        print(f"  Start {i}: x0 = {x0}, f(x0) = {objective(x0):.6e}")
+
+    # Run Pass 2 in parallel
+    print(f"\nRunning {n_starts_pass2} dual annealing instances (no log-tanh)...")
+    from joblib import Parallel, delayed
+
+    results_pass2 = Parallel(n_jobs=n_jobs)(
+        delayed(dual_annealing_optimizer)(
+            objective=objective,
+            x0=x0,
+            bounds=bounds,
+            local_minimizer_kwargs=local_minimizer_kwargs,
+            global_minimizer_kwargs=global_minimizer_kwargs,
+            use_log10_bounded_transform=False,  # No transformation in Pass 2
+        )
+        for x0 in x0_list_pass2
+    )
+
+    # Select best from Pass 2
+    pass2_losses = [ret.fun for ret in results_pass2]
+    best_idx_pass2 = np.argmin(pass2_losses)
+    result_pass2 = results_pass2[best_idx_pass2]
+
+    x_best_pass2 = result_pass2.x
+    f_best_pass2 = result_pass2.fun
+
+    print(f"\nPass 2 Results (all runs):")
+    for i, loss in enumerate(pass2_losses):
+        marker = " <-- BEST" if i == best_idx_pass2 else ""
+        print(f"  Start {i}: f = {loss:.6e}{marker}")
+
+    print(f"\nPass 2 Best Result:")
+    print(f"  Best loss: {f_best_pass2:.6e}")
+    print(f"  Best x: {x_best_pass2}")
+    print(f"  Best start ID: {best_idx_pass2}")
+
+    # =========================================================================
+    # PASS 3: Local optimization (L-BFGS-B) with tight tolerances
+    # =========================================================================
+    print("\n" + "-"*70)
+    print("PASS 3: Local optimization (L-BFGS-B) - Final refinement")
+    print(f"        Starting from Pass 2 result")
+    print("-"*70)
+
+    result_pass3 = _refine_with_lbfgsb_tight(
+        objective=objective,
+        x0=x_best_pass2,
+        bounds=bounds,
+    )
+
+    x_best_pass3 = result_pass3.x
+    f_best_pass3 = result_pass3.fun
+
+    print(f"\nPass 3 Result:")
+    print(f"  Final loss: {f_best_pass3:.6e}")
+    print(f"  Final x: {x_best_pass3}")
+    print(f"  Success: {result_pass3.success}")
+
+    # =========================================================================
+    # Aggregate trajectories from all passes
+    # =========================================================================
+    X_global_all = []
+    F_global_all = []
+    X_local_all = []
+    F_local_all = []
+    context_global_all = []
+
+    # Aggregate from Pass 1
+    if hasattr(result_pass1, 'X_global') and result_pass1.X_global:
+        X_global_all.extend(result_pass1.X_global)
+        F_global_all.extend(result_pass1.F_global)
+        context_global_all.extend(result_pass1.context_global if hasattr(result_pass1, 'context_global') else [])
+
+    if hasattr(result_pass1, 'X_local') and result_pass1.X_local:
+        X_local_all.extend(result_pass1.X_local)
+        F_local_all.extend(result_pass1.F_local)
+
+    # Aggregate from Pass 2
+    if hasattr(result_pass2, 'X_global') and result_pass2.X_global:
+        X_global_all.extend(result_pass2.X_global)
+        F_global_all.extend(result_pass2.F_global)
+        context_global_all.extend(result_pass2.context_global if hasattr(result_pass2, 'context_global') else [])
+
+    if hasattr(result_pass2, 'X_local') and result_pass2.X_local:
+        X_local_all.extend(result_pass2.X_local)
+        F_local_all.extend(result_pass2.F_local)
+
+    # Pass 3 (L-BFGS-B) trajectory if available
+    if hasattr(result_pass3, 'X_local') and result_pass3.X_local:
+        X_local_all.extend(result_pass3.X_local)
+        F_local_all.extend(result_pass3.F_local)
+
+    # =========================================================================
+    # Combine results into single OptimizeResult
+    # =========================================================================
+    print("\n" + "="*70)
+    print("SUMMARY - THREE-PASS OPTIMIZATION")
+    print("="*70)
+    print(f"Pass 1 (log-tanh):   f = {f_best_pass1:.6e}")
+    print(f"Pass 2 (no log-tanh): f = {f_best_pass2:.6e}")
+    print(f"Pass 3 (L-BFGS-B):   f = {f_best_pass3:.6e}")
+    print(f"\nImprovement:")
+    print(f"  Pass 1 → Pass 2: {(f_best_pass1 - f_best_pass2)/f_best_pass1 * 100:.2f}%")
+    print(f"  Pass 2 → Pass 3: {(f_best_pass2 - f_best_pass3)/f_best_pass2 * 100:.2f}%")
+    print(f"  Pass 1 → Pass 3: {(f_best_pass1 - f_best_pass3)/f_best_pass1 * 100:.2f}%")
+    print("="*70 + "\n")
+
+    # Create final result object with same structure as dual_annealing_optimizer
+    final_result = OptimizeResult(
+        x=x_best_pass3,
+        fun=f_best_pass3,
+        success=result_pass3.success,
+        nit=sum([
+            result_pass1.nit if hasattr(result_pass1, 'nit') else 0,
+            result_pass2.nit if hasattr(result_pass2, 'nit') else 0,
+            result_pass3.nit if hasattr(result_pass3, 'nit') else 0,
+        ]),
+        X_global=X_global_all,
+        F_global=F_global_all,
+        X_local=X_local_all,
+        F_local=F_local_all,
+        context_global=context_global_all,
+        transform_info=result_pass2.transform_info if hasattr(result_pass2, 'transform_info') else {'enabled': False},
+    )
+
+    # Attach three-pass specific results
+    final_result.result_pass1 = result_pass1
+    final_result.result_pass2 = result_pass2
+    final_result.result_pass3 = result_pass3
+    final_result.pass1_losses = pass1_losses
+    final_result.pass2_losses = pass2_losses
+    final_result.all_results_pass1 = all_results_pass1
+    final_result.all_results_pass2 = results_pass2
+    final_result.best_start_id_pass2 = best_idx_pass2
+
+    return final_result
+
+
+def _generate_pass2_starts(
+    x_best,
+    bounds,
+    n_starts: int,
+    seed=None,
+    perturbation_scale: float = 0.1,
+):
+    """
+    Generate initial guesses for Pass 2 by perturbing the best result from Pass 1.
+    
+    Strategy:
+    - First guess: Exactly x_best (no perturbation)
+    - Remaining guesses: x_best + random perturbations (within bounds)
+    
+    Args:
+        x_best: Best result from Pass 1
+        bounds: Bounds object
+        n_starts: Number of initial guesses to generate
+        seed: Random seed
+        perturbation_scale: Fraction of parameter range to perturb (default 0.1 = ±10%)
+    
+    Returns:
+        List of initial guesses (numpy arrays)
+    """
+    rng = np.random.default_rng(seed)
+
+    lb = np.asarray(bounds.lb)
+    ub = np.asarray(bounds.ub)
+    param_range = ub - lb
+
+    x0_list = []
+
+    # First guess: x_best itself (no perturbation)
+    x0_list.append(np.copy(x_best))
+
+    # Remaining guesses: x_best + perturbations
+    for i in range(1, n_starts):
+        # Random perturbation: ±perturbation_scale * param_range
+        perturbation = rng.uniform(
+            -perturbation_scale * param_range,
+            perturbation_scale * param_range,
+        )
+        x0_perturbed = x_best + perturbation
+
+        # Clip to bounds
+        x0_perturbed = np.clip(x0_perturbed, lb, ub)
+        x0_list.append(x0_perturbed)
+
+    return x0_list
+
+def _refine_with_lbfgsb_tight(
+    objective,
+    x0,
+    bounds,
+):
+    """
+    Refine a solution using L-BFGS-B with tight tolerances (Pass 3).
+    
+    Args:
+        objective: Callable in original space
+        x0: Starting point (from Pass 2)
+        bounds: scipy.optimize.Bounds
+    
+    Returns:
+        OptimizeResult from scipy.optimize.minimize with trajectory info
+    """
+    from scipy.optimize import minimize
+    import copy
+
+    # Extract bounds
+    if hasattr(bounds, 'lb') and hasattr(bounds, 'ub'):
+        bounds_list = list(zip(bounds.lb, bounds.ub))
+    else:
+        bounds_list = bounds
+
+    print(f"\nStarting L-BFGS-B refinement:")
+    print(f"  Initial point: x0 = {x0}")
+    print(f"  Initial loss: f(x0) = {objective(x0):.6e}")
+
+    # Track trajectory for L-BFGS-B
+    X_local = []
+    F_local = []
+
+    def callback_lbfgsb(xk):
+        """Callback to track iterations"""
+        X_local.append(copy.deepcopy(xk))
+        F_local.append(objective(xk))
+
+    result = minimize(
+        fun=objective,
+        x0=x0,
+        method='L-BFGS-B',
+        bounds=bounds_list,
+        jac='3-point',
+        callback=callback_lbfgsb,
+        options={
+            'ftol': 1e-12,      # Very tight function tolerance
+            'gtol': 1e-6,       # Gradient tolerance
+            'maxiter': 10000,   # High iteration limit
+            'eps': 1e-8,        # Finite difference step
+        },
+    )
+
+    print(f"\nL-BFGS-B refinement completed:")
+    print(f"  Final loss: f(x) = {result.fun:.6e}")
+    print(f"  Final x: {result.x}")
+    print(f"  Success: {result.success}")
+    print(f"  Iterations: {result.nit}")
+    print(f"  Function evaluations: {result.nfev}")
+
+    # Attach trajectory info
+    result.X_local = X_local
+    result.F_local = F_local
+    result.X_global = []  # L-BFGS-B is local only
+    result.F_global = []
+    result.context_global = []
+    result.transform_info = {'enabled': False}
+
+    return result
+
+
 ### Loss function
 
 def rel_mse(predicted: np.ndarray, ground_truth: np.ndarray) -> float:
@@ -1050,6 +1528,8 @@ def make_optimizer_kwargs(
         global_kwargs = basinhopping_kwargs
     elif optimizer.__name__ == 'dual_annealing_optimizer':
         global_kwargs = dual_annealing_kwargs
+    elif optimizer.__name__ == 'dual_annealing_optimizer_three_pass':
+        global_kwargs = dual_annealing_kwargs
     elif optimizer.__name__ == 'identity_optimizer':
         bounds = None
         local_minimizer_kwargs = None
@@ -1057,7 +1537,6 @@ def make_optimizer_kwargs(
     else:
         raise ValueError(
             f"Unknown optimizer {optimizer.__name__}. "
-            "Expected 'basinhopping_optimizer' or 'dual_annealing_optimizer'"
         )
     
     return {
@@ -1827,9 +2306,9 @@ def workflow_elastic_viscous_general(
     print("-" * 80)
     
     # Create initial guesses for all params to infer
-    n_guesses = 10
+    n_guesses = 1 # Default value is 1 for now
     initial_guesses = {
-        param: 1e-1 if param.startswith('Sp') else 1 # TODO: change back to 0
+        param: 1e-1 if param.startswith('Sp') else 1 # TODO: change back to 0 when identity_optimiser is not needed.
         for param in param_keys_to_infer
     }
     initial_guesses_list = [initial_guesses]*n_guesses
