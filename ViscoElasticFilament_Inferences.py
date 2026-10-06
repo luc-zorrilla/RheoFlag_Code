@@ -25,6 +25,26 @@ from joblib import Parallel, delayed
 
 ### Optimization schemes
 
+def identity_optimizer(
+    objective,
+    x0,
+    bounds=None,
+    local_minimizer_kwargs: Dict[str, Any] = None,
+    global_minimizer_kwargs: Dict[str, Any] = None,    
+):
+    """ Returns the initial guess. 
+    This optimizer is used to compute hessian and other quantities directly at the initial guess position.
+    """
+
+    return OptimizeResult(
+        x=x0,
+        success=True,
+        fun=0,
+        message='optimiser corresponds to identity function.',
+        nit=0,
+        nfev=0,
+    )
+
 class RandomDisplacementBounds:
     """random displacement with bounds:  see: https://stackoverflow.com/a/21967888/2320035
         Modified: dropped acceptance-rejection sampling
@@ -599,7 +619,7 @@ def dual_annealing_optimizer(
                 'accept': -5.0,  # Accept parameter
                 'maxfun':10000000, # Soft limit for the number of objective function calls
                 'seed': None,  # Random seed for reproducibility
-                'no_local_search':True, # Whether to apply local search or not
+                'no_local_search':False, # Whether to apply local search or not
                 'tol': 1e-8,  # Early stopping tolerance
             }
 
@@ -628,7 +648,7 @@ def dual_annealing_optimizer(
         
         # Create bounds for the transformed space [-1, 1]^n
         n_params = len(y0)
-        bounds_transformed = Bounds( # TODO: this might not be necessary as it could be replaced by Bounds(-1, 1)
+        bounds_transformed = Bounds(
             lb=np.full(n_params, -1.0),
             ub=np.full(n_params, 1.0)
         )
@@ -657,140 +677,126 @@ def dual_annealing_optimizer(
         objective_opt = objective
         transform_info = {'enabled': False}            
 
-    # Repeat optimizer while global minimum is not reached or optimizer has been called x times
-    repeat_loss = np.inf
-    n_repeat = 0
-    max_repeat = 10
-    repeat_tol = 1e-5
+    # --- Trajectory tracking ---
+    X_global = []
+    F_global = []
+    X_local = []
+    F_local = []
+    context_global = []
+    early_stop = {'flag': False}  # Mutable container
 
-    while repeat_loss > repeat_tol and n_repeat < max_repeat:
-        
-        # --- Trajectory tracking ---
-        X_global = []
-        F_global = []
-        X_local = []
-        F_local = []
-        context_global = []
-        early_stop = {'flag': False}  # Mutable container
-
-        # Convert Bounds object to list of finite tuples for dual_annealing
-        if hasattr(bounds, 'lb') and hasattr(bounds, 'ub'):
-            lb = np.asarray(bounds_opt.lb)
-            ub = np.asarray(bounds_opt.ub)
-            # Convert Bounds object to list of tuples
-            bounds_list = list(zip(lb, ub))
-        else:
-            bounds_list = bounds_opt  # Already a list of tuples    
-        
-        # --- Callback for dual annealing ---
-        def global_callback_function(x, f, context):
-            """
-            Capture minima from dual annealing.
-            """
-            context_dict = {
-                0: 'minimum detected in the annealing process', 
-                1: 'detection occurred in the local search process', 
-                2: 'detection done in the dual annealing process',
-            }
-
-            # Transform back to original space if transformation was applied
-            if transform_info['enabled']:
-                x_original, _ = from_log10_bounded_scale(x, transform_info['transform_params_template'])
-            else:
-                x_original = x
-
-            print(f"{context_dict[context]}, x = {x_original}, f = {f}")
-            if context == 1:  # Local search detected minimum
-                X_local.append(copy.deepcopy(x))
-                F_local.append(copy.deepcopy(f))
-            else: # context == 0 or 2 (annealing or dual annealing process)
-                X_global.append(copy.deepcopy(x))
-                F_global.append(copy.deepcopy(f))
-                context_global.append(context)
-            
-            # Early stopping if tolerance reached
-            if f < tol:
-                early_stop['flag'] = True  # Modify the dict
-                return True
-            return False
-
-        # --- Set defaults for global minimizer ---
-        global_minimizer_kwargs = global_minimizer_kwargs or {
-            'maxiter': 1000,
-            'initial_temp': 40,
-            'restart_temp_ratio': 1e-3,
-            'visit': 2.62,
-            'accept': -5.0,
-            'maxfun':10000000,
-            'seed': None,
-            'no_local_search':False,
-            'tol': 1e-8,
+    # Convert Bounds object to list of finite tuples for dual_annealing
+    if hasattr(bounds, 'lb') and hasattr(bounds, 'ub'):
+        lb = np.asarray(bounds_opt.lb)
+        ub = np.asarray(bounds_opt.ub)
+        # Convert Bounds object to list of tuples
+        bounds_list = list(zip(lb, ub))
+    else:
+        bounds_list = bounds_opt  # Already a list of tuples    
+    
+    # --- Callback for dual annealing ---
+    def global_callback_function(x, f, context):
+        """
+        Capture minima from dual annealing.
+        """
+        context_dict = {
+            0: 'minimum detected in the annealing process', 
+            1: 'detection occurred in the local search process', 
+            2: 'detection done in the dual annealing process',
         }
-        
-        # --- Extract global minimizer parameters ---
-        maxiter = global_minimizer_kwargs.pop('maxiter', 1000)
-        initial_temp = global_minimizer_kwargs.pop('initial_temp', 40)
-        restart_temp_ratio = global_minimizer_kwargs.pop('restart_temp_ratio', 1e-3)
-        visit = global_minimizer_kwargs.pop('visit', 2.62)
-        accept = global_minimizer_kwargs.pop('accept', -5.0)
-        maxfun = global_minimizer_kwargs.pop('maxfun', 10000000)
-        seed = global_minimizer_kwargs.pop('seed', None)
-        no_local_search = global_minimizer_kwargs.pop('no_local_search', False)
-        tol = global_minimizer_kwargs.pop('tol', 1e-8)
 
-        # --- Set defaults for local minimizer ---
-        local_minimizer_kwargs = local_minimizer_kwargs or {
-            'method': 'L-BFGS-B',
-            'jac': '3-point',
-            'options': {
-                'ftol': 1e-8,
-                'gtol': 1e-4,
-                'eps': 1e-8,
-                'finite_diff_rel_step': None,
-            },
-        }
-        local_minimizer_kwargs['bounds'] = bounds_opt
-        
-        # --- Run dual annealing ---
-        ret = dual_annealing_wrapper(
-            func=objective_opt,
-            bounds=bounds_list,
-            x0=x0,
-            maxiter=maxiter,
-            minimizer_kwargs=local_minimizer_kwargs,
-            initial_temp=initial_temp,
-            restart_temp_ratio=restart_temp_ratio,
-            visit=visit,
-            accept=accept,
-            maxfun=maxfun,
-            seed=seed,
-            no_local_search=no_local_search,
-            callback=global_callback_function,
-            timeout_seconds=1200,
-        )
-
-        # --- Transform solution back to original space if needed ---
+        # Transform back to original space if transformation was applied
         if transform_info['enabled']:
-            ret.x, _ = from_log10_bounded_scale(ret.x, transform_info['transform_params_template'])
-
-        # --- Attach optimization history ---
-        ret.X_global = X_global
-        ret.F_global = F_global
-        ret.X_local = X_local
-        ret.F_local = F_local
-        ret.context_global = context_global
-        ret.transform_info = transform_info
-
-        # --- Success if early stop ---
-        if early_stop['flag']:
-            ret.success = True
-        
-        if ret.success:
-            repeat_loss = ret.fun
+            x_original, _ = from_log10_bounded_scale(x, transform_info['transform_params_template'])
         else:
-            repeat_loss = np.inf
+            x_original = x
 
-        n_repeat += 1
+        print(f"{context_dict[context]}, x = {x_original}, f = {f}")
+        if context == 1:  # Local search detected minimum
+            X_local.append(copy.deepcopy(x))
+            F_local.append(copy.deepcopy(f))
+        else: # context == 0 or 2 (annealing or dual annealing process)
+            X_global.append(copy.deepcopy(x))
+            F_global.append(copy.deepcopy(f))
+            context_global.append(context)
+        
+        # Early stopping if tolerance reached
+        if f < tol:
+            early_stop['flag'] = True  # Modify the dict
+            return True
+        return False
+
+    # --- Set defaults for global minimizer ---
+    global_minimizer_kwargs = global_minimizer_kwargs or {
+        'maxiter': 1000,
+        'initial_temp': 40,
+        'restart_temp_ratio': 1e-3,
+        'visit': 2.62,
+        'accept': -5.0,
+        'maxfun':10000000,
+        'seed': None,
+        'no_local_search':False,
+        'tol': 1e-8,
+    }
+    
+    # --- Extract global minimizer parameters ---
+    maxiter = global_minimizer_kwargs.pop('maxiter', 1000)
+    initial_temp = global_minimizer_kwargs.pop('initial_temp', 40)
+    restart_temp_ratio = global_minimizer_kwargs.pop('restart_temp_ratio', 1e-3)
+    visit = global_minimizer_kwargs.pop('visit', 2.62)
+    accept = global_minimizer_kwargs.pop('accept', -5.0)
+    maxfun = global_minimizer_kwargs.pop('maxfun', 10000000)
+    seed = global_minimizer_kwargs.pop('seed', None)
+    no_local_search = global_minimizer_kwargs.pop('no_local_search', False)
+    tol = global_minimizer_kwargs.pop('tol', 1e-8)
+
+    # --- Set defaults for local minimizer ---
+    local_minimizer_kwargs = local_minimizer_kwargs or {
+        'method': 'L-BFGS-B',
+        'jac': '3-point',
+        'options': {
+            'ftol': 1e-8,
+            'gtol': 1e-4,
+            'eps': 1e-8,
+            'finite_diff_rel_step': None,
+        },
+    }
+    local_minimizer_kwargs['bounds'] = bounds_opt
+    
+    # --- Run dual annealing ---
+    ret = dual_annealing_wrapper(
+        func=objective_opt,
+        bounds=bounds_list,
+        x0=x0,
+        maxiter=maxiter,
+        minimizer_kwargs=local_minimizer_kwargs,
+        initial_temp=initial_temp,
+        restart_temp_ratio=restart_temp_ratio,
+        visit=visit,
+        accept=accept,
+        maxfun=maxfun,
+        seed=seed,
+        no_local_search=no_local_search,
+        callback=global_callback_function,
+        timeout_seconds=1200,
+    )
+
+    # --- Transform solution back to original space if needed ---
+    if transform_info['enabled']:
+        ret.x, _ = from_log10_bounded_scale(ret.x, transform_info['transform_params_template'])
+
+    # --- Attach optimization history ---
+    ret.X_global = X_global
+    ret.F_global = F_global
+    ret.X_local = X_local
+    ret.F_local = F_local
+    ret.context_global = context_global
+    ret.transform_info = transform_info
+
+    # --- Success if early stop ---
+    if early_stop['flag']:
+        ret.success = True
+    
     return ret
 
 ### Loss function
@@ -1044,6 +1050,10 @@ def make_optimizer_kwargs(
         global_kwargs = basinhopping_kwargs
     elif optimizer.__name__ == 'dual_annealing_optimizer':
         global_kwargs = dual_annealing_kwargs
+    elif optimizer.__name__ == 'identity_optimizer':
+        bounds = None
+        local_minimizer_kwargs = None
+        global_kwargs = None
     else:
         raise ValueError(
             f"Unknown optimizer {optimizer.__name__}. "
@@ -1817,11 +1827,12 @@ def workflow_elastic_viscous_general(
     print("-" * 80)
     
     # Create initial guesses for all params to infer
+    n_guesses = 10
     initial_guesses = {
-        param: 1e-1 if param.startswith('Sp') else 0
+        param: 1e-1 if param.startswith('Sp') else 1 # TODO: change back to 0
         for param in param_keys_to_infer
     }
-    initial_guesses_list = [initial_guesses]
+    initial_guesses_list = [initial_guesses]*n_guesses
     
     # Build optimizer_kwargs if not provided
     if optimizer_kwargs is None:

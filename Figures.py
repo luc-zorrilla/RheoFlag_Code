@@ -15,7 +15,7 @@ from scipy.optimize import curve_fit
 from scipy.signal import find_peaks
 
 from ViscoElasticFilament_Models import X3N, Bend, StraightLine, SecondBend
-from ViscoElasticFilament_Inferences import workflow_elastic_viscous_simulation, workflow_elastic_viscous_general, basinhopping_optimizer, dual_annealing_optimizer, rel_mse
+from ViscoElasticFilament_Inferences import workflow_elastic_viscous_simulation, workflow_elastic_viscous_general, identity_optimizer, basinhopping_optimizer, dual_annealing_optimizer, rel_mse
 
 def plot_model_distance_comparison(
     model_lists: Dict[int, ModelList],  # Changed from List to Dict
@@ -3420,11 +3420,11 @@ if __name__ == "__main__":
     # Figure 6: ? #
     # ----------- #
 
-    optimizer = dual_annealing_optimizer
+    optimizer = identity_optimizer # dual_annealing_optimizer
 
     # Bending Viscosity (Fixed Bending Elasticity)
 
-    int_param_ranges = {'tau_b': [1e-1, 1e0, 1e1]} # {'tau_b': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
+    int_param_ranges = {'tau_b': [1e0]} # {'tau_b': [1e-1, 1e0, 1e1]} # {'tau_b': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
     A_vec = [1e-6]
     w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 24))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
@@ -3490,9 +3490,11 @@ if __name__ == "__main__":
     fig.write_html("Figures/err_tau_b_vs_w0.html")
     fig.show()
 
+    exit() 
+
     # Shear Viscosity (Fixed Bending Elasticity & Shear Elasticity)
 
-    int_param_ranges = {'tau_s': [1e-1, 1e0, 1e1], 'Beta':[1.0]} # {'tau_s': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3], 'Beta':[1.0]}
+    int_param_ranges = {'tau_s': [1e0], 'Beta':[1.0]} # {'tau_s': [1e-1, 1e0, 1e1], 'Beta':[1.0]} # {'tau_s': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3], 'Beta':[1.0]}
     A_vec = [1e-6]
     w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 24)) # np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
@@ -3515,7 +3517,7 @@ if __name__ == "__main__":
     fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_s'], ext_param_name='w0', metric = 'std')
 
     # Transform w0 -> tau_s * w0
-    ## Extract tau_b values from legend entries
+    ## Extract tau_s values from legend entries
     tau_s_values = {}
     for trace in fig.data:
         if trace.name and 'tau_s' in trace.name:

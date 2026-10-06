@@ -937,7 +937,7 @@ class InferencePipeline:
 
             # Select best result by loss TODO See if this is what I want to do or not.
             best_result = self._select_best_result(pass_results)
-            self.results.append(best_result)    
+            self.results.append(best_result)
             
             if verbose:
                 self._print_pass_results(pass_idx, pass_def, best_result, pass_results)
