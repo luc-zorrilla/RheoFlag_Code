@@ -751,7 +751,7 @@ class Inference:
             self._compute_hessian(param_keys)
 
             # Fallback to optimizer's Hessian if numerical computation failed
-            if np.allclose(self.hessian, 0) or not np.all(np.isfinite(self.covariance)):
+            if np.allclose(self.hessian, 0, atol=1e-15, rtol=0) or not np.all(np.isfinite(self.covariance)):
                 self._use_optimiser_hessian()
 
         else: 

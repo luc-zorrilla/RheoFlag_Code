@@ -15,7 +15,7 @@ from scipy.optimize import curve_fit
 from scipy.signal import find_peaks
 
 from ViscoElasticFilament_Models import X3N, Bend, StraightLine, SecondBend
-from ViscoElasticFilament_Inferences import workflow_elastic_viscous_simulation, workflow_elastic_viscous_general, identity_optimizer, basinhopping_optimizer, dual_annealing_optimizer, rel_mse
+from ViscoElasticFilament_Inferences import workflow_elastic_viscous_simulation, workflow_elastic_viscous_general, identity_optimizer, basinhopping_optimizer, dual_annealing_optimizer, dual_annealing_optimizer_three_pass, rel_mse
 
 def plot_model_distance_comparison(
     model_lists: Dict[int, ModelList],  # Changed from List to Dict
@@ -560,7 +560,7 @@ def plot_final_output_vs_ext_param_color_int_param(
                 y=y_vals,
                 mode='lines',
                 name=f"{int_param_name} = {int_param_values[int_idx]:.4f}",
-                hovertemplate=f"<b>{ext_param_name}</b>: %{{x:.2e}}<br><b>{y_label}</b>: %{{y:.6e}}<br><b>{int_param_name}</b>: {int_param_values[int_idx]:.4f}<extra></extra>",
+                hovertemplate=f"<b>{ext_param_name}</b>: %{{x:.2e}}<br><b>{y_label}</b>: %{{y:.2e}}<br><b>{int_param_name}</b>: {int_param_values[int_idx]:.4f}<extra></extra>",
                 line=dict(width=2, color=colors[int_idx]),
                 marker=dict(size=6, color=colors[int_idx]),
             ))
@@ -3420,13 +3420,13 @@ if __name__ == "__main__":
     # Figure 6: ? #
     # ----------- #
 
-    optimizer = identity_optimizer # dual_annealing_optimizer
+    optimizer = dual_annealing_optimizer_three_pass # dual_annealing_optimizer
 
     # Bending Viscosity (Fixed Bending Elasticity)
 
-    int_param_ranges = {'tau_b': [1e0]} # {'tau_b': [1e-1, 1e0, 1e1]} # {'tau_b': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
-    A_vec = [1e-5]
-    w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 24))
+    int_param_ranges = {'tau_b': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
+    A_vec = [1e-10]
+    w0_vec = np.pow(10, -np.linspace(start = -6, stop = 6, num = 13))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_b']
@@ -3442,6 +3442,7 @@ if __name__ == "__main__":
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,
         checkpoint_str=checkpoint_str,
+        n_jobs_per_pass=1,
         )
     
     fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b'], ext_param_name='w0', metric = 'std')
@@ -3491,13 +3492,11 @@ if __name__ == "__main__":
     fig.write_html("Figures/err_tau_b_vs_w0.html")
     fig.show()
 
-    exit() 
-
     # Shear Viscosity (Fixed Bending Elasticity & Shear Elasticity)
 
-    int_param_ranges = {'tau_s': [1e0], 'Beta':[1.0]} # {'tau_s': [1e-1, 1e0, 1e1], 'Beta':[1.0]} # {'tau_s': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3], 'Beta':[1.0]}
-    A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -3, stop = 3, num = 24)) # np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
+    int_param_ranges = {'tau_s': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3], 'Beta':[1.0]} # {'tau_s': [1e0], 'Beta':[1.0]} # {'tau_s': [1e-1, 1e0, 1e1], 'Beta':[1.0]} # 
+    A_vec = [1e-10]
+    w0_vec = np.pow(10, -np.linspace(start = -6, stop = 6, num = 13)) # np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_s']
@@ -3513,6 +3512,7 @@ if __name__ == "__main__":
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,
         checkpoint_str=checkpoint_str,
+        n_jobs_per_pass=1,
         )
 
     fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_s'], ext_param_name='w0', metric = 'std')
@@ -3561,13 +3561,11 @@ if __name__ == "__main__":
     fig.write_html("Figures/err_tau_s_vs_w0.html")
     fig.show()    
 
-if __name__ is None:
-
     # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
 
     int_param_ranges = {'tau_b': [1e-3, 1e0, 1e3], 'tau_s':[1e-3, 1e0, 1e3], 'Beta':[1.0]}
     A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
+    w0_vec = np.pow(10, -np.linspace(start = -6, stop = 6, num = 13))
     ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_b', 'tau_s']
@@ -3583,6 +3581,7 @@ if __name__ is None:
         viscous_params_list = viscous_params_list,
         inference_mode = inference_mode,
         checkpoint_str=checkpoint_str,
+        n_jobs_per_pass=1,
         )
 
     fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'std')
