@@ -5,7 +5,7 @@ from plotly.subplots import make_subplots
 
 import itertools
 from pathlib import Path
-import pickle
+import dill as pickle
 import json
 
 import numpy as np
@@ -2871,7 +2871,874 @@ def plot_vid_S5c(
     
     return fig
 
-# def plot_fig_6()
+def plot_fig_6(
+    workflow_output_1, workflow_output_2, workflow_output_3
+) -> tuple[go.Figure, go.Figure]:
+    
+    def compute_signed_rel_error(measured_val, ground_truth_val):
+        """Compute signed relative error: (measured - ground_truth) / ground_truth"""
+        if ground_truth_val is None or ground_truth_val == 0:
+            return None
+        
+        measured = float(measured_val[0]) if isinstance(measured_val, (list, np.ndarray)) else float(measured_val)
+        gt = float(ground_truth_val[0]) if isinstance(ground_truth_val, (list, np.ndarray)) else float(ground_truth_val)
+        
+        if gt == 0:
+            return None
+        
+        return (measured - gt) / gt
+    
+    results_1 = workflow_output_1['results_summary']
+    results_2 = workflow_output_2['results_summary']
+    results_3 = workflow_output_3['results_summary']
+    
+    ext_param_ranges_1 = workflow_output_1['ext_param_ranges']['w0']
+    ext_param_ranges_2 = workflow_output_2['ext_param_ranges']['w0']
+    ext_param_ranges_3 = workflow_output_3['ext_param_ranges']['w0']
+    
+    tau_b_gt = 1e0
+    tau_s_gt = 1e0
+
+    fig_std = go.Figure()
+    
+    tau_b_std_1 = [r.get('tau_b_sigma') for r in results_1]
+    tau_b_std_1 = [float(v[0]) if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v for v in tau_b_std_1]
+    tau_b_norm_std_1 = [v / abs(tau_b_gt) if v is not None and np.isfinite(v) else None for v in tau_b_std_1]
+    
+    fig_std.add_trace(go.Scatter(
+        x=ext_param_ranges_1,
+        y=tau_b_norm_std_1,
+        mode='markers+lines',
+        name='Bending (tau_b)',
+        marker=dict(size=8, color='#1f77b4', opacity=0.7),
+        line=dict(color='#1f77b4', width=2)
+    ))
+    
+    tau_s_std_2 = [r.get('tau_s_sigma') for r in results_2]
+    tau_s_std_2 = [float(v[0]) if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v for v in tau_s_std_2]
+    tau_s_norm_std_2 = [v / abs(tau_s_gt) if v is not None and np.isfinite(v) else None for v in tau_s_std_2]
+    
+    fig_std.add_trace(go.Scatter(
+        x=ext_param_ranges_2,
+        y=tau_s_norm_std_2,
+        mode='markers+lines',
+        name='Shear (tau_s)',
+        marker=dict(size=8, color='#ff7f0e', opacity=0.7),
+        line=dict(color='#ff7f0e', width=2)
+    ))
+    
+    tau_b_std_3 = [r.get('tau_b_sigma') for r in results_3]
+    tau_b_std_3 = [float(v[0]) if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v for v in tau_b_std_3]
+    tau_s_std_3 = [r.get('tau_s_sigma') for r in results_3]
+    tau_s_std_3 = [float(v[0]) if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v for v in tau_s_std_3]
+    
+    tau_b_norm_std_3 = [v / abs(tau_b_gt) if v is not None and np.isfinite(v) else None for v in tau_b_std_3]
+    tau_s_norm_std_3 = [v / abs(tau_s_gt) if v is not None and np.isfinite(v) else None for v in tau_s_std_3]
+    combined_norm_std_3 = [
+        np.sqrt(tau_b**2 + tau_s**2) if tau_b is not None and tau_s is not None and np.isfinite(tau_b) and np.isfinite(tau_s) else None
+        for tau_b, tau_s in zip(tau_b_norm_std_3, tau_s_norm_std_3)
+    ]
+    
+    fig_std.add_trace(go.Scatter(
+        x=ext_param_ranges_3,
+        y=combined_norm_std_3,
+        mode='markers+lines',
+        name='Combined (tau_b+tau_s)',
+        marker=dict(size=8, color='#2ca02c', opacity=0.7, symbol='diamond'),
+        line=dict(color='#2ca02c', width=2, dash='dash')
+    ))
+    
+    fig_std.update_layout(
+        title=dict(
+            text='Normalized Standard Error vs External Parameter w₀',
+            font=dict(size=16, color='black')
+        ),
+        xaxis=dict(
+            title=dict(text='w₀', font=dict(size=12)),
+            type='log',
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        yaxis=dict(
+            title=dict(text='Normalized Sigma (Std. Error / Internal Parameter)', font=dict(size=12)),
+            type='log',
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        hovermode='closest',
+        template='plotly_white',
+        width=1000,
+        height=600,
+        font=dict(size=11),
+        legend=dict(
+            x=1.02, y=1,
+            xanchor='left', yanchor='top',
+            bgcolor='rgba(255, 255, 255, 0.8)',
+            bordercolor='black',
+            borderwidth=1
+        )
+    )
+    
+    fig_signed_rel_err = go.Figure()
+    
+    tau_b_measured_1 = [r.get('tau_b_inferred') for r in results_1]
+    tau_b_signed_rel_err_1 = [
+        compute_signed_rel_error(measured, tau_b_gt)
+        if measured is not None else None
+        for measured in tau_b_measured_1
+    ]
+    
+    fig_signed_rel_err.add_trace(go.Scatter(
+        x=ext_param_ranges_1,
+        y=tau_b_signed_rel_err_1,
+        mode='markers+lines',
+        name='Bending (tau_b)',
+        marker=dict(size=8, color='#1f77b4', opacity=0.7),
+        line=dict(color='#1f77b4', width=2)
+    ))
+    
+    tau_s_measured_2 = [r.get('tau_s_inferred') for r in results_2]
+    tau_s_signed_rel_err_2 = [
+        compute_signed_rel_error(measured, tau_s_gt)
+        if measured is not None else None
+        for measured in tau_s_measured_2
+    ]
+    
+    fig_signed_rel_err.add_trace(go.Scatter(
+        x=ext_param_ranges_2,
+        y=tau_s_signed_rel_err_2,
+        mode='markers+lines',
+        name='Shear (tau_s)',
+        marker=dict(size=8, color='#ff7f0e', opacity=0.7),
+        line=dict(color='#ff7f0e', width=2)
+    ))
+    
+    tau_b_measured_3 = [r.get('tau_b_inferred') for r in results_3]
+    tau_b_signed_rel_err_3 = [
+        compute_signed_rel_error(measured, tau_b_gt)
+        if measured is not None else None
+        for measured in tau_b_measured_3
+    ]
+    
+    tau_s_measured_3 = [r.get('tau_s_inferred') for r in results_3]
+    tau_s_signed_rel_err_3 = [
+        compute_signed_rel_error(measured, tau_s_gt)
+        if measured is not None else None
+        for measured in tau_s_measured_3
+    ]
+    
+    combined_signed_rel_err_3 = [
+        np.sqrt(tau_b**2 + tau_s**2) if tau_b is not None and tau_s is not None and np.isfinite(tau_b) and np.isfinite(tau_s) else None
+        for tau_b, tau_s in zip(tau_b_signed_rel_err_3, tau_s_signed_rel_err_3)
+    ]
+    
+    fig_signed_rel_err.add_trace(go.Scatter(
+        x=ext_param_ranges_3,
+        y=combined_signed_rel_err_3,
+        mode='markers+lines',
+        name='Combined (tau_b+tau_s)',
+        marker=dict(size=8, color='#2ca02c', opacity=0.7, symbol='diamond'),
+        line=dict(color='#2ca02c', width=2, dash='dash')
+    ))
+    
+    fig_signed_rel_err.update_layout(
+        title=dict(
+            text='Signed Relative Error vs External Parameter w₀',
+            font=dict(size=16, color='black')
+        ),
+        xaxis=dict(
+            title=dict(text='w₀', font=dict(size=12)),
+            type='log',
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        yaxis=dict(
+            title=dict(text='Signed Relative Error', font=dict(size=12)),
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        hovermode='closest',
+        template='plotly_white',
+        width=1000,
+        height=600,
+        font=dict(size=11),
+        legend=dict(
+            x=1.02, y=1,
+            xanchor='left', yanchor='top',
+            bgcolor='rgba(255, 255, 255, 0.8)',
+            bordercolor='black',
+            borderwidth=1
+        )
+    )
+    
+    return fig_std, fig_signed_rel_err
+
+def plot_fig_S6a(workflow_output, int_param_name, ext_param_name='w0', metric='std') -> go.Figure:
+    """
+    Plot normalized standard error or relative error vs scaled external parameter.
+    Directly plots results for a single internal parameter with multiple values,
+    scaling the x-axis by the internal parameter value.
+    
+    Parameters:
+    -----------
+    workflow_output : dict
+        Output from workflow_elastic_viscous_general
+    int_param_name : str
+        Internal parameter name (e.g., 'tau_b', 'tau_s')
+    ext_param_name : str
+        External parameter name (e.g., 'w0', 'A')
+    metric : str
+        Metric to plot ('std' for normalized standard error, 'rel_error' for relative error)
+    
+    Returns:
+    --------
+    go.Figure
+        Plotly figure object
+    """
+    
+    results_summary = workflow_output['results_summary']
+    ext_param_ranges = workflow_output['ext_param_ranges']
+    int_param_ranges = workflow_output['int_param_ranges']
+    
+    ext_param_vec = ext_param_ranges[ext_param_name]
+    int_param_vec = int_param_ranges[int_param_name]
+    
+    # Define metric key based on requested metric
+    if metric == 'std':
+        metric_key = f'{int_param_name}_sigma'
+        y_label = 'Normalized Sigma (Std. Error / Internal Parameter)'
+        title_suffix = 'Normalized Standard Error'
+    elif metric == 'rel_error':
+        metric_key = f'{int_param_name}_rel_error'
+        y_label = 'Relative Error'
+        title_suffix = 'Relative Error'
+    else:
+        raise ValueError(f"Unknown metric: {metric}")
+    
+    def parse_task_key(task_key, int_param_ranges):
+        """Parse task key to get internal and external parameter indices."""
+        parts = task_key.split('_')
+        int_idx = int(parts[1])
+        ext_idx = int(parts[3])
+        
+        int_param_names = list(int_param_ranges.keys())
+        int_param_counts = [len(int_param_ranges[name]) for name in int_param_names]
+        
+        multi_idx = np.unravel_index(int_idx, tuple(int_param_counts))
+        
+        idx_mapping = {name: multi_idx[i] for i, name in enumerate(int_param_names)}
+        return idx_mapping, ext_idx
+    
+    def normalize_metric(metric_val, ground_truth_val):
+        """Normalize metric by ground truth value."""
+        if metric_val is None or not np.isfinite(metric_val):
+            return None
+        
+        if isinstance(ground_truth_val, (list, np.ndarray)):
+            gt_val = float(ground_truth_val[0]) if len(ground_truth_val) > 0 else None
+        else:
+            gt_val = float(ground_truth_val)
+        
+        if gt_val is not None and gt_val != 0:
+            return metric_val / abs(gt_val)
+        return None
+    
+    def format_value(val):
+        """Format value for display."""
+        if isinstance(val, (int, float)):
+            if val >= 1e3 or (val < 1e-2 and val > 0):
+                return f'{val:.1e}'
+            else:
+                return f'{val}'
+        return str(val)
+    
+    # Color palette for different parameter values
+    num_params = len(int_param_vec)
+    if num_params <= 10:
+        color_palette = px.colors.qualitative.Light24[:num_params]
+    else:
+        color_palette = px.colors.qualitative.Light24
+    
+    # Organize data by internal parameter value
+    data_by_param = {}
+    
+    for result in results_summary:
+        task_key = result['task_key']
+        idx_mapping, ext_idx = parse_task_key(task_key, int_param_ranges)
+        
+        # Get the internal parameter value for this result
+        param_idx = idx_mapping[int_param_name]
+        param_val = int_param_vec[param_idx]
+        
+        # Get the metric value
+        value = result.get(metric_key)
+        
+        if value is not None:
+            if isinstance(value, (list, np.ndarray)):
+                metric_val = float(value[0]) if len(value) > 0 else None
+            else:
+                metric_val = float(value)
+            
+            # Normalize if it's standard error metric
+            if metric == 'std' and metric_val is not None:
+                metric_val = normalize_metric(metric_val, param_val)
+            
+            if metric_val is not None and np.isfinite(metric_val):
+                ext_param_val = ext_param_vec[ext_idx]
+                
+                # Scale x-axis by internal parameter value
+                scaled_x = ext_param_val * param_val
+                
+                if param_val not in data_by_param:
+                    data_by_param[param_val] = {
+                        'x': [],
+                        'y': [],
+                        'color': color_palette[param_idx % len(color_palette)],
+                        'label': f'{int_param_name} = {format_value(param_val)}'
+                    }
+                
+                data_by_param[param_val]['x'].append(scaled_x)
+                data_by_param[param_val]['y'].append(metric_val)
+    
+    # Sort by parameter value for consistent plotting order
+    sorted_params = sorted(data_by_param.keys())
+    
+    fig = go.Figure()
+    
+    for param_val in sorted_params:
+        data = data_by_param[param_val]
+        
+        fig.add_trace(go.Scatter(
+            x=data['x'],
+            y=data['y'],
+            mode='markers+lines',
+            name=data['label'],
+            marker=dict(
+                size=8,
+                color=data['color'],
+                opacity=0.7,
+                line=dict(color='black', width=0.5)
+            ),
+            line=dict(color=data['color'], width=2),
+            hovertemplate=f'<b>{data["label"]}</b><br>' + 
+                         f'{int_param_name} * {ext_param_name}: %{{x:.4e}}<br>' +
+                        f'Metric: %{{y:.4e}}<extra></extra>'
+        ))
+    
+    # Determine if log scale is appropriate
+    x_logscale = True  # Scale is typically log for w0*tau_b or similar
+    y_logscale = True  # Standard error and relative error typically plotted on log scale
+    
+    fig.update_layout(
+        title=dict(
+            text=f'{title_suffix} vs {int_param_name} * {ext_param_name}',
+            font=dict(size=16, color='black')
+        ),
+        xaxis=dict(
+            title=dict(text=f'{int_param_name} × {ext_param_name}', font=dict(size=12)),
+            type='log' if x_logscale else 'linear',
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        yaxis=dict(
+            title=dict(text=y_label, font=dict(size=12)),
+            type='log' if y_logscale else 'linear',
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        hovermode='closest',
+        template='plotly_white',
+        width=1000,
+        height=600,
+        font=dict(size=11),
+        legend=dict(
+            x=1.02, y=1,
+            xanchor='left', yanchor='top',
+            bgcolor='rgba(255, 255, 255, 0.8)',
+            bordercolor='black',
+            borderwidth=1
+        )
+    )
+    
+    return fig
+
+def plot_fig_S6b(workflow_output, int_param_name, ext_param_name, metric='std'):
+    """
+    Plot parameter sweep with x-axis scaled by internal parameter value.
+    
+    Parameters
+    ----------
+    workflow_output : dict
+        Output from workflow_elastic_viscous_general containing results_summary,
+        ext_param_ranges, and int_param_ranges.
+    int_param_name : str
+        Name of the internal parameter to sweep (e.g., 'tau_s', 'tau_b').
+    ext_param_name : str
+        Name of the external parameter (e.g., 'w0', 'A', 'omega').
+    metric : str, default='std'
+        Metric to plot: 'std' for normalized standard error or 'rel_error' for 
+        signed relative error.
+    
+    Returns
+    -------
+    fig : plotly.graph_objects.Figure
+        Plotly figure with scaled x-axis.
+    """
+    results_summary = workflow_output['results_summary']
+    ext_param_ranges = workflow_output['ext_param_ranges']
+    int_param_ranges = workflow_output['int_param_ranges']
+    
+    ext_param_vec = ext_param_ranges[ext_param_name]
+    int_param_vec = int_param_ranges[int_param_name]
+    
+    # Validate metric
+    if metric not in ['std', 'rel_error']:
+        raise ValueError(f"Unknown metric: {metric}. Use 'std' or 'rel_error'.")
+    
+    # Define metric key
+    metric_key = f'{int_param_name}_sigma' if metric == 'std' else f'{int_param_name}_rel_error'
+    
+    def parse_task_key(task_key, int_param_ranges):
+        """Parse task key to extract internal and external indices."""
+        parts = task_key.split('_')
+        int_idx = int(parts[1])
+        ext_idx = int(parts[3])
+        
+        int_param_names = list(int_param_ranges.keys())
+        int_param_counts = [len(int_param_ranges[name]) for name in int_param_names]
+        
+        multi_idx = np.unravel_index(int_idx, tuple(int_param_counts))
+        
+        idx_mapping = {name: multi_idx[i] for i, name in enumerate(int_param_names)}
+        return idx_mapping, ext_idx
+    
+    def normalize_metric(metric_val, ground_truth_val):
+        """Normalize metric by ground truth value."""
+        if metric_val is None or not np.isfinite(metric_val):
+            return None
+        
+        if isinstance(ground_truth_val, (list, np.ndarray)):
+            gt_val = float(ground_truth_val[0]) if len(ground_truth_val) > 0 else None
+        else:
+            gt_val = float(ground_truth_val)
+        
+        if gt_val is not None and gt_val != 0:
+            return metric_val / abs(gt_val)
+        return None
+    
+    # Organize data by internal parameter value
+    data_by_int_param = {}
+    
+    for result in results_summary:
+        task_key = result['task_key']
+        idx_mapping, ext_idx = parse_task_key(task_key, int_param_ranges)
+        
+        # Get internal parameter value
+        int_param_idx = idx_mapping[int_param_name]
+        int_param_val = int_param_vec[int_param_idx]
+        
+        # Get metric value
+        value = result.get(metric_key)
+        
+        if value is not None:
+            if isinstance(value, (list, np.ndarray)):
+                metric_val = float(value[0]) if len(value) > 0 else None
+            else:
+                metric_val = float(value)
+            
+            # Normalize if std metric
+            if metric == 'std' and metric_val is not None:
+                metric_val = normalize_metric(metric_val, int_param_val)
+            
+            if metric_val is not None and np.isfinite(metric_val):
+                ext_param_val = ext_param_vec[ext_idx]
+                # Scale x-axis by internal parameter value
+                scaled_x = ext_param_val * int_param_val
+                
+                if int_param_val not in data_by_int_param:
+                    data_by_int_param[int_param_val] = {
+                        'ext_param': [],
+                        'scaled_x': [],
+                        'metric': []
+                    }
+                
+                data_by_int_param[int_param_val]['ext_param'].append(ext_param_val)
+                data_by_int_param[int_param_val]['scaled_x'].append(scaled_x)
+                data_by_int_param[int_param_val]['metric'].append(metric_val)
+    
+    # Create figure
+    fig = go.Figure()
+    
+    # Color palette
+    num_params = len(data_by_int_param)
+    if num_params <= 10:
+        color_palette = px.colors.qualitative.Light24[:num_params]
+    elif num_params <= 24:
+        color_palette = px.colors.qualitative.Light24
+    else:
+        color_palette = px.colors.qualitative.Light24
+    
+    # Sort by internal parameter value for consistent coloring
+    sorted_int_params = sorted(data_by_int_param.keys())
+    
+    # Format function for legend labels
+    def format_value(val):
+        if isinstance(val, (int, float)):
+            if val >= 1e3 or (val < 1e-2 and val > 0):
+                return f'{val:.1e}'
+            else:
+                return f'{val:.3g}'
+        return str(val)
+    
+    # Add traces
+    for i, int_param_val in enumerate(sorted_int_params):
+        data = data_by_int_param[int_param_val]
+        color = color_palette[i % len(color_palette)]
+        
+        label = f'{int_param_name}={format_value(int_param_val)}'
+        
+        fig.add_trace(go.Scatter(
+            x=data['scaled_x'],
+            y=data['metric'],
+            mode='markers+lines',
+            name=label,
+            marker=dict(
+                size=8,
+                color=color,
+                opacity=0.7,
+                line=dict(color='black', width=0.5)
+            ),
+            line=dict(color=color, width=1.5, dash='solid'),
+            hovertemplate=(
+                f'<b>{label}</b><br>'
+                f'{ext_param_name}: %{{customdata[0]:.3e}}<br>'
+                f'Scaled x ({int_param_name}*{ext_param_name}): %{{x:.3e}}<br>'
+                f'Metric: %{{y:.3e}}<extra></extra>'
+            ),
+            customdata=[[ext_param_vec[data_by_int_param[int_param_val]['ext_param'].index(x)]] 
+                       for x in data['scaled_x']]
+        ))
+    
+    # Determine axis scaling
+    x_logscale = ext_param_name in ['A', 'w0', 'omega']
+    y_logscale = True
+    
+    # Update layout
+    if metric == 'std':
+        y_label = 'Normalized Sigma (Std. Error / Internal Parameter)'
+        title_suffix = 'Normalized Standard Error'
+    else:
+        y_label = 'Signed Relative Error'
+        title_suffix = 'Signed Relative Error'
+    
+    scaled_x_label = f'{int_param_name} × {ext_param_name}'
+    
+    fig.update_layout(
+        title=dict(
+            text=f'{title_suffix} vs {scaled_x_label}',
+            font=dict(size=16, color='black')
+        ),
+        xaxis=dict(
+            title=dict(text=scaled_x_label, font=dict(size=12)),
+            type='log' if x_logscale else 'linear',
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        yaxis=dict(
+            title=dict(text=y_label, font=dict(size=12)),
+            type='log' if y_logscale else 'linear',
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        hovermode='closest',
+        template='plotly_white',
+        width=1000,
+        height=600,
+        font=dict(size=11),
+        legend=dict(
+            x=1.02,
+            y=1,
+            xanchor='left',
+            yanchor='top',
+            bgcolor='rgba(255, 255, 255, 0.8)',
+            bordercolor='black',
+            borderwidth=1
+        )
+    )
+    
+    return fig
+
+def plot_fig_S6c(workflow_output, int_params, ext_param_name, metric='std'):
+    """
+    Plot combined error metric for multiple internal parameters.
+    
+    Displays only the combined L2 norm of normalized errors across all
+    internal parameters, without individual parameter traces.
+    
+    Parameters
+    ----------
+    workflow_output : dict
+        Output from workflow_elastic_viscous_general containing results_summary,
+        ext_param_ranges, and int_param_ranges.
+    int_params : list of str
+        Names of internal parameters to include in combined metric
+        (e.g., ['tau_b', 'tau_s']).
+    ext_param_name : str
+        Name of the external parameter (e.g., 'w0', 'A', 'omega').
+    metric : str, default='std'
+        Metric to plot: 'std' for normalized standard error or 'rel_error' for 
+        signed relative error.
+    
+    Returns
+    -------
+    fig : plotly.graph_objects.Figure
+        Plotly figure with combined error traces only.
+    """
+    results_summary = workflow_output['results_summary']
+    ext_param_ranges = workflow_output['ext_param_ranges']
+    int_param_ranges = workflow_output['int_param_ranges']
+    
+    ext_param_vec = ext_param_ranges[ext_param_name]
+    
+    # Validate metric
+    if metric not in ['std', 'rel_error']:
+        raise ValueError(f"Unknown metric: {metric}. Use 'std' or 'rel_error'.")
+    
+    # Identify varying and fixed parameters
+    varying_params = {
+        name: values for name, values in int_param_ranges.items()
+        if name in int_params and len(values) > 1
+    }
+    fixed_params = {
+        name: values for name, values in int_param_ranges.items()
+        if name in int_params and len(values) == 1
+    }
+    
+    varying_param_names = list(varying_params.keys())
+    
+    # Create parameter combinations for coloring
+    if varying_param_names:
+        param_combinations = list(itertools.product(*[varying_params[name] for name in varying_param_names]))
+        num_combinations = len(param_combinations)
+        
+        if num_combinations <= 10:
+            color_palette = px.colors.qualitative.Light24[:num_combinations]
+        elif num_combinations <= 24:
+            color_palette = px.colors.qualitative.Light24
+        else:
+            color_palette = px.colors.qualitative.Light24
+        
+        combination_colors = {combo: color_palette[i % len(color_palette)] for i, combo in enumerate(param_combinations)}
+    else:
+        combination_colors = {tuple(): px.colors.qualitative.Light24[0]}
+    
+    def format_value(val):
+        """Format numerical values for display."""
+        if isinstance(val, (int, float)):
+            if val >= 1e3 or (val < 1e-2 and val > 0):
+                return f'{val:.1e}'
+            else:
+                return f'{val:.3g}'
+        return str(val)
+    
+    def parse_task_key(task_key, int_param_ranges):
+        """Parse task key to extract internal and external indices."""
+        parts = task_key.split('_')
+        int_idx = int(parts[1])
+        ext_idx = int(parts[3])
+        
+        int_param_names = list(int_param_ranges.keys())
+        int_param_counts = [len(int_param_ranges[name]) for name in int_param_names]
+        
+        multi_idx = np.unravel_index(int_idx, tuple(int_param_counts))
+        
+        idx_mapping = {name: multi_idx[i] for i, name in enumerate(int_param_names)}
+        return idx_mapping, ext_idx
+    
+    def get_param_combination_with_values(idx_mapping, int_params, int_param_ranges):
+        """Extract parameter combinations and ground truth values."""
+        combo = tuple(
+            int_param_ranges[param_name][idx_mapping[param_name]]
+            for param_name in int_params
+            if param_name in varying_params
+        )
+        
+        ground_truth_dict = {
+            param_name: int_param_ranges[param_name][idx_mapping[param_name]]
+            for param_name in int_params
+        }
+        
+        return combo, ground_truth_dict
+    
+    def normalize_metric(metric_val, ground_truth_val):
+        """Normalize metric by ground truth value."""
+        if metric_val is None or not np.isfinite(metric_val):
+            return None
+        
+        if isinstance(ground_truth_val, (list, np.ndarray)):
+            gt_val = float(ground_truth_val[0]) if len(ground_truth_val) > 0 else None
+        else:
+            gt_val = float(ground_truth_val)
+        
+        if gt_val is not None and gt_val != 0:
+            return metric_val / abs(gt_val)
+        return None
+    
+    # Organize combined data by parameter combination
+    combined_data_by_combo = {}
+    
+    for result in results_summary:
+        task_key = result['task_key']
+        idx_mapping, ext_idx = parse_task_key(task_key, int_param_ranges)
+        
+        param_combo, ground_truth_dict = get_param_combination_with_values(
+            idx_mapping, int_params, int_param_ranges
+        )
+        
+        # Collect normalized metrics for all internal parameters
+        normalized_metrics = []
+        all_finite = True
+        
+        for int_param_name in int_params:
+            if metric == 'std':
+                metric_key = f'{int_param_name}_sigma'
+            elif metric == 'rel_error':
+                metric_key = f'{int_param_name}_rel_error'
+            
+            value = result.get(metric_key)
+            
+            if value is not None:
+                if isinstance(value, (list, np.ndarray)):
+                    metric_val = float(value[0]) if len(value) > 0 else None
+                else:
+                    metric_val = float(value)
+                
+                # Normalize if std metric
+                if metric == 'std' and metric_val is not None:
+                    ground_truth_val = ground_truth_dict[int_param_name]
+                    metric_val = normalize_metric(metric_val, ground_truth_val)
+                
+                if metric_val is not None and np.isfinite(metric_val):
+                    normalized_metrics.append(metric_val)
+                else:
+                    all_finite = False
+                    break
+            else:
+                all_finite = False
+                break
+        
+        # Compute combined L2 norm
+        if all_finite and len(normalized_metrics) == len(int_params):
+            combined_metric = np.sqrt(np.sum(np.array(normalized_metrics) ** 2))
+            ext_param_val = ext_param_vec[ext_idx]
+            color = combination_colors[param_combo]
+            
+            # Build label from all parameters
+            label_parts = []
+            for pname in int_params:
+                pval = ground_truth_dict[pname]
+                label_parts.append(f'{pname}={format_value(pval)}')
+            
+            label = ', '.join(label_parts)
+            
+            if param_combo not in combined_data_by_combo:
+                combined_data_by_combo[param_combo] = {
+                    'ext_param': [],
+                    'metric': [],
+                    'color': color,
+                    'label': label
+                }
+            combined_data_by_combo[param_combo]['ext_param'].append(ext_param_val)
+            combined_data_by_combo[param_combo]['metric'].append(combined_metric)
+    
+    # Create figure
+    fig = go.Figure()
+    
+    # Add traces for each parameter combination
+    for param_combo, data in combined_data_by_combo.items():
+        # Sort by external parameter for better line rendering
+        sorted_indices = np.argsort(data['ext_param'])
+        sorted_ext_param = [data['ext_param'][i] for i in sorted_indices]
+        sorted_metric = [data['metric'][i] for i in sorted_indices]
+        
+        fig.add_trace(go.Scatter(
+            x=sorted_ext_param,
+            y=sorted_metric,
+            mode='markers+lines',
+            name=data['label'],
+            marker=dict(
+                size=10,
+                color=data['color'],
+                opacity=0.7,
+                symbol='circle',
+                line=dict(color='black', width=1)
+            ),
+            line=dict(color=data['color'], width=2, dash='solid'),
+            legendgroup=data['label'],
+            showlegend=True,
+            hovertemplate=(
+                f'<b>{data["label"]}</b><br>'
+                f'{ext_param_name}: %{{x:.3e}}<br>'
+                f'Combined Error: %{{y:.3e}}<extra></extra>'
+            )
+        ))
+    
+    # Determine axis scaling
+    x_logscale = ext_param_name in ['A', 'w0', 'omega']
+    y_logscale = True
+    
+    # Set labels and title based on metric
+    if metric == 'std':
+        y_label = 'Combined Normalized Sigma (L2 norm)'
+        title_suffix = 'Combined Normalized Standard Error'
+    else:
+        y_label = 'Combined Relative Error (L2 norm)'
+        title_suffix = 'Combined Signed Relative Error'
+    
+    fig.update_layout(
+        title=dict(
+            text=f'{title_suffix} vs {ext_param_name}',
+            font=dict(size=16, color='black')
+        ),
+        xaxis=dict(
+            title=dict(text=ext_param_name, font=dict(size=12)),
+            type='log' if x_logscale else 'linear',
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        yaxis=dict(
+            title=dict(text=y_label, font=dict(size=12)),
+            type='log' if y_logscale else 'linear',
+            gridwidth=1,
+            gridcolor='rgba(128, 128, 128, 0.2)',
+            showgrid=True
+        ),
+        hovermode='closest',
+        template='plotly_white',
+        width=1000,
+        height=600,
+        font=dict(size=11),
+        legend=dict(
+            x=1.02,
+            y=1,
+            xanchor='left',
+            yanchor='top',
+            bgcolor='rgba(255, 255, 255, 0.8)',
+            bordercolor='black',
+            borderwidth=1
+        )
+    )
+    
+    return fig
 
 if __name__ == "__main__":
     
@@ -3420,176 +4287,381 @@ if __name__ == "__main__":
     # Figure 6: ? #
     # ----------- #
 
-    optimizer = dual_annealing_optimizer_three_pass # dual_annealing_optimizer
+    optimizer = dual_annealing_optimizer_three_pass
 
-    # Bending Viscosity (Fixed Bending Elasticity)
-
-    int_param_ranges = {'tau_b': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
+    # Bending Viscosity (tau_b)
+    int_param_ranges = {'tau_b': [1e0]}
     A_vec = [1e-10]
-    w0_vec = np.pow(10, -np.linspace(start = -6, stop = 6, num = 13))
-    ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
+    w0_vec = np.pow(10, -np.linspace(start=-6, stop=6, num=13))
+    ext_param_ranges = {'A': A_vec, 'w0': w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_b']
 
     inference_mode = "single_inference"
     checkpoint_str = "./Results/BendingViscosity/BendingViscosity"
 
-    workflow_output = workflow_elastic_viscous_general(
+    workflow_output_bending_visc = workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
-        optimizer = optimizer,
-        elastic_params_list = elastic_params_list,
-        viscous_params_list = viscous_params_list,
-        inference_mode = inference_mode,
+        optimizer=optimizer,
+        elastic_params_list=elastic_params_list,
+        viscous_params_list=viscous_params_list,
+        inference_mode=inference_mode,
         checkpoint_str=checkpoint_str,
         n_jobs_per_pass=1,
-        )
-    
-    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b'], ext_param_name='w0', metric = 'std')
+    )
 
-    # Transform w0 -> tau_b * w0
-    ## Extract tau_b values from legend entries
-    tau_b_values = {}
-    for trace in fig.data:
-        if trace.name and 'tau_b' in trace.name:
-            # Extract tau_b value from trace name (e.g., "tau_b = 0.5" -> 0.5)
-            tau_b_str = trace.name.split('=')[-1].strip()
-            tau_b = float(tau_b_str)
-            tau_b_values[trace.name] = tau_b
-    ## Modify x data for each trace
-    for trace in fig.data:
-        if trace.name in tau_b_values:
-            tau_b = tau_b_values[trace.name]
-            trace.x = tuple(x * tau_b for x in trace.x)
-    ## Update x-axis label
-    fig.update_xaxes(title_text="τ_b * w₀")
-    # fig.update_yaxes(type = 'linear')
-
-    fig.write_image("Figures/std_tau_b_vs_w0.svg")
-    fig.write_html("Figures/std_tau_b_vs_w0.html")
-    fig.show()        
-
-    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b'], ext_param_name='w0', metric = 'rel_error')
-
-    # Transform w0 -> tau_b * w0
-    ## Extract tau_b values from legend entries
-    tau_b_values = {}
-    for trace in fig.data:
-        if trace.name and 'tau_b' in trace.name:
-            # Extract tau_b value from trace name (e.g., "tau_b = 0.5" -> 0.5)
-            tau_b_str = trace.name.split('=')[-1].strip()
-            tau_b = float(tau_b_str)
-            tau_b_values[trace.name] = tau_b
-    ## Modify x data for each trace
-    for trace in fig.data:
-        if trace.name in tau_b_values:
-            tau_b = tau_b_values[trace.name]
-            trace.x = tuple(x * tau_b for x in trace.x)
-    ## Update x-axis label
-    fig.update_xaxes(title_text="τ_b * w₀")
-
-    fig.write_image("Figures/err_tau_b_vs_w0.svg")
-    fig.write_html("Figures/err_tau_b_vs_w0.html")
-    fig.show()
-
-    # Shear Viscosity (Fixed Bending Elasticity & Shear Elasticity)
-
-    int_param_ranges = {'tau_s': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3], 'Beta':[1.0]} # {'tau_s': [1e0], 'Beta':[1.0]} # {'tau_s': [1e-1, 1e0, 1e1], 'Beta':[1.0]} # 
+    # Shear Viscosity (tau_s)
+    int_param_ranges = {'tau_s': [1e0], 'Beta': [1.0]}
     A_vec = [1e-10]
-    w0_vec = np.pow(10, -np.linspace(start = -6, stop = 6, num = 13)) # np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
-    ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
+    w0_vec = np.pow(10, -np.linspace(start=-6, stop=6, num=13))
+    ext_param_ranges = {'A': A_vec, 'w0': w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_s']
 
     inference_mode = "single_inference"
     checkpoint_str = "./Results/ShearViscosity/ShearViscosity"
 
-    workflow_output = workflow_elastic_viscous_general(
+    workflow_output_shear_visc = workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
-        optimizer = optimizer,        
-        elastic_params_list = elastic_params_list,
-        viscous_params_list = viscous_params_list,
-        inference_mode = inference_mode,
+        optimizer=optimizer,
+        elastic_params_list=elastic_params_list,
+        viscous_params_list=viscous_params_list,
+        inference_mode=inference_mode,
         checkpoint_str=checkpoint_str,
         n_jobs_per_pass=1,
-        )
+    )
 
-    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_s'], ext_param_name='w0', metric = 'std')
-
-    # Transform w0 -> tau_s * w0
-    ## Extract tau_s values from legend entries
-    tau_s_values = {}
-    for trace in fig.data:
-        if trace.name and 'tau_s' in trace.name:
-            # Extract tau_s value from trace name (e.g., "tau_s = 0.5" -> 0.5)
-            tau_s_str = trace.name.split('=')[-1].strip()
-            tau_s = float(tau_s_str)
-            tau_s_values[trace.name] = tau_s
-    ## Modify x data for each trace
-    for trace in fig.data:
-        if trace.name in tau_s_values:
-            tau_s = tau_s_values[trace.name]
-            trace.x = tuple(x * tau_s for x in trace.x)
-    ## Update x-axis label
-    fig.update_xaxes(title_text="τ_s * w₀")
-    
-    fig.write_image("Figures/std_tau_s_vs_w0.svg")
-    fig.write_html("Figures/std_tau_s_vs_w0.html")
-    fig.show()    
-
-    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_s'], ext_param_name='w0', metric = 'rel_error')
-
-    # Transform w0 -> tau_s * w0
-    ## Extract tau_b values from legend entries
-    tau_s_values = {}
-    for trace in fig.data:
-        if trace.name and 'tau_s' in trace.name:
-            # Extract tau_s value from trace name (e.g., "tau_s = 0.5" -> 0.5)
-            tau_s_str = trace.name.split('=')[-1].strip()
-            tau_s = float(tau_s_str)
-            tau_s_values[trace.name] = tau_s
-    ## Modify x data for each trace
-    for trace in fig.data:
-        if trace.name in tau_s_values:
-            tau_s = tau_s_values[trace.name]
-            trace.x = tuple(x * tau_s for x in trace.x)
-    ## Update x-axis label
-    fig.update_xaxes(title_text="τ_s * w₀")
-
-    fig.write_image("Figures/err_tau_s_vs_w0.svg")
-    fig.write_html("Figures/err_tau_s_vs_w0.html")
-    fig.show()    
-
-    # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
-
-    int_param_ranges = {'tau_b': [1e-3, 1e0, 1e3], 'tau_s':[1e-3, 1e0, 1e3], 'Beta':[1.0]}
+    # Combined Bending and Shear Viscosity (tau_b + tau_s)
+    int_param_ranges = {'tau_b': [1e0], 'tau_s': [1e0], 'Beta': [1.0]}
     A_vec = [1e-6]
-    w0_vec = np.pow(10, -np.linspace(start = -6, stop = 6, num = 13))
-    ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
+    w0_vec = np.pow(10, -np.linspace(start=-6, stop=6, num=13))
+    ext_param_ranges = {'A': A_vec, 'w0': w0_vec}
     elastic_params_list = []
     viscous_params_list = ['tau_b', 'tau_s']
 
     inference_mode = "single_inference"
     checkpoint_str = "./Results/BendingShearViscosity/BendingShearViscosity"
 
+    workflow_output_bending_shear_visc = workflow_elastic_viscous_general(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        optimizer=optimizer,
+        elastic_params_list=elastic_params_list,
+        viscous_params_list=viscous_params_list,
+        inference_mode=inference_mode,
+        checkpoint_str=checkpoint_str,
+        n_jobs_per_pass=1,
+    )
+
+    fig_6_a, fig_6_b = plot_fig_6(
+        workflow_output_bending_visc,
+        workflow_output_shear_visc,
+        workflow_output_bending_shear_visc
+    )
+
+    fig_6_a.write_image("Figures/fig_6_a_std_vs_w0.svg")
+    fig_6_a.write_html("Figures/fig_6_a_std_vs_w0.html")
+    fig_6_a.show()
+
+    fig_6_b.write_image("Figures/fig_6_b_err_vs_w0.svg")
+    fig_6_b.write_html("Figures/fig_6_b_err_vs_w0.html")
+    fig_6_b.show()
+
+    # ----------- #
+    # Figure S6   #
+    # ----------- #
+
+    # optimizer = dual_annealing_optimizer_three_pass # dual_annealing_optimizer
+
+    # # Bending Viscosity (Fixed Bending Elasticity)
+
+    # int_param_ranges = {'tau_b': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
+    # A_vec = [1e-10]
+    # w0_vec = np.pow(10, -np.linspace(start = -6, stop = 6, num = 13))
+    # ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
+    # elastic_params_list = []
+    # viscous_params_list = ['tau_b']
+
+    # inference_mode = "single_inference"
+    # checkpoint_str = "./Results/BendingViscosity/BendingViscosity"
+
+    # workflow_output = workflow_elastic_viscous_general(
+    #     int_param_ranges=int_param_ranges,
+    #     ext_param_ranges=ext_param_ranges,
+    #     optimizer = optimizer,
+    #     elastic_params_list = elastic_params_list,
+    #     viscous_params_list = viscous_params_list,
+    #     inference_mode = inference_mode,
+    #     checkpoint_str=checkpoint_str,
+    #     n_jobs_per_pass=1,
+    #     )
+    
+    # fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b'], ext_param_name='w0', metric = 'std')
+
+    # # Transform w0 -> tau_b * w0
+    # ## Extract tau_b values from legend entries
+    # tau_b_values = {}
+    # for trace in fig.data:
+    #     if trace.name and 'tau_b' in trace.name:
+    #         # Extract tau_b value from trace name (e.g., "tau_b = 0.5" -> 0.5)
+    #         tau_b_str = trace.name.split('=')[-1].strip()
+    #         tau_b = float(tau_b_str)
+    #         tau_b_values[trace.name] = tau_b
+    # ## Modify x data for each trace
+    # for trace in fig.data:
+    #     if trace.name in tau_b_values:
+    #         tau_b = tau_b_values[trace.name]
+    #         trace.x = tuple(x * tau_b for x in trace.x)
+    # ## Update x-axis label
+    # fig.update_xaxes(title_text="τ_b * w₀")
+    # # fig.update_yaxes(type = 'linear')
+
+    # fig.write_image("Figures/std_tau_b_vs_w0.svg")
+    # fig.write_html("Figures/std_tau_b_vs_w0.html")
+    # fig.show()        
+
+    # fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b'], ext_param_name='w0', metric = 'rel_error')
+
+    # # Transform w0 -> tau_b * w0
+    # ## Extract tau_b values from legend entries
+    # tau_b_values = {}
+    # for trace in fig.data:
+    #     if trace.name and 'tau_b' in trace.name:
+    #         # Extract tau_b value from trace name (e.g., "tau_b = 0.5" -> 0.5)
+    #         tau_b_str = trace.name.split('=')[-1].strip()
+    #         tau_b = float(tau_b_str)
+    #         tau_b_values[trace.name] = tau_b
+    # ## Modify x data for each trace
+    # for trace in fig.data:
+    #     if trace.name in tau_b_values:
+    #         tau_b = tau_b_values[trace.name]
+    #         trace.x = tuple(x * tau_b for x in trace.x)
+    # ## Update x-axis label
+    # fig.update_xaxes(title_text="τ_b * w₀")
+
+    # fig.write_image("Figures/err_tau_b_vs_w0.svg")
+    # fig.write_html("Figures/err_tau_b_vs_w0.html")
+    # fig.show()
+
+    # # Shear Viscosity (Fixed Bending Elasticity & Shear Elasticity)
+
+    # int_param_ranges = {'tau_s': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3], 'Beta':[1.0]} # {'tau_s': [1e0], 'Beta':[1.0]} # {'tau_s': [1e-1, 1e0, 1e1], 'Beta':[1.0]} # 
+    # A_vec = [1e-10]
+    # w0_vec = np.pow(10, -np.linspace(start = -6, stop = 6, num = 13)) # np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
+    # ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
+    # elastic_params_list = []
+    # viscous_params_list = ['tau_s']
+
+    # inference_mode = "single_inference"
+    # checkpoint_str = "./Results/ShearViscosity/ShearViscosity"
+
+    # workflow_output = workflow_elastic_viscous_general(
+    #     int_param_ranges=int_param_ranges,
+    #     ext_param_ranges=ext_param_ranges,
+    #     optimizer = optimizer,        
+    #     elastic_params_list = elastic_params_list,
+    #     viscous_params_list = viscous_params_list,
+    #     inference_mode = inference_mode,
+    #     checkpoint_str=checkpoint_str,
+    #     n_jobs_per_pass=1,
+    #     )
+
+    # fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_s'], ext_param_name='w0', metric = 'std')
+
+    # # Transform w0 -> tau_s * w0
+    # ## Extract tau_s values from legend entries
+    # tau_s_values = {}
+    # for trace in fig.data:
+    #     if trace.name and 'tau_s' in trace.name:
+    #         # Extract tau_s value from trace name (e.g., "tau_s = 0.5" -> 0.5)
+    #         tau_s_str = trace.name.split('=')[-1].strip()
+    #         tau_s = float(tau_s_str)
+    #         tau_s_values[trace.name] = tau_s
+    # ## Modify x data for each trace
+    # for trace in fig.data:
+    #     if trace.name in tau_s_values:
+    #         tau_s = tau_s_values[trace.name]
+    #         trace.x = tuple(x * tau_s for x in trace.x)
+    # ## Update x-axis label
+    # fig.update_xaxes(title_text="τ_s * w₀")
+    
+    # fig.write_image("Figures/std_tau_s_vs_w0.svg")
+    # fig.write_html("Figures/std_tau_s_vs_w0.html")
+    # fig.show()    
+
+    # fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_s'], ext_param_name='w0', metric = 'rel_error')
+
+    # # Transform w0 -> tau_s * w0
+    # ## Extract tau_b values from legend entries
+    # tau_s_values = {}
+    # for trace in fig.data:
+    #     if trace.name and 'tau_s' in trace.name:
+    #         # Extract tau_s value from trace name (e.g., "tau_s = 0.5" -> 0.5)
+    #         tau_s_str = trace.name.split('=')[-1].strip()
+    #         tau_s = float(tau_s_str)
+    #         tau_s_values[trace.name] = tau_s
+    # ## Modify x data for each trace
+    # for trace in fig.data:
+    #     if trace.name in tau_s_values:
+    #         tau_s = tau_s_values[trace.name]
+    #         trace.x = tuple(x * tau_s for x in trace.x)
+    # ## Update x-axis label
+    # fig.update_xaxes(title_text="τ_s * w₀")
+
+    # fig.write_image("Figures/err_tau_s_vs_w0.svg")
+    # fig.write_html("Figures/err_tau_s_vs_w0.html")
+    # fig.show()    
+
+    # # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
+
+    # int_param_ranges = {'tau_b': [1e-3, 1e0, 1e3], 'tau_s':[1e-3, 1e0, 1e3], 'Beta':[1.0]}
+    # A_vec = [1e-6]
+    # w0_vec = np.pow(10, -np.linspace(start = -6, stop = 6, num = 13))
+    # ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
+    # elastic_params_list = []
+    # viscous_params_list = ['tau_b', 'tau_s']
+
+    # inference_mode = "single_inference"
+    # checkpoint_str = "./Results/BendingShearViscosity/BendingShearViscosity"
+
+    # workflow_output = workflow_elastic_viscous_general(
+    #     int_param_ranges=int_param_ranges,
+    #     ext_param_ranges=ext_param_ranges,
+    #     optimizer = optimizer,        
+    #     elastic_params_list = elastic_params_list,
+    #     viscous_params_list = viscous_params_list,
+    #     inference_mode = inference_mode,
+    #     checkpoint_str=checkpoint_str,
+    #     n_jobs_per_pass=1,
+    #     )
+
+    # fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'std')
+    # fig.write_image("Figures/std_tau_b_tau_s_vs_w0.svg")
+    # fig.write_html("Figures/std_tau_b_tau_s_vs_w0.html")
+    # fig.show()    
+
+    # fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'rel_error')
+    # fig.write_image("Figures/err_tau_b_tau_s_vs_w0.svg")
+    # fig.write_html("Figures/err_tau_b_tau_s_vs_w0.html")
+    # fig.show()    
+
+
+    # ============ Figure S6a: Viscous Parameter Sweeps ============
+
+    optimizer = dual_annealing_optimizer_three_pass
+
+    # Bending Viscosity (tau_b with multiple values)
+    int_param_ranges = {'tau_b': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
+    A_vec = [1e-10]
+    w0_vec = np.pow(10, -np.linspace(start=-6, stop=6, num=13))
+    ext_param_ranges = {'A': A_vec, 'w0': w0_vec}
+    elastic_params_list = []
+    viscous_params_list = ['tau_b']
+
+    inference_mode = "single_inference"
+    checkpoint_str = "./Results/BendingViscosity/Full/BendingViscosity"
+
+    workflow_output_tau_b = workflow_elastic_viscous_general(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        optimizer=optimizer,
+        elastic_params_list=elastic_params_list,
+        viscous_params_list=viscous_params_list,
+        inference_mode=inference_mode,
+        checkpoint_str=checkpoint_str,
+        n_jobs_per_pass=1,
+    )
+
+    # Plot bending viscosity standard error
+    fig_S6a_std = plot_fig_S6a(
+        workflow_output_tau_b,
+        int_param_name='tau_b',
+        ext_param_name='w0',
+        metric='std'
+    )
+
+    fig_S6a_std.write_image("Figures/std_tau_b_vs_w0.svg")
+    fig_S6a_std.write_html("Figures/std_tau_b_vs_w0.html")
+    fig_S6a_std.show()
+
+    # Plot bending viscosity relative error
+    fig_S6a_err = plot_fig_S6a(
+        workflow_output_tau_b,
+        int_param_name='tau_b',
+        ext_param_name='w0',
+        metric='rel_error'
+    )
+
+    fig_S6a_err.write_image("Figures/err_tau_b_vs_w0.svg")
+    fig_S6a_err.write_html("Figures/err_tau_b_vs_w0.html")
+    fig_S6a_err.show()
+
+    # Shear Viscosity (Fixed Shear Elasticity)
+    int_param_ranges = {'tau_s': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3], 'Beta': [1.0]}
+    A_vec = [1e-10]
+    w0_vec = np.pow(10, -np.linspace(start=-6, stop=6, num=13))
+    ext_param_ranges = {'A': A_vec, 'w0': w0_vec}
+    elastic_params_list = []
+    viscous_params_list = ['tau_s']
+
+    inference_mode = "single_inference"
+    checkpoint_str = "./Results/ShearViscosity/Full/ShearViscosity"
+
     workflow_output = workflow_elastic_viscous_general(
         int_param_ranges=int_param_ranges,
         ext_param_ranges=ext_param_ranges,
-        optimizer = optimizer,        
-        elastic_params_list = elastic_params_list,
-        viscous_params_list = viscous_params_list,
-        inference_mode = inference_mode,
+        optimizer=optimizer,
+        elastic_params_list=elastic_params_list,
+        viscous_params_list=viscous_params_list,
+        inference_mode=inference_mode,
         checkpoint_str=checkpoint_str,
         n_jobs_per_pass=1,
-        )
+    )
 
-    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'std')
+    # Standard error with scaled x-axis
+    fig = plot_fig_S6b(workflow_output, int_param_name='tau_s', ext_param_name='w0', metric='std')
+    fig.write_image("Figures/std_tau_s_vs_w0.svg")
+    fig.write_html("Figures/std_tau_s_vs_w0.html")
+    fig.show()
+
+    # Relative error with scaled x-axis
+    fig = plot_fig_S6b(workflow_output, int_param_name='tau_s', ext_param_name='w0', metric='rel_error')
+    fig.write_image("Figures/err_tau_s_vs_w0.svg")
+    fig.write_html("Figures/err_tau_s_vs_w0.html")
+    fig.show()
+
+    # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
+    int_param_ranges = {'tau_b': [1e-3, 1e0, 1e3], 'tau_s': [1e-3, 1e0, 1e3], 'Beta': [1.0]}
+    A_vec = [1e-6]
+    w0_vec = np.pow(10, -np.linspace(start=-6, stop=6, num=13))
+    ext_param_ranges = {'A': A_vec, 'w0': w0_vec}
+    elastic_params_list = []
+    viscous_params_list = ['tau_b', 'tau_s']
+
+    inference_mode = "single_inference"
+    checkpoint_str = "./Results/BendingShearViscosity/Full/BendingShearViscosity"
+
+    workflow_output = workflow_elastic_viscous_general(
+        int_param_ranges=int_param_ranges,
+        ext_param_ranges=ext_param_ranges,
+        optimizer=optimizer,
+        elastic_params_list=elastic_params_list,
+        viscous_params_list=viscous_params_list,
+        inference_mode=inference_mode,
+        checkpoint_str=checkpoint_str,
+        n_jobs_per_pass=1,
+    )
+
+    # Combined standard error with scaled x-axis
+    fig = plot_fig_S6c(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric='std')
     fig.write_image("Figures/std_tau_b_tau_s_vs_w0.svg")
     fig.write_html("Figures/std_tau_b_tau_s_vs_w0.html")
-    fig.show()    
+    fig.show()
 
-    fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'rel_error')
+    # Combined relative error with scaled x-axis
+    fig = plot_fig_S6c(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric='rel_error')
     fig.write_image("Figures/err_tau_b_tau_s_vs_w0.svg")
     fig.write_html("Figures/err_tau_b_tau_s_vs_w0.html")
-    fig.show()    
+    fig.show()
