@@ -1335,181 +1335,281 @@ def CheckEquilibrium(N, A, gamma, Sp4, n_L = [0,0], Lambdas=[[0,0]], conditions 
     X_3N_eq = np.vstack((X_eq.reshape((-1,1)), theta_eq.reshape(-1,1))) # Thetas are filled to zero here!
     return X_3N_eq
 
-    def plot_fig_S1(
-        model_lists: Dict[int, ModelList],
-        int_params_metadata: List[Dict[str, Any]],
-        ext_params_list: List[Dict[str, Any]],
-        int_param_name: str = 'Sp4',
-        ext_param_name: str = 'A',
-        title: Optional[str] = None,
-        x_label: str = "x",
-        y_label: str = "y",
-        log_scale: bool = False,
-        colorscale: str = 'Viridis',
-    ) -> go.Figure:
-        """
-        Args:
-            model_lists: Dictionary mapping indices to ModelList objects
-            int_params_metadata: List of dicts, each containing internal parameter values
-            ext_params_list: List of external parameter dicts (each with 'A' key)
-            int_param_name: Name of the internal parameter for subplots (e.g., 'Sp4')
-            ext_param_name: Name of the external parameter for coloring (e.g., 'A')
-            title: Plot title
-            x_label: X-axis label
-            y_label: Y-axis label
-            log_scale: Whether to use log scale for axes
-            colorscale: Plotly colorscale name (e.g., 'Viridis', 'Blues', 'Reds')
-        
-        Returns:
-            Plotly Figure with subplots
-        """
-        # Extract internal and external parameter values
-        int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
-        ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
-        
-        n_internal = len(int_param_values)
-        
-        # Create plot
-        fig_S1_a = go.Figure()
+def plot_fig_S1(
+    model_lists: Dict[int, ModelList],
+    int_params_metadata: List[Dict[str, Any]],
+    ext_params_list: List[Dict[str, Any]],
+    int_param_name: str = 'N',
+    ext_param_name: str = 'A',
+    x_label: str = "x (normalized)",
+    y_label: str = "y (normalized)",
+    log_scale: bool = False,
+    colorscale: str = 'Turbo',
+) -> Tuple[go.Figure, go.Figure]:
+    """
+    Generate publication-ready phase-space trajectory plots comparing simulations to analytical solutions.
+    
+    Args:
+        model_lists: Dictionary mapping indices to ModelList objects
+        int_params_metadata: List of dicts, each containing internal parameter values
+        ext_params_list: List of external parameter dicts (each with 'A' key)
+        int_param_name: Name of the internal parameter for colormapping (e.g., 'N')
+        ext_param_name: Name of the external parameter (e.g., 'A')
+        x_label: X-axis label
+        y_label: Y-axis label
+        log_scale: Whether to use log scale for axes
+        colorscale: Plotly colorscale name (e.g., 'Viridis', 'Blues', 'Reds')
+    
+    Returns:
+        Tuple of (fig_S1_a, fig_S1_b) - phase-space trajectories and convergence error plots
+    """
+    # Extract internal and external parameter values
+    int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
+    ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
+    
+    # Filter to start from N=30
+    filtered_indices = [i for i, val in enumerate(int_param_values) if val >= 30]
+    int_param_values = [int_param_values[i] for i in filtered_indices]
+    int_param_indices = filtered_indices
+    
+    # Create figures
+    fig_S1_a = go.Figure()
+    fig_S1_b = go.Figure()
+    
+    # Normalize internal parameter values for colormap
+    if len(int_param_values) > 1:
+        int_param_min = min(int_param_values)
+        int_param_max = max(int_param_values)
+        int_param_norm = [
+            (val - int_param_min) / (int_param_max - int_param_min) 
+            for val in int_param_values
+        ]
+    else:
+        int_param_norm = [0]
 
-        # Second figure: L2 error between simulation and analytical solution for small uniform vertical flow
-        fig_S1_b = go.Figure()
+    # Get colors for internal parameters
+    colors_int = px.colors.sample_colorscale(colorscale, int_param_norm)
+
+    N_array = []
+    error_array = []
+    
+    # Plot one trace per external parameter in each subplot
+    for pos, int_idx in enumerate(sorted([i for i in model_lists.keys() if i in int_param_indices])):
+        model_list = model_lists[int_idx]
+        int_param_val = int_param_values[pos]
         
-        if len(int_param_values) > 1:
-            # Normalize internal parameter values for colormap
-            int_param_min = min(int_param_values)
-            int_param_max = max(int_param_values)
-            int_param_norm = [
-                (val - int_param_min) / (int_param_max - int_param_min) 
-                for val in int_param_values
-            ]
-        else: # Only one internal parameter
-            int_param_norm = [0]
-
-        # Get colors for external parameters
-        colors_int = px.colors.sample_colorscale(
-            colorscale, 
-            int_param_norm,
-        )
-
-        N_array = []
-        error_array = []
-        # Plot one trace per external parameter in each subplot
-        for int_idx in sorted(model_lists.keys()):
-            model_list = model_lists[int_idx]
-            int_param_val = int_param_values[int_idx]
+        # Iterate through all external parameters
+        for ext_idx in range(len(model_list.models)):
+            model = model_list.models[ext_idx]
+            ext_param_val = ext_param_values[ext_idx]
             
-            # Iterate through all external parameters
-            for ext_idx in range(len(model_list.models)):
-                model = model_list.models[ext_idx]
-                ext_param_val = ext_param_values[ext_idx]
+            if model.sim_output is not None:
+                output_data = model.sim_output
+                # Handle both array and dict outputs
+                if isinstance(output_data, dict) and 'value' in output_data:
+                    output_data = output_data['value']
                 
-                if model.sim_output is not None:
-                    output_data = model.sim_output
-                    # Handle both array and dict outputs
-                    if isinstance(output_data, dict) and 'value' in output_data:
-                        output_data = output_data['value']
+                output_array = np.array(output_data)
+                
+                if output_array.size > 1:
+                    output_array = np.atleast_1d(output_array)
                     
-                    output_array = np.array(output_data)
+                    # Apply X3N transformation
+                    X_3N = X3N(output_array)
+                    N = X_3N.shape[0] // 3    
+                    N_array.append(N)                
                     
-                    if output_array.size > 1:
-                        output_array = np.atleast_1d(output_array)
-                        
-                        # Apply X3N transformation
-                        X_3N = X3N(output_array)
-                        N = X_3N.shape[0] // 3    
-                        N_array.append(N)                
-                        
-                        # Extract x and y trajectories
-                        x_trajectory = X_3N[:N, 0]/N
-                        y_trajectory = X_3N[N:int(2*N), 0]/N
+                    # Extract x and y trajectories
+                    x_trajectory = X_3N[:N, 0] / N
+                    y_trajectory = X_3N[N:int(2*N), 0] / N
 
-                        # Analytical Equilbrium Profile
-                        n_eq = 1000
-                        X_3N_eq = CheckEquilibrium(N, model.ext_params['A'], model.int_params['gamma'], model.int_params['Sp4'], n_L = model.int_params['n_L'], Lambdas=model.ext_params['Lambdas'], conditions = "vertical_flow_uniform", n_eq = n_eq)
-                        
-                        x_eq_trajectory = X_3N_eq[:n_eq, 0][X_3N_eq[:n_eq,0]<=N-1]/N
-                        y_eq_trajectory = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N
+                    # Analytical Equilibrium Profile
+                    n_eq = 1000
+                    X_3N_eq = CheckEquilibrium(
+                        N, model.ext_params['A'], model.int_params['gamma'], 
+                        model.int_params['Sp4'], n_L=model.int_params['n_L'], 
+                        Lambdas=model.ext_params['Lambdas'], 
+                        conditions="vertical_flow_uniform", n_eq=n_eq
+                    )
+                    
+                    x_eq_trajectory = X_3N_eq[:n_eq, 0][X_3N_eq[:n_eq, 0] <= N-1] / N
+                    y_eq_trajectory = X_3N_eq[n_eq:2*n_eq, 0][X_3N_eq[:n_eq, 0] <= N-1] / N
 
-                        # Concatenate x and y:
-                        x_traj = np.array((x_trajectory, y_trajectory)).reshape((2,-1))
-                        x_eq_traj = np.array((x_eq_trajectory, y_eq_trajectory)).reshape((2,-1))
+                    # Concatenate x and y trajectories
+                    x_traj = np.array((x_trajectory, y_trajectory)).reshape((2, -1))
+                    x_eq_traj = np.array((x_eq_trajectory, y_eq_trajectory)).reshape((2, -1))
 
-                        # ============================================================
-                        # Approach 1: Hausdorff Distance
-                        # ============================================================
-                        d1 = directed_hausdorff(x_traj.T, x_eq_traj.T)[0]
-                        d2 = directed_hausdorff(x_eq_traj.T, x_traj.T)[0]
-                        hausdorff_error = max(d1, d2)
-                        error_array.append(hausdorff_error)
-
-                        if 'Beta' in int_param_name:
-                            y_trajectory *= 1
-                        
-                        fig_S1_a.add_trace(
-                            go.Scatter(
-                                x=x_trajectory,
-                                y=y_trajectory,
-                                mode='lines+markers',
-                                hovertemplate=(
-                                    f"<b>{x_label}</b>: %{{x:.6e}}<br>"
-                                    f"<b>{y_label}</b>: %{{y:.6e}}<br>"
-                                    f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
-                                    f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
-                                ),
-                                line=dict(width=2, color=colors_int[int_idx]),
-                                marker=dict(size=4, color=colors_int[int_idx]),
+                    # Calculate Hausdorff Distance (convergence error metric)
+                    d1 = directed_hausdorff(x_traj.T, x_eq_traj.T)[0]
+                    d2 = directed_hausdorff(x_eq_traj.T, x_traj.T)[0]
+                    hausdorff_error = max(d1, d2)
+                    error_array.append(hausdorff_error)
+                    
+                    # Add simulation data trace (SOLID LINE with transparency)
+                    fig_S1_a.add_trace(
+                        go.Scatter(
+                            x=x_trajectory,
+                            y=y_trajectory,
+                            mode='lines+markers',
+                            name=f"{int_param_name} = {int_param_val}",
+                            legendgroup=f"group_{pos}",
+                            showlegend=False,
+                            hovertemplate=(
+                                f"<b>Simulation</b><br>"
+                                f"<b>{x_label}</b>: %{{x:.6e}}<br>"
+                                f"<b>{y_label}</b>: %{{y:.6e}}<br>"
+                                f"<b>{int_param_name}</b>: {int_param_val}<br>"
+                                f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
                             ),
-                        )
-                        fig_S1_a.add_trace(
-                            go.Scatter(
-                                x=x_eq_trajectory,
-                                y=y_eq_trajectory,
-                                mode='lines',
-                                hovertemplate=(
-                                    f"<b>{x_label}</b>: %{{x:.6e}}<br>"
-                                    f"<b>{y_label}</b>: %{{y:.6e}}<br>"
-                                    f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
-                                    f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
-                                ),
-                                line=dict(width=2, color="black"),
-                            ),
-                        )       
+                            line=dict(width=2.5, color=colors_int[pos], dash='solid'),
+                            marker=dict(size=5, color=colors_int[pos], opacity=0.7),
+                            opacity=0.7,
+                        ),
+                    )
 
-        N_array = np.array(N_array)
-        error_array = np.array(error_array)
-        fig_S1_b.add_trace(
-            go.Scatter(
-                x = 1/N_array,
-                y = error_array,
-                mode='markers+lines',
-                line=dict(width=2, color="black"),
-                marker=dict(size=4, color="black"),
-            )
+                    # Add analytical solution trace (DASHED BLACK LINE with transparency)
+                    fig_S1_a.add_trace(
+                        go.Scatter(
+                            x=x_eq_trajectory,
+                            y=y_eq_trajectory,
+                            mode='lines',
+                            name=f"{int_param_name} = {int_param_val}",
+                            legendgroup=f"group_{pos}",
+                            showlegend=True,
+                            hovertemplate=(
+                                f"<b>Analytical Solution</b><br>"
+                                f"<b>{x_label}</b>: %{{x:.6e}}<br>"
+                                f"<b>{y_label}</b>: %{{y:.6e}}<br>"
+                                f"<b>{int_param_name}</b>: {int_param_val}<br>"
+                                f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
+                            ),
+                            line=dict(width=2.5, color="black", dash='dash'),
+                            opacity=0.7,
+                        ),
+                    )
+
+    # Build convergence error plot (fig_S1_b)
+    N_array = np.array(N_array)
+    error_array = np.array(error_array)
+
+    # Fit in semi-log space: log(error) = a * log(1/N) + b
+    log_N_inv = np.log10(1/N_array)
+    log_error = np.log10(error_array)
+    coeffs = np.polyfit(log_N_inv, log_error, 1)
+    print(f"Linear fit slope (in log-log space): {coeffs[0]:.4f}")
+    print(f"Linear fit intercept (in log-log space): {coeffs[1]:.4f}")
+
+    fig_S1_b.add_trace(
+        go.Scatter(
+            x=1/N_array,
+            y=error_array,
+            mode='markers',
+            name='Hausdorff Distance',
+            marker=dict(size=12, color="black", opacity=0.8),
+            hovertemplate=(
+                f"<b>Grid Spacing</b>: 1/N = %{{x:.6e}}<br>"
+                f"<b>Error (Hausdorff)</b>: %{{y:.6e}}<extra></extra>"
+            ),
         )
-        fig_S1_b.update_xaxes(type = "log")
-        fig_S1_b.update_yaxes(type = "log")
+    )
         
-        # Update axes
-        fig_S1_a.update_xaxes(title_text=x_label)
-        fig_S1_a.update_yaxes(title_text=y_label)
-        
-        if log_scale:
-            fig_S1_a.update_xaxes(type='log')
-            fig_S1_a.update_yaxes(type='log')
-        
-        if title is None:
-            title = f"Phase-Space Trajectories color-coded by {int_param_name})"
-        
-        fig_S1_a.update_layout(
-            title=title,
-            hovermode='closest',
-            legend=dict(title=int_param_name),
-            height=800,
-            width=1400,
+    # Add linear fit line in semi-log space, resampled over full range
+    x_fit = np.linspace(0.008, 0.036, 100)
+    log_x_fit = np.log10(x_fit)
+    log_y_fit = coeffs[0] * log_x_fit + coeffs[1]
+    y_fit = 10**log_y_fit
+
+    fig_S1_b.add_trace(
+        go.Scatter(
+            x=x_fit,
+            y=y_fit,
+            mode='lines',
+            name='Linear Fit',
+            line=dict(width=2.5, color="black", dash='dash'),
+            hovertemplate=(
+                f"<b>Grid Spacing</b>: 1/N = %{{x:.6e}}<br>"
+                f"<b>Fit</b>: %{{y:.6e}}<extra></extra>"
+            ),
         )
-        
-        return fig_S1_a, fig_S1_b  
+    )
+
+    # Update fig_S1_b axes
+    fig_S1_b.update_xaxes(
+        title_text="Grid Spacing (1/N)",
+        type="log",
+        showgrid=True,
+        gridwidth=1,
+        gridcolor="lightgray",
+    )
+    fig_S1_b.update_yaxes(
+        title_text="Hausdorff Distance (error)",
+        type="log",
+        showgrid=True,
+        gridwidth=1,
+        gridcolor="lightgray",
+    )
+    
+    fig_S1_b.update_layout(
+        hovermode='closest',
+        height=700,
+        width=950,
+        font=dict(size=11, family="Times New Roman"),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        showlegend=False, 
+    )
+    
+    # Update fig_S1_a axes
+    fig_S1_a.update_xaxes(
+        title_text=x_label,
+        showgrid=True,
+        gridwidth=1,
+        gridcolor="lightgray",
+    )
+    fig_S1_a.update_yaxes(
+        title_text=y_label,
+        showgrid=True,
+        gridwidth=1,
+        gridcolor="lightgray",
+    )
+    
+    if log_scale:
+        fig_S1_a.update_xaxes(type='log')
+        fig_S1_a.update_yaxes(type='log')
+    
+    # Create colorbar manually using a hidden scatter trace
+    colorbar_trace = go.Scatter(
+        x=[None], y=[None],
+        mode='markers',
+        marker=dict(
+            colorscale=colorscale,
+            cmin=min(int_param_values),
+            cmax=max(int_param_values),
+            colorbar=dict(
+                title=int_param_name,
+                thickness=20,
+                len=0.7,
+                x=1.15,
+            ),
+            showscale=True,
+        ),
+        showlegend=False,
+        hoverinfo='none',
+    )
+    fig_S1_a.add_trace(colorbar_trace)
+    
+    fig_S1_a.update_layout(
+        hovermode='closest',
+        height=700,
+        width=1100,
+        font=dict(size=11, family="Times New Roman"),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        showlegend=False,
+        margin=dict(r=150),  # Extra right margin for colorbar
+    )
+    
+    return fig_S1_a, fig_S1_b
 
 def plot_fig_1(
     model_lists: Dict[int, ModelList],
@@ -1520,7 +1620,8 @@ def plot_fig_1(
     title: Optional[str] = None,
     x_label: str = "x",
     y_label: str = "y",
-    colorscale: str = 'Viridis',
+    colorscale: str = 'RdYlBu_r',
+    selected_int_param_values: Optional[List[float]] = None,
 ) -> go.Figure:
     """
     Args:
@@ -1532,8 +1633,8 @@ def plot_fig_1(
         title: Plot title
         x_label: X-axis label
         y_label: Y-axis label
-        log_scale: Whether to use log scale for axes
-        colorscale: Plotly colorscale name (e.g., 'Viridis', 'Blues', 'Reds')
+        colorscale: Plotly colorscale name (e.g., 'RdYlBu_r', 'Plasma')
+        selected_int_param_values: List of specific parameter values to plot (e.g., [1e-1, 1e0, 1e1])
     
     Returns:
         Plotly Figure with subplots
@@ -1549,25 +1650,32 @@ def plot_fig_1(
     fig_1_b = go.Figure()
 
     if len(int_param_values) > 1:
-        # Normalize internal parameter values for colormap
-        int_param_min = min(int_param_values)
-        int_param_max = max(int_param_values)
+        # Normalize internal parameter values for colormap using log scale
+        int_param_min = np.log10(min(int_param_values))
+        int_param_max = np.log10(max(int_param_values))
         int_param_norm = [
-            (val - int_param_min) / (int_param_max - int_param_min) 
+            (np.log10(val) - int_param_min) / (int_param_max - int_param_min) 
             for val in int_param_values
         ]
     else: # Only one internal parameter
         int_param_norm = [0]
 
-    # Get colors for external parameters
-    colors_int = px.colors.sample_colorscale(
-        colorscale, 
-        int_param_norm,
-    )
-
     all_theta_trajectories = []
     theta_matrix = []  # List to store rows for the heatmap
     y_axis_values = []  # Store corresponding int_param_values
+    
+    # Determine which indices to plot based on selected parameter values
+    if selected_int_param_values is None:
+        selected_indices = set(sorted(model_lists.keys()))
+    else:
+        selected_indices = set()
+        for target_val in selected_int_param_values:
+            # Find the closest index to each target value
+            closest_idx = min(
+                sorted(model_lists.keys()),
+                key=lambda idx: abs(int_param_values[idx] - target_val)
+            )
+            selected_indices.add(closest_idx)
 
     # Plot one trace per external parameter in each subplot
     for int_idx in sorted(model_lists.keys()):
@@ -1605,6 +1713,13 @@ def plot_fig_1(
                     if 'Beta' in int_param_name:
                         y_trajectory *= int_param_val
                     
+                    # Map internal parameter value to color using log-normalized scale
+                    normalized_val = int_param_norm[int_idx]
+                    color = px.colors.sample_colorscale(colorscale, [normalized_val])[0]
+                    
+                    # Only plot if this index is in the selected set
+                    should_plot = int_idx in selected_indices
+                    
                     fig_1_a.add_trace(
                         go.Scatter(
                             x = x_trajectory,
@@ -1616,7 +1731,9 @@ def plot_fig_1(
                                 f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
                                 f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
                             ),
-                            line=dict(width=2, color=colors_int[int_idx]),
+                            line=dict(width=2.5, color=color),
+                            showlegend=False,
+                            visible=should_plot,
                         ),
                     )
 
@@ -1624,52 +1741,87 @@ def plot_fig_1(
                     theta_matrix.append(np.log10(theta_trajectory))
                     y_axis_values.append(int_param_val)
 
-    # Update axes
-    fig_1_a.update_xaxes(title_text=x_label)
-    fig_1_a.update_yaxes(title_text=y_label)
-    
-    if title is None:
-        title = f"Trajectories color-coded by {int_param_name})"
-    
-    fig_1_a.update_layout(
-        title=title,
-        hovermode='closest',
-        legend=dict(title=int_param_name),
-        height=800,
-        width=1400,
+    # Create parameter-specific colorbar label
+    if int_param_name == 'Beta':
+        colorbar_label = 'β'
+    else:
+        colorbar_label = int_param_name
+        
+    # Get the selected parameter values for colorbar display
+    selected_param_values = sorted([int_param_values[idx] for idx in selected_indices])
+
+    # Limit colorbar ticks to a reasonable number (e.g., 5-7)
+    n_ticks = min(7, len(selected_param_values))  # Show max 7 ticks
+    tick_indices = np.linspace(0, len(selected_param_values) - 1, n_ticks, dtype=int)
+    colorbar_tickvals = [np.log10(selected_param_values[i]) for i in tick_indices]
+    colorbar_ticktext = [f"{selected_param_values[i]:.0e}" for i in tick_indices]
+
+    # Add invisible scatter trace for colorbar
+    fig_1_a.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode='markers',
+            marker=dict(
+                colorscale=colorscale,
+                cmin=min([np.log10(v) for v in int_param_values]),
+                cmax=max([np.log10(v) for v in int_param_values]),
+                colorbar=dict(
+                    title=colorbar_label,
+                    tickvals=colorbar_tickvals,
+                    ticktext=colorbar_ticktext,
+                ),
+                showscale=True,
+            ),
+            showlegend=False,
+            hoverinfo='skip',
+        )
     )
 
-    # theta_min = 1e-25 # np.min([np.min(theta_traj) for theta_traj in all_theta_trajectories])
-    # theta_max = 1e0 # np.max([np.max(theta_traj) for theta_traj in all_theta_trajectories])
+
+    # Update axes for fig_1_a
+    fig_1_a.update_xaxes(title_text=f"{x_label}/N")
+    fig_1_a.update_yaxes(title_text=f"{y_label}/N")
+    
+    fig_1_a.update_layout(
+        title="",
+        hovermode='closest',
+        height=800,
+        width=1400,
+        plot_bgcolor='white',
+        xaxis=dict(showgrid=True, gridwidth=1, gridcolor='lightgray'),
+        yaxis=dict(showgrid=True, gridwidth=1, gridcolor='lightgray'),
+    )
 
     fig_1_b.add_trace(
             go.Heatmap(
                 x=np.linspace(0, 1, len(theta_matrix[0])) if theta_matrix else [],
                 y=y_axis_values,
                 z=theta_matrix,
-                colorscale="RdBu",
-                # zmin=np.log10(theta_min),
-                # zmax=np.log10(theta_max),
+                colorscale="Viridis",
                 hovertemplate=(
                     f"<b>s</b>: %{{x:.4f}}<br>"
                     f"<b>{int_param_name}</b>: %{{y:.4f}}<br>"
-                    f"<b>log10(Theta)</b>: %{{z:.2f}}<extra></extra>"
+                    f"<b>log10(Θ)</b>: %{{z:.2f}}<extra></extra>"
                 ),
-                colorbar=dict(title="log10(Theta)"),
+                colorbar=dict(title="log10(Θ)"),
             )
         )
 
     fig_1_b.update_yaxes(type = "log")
     fig_1_b.update_layout(
-        title=f"log10 theta(s, {int_param_name})",
-        xaxis_title="s",
-        yaxis_title=int_param_name,
+        xaxis_title="s/L",
+        yaxis_title=colorbar_label,
         autosize = False,
-        height=600,
-        width=1000,
+        height=800,
+        width=1400,
+        plot_bgcolor='white',
+        xaxis=dict(showgrid=True, gridwidth=1, gridcolor='lightgray'),
+        yaxis=dict(showgrid=True, gridwidth=1, gridcolor='lightgray'),
     )
     
     return fig_1_a, fig_1_b
+
 
 def plot_fig_2(
     model_lists: Dict[int, ModelList],
@@ -3773,18 +3925,16 @@ if __name__ == "__main__":
         model_lists, int_params_metadata, ext_params_list,
         int_param_name='N', ext_param_name='A',
         x_label='x', y_label='y',
-        colorscale='Viridis', log_scale=False
+        colorscale='Turbo', log_scale=False
     )
 
-    fig_S1_a.write_image("Figures/analytical_solution_constant_vertical_flow_a.svg")
-    fig_S1_a.write_html("Figures/analytical_solution_constant_vertical_flow_a.html")
-    fig_S1_a.show()
+    # fig_S1_a.write_image("Figures/analytical_solution_constant_vertical_flow_a.svg")
+    # fig_S1_a.write_html("Figures/analytical_solution_constant_vertical_flow_a.html")
+    # fig_S1_a.show()
 
-    fig_S1_b.write_image("Figures/analytical_solution_constant_vertical_flow_b.svg")
-    fig_S1_b.write_html("Figures/analytical_solution_constant_vertical_flow_b.html")
-    fig_S1_b.show()
-
-    exit()
+    # fig_S1_b.write_image("Figures/analytical_solution_constant_vertical_flow_b.svg")
+    # fig_S1_b.write_html("Figures/analytical_solution_constant_vertical_flow_b.html")
+    # fig_S1_b.show()
 
     # --------------------- #
     # Figure 1: Counterbend #
@@ -3819,7 +3969,7 @@ if __name__ == "__main__":
         model_lists, int_params_metadata, ext_params_list,
         int_param_name='Beta', ext_param_name='A',
         x_label='x', y_label='y',
-        colorscale='Viridis',
+        colorscale='RdYlBu_r',
     )
 
     fig_1_a.write_image("Figures/counterbend_a.svg")
@@ -3829,6 +3979,8 @@ if __name__ == "__main__":
     fig_1_b.write_image("Figures/counterbend_b.svg")
     fig_1_b.write_html("Figures/counterbend_b.html")
     fig_1_b.show()
+
+    exit()
 
     # ------------------------------------------ #
     # Figure 2: Relaxation of a bending filament #
