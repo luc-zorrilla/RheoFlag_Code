@@ -1335,181 +1335,181 @@ def CheckEquilibrium(N, A, gamma, Sp4, n_L = [0,0], Lambdas=[[0,0]], conditions 
     X_3N_eq = np.vstack((X_eq.reshape((-1,1)), theta_eq.reshape(-1,1))) # Thetas are filled to zero here!
     return X_3N_eq
 
-def plot_fig_S1(
-    model_lists: Dict[int, ModelList],
-    int_params_metadata: List[Dict[str, Any]],
-    ext_params_list: List[Dict[str, Any]],
-    int_param_name: str = 'Sp4',
-    ext_param_name: str = 'A',
-    title: Optional[str] = None,
-    x_label: str = "x",
-    y_label: str = "y",
-    log_scale: bool = False,
-    colorscale: str = 'Viridis',
-) -> go.Figure:
-    """
-    Args:
-        model_lists: Dictionary mapping indices to ModelList objects
-        int_params_metadata: List of dicts, each containing internal parameter values
-        ext_params_list: List of external parameter dicts (each with 'A' key)
-        int_param_name: Name of the internal parameter for subplots (e.g., 'Sp4')
-        ext_param_name: Name of the external parameter for coloring (e.g., 'A')
-        title: Plot title
-        x_label: X-axis label
-        y_label: Y-axis label
-        log_scale: Whether to use log scale for axes
-        colorscale: Plotly colorscale name (e.g., 'Viridis', 'Blues', 'Reds')
-    
-    Returns:
-        Plotly Figure with subplots
-    """
-    # Extract internal and external parameter values
-    int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
-    ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
-    
-    n_internal = len(int_param_values)
-    
-    # Create plot
-    fig_S1_a = go.Figure()
-
-    # Second figure: L2 error between simulation and analytical solution for small uniform vertical flow
-    fig_S1_b = go.Figure()
-    
-    if len(int_param_values) > 1:
-        # Normalize internal parameter values for colormap
-        int_param_min = min(int_param_values)
-        int_param_max = max(int_param_values)
-        int_param_norm = [
-            (val - int_param_min) / (int_param_max - int_param_min) 
-            for val in int_param_values
-        ]
-    else: # Only one internal parameter
-        int_param_norm = [0]
-
-    # Get colors for external parameters
-    colors_int = px.colors.sample_colorscale(
-        colorscale, 
-        int_param_norm,
-    )
-
-    N_array = []
-    error_array = []
-    # Plot one trace per external parameter in each subplot
-    for int_idx in sorted(model_lists.keys()):
-        model_list = model_lists[int_idx]
-        int_param_val = int_param_values[int_idx]
+    def plot_fig_S1(
+        model_lists: Dict[int, ModelList],
+        int_params_metadata: List[Dict[str, Any]],
+        ext_params_list: List[Dict[str, Any]],
+        int_param_name: str = 'Sp4',
+        ext_param_name: str = 'A',
+        title: Optional[str] = None,
+        x_label: str = "x",
+        y_label: str = "y",
+        log_scale: bool = False,
+        colorscale: str = 'Viridis',
+    ) -> go.Figure:
+        """
+        Args:
+            model_lists: Dictionary mapping indices to ModelList objects
+            int_params_metadata: List of dicts, each containing internal parameter values
+            ext_params_list: List of external parameter dicts (each with 'A' key)
+            int_param_name: Name of the internal parameter for subplots (e.g., 'Sp4')
+            ext_param_name: Name of the external parameter for coloring (e.g., 'A')
+            title: Plot title
+            x_label: X-axis label
+            y_label: Y-axis label
+            log_scale: Whether to use log scale for axes
+            colorscale: Plotly colorscale name (e.g., 'Viridis', 'Blues', 'Reds')
         
-        # Iterate through all external parameters
-        for ext_idx in range(len(model_list.models)):
-            model = model_list.models[ext_idx]
-            ext_param_val = ext_param_values[ext_idx]
-            
-            if model.sim_output is not None:
-                output_data = model.sim_output
-                # Handle both array and dict outputs
-                if isinstance(output_data, dict) and 'value' in output_data:
-                    output_data = output_data['value']
-                
-                output_array = np.array(output_data)
-                
-                if output_array.size > 1:
-                    output_array = np.atleast_1d(output_array)
-                    
-                    # Apply X3N transformation
-                    X_3N = X3N(output_array)
-                    N = X_3N.shape[0] // 3    
-                    N_array.append(N)                
-                    
-                    # Extract x and y trajectories
-                    x_trajectory = X_3N[:N, 0]/N
-                    y_trajectory = X_3N[N:int(2*N), 0]/N
+        Returns:
+            Plotly Figure with subplots
+        """
+        # Extract internal and external parameter values
+        int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
+        ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
+        
+        n_internal = len(int_param_values)
+        
+        # Create plot
+        fig_S1_a = go.Figure()
 
-                    # Analytical Equilbrium Profile
-                    n_eq = 1000
-                    X_3N_eq = CheckEquilibrium(N, model.ext_params['A'], model.int_params['gamma'], model.int_params['Sp4'], n_L = model.int_params['n_L'], Lambdas=model.ext_params['Lambdas'], conditions = "vertical_flow_uniform", n_eq = n_eq)
-                    
-                    x_eq_trajectory = X_3N_eq[:n_eq, 0][X_3N_eq[:n_eq,0]<=N-1]/N
-                    y_eq_trajectory = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N
+        # Second figure: L2 error between simulation and analytical solution for small uniform vertical flow
+        fig_S1_b = go.Figure()
+        
+        if len(int_param_values) > 1:
+            # Normalize internal parameter values for colormap
+            int_param_min = min(int_param_values)
+            int_param_max = max(int_param_values)
+            int_param_norm = [
+                (val - int_param_min) / (int_param_max - int_param_min) 
+                for val in int_param_values
+            ]
+        else: # Only one internal parameter
+            int_param_norm = [0]
 
-                    # Concatenate x and y:
-                    x_traj = np.array((x_trajectory, y_trajectory)).reshape((2,-1))
-                    x_eq_traj = np.array((x_eq_trajectory, y_eq_trajectory)).reshape((2,-1))
-
-                    # ============================================================
-                    # Approach 1: Hausdorff Distance
-                    # ============================================================
-                    d1 = directed_hausdorff(x_traj.T, x_eq_traj.T)[0]
-                    d2 = directed_hausdorff(x_eq_traj.T, x_traj.T)[0]
-                    hausdorff_error = max(d1, d2)
-                    error_array.append(hausdorff_error)
-
-                    if 'Beta' in int_param_name:
-                        y_trajectory *= 1
-                    
-                    fig_S1_a.add_trace(
-                        go.Scatter(
-                            x=x_trajectory,
-                            y=y_trajectory,
-                            mode='lines+markers',
-                            hovertemplate=(
-                                f"<b>{x_label}</b>: %{{x:.6e}}<br>"
-                                f"<b>{y_label}</b>: %{{y:.6e}}<br>"
-                                f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
-                                f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
-                            ),
-                            line=dict(width=2, color=colors_int[int_idx]),
-                            marker=dict(size=4, color=colors_int[int_idx]),
-                        ),
-                    )
-                    fig_S1_a.add_trace(
-                        go.Scatter(
-                            x=x_eq_trajectory,
-                            y=y_eq_trajectory,
-                            mode='lines',
-                            hovertemplate=(
-                                f"<b>{x_label}</b>: %{{x:.6e}}<br>"
-                                f"<b>{y_label}</b>: %{{y:.6e}}<br>"
-                                f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
-                                f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
-                            ),
-                            line=dict(width=2, color="black"),
-                        ),
-                    )       
-
-    N_array = np.array(N_array)
-    error_array = np.array(error_array)
-    fig_S1_b.add_trace(
-        go.Scatter(
-            x = 1/N_array,
-            y = error_array,
-            mode='markers+lines',
-            line=dict(width=2, color="black"),
-            marker=dict(size=4, color="black"),
+        # Get colors for external parameters
+        colors_int = px.colors.sample_colorscale(
+            colorscale, 
+            int_param_norm,
         )
-    )
-    fig_S1_b.update_xaxes(type = "log")
-    fig_S1_b.update_yaxes(type = "log")
-    
-    # Update axes
-    fig_S1_a.update_xaxes(title_text=x_label)
-    fig_S1_a.update_yaxes(title_text=y_label)
-    
-    if log_scale:
-        fig_S1_a.update_xaxes(type='log')
-        fig_S1_a.update_yaxes(type='log')
-    
-    if title is None:
-        title = f"Phase-Space Trajectories color-coded by {int_param_name})"
-    
-    fig_S1_a.update_layout(
-        title=title,
-        hovermode='closest',
-        legend=dict(title=int_param_name),
-        height=800,
-        width=1400,
-    )
-    
-    return fig_S1_a, fig_S1_b  
+
+        N_array = []
+        error_array = []
+        # Plot one trace per external parameter in each subplot
+        for int_idx in sorted(model_lists.keys()):
+            model_list = model_lists[int_idx]
+            int_param_val = int_param_values[int_idx]
+            
+            # Iterate through all external parameters
+            for ext_idx in range(len(model_list.models)):
+                model = model_list.models[ext_idx]
+                ext_param_val = ext_param_values[ext_idx]
+                
+                if model.sim_output is not None:
+                    output_data = model.sim_output
+                    # Handle both array and dict outputs
+                    if isinstance(output_data, dict) and 'value' in output_data:
+                        output_data = output_data['value']
+                    
+                    output_array = np.array(output_data)
+                    
+                    if output_array.size > 1:
+                        output_array = np.atleast_1d(output_array)
+                        
+                        # Apply X3N transformation
+                        X_3N = X3N(output_array)
+                        N = X_3N.shape[0] // 3    
+                        N_array.append(N)                
+                        
+                        # Extract x and y trajectories
+                        x_trajectory = X_3N[:N, 0]/N
+                        y_trajectory = X_3N[N:int(2*N), 0]/N
+
+                        # Analytical Equilbrium Profile
+                        n_eq = 1000
+                        X_3N_eq = CheckEquilibrium(N, model.ext_params['A'], model.int_params['gamma'], model.int_params['Sp4'], n_L = model.int_params['n_L'], Lambdas=model.ext_params['Lambdas'], conditions = "vertical_flow_uniform", n_eq = n_eq)
+                        
+                        x_eq_trajectory = X_3N_eq[:n_eq, 0][X_3N_eq[:n_eq,0]<=N-1]/N
+                        y_eq_trajectory = X_3N_eq[n_eq:2*n_eq,0][X_3N_eq[:n_eq,0]<=N-1]/N
+
+                        # Concatenate x and y:
+                        x_traj = np.array((x_trajectory, y_trajectory)).reshape((2,-1))
+                        x_eq_traj = np.array((x_eq_trajectory, y_eq_trajectory)).reshape((2,-1))
+
+                        # ============================================================
+                        # Approach 1: Hausdorff Distance
+                        # ============================================================
+                        d1 = directed_hausdorff(x_traj.T, x_eq_traj.T)[0]
+                        d2 = directed_hausdorff(x_eq_traj.T, x_traj.T)[0]
+                        hausdorff_error = max(d1, d2)
+                        error_array.append(hausdorff_error)
+
+                        if 'Beta' in int_param_name:
+                            y_trajectory *= 1
+                        
+                        fig_S1_a.add_trace(
+                            go.Scatter(
+                                x=x_trajectory,
+                                y=y_trajectory,
+                                mode='lines+markers',
+                                hovertemplate=(
+                                    f"<b>{x_label}</b>: %{{x:.6e}}<br>"
+                                    f"<b>{y_label}</b>: %{{y:.6e}}<br>"
+                                    f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
+                                    f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
+                                ),
+                                line=dict(width=2, color=colors_int[int_idx]),
+                                marker=dict(size=4, color=colors_int[int_idx]),
+                            ),
+                        )
+                        fig_S1_a.add_trace(
+                            go.Scatter(
+                                x=x_eq_trajectory,
+                                y=y_eq_trajectory,
+                                mode='lines',
+                                hovertemplate=(
+                                    f"<b>{x_label}</b>: %{{x:.6e}}<br>"
+                                    f"<b>{y_label}</b>: %{{y:.6e}}<br>"
+                                    f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
+                                    f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
+                                ),
+                                line=dict(width=2, color="black"),
+                            ),
+                        )       
+
+        N_array = np.array(N_array)
+        error_array = np.array(error_array)
+        fig_S1_b.add_trace(
+            go.Scatter(
+                x = 1/N_array,
+                y = error_array,
+                mode='markers+lines',
+                line=dict(width=2, color="black"),
+                marker=dict(size=4, color="black"),
+            )
+        )
+        fig_S1_b.update_xaxes(type = "log")
+        fig_S1_b.update_yaxes(type = "log")
+        
+        # Update axes
+        fig_S1_a.update_xaxes(title_text=x_label)
+        fig_S1_a.update_yaxes(title_text=y_label)
+        
+        if log_scale:
+            fig_S1_a.update_xaxes(type='log')
+            fig_S1_a.update_yaxes(type='log')
+        
+        if title is None:
+            title = f"Phase-Space Trajectories color-coded by {int_param_name})"
+        
+        fig_S1_a.update_layout(
+            title=title,
+            hovermode='closest',
+            legend=dict(title=int_param_name),
+            height=800,
+            width=1400,
+        )
+        
+        return fig_S1_a, fig_S1_b  
 
 def plot_fig_1(
     model_lists: Dict[int, ModelList],
@@ -3775,12 +3775,16 @@ if __name__ == "__main__":
         x_label='x', y_label='y',
         colorscale='Viridis', log_scale=False
     )
-    # fig_S1_a.write_image("Figures/analytical_solution_constant_vertical_flow_a.svg")
-    # fig_S1_a.write_html("Figures/analytical_solution_constant_vertical_flow_a.html")
-    # fig_S1_a.show()
-    # fig_S1_b.write_image("Figures/analytical_solution_constant_vertical_flow_b.svg")
-    # fig_S1_b.write_html("Figures/analytical_solution_constant_vertical_flow_b.html")
-    # fig_S1_b.show()
+
+    fig_S1_a.write_image("Figures/analytical_solution_constant_vertical_flow_a.svg")
+    fig_S1_a.write_html("Figures/analytical_solution_constant_vertical_flow_a.html")
+    fig_S1_a.show()
+
+    fig_S1_b.write_image("Figures/analytical_solution_constant_vertical_flow_b.svg")
+    fig_S1_b.write_html("Figures/analytical_solution_constant_vertical_flow_b.html")
+    fig_S1_b.show()
+
+    exit()
 
     # --------------------- #
     # Figure 1: Counterbend #
@@ -3818,12 +3822,13 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    # fig_1_a.write_image("Figures/counterbend_a.svg")
-    # fig_1_a.write_html("Figures/counterbend_a.html")
-    # fig_1_a.show()
-    # fig_1_b.write_image("Figures/counterbend_b.svg")
-    # fig_1_b.write_html("Figures/counterbend_b.html")
-    # fig_1_b.show()
+    fig_1_a.write_image("Figures/counterbend_a.svg")
+    fig_1_a.write_html("Figures/counterbend_a.html")
+    fig_1_a.show()
+
+    fig_1_b.write_image("Figures/counterbend_b.svg")
+    fig_1_b.write_html("Figures/counterbend_b.html")
+    fig_1_b.show()
 
     # ------------------------------------------ #
     # Figure 2: Relaxation of a bending filament #
@@ -3915,13 +3920,13 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    # fig_2_a.write_image("Figures/relaxation.svg")
-    # fig_2_a.write_html("Figures/relaxation.html")
-    # fig_2_a.show()
+    fig_2_a.write_image("Figures/relaxation.svg")
+    fig_2_a.write_html("Figures/relaxation.html")
+    fig_2_a.show()
 
-    # fig_2_b.write_image("Figures/relaxation_timescale.svg")
-    # fig_2_b.write_html("Figures/relaxation_timescale.html")
-    # fig_2_b.show()
+    fig_2_b.write_image("Figures/relaxation_timescale.svg")
+    fig_2_b.write_html("Figures/relaxation_timescale.html")
+    fig_2_b.show()
 
     # ------------------------------------------------- #
     # -------- II. Spring-Dashpot Simplification ------ #
@@ -3959,12 +3964,13 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    # fig_3_a.write_image("Figures/harmonic_response_tip_amplitude.svg")
-    # fig_3_a.write_html("Figures/harmonic_response_tip_amplitude.html")
-    # fig_3_a.show()
-    # fig_3_b.write_image("Figures/harmonic_response_tip_amplitude_fit.svg")
-    # fig_3_b.write_html("Figures/harmonic_response_tip_amplitude_fit.html")
-    # fig_3_b.show()    
+    fig_3_a.write_image("Figures/harmonic_response_tip_amplitude.svg")
+    fig_3_a.write_html("Figures/harmonic_response_tip_amplitude.html")
+    fig_3_a.show()
+
+    fig_3_b.write_image("Figures/harmonic_response_tip_amplitude_fit.svg")
+    fig_3_b.write_html("Figures/harmonic_response_tip_amplitude_fit.html")
+    fig_3_b.show()    
 
     # ----------------------------------------- #
     # -------- II. Algorithmic Inversion ------ #
@@ -4054,12 +4060,13 @@ if __name__ == "__main__":
         workflow_output_bending_shear
         )
 
-    # fig_5_a.write_image("Figures/elastic_inference_standard_error.svg")
-    # fig_5_a.write_html("Figures/elastic_inference_standard_error.html")
-    # fig_5_a.show()
-    # fig_5_b.write_image("Figures/elastic_inference_rel_error.svg")
-    # fig_5_b.write_html("Figures/harmonic_response_rel_error.html")
-    # fig_5_b.show()
+    fig_5_a.write_image("Figures/elastic_inference_standard_error.svg")
+    fig_5_a.write_html("Figures/elastic_inference_standard_error.html")
+    fig_5_a.show()
+
+    fig_5_b.write_image("Figures/elastic_inference_rel_error.svg")
+    fig_5_b.write_html("Figures/harmonic_response_rel_error.html")
+    fig_5_b.show()
 
     # ------------------------------------------------ #
     # Figure S4: Hessian decrease for bending filament #
@@ -4104,9 +4111,9 @@ if __name__ == "__main__":
         title_a="Distance vs Sp4 (All Amplitudes)",
     )
 
-    # fig_S4a.write_image("Figures/loss_vs_Sp4_color_A.svg")
-    # fig_S4a.write_html("Figures/loss_vs_Sp4_color_A.html")
-    # fig_S4a.show()
+    fig_S4a.write_image("Figures/loss_vs_Sp4_color_A.svg")
+    fig_S4a.write_html("Figures/loss_vs_Sp4_color_A.html")
+    fig_S4a.show()
 
     # ============================================================================
     # FIGURE S4B: Tip displacement vs A (color-coded by Sp4)
@@ -4143,9 +4150,9 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    # fig_S4b.write_image("Figures/tip_vs_A_color_Sp4.svg")
-    # fig_S4b.write_html("Figures/tip_vs_A_color_Sp4.html")
-    # fig_S4b.show()
+    fig_S4b.write_image("Figures/tip_vs_A_color_Sp4.svg")
+    fig_S4b.write_html("Figures/tip_vs_A_color_Sp4.html")
+    fig_S4b.show()
 
     # ---------------------------------------------- #
     # Figure S5: Hessian decrease for shear filament #
@@ -4193,9 +4200,9 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    # fig_S5a.write_image("Figures/loss_vs_Beta_color_A.svg")
-    # fig_S5a.write_html("Figures/loss_vs_Beta_color_A.html")
-    # fig_S5a.show()
+    fig_S5a.write_image("Figures/loss_vs_Beta_color_A.svg")
+    fig_S5a.write_html("Figures/loss_vs_Beta_color_A.html")
+    fig_S5a.show()
 
     # ============================================================================
     # FIGURE S5B: Tip Displacement vs A (Color-coded by Beta)
@@ -4231,9 +4238,9 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    # fig_S5b.write_image("Figures/tip_vs_A_color_Beta.svg")
-    # fig_S5b.write_html("Figures/tip_vs_A_color_Beta.html")
-    # fig_S5b.show()
+    fig_S5b.write_image("Figures/tip_vs_A_color_Beta.svg")
+    fig_S5b.write_html("Figures/tip_vs_A_color_Beta.html")
+    fig_S5b.show()
 
     # =========
     # VIDEO S5c
@@ -4335,7 +4342,7 @@ if __name__ == "__main__":
 
     # Combined Bending and Shear Viscosity (tau_b + tau_s)
     int_param_ranges = {'tau_b': [1e0], 'tau_s': [1e0], 'Beta': [1.0]}
-    A_vec = [1e-6]
+    A_vec = [1e-10]
     w0_vec = np.pow(10, -np.linspace(start=-6, stop=6, num=13))
     ext_param_ranges = {'A': A_vec, 'w0': w0_vec}
     elastic_params_list = []
@@ -4372,181 +4379,6 @@ if __name__ == "__main__":
     # ----------- #
     # Figure S6   #
     # ----------- #
-
-    # optimizer = dual_annealing_optimizer_three_pass # dual_annealing_optimizer
-
-    # # Bending Viscosity (Fixed Bending Elasticity)
-
-    # int_param_ranges = {'tau_b': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3]}
-    # A_vec = [1e-10]
-    # w0_vec = np.pow(10, -np.linspace(start = -6, stop = 6, num = 13))
-    # ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
-    # elastic_params_list = []
-    # viscous_params_list = ['tau_b']
-
-    # inference_mode = "single_inference"
-    # checkpoint_str = "./Results/BendingViscosity/BendingViscosity"
-
-    # workflow_output = workflow_elastic_viscous_general(
-    #     int_param_ranges=int_param_ranges,
-    #     ext_param_ranges=ext_param_ranges,
-    #     optimizer = optimizer,
-    #     elastic_params_list = elastic_params_list,
-    #     viscous_params_list = viscous_params_list,
-    #     inference_mode = inference_mode,
-    #     checkpoint_str=checkpoint_str,
-    #     n_jobs_per_pass=1,
-    #     )
-    
-    # fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b'], ext_param_name='w0', metric = 'std')
-
-    # # Transform w0 -> tau_b * w0
-    # ## Extract tau_b values from legend entries
-    # tau_b_values = {}
-    # for trace in fig.data:
-    #     if trace.name and 'tau_b' in trace.name:
-    #         # Extract tau_b value from trace name (e.g., "tau_b = 0.5" -> 0.5)
-    #         tau_b_str = trace.name.split('=')[-1].strip()
-    #         tau_b = float(tau_b_str)
-    #         tau_b_values[trace.name] = tau_b
-    # ## Modify x data for each trace
-    # for trace in fig.data:
-    #     if trace.name in tau_b_values:
-    #         tau_b = tau_b_values[trace.name]
-    #         trace.x = tuple(x * tau_b for x in trace.x)
-    # ## Update x-axis label
-    # fig.update_xaxes(title_text="τ_b * w₀")
-    # # fig.update_yaxes(type = 'linear')
-
-    # fig.write_image("Figures/std_tau_b_vs_w0.svg")
-    # fig.write_html("Figures/std_tau_b_vs_w0.html")
-    # fig.show()        
-
-    # fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b'], ext_param_name='w0', metric = 'rel_error')
-
-    # # Transform w0 -> tau_b * w0
-    # ## Extract tau_b values from legend entries
-    # tau_b_values = {}
-    # for trace in fig.data:
-    #     if trace.name and 'tau_b' in trace.name:
-    #         # Extract tau_b value from trace name (e.g., "tau_b = 0.5" -> 0.5)
-    #         tau_b_str = trace.name.split('=')[-1].strip()
-    #         tau_b = float(tau_b_str)
-    #         tau_b_values[trace.name] = tau_b
-    # ## Modify x data for each trace
-    # for trace in fig.data:
-    #     if trace.name in tau_b_values:
-    #         tau_b = tau_b_values[trace.name]
-    #         trace.x = tuple(x * tau_b for x in trace.x)
-    # ## Update x-axis label
-    # fig.update_xaxes(title_text="τ_b * w₀")
-
-    # fig.write_image("Figures/err_tau_b_vs_w0.svg")
-    # fig.write_html("Figures/err_tau_b_vs_w0.html")
-    # fig.show()
-
-    # # Shear Viscosity (Fixed Bending Elasticity & Shear Elasticity)
-
-    # int_param_ranges = {'tau_s': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2, 1e3], 'Beta':[1.0]} # {'tau_s': [1e0], 'Beta':[1.0]} # {'tau_s': [1e-1, 1e0, 1e1], 'Beta':[1.0]} # 
-    # A_vec = [1e-10]
-    # w0_vec = np.pow(10, -np.linspace(start = -6, stop = 6, num = 13)) # np.pow(10, -np.linspace(start = -4, stop = 5, num = 10))
-    # ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
-    # elastic_params_list = []
-    # viscous_params_list = ['tau_s']
-
-    # inference_mode = "single_inference"
-    # checkpoint_str = "./Results/ShearViscosity/ShearViscosity"
-
-    # workflow_output = workflow_elastic_viscous_general(
-    #     int_param_ranges=int_param_ranges,
-    #     ext_param_ranges=ext_param_ranges,
-    #     optimizer = optimizer,        
-    #     elastic_params_list = elastic_params_list,
-    #     viscous_params_list = viscous_params_list,
-    #     inference_mode = inference_mode,
-    #     checkpoint_str=checkpoint_str,
-    #     n_jobs_per_pass=1,
-    #     )
-
-    # fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_s'], ext_param_name='w0', metric = 'std')
-
-    # # Transform w0 -> tau_s * w0
-    # ## Extract tau_s values from legend entries
-    # tau_s_values = {}
-    # for trace in fig.data:
-    #     if trace.name and 'tau_s' in trace.name:
-    #         # Extract tau_s value from trace name (e.g., "tau_s = 0.5" -> 0.5)
-    #         tau_s_str = trace.name.split('=')[-1].strip()
-    #         tau_s = float(tau_s_str)
-    #         tau_s_values[trace.name] = tau_s
-    # ## Modify x data for each trace
-    # for trace in fig.data:
-    #     if trace.name in tau_s_values:
-    #         tau_s = tau_s_values[trace.name]
-    #         trace.x = tuple(x * tau_s for x in trace.x)
-    # ## Update x-axis label
-    # fig.update_xaxes(title_text="τ_s * w₀")
-    
-    # fig.write_image("Figures/std_tau_s_vs_w0.svg")
-    # fig.write_html("Figures/std_tau_s_vs_w0.html")
-    # fig.show()    
-
-    # fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_s'], ext_param_name='w0', metric = 'rel_error')
-
-    # # Transform w0 -> tau_s * w0
-    # ## Extract tau_b values from legend entries
-    # tau_s_values = {}
-    # for trace in fig.data:
-    #     if trace.name and 'tau_s' in trace.name:
-    #         # Extract tau_s value from trace name (e.g., "tau_s = 0.5" -> 0.5)
-    #         tau_s_str = trace.name.split('=')[-1].strip()
-    #         tau_s = float(tau_s_str)
-    #         tau_s_values[trace.name] = tau_s
-    # ## Modify x data for each trace
-    # for trace in fig.data:
-    #     if trace.name in tau_s_values:
-    #         tau_s = tau_s_values[trace.name]
-    #         trace.x = tuple(x * tau_s for x in trace.x)
-    # ## Update x-axis label
-    # fig.update_xaxes(title_text="τ_s * w₀")
-
-    # fig.write_image("Figures/err_tau_s_vs_w0.svg")
-    # fig.write_html("Figures/err_tau_s_vs_w0.html")
-    # fig.show()    
-
-    # # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
-
-    # int_param_ranges = {'tau_b': [1e-3, 1e0, 1e3], 'tau_s':[1e-3, 1e0, 1e3], 'Beta':[1.0]}
-    # A_vec = [1e-6]
-    # w0_vec = np.pow(10, -np.linspace(start = -6, stop = 6, num = 13))
-    # ext_param_ranges = {'A': A_vec, 'w0':w0_vec}
-    # elastic_params_list = []
-    # viscous_params_list = ['tau_b', 'tau_s']
-
-    # inference_mode = "single_inference"
-    # checkpoint_str = "./Results/BendingShearViscosity/BendingShearViscosity"
-
-    # workflow_output = workflow_elastic_viscous_general(
-    #     int_param_ranges=int_param_ranges,
-    #     ext_param_ranges=ext_param_ranges,
-    #     optimizer = optimizer,        
-    #     elastic_params_list = elastic_params_list,
-    #     viscous_params_list = viscous_params_list,
-    #     inference_mode = inference_mode,
-    #     checkpoint_str=checkpoint_str,
-    #     n_jobs_per_pass=1,
-    #     )
-
-    # fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'std')
-    # fig.write_image("Figures/std_tau_b_tau_s_vs_w0.svg")
-    # fig.write_html("Figures/std_tau_b_tau_s_vs_w0.html")
-    # fig.show()    
-
-    # fig = plot_sigma_vs_ext_param(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric = 'rel_error')
-    # fig.write_image("Figures/err_tau_b_tau_s_vs_w0.svg")
-    # fig.write_html("Figures/err_tau_b_tau_s_vs_w0.html")
-    # fig.show()    
-
 
     # ============ Figure S6a: Viscous Parameter Sweeps ============
 
@@ -4634,7 +4466,7 @@ if __name__ == "__main__":
 
     # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
     int_param_ranges = {'tau_b': [1e-3, 1e0, 1e3], 'tau_s': [1e-3, 1e0, 1e3], 'Beta': [1.0]}
-    A_vec = [1e-6]
+    A_vec = [1e-10]
     w0_vec = np.pow(10, -np.linspace(start=-6, stop=6, num=13))
     ext_param_ranges = {'A': A_vec, 'w0': w0_vec}
     elastic_params_list = []

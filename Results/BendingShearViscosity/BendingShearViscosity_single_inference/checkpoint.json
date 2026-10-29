@@ -1,11 +1,11 @@
 {
   "stage": "inference",
-  "timestamp": "2026-10-26 16:19:59.485579",
+  "timestamp": "2026-10-27 09:14:58.944466",
   "simulation_entries": {
     "int_0_pair_all": {
       "task_key": "int_0_pair_all",
       "completed": true,
-      "timestamp": "2026-10-26 16:03:23.399341",
+      "timestamp": "2026-10-27 08:57:02.036140",
       "filepath": "artifacts/models/int_0_pair_all.pkl"
     }
   },
@@ -13,50 +13,80 @@
     "int_000_ext_000": {
       "task_key": "int_000_ext_000",
       "completed": true,
-      "timestamp": "2026-10-26 16:04:04.336959",
+      "timestamp": "2026-10-27 08:57:10.725555",
       "filepath": "artifacts/inference/int_000_ext_000.pkl"
     },
     "int_000_ext_001": {
       "task_key": "int_000_ext_001",
       "completed": true,
-      "timestamp": "2026-10-26 16:04:14.445307",
+      "timestamp": "2026-10-27 08:57:21.234953",
       "filepath": "artifacts/inference/int_000_ext_001.pkl"
     },
     "int_000_ext_002": {
       "task_key": "int_000_ext_002",
       "completed": true,
-      "timestamp": "2026-10-26 16:05:14.195497",
+      "timestamp": "2026-10-27 08:57:32.591543",
       "filepath": "artifacts/inference/int_000_ext_002.pkl"
     },
     "int_000_ext_003": {
       "task_key": "int_000_ext_003",
       "completed": true,
-      "timestamp": "2026-10-26 16:05:29.081939",
+      "timestamp": "2026-10-27 08:57:44.910645",
       "filepath": "artifacts/inference/int_000_ext_003.pkl"
     },
     "int_000_ext_004": {
       "task_key": "int_000_ext_004",
       "completed": true,
-      "timestamp": "2026-10-26 16:05:44.289132",
+      "timestamp": "2026-10-27 08:58:33.771582",
       "filepath": "artifacts/inference/int_000_ext_004.pkl"
     },
     "int_000_ext_005": {
       "task_key": "int_000_ext_005",
       "completed": true,
-      "timestamp": "2026-10-26 16:07:16.731190",
+      "timestamp": "2026-10-27 09:00:07.014270",
       "filepath": "artifacts/inference/int_000_ext_005.pkl"
     },
     "int_000_ext_006": {
       "task_key": "int_000_ext_006",
       "completed": true,
-      "timestamp": "2026-10-26 16:11:37.529906",
+      "timestamp": "2026-10-27 09:01:53.864632",
       "filepath": "artifacts/inference/int_000_ext_006.pkl"
     },
     "int_000_ext_007": {
       "task_key": "int_000_ext_007",
       "completed": true,
-      "timestamp": "2026-10-26 16:19:59.485572",
+      "timestamp": "2026-10-27 09:05:38.489832",
       "filepath": "artifacts/inference/int_000_ext_007.pkl"
+    },
+    "int_000_ext_008": {
+      "task_key": "int_000_ext_008",
+      "completed": true,
+      "timestamp": "2026-10-27 09:09:28.168066",
+      "filepath": "artifacts/inference/int_000_ext_008.pkl"
+    },
+    "int_000_ext_009": {
+      "task_key": "int_000_ext_009",
+      "completed": true,
+      "timestamp": "2026-10-27 09:10:46.599391",
+      "filepath": "artifacts/inference/int_000_ext_009.pkl"
+    },
+    "int_000_ext_010": {
+      "task_key": "int_000_ext_010",
+      "completed": true,
+      "timestamp": "2026-10-27 09:11:59.351971",
+      "filepath": "artifacts/inference/int_000_ext_010.pkl"
+    },
+    "int_000_ext_011": {
+      "task_key": "int_000_ext_011",
+      "completed": true,
+      "timestamp": "2026-10-27 09:13:27.237810",
+      "filepath": "artifacts/inference/int_000_ext_011.pkl"
+    },
+    "int_000_ext_012": {
+      "task_key": "int_000_ext_012",
+      "completed": true,
+      "timestamp": "2026-10-27 09:14:58.944460",
+      "filepath": "artifacts/inference/int_000_ext_012.pkl"
     }
   }
 }
