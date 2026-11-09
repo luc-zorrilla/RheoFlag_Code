@@ -2079,198 +2079,224 @@ def plot_fig_2(
 
     return fig_2_a, fig_2_b
 
-
 def plot_fig_3(
-    model_lists: Dict[int, ModelList],
-    int_params_metadata: List[Dict[str, Any]],
-    ext_params_list: List[Dict[str, Any]],
-    sim_params_list: List[Dict[str, Any]],
-    int_param_name: str = 'Sp4',
-    ext_param_name: str = 'A',
-    sim_param_name: str = 'T_eval',
-    title: Optional[str] = None,
-    x_label: str = "x",
-    y_label: str = "y",
-    colorscale: str = 'Viridis',
-) -> go.Figure:
+    model_lists,
+    int_params_metadata,
+    ext_params_list,
+    sim_params_list,
+    int_param_name='tau_b',
+    ext_param_name='w0',
+    sim_param_name='T_eval',
+    x_label=r"$w_0$",
+    y_label_a=r"$\frac{|y_{\max}|}{\max_{\tau_b} |y_{\max}|}$",
+    y_label_b=r"$\tau_{b,inf}$",
+    x_label_b=r"$\tau_{b,\mathrm{sim}}$",
+    cbar_label=r"$\tau_b$",
+    colorscale='Viridis',
+    M_peaks=20,
+    font_family="Times New Roman",
+    font_size=16,
+    width_px=800,
+    height_px=600,
+    title=None,
+):
     """
-    Args:
-        model_lists: Dictionary mapping indices to ModelList objects
-        int_params_metadata: List of dicts, each containing internal parameter values
-        ext_params_list: List of external parameter dicts (each with 'A' key)
-        int_param_name: Name of the internal parameter for subplots (e.g., 'Sp4')
-        ext_param_name: Name of the external parameter for coloring (e.g., 'A')
-        title: Plot title
-        x_label: X-axis label
-        y_label: Y-axis label
-        log_scale: Whether to use log scale for axes
-        colorscale: Plotly colorscale name (e.g., 'Viridis', 'Blues', 'Reds')
-    
-    Returns:
-        Plotly Figure with subplots
+    Returns
+    -------
+    fig_3_a : go.Figure
+        Normalised harmonic tip amplitude vs w0, coloured by tau_b (log colorbar).
+    fig_3_b : go.Figure
+        Fitted tau_b_inf vs simulated tau_b_sim (log-log).
     """
-    # Extract internal and external parameter values
-    int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
-    ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
-    sim_param_values = [sim_dict[sim_param_name] for sim_dict in sim_params_list]
-    
-    n_internal = len(int_param_values)
-    
-    # Create plot
-    fig_3_a = go.Figure()
-    fig_3_b = go.Figure()
+    # ------------------------------------------------------------------ #
+    # Parameter extraction
+    # ------------------------------------------------------------------ #
+    int_vals = np.array([p[int_param_name] for p in int_params_metadata], dtype=float)
+    ext_vals = np.array([e[ext_param_name] for e in ext_params_list], dtype=float)
 
-    if len(int_param_values) > 1:
-        # Normalize internal parameter values for colormap
-        int_param_min = min(int_param_values)
-        int_param_max = max(int_param_values)
-        int_param_norm = [
-            (val - int_param_min) / (int_param_max - int_param_min) 
-            for val in int_param_values
-        ]
-    else: # Only one internal parameter
-        int_param_norm = [0]
+    # Colour coordinate: log10(tau_b) mapped linearly to [0, 1]
+    log_int = np.log10(int_vals)
+    log_span = log_int.max() - log_int.min()
+    if len(int_vals) > 1 and log_span > 0:
+        int_norm = (log_int - log_int.min()) / log_span
+    else:
+        int_norm = np.zeros_like(log_int)
+    colors_int = px.colors.sample_colorscale(colorscale, list(int_norm))
 
-    # Get colors for external parameters
-    colors_int = px.colors.sample_colorscale(
-        colorscale, 
-        int_param_norm,
-    )
-
-    # Fit to 1/sqrt(1+(tau*w)²)
-    def f(x, tau):
-        return 1 / np.sqrt(1 + (tau * x)**2)
-
-    tau_b_list = []
-    tau_list = []
-    # Plot one trace per external parameter in each subplot
+    # ------------------------------------------------------------------ #
+    # Pass 1: extract tip amplitudes for every (tau_b, w0) pair
+    # ------------------------------------------------------------------ #
+    raw = {}  # int_idx -> (w0_array, ymax_array)
     for int_idx in sorted(model_lists.keys()):
         model_list = model_lists[int_idx]
-        int_param_val = int_param_values[int_idx]
-        tau_b_list.append(int_param_val)
+        w0_list, peak_list = [], []
 
-        w0_list = []
-        max_y_tip_list = []        
-        
-        # Iterate through all external parameters
-        for ext_idx in range(len(model_list.models)):
-            model = model_list.models[ext_idx]
-            ext_param_val = ext_param_values[ext_idx]
-            sim_param_val = sim_param_values[ext_idx] # sim params depend on ext_params
-            
-            if model.sim_output is not None:
-                output_data = model.sim_output
-                T_eval = sim_param_val
+        for ext_idx, model in enumerate(model_list.models):
+            if model.sim_output is None:
+                continue
 
-                # Handle both array and dict outputs
-                if isinstance(output_data, dict) and 'value' in output_data:
-                    output_data = output_data['value']
-                
-                output_array = np.array(output_data)
-                
-                if output_array.size > 1:
-                    output_array = np.atleast_1d(output_array)
-                    
-                    # Apply X3N transformation
-                    X_3N = np.transpose(np.array([X3N(output_array[:,t]) for t in range(output_array.shape[1])]).squeeze())
-                    N = X_3N.shape[0] // 3
-                    y_tip = X_3N[int(2*N)-1, :]/N
-                    
-                    # Extract w0, max_y_tip
-                    w0_list.append(ext_param_val)
-                    max_y_tip = np.max(np.abs(y_tip))
-                        
-                    # Alternative max_y_tip (more precise?)
-                    # d = 10
-                    peaks, properties = find_peaks(np.abs(y_tip)) # , distance=d)
+            output_data = model.sim_output
+            if isinstance(output_data, dict) and 'value' in output_data:
+                output_data = output_data['value']
+            output_array = np.atleast_1d(np.array(output_data))
+            if output_array.size <= 1:
+                continue
 
-                    # Get the M highest peaks
-                    M = 2*10 # 10 flow periods
-                    top_peak_indices = peaks[np.argsort(np.abs(y_tip)[peaks])[-M:][::-1]]
-                    
-                    top_peak_values = np.abs(y_tip)[top_peak_indices]
+            X_3N = np.transpose(
+                np.array([X3N(output_array[:, t]) for t in range(output_array.shape[1])]).squeeze()
+            )
+            N = X_3N.shape[0] // 3
+            y_tip = np.abs(X_3N[int(2 * N) - 1, :] / N)
 
-                    mean_max_y_tip = np.mean(top_peak_values)
+            peaks, _ = find_peaks(y_tip)
+            if peaks.size == 0:
+                peak_vals = np.array([np.max(y_tip)])
+            else:
+                top = peaks[np.argsort(y_tip[peaks])[-M_peaks:]]
+                peak_vals = y_tip[top]
 
-                    if np.isnan(mean_max_y_tip):
-                        max_y_tip_list.append(max_y_tip)  
-                    else:
-                        max_y_tip_list.append(mean_max_y_tip)
-                        
-        w0_array = np.array(w0_list)
-        max_y_tip_array = np.array(max_y_tip_list) / np.max(max_y_tip_list)
-        fig_3_a.add_trace(
-            go.Scatter(
-                x = w0_array,
-                y = max_y_tip_array,
-                mode='markers',
-                hovertemplate=(
-                    f"<b>{x_label}</b>: %{{x:.6e}}<br>"
-                    f"<b>{y_label}</b>: %{{y:.6e}}<br>"
-                    f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
-                ),
-                marker=dict(size=4, color=colors_int[int_idx]),
+            w0_list.append(ext_vals[ext_idx])
+            peak_list.append(np.nanmean(peak_vals))
+
+        raw[int_idx] = (np.array(w0_list), np.array(peak_list))
+
+    # Global normalisation: |y_max| / max over all tau_b
+    global_max = max(np.nanmax(ymax) for _, ymax in raw.values())
+
+    # ------------------------------------------------------------------ #
+    # Figure 3a
+    # ------------------------------------------------------------------ #
+    fig_3_a = go.Figure()
+    tau_fit = {}
+
+    def f(x, tau):
+        return 1 / np.sqrt(1 + (tau * x) ** 2)
+
+    for int_idx in sorted(raw.keys()):
+        w0_arr, ymax_arr = raw[int_idx]
+        y_norm = ymax_arr / global_max
+        color = colors_int[int_idx]
+
+        fig_3_a.add_trace(go.Scatter(
+            x=w0_arr, y=y_norm,
+            mode='markers',
+            marker=dict(size=6, color=color, line=dict(width=0)),
+            hovertemplate=(
+                f"{x_label}: %{{x:.3e}}<br>"
+                f"{y_label_a}: %{{y:.3e}}<br>"
+                f"{int_param_name}: {int_vals[int_idx]:.3g}<extra></extra>"
             ),
+        ))
+
+        # Fit 1/sqrt(1+(tau*w0)^2) to valid points
+        mask = np.isfinite(y_norm) & np.isfinite(w0_arr) & (w0_arr > 0)
+        popt, _ = curve_fit(
+            f, w0_arr[mask], y_norm[mask],
+            p0=[1.0 / np.sqrt(w0_arr[mask].min() * w0_arr[mask].max())],
+            bounds=(0, np.inf),
         )
-
-        # Curve fitting
-        # Remove NaN values from both arrays
-        mask = ~np.isnan(max_y_tip_array)
-
-        popt, pcov = curve_fit(f, w0_array[mask], max_y_tip_array[mask])
         tau = popt[0]
-        tau_list.append(tau)
-        # tau_err = np.sqrt(pcov[0, 0])     
+        tau_fit[int_idx] = tau
 
-        # Generate smooth curve for plotting
-        x_fit = np.logspace(np.log10(w0_array.min()), np.log10(w0_array.max()), 1000)
-        y_fit = f(x_fit, tau)
+        x_fit = np.logspace(np.log10(w0_arr[mask].min()), np.log10(w0_arr[mask].max()), 1000)
+        fig_3_a.add_trace(go.Scatter(
+            x=x_fit, y=f(x_fit, tau),
+            mode='lines',
+            line=dict(width=2.5, color=color),
+            hoverinfo='skip',
+        ))
 
-        fig_3_a.add_trace(
-            go.Scatter(
-                x = x_fit,
-                y = y_fit,
-                mode='lines',
-                hovertemplate=(
-                    f"<b>{x_label}</b>: %{{x:.6e}}<br>"
-                    f"<b>{y_label}</b>: %{{y:.6e}}<br>"
-                    f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
-                    f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
-                ),
-                line=dict(width=4, color=colors_int[int_idx]),
+    # Colorbar carrier trace (log-scaled tau_b ticks)
+    k_min = int(np.ceil(log_int.min()))
+    k_max = int(np.floor(log_int.max()))
+    tick_k = np.arange(k_min, k_max + 1)
+    if log_span > 0:
+        tickvals = (tick_k - log_int.min()) / log_span
+    else:
+        tickvals = np.array([0.5])
+    ticktext = [f"10<sup>{k}</sup>" for k in tick_k]
+
+    fig_3_a.add_trace(go.Scatter(
+        x=[np.nan], y=[np.nan],
+        mode='markers',
+        showlegend=False,
+        hoverinfo='skip',
+        marker=dict(
+            color=[0],
+            colorscale=colorscale,
+            cmin=0, cmax=1,
+            showscale=True,
+            colorbar=dict(
+                title=dict(text=cbar_label, side='right'),
+                tickmode='array',
+                tickvals=tickvals,
+                ticktext=ticktext,
+                len=0.9,
+                thickness=18,
+                outlinewidth=1,
+                outlinecolor='black',
             ),
-        )
+        ),
+    ))
 
-    # Update axes
-    fig_3_a.update_xaxes(title_text=x_label, type = "log")
-    fig_3_a.update_yaxes(title_text=y_label, type = "log")
-    
-    if title is None:
-        title = f"Trajectories color-coded by {int_param_name})"
-    
+    fig_3_a.update_xaxes(
+        title_text=x_label, type='log',
+        showline=True, linewidth=1.2, linecolor='black', mirror=True,
+        ticks='outside', showgrid=False,
+    )
+    fig_3_a.update_yaxes(
+        title_text=y_label_a, type='log',
+        showline=True, linewidth=1.2, linecolor='black', mirror=True,
+        ticks='outside', showgrid=False,
+    )
     fig_3_a.update_layout(
-        title=title,
+        template='simple_white',
+        font=dict(family=font_family, size=font_size, color='black'),
+        title=dict(text=title) if title else None,
+        showlegend=False,
         hovermode='closest',
-        legend=dict(title=int_param_name),
-        height=800,
-        width=1400,
+        width=width_px,
+        height=height_px,
+        margin=dict(l=90, r=110, t=50 if title else 20, b=75),
     )
 
-    tau_array = np.array(tau_list)
-    tau_b_array = np.array(tau_b_list)
+    # ------------------------------------------------------------------ #
+    # Figure 3b
+    # ------------------------------------------------------------------ #
+    tau_sim = np.array([int_vals[i] for i in sorted(tau_fit.keys())])
+    tau_inf = np.array([tau_fit[i] for i in sorted(tau_fit.keys())])
 
-    fig_3_b.add_trace(
-            go.Scatter(
-                x = tau_b_array,
-                y = tau_array,
-                mode='markers',
-                marker=dict(size=4, color="black"),
-            ),
-        )
-    # Update axes
-    fig_3_b.update_xaxes(title_text=x_label, type = "log")
-    fig_3_b.update_yaxes(title_text=y_label, type = "log")
-    
+    fig_3_b = go.Figure()
+    fig_3_b.add_trace(go.Scatter(
+        x=tau_sim, y=tau_inf,
+        mode='markers',
+        marker=dict(size=8, color='black', symbol='circle'),
+        hovertemplate=(
+            f"{x_label_b}: %{{x:.3g}}<br>"
+            f"{y_label_b}: %{{y:.3g}}<extra></extra>"
+        ),
+    ))
+
+    fig_3_b.update_xaxes(
+        title_text=x_label_b, type='log',
+        showline=True, linewidth=1.2, linecolor='black', mirror=True,
+        ticks='outside', showgrid=False,
+    )
+    fig_3_b.update_yaxes(
+        title_text=y_label_b, type='log',
+        showline=True, linewidth=1.2, linecolor='black', mirror=True,
+        ticks='outside', showgrid=False,
+    )
+    fig_3_b.update_layout(
+        template='simple_white',
+        font=dict(family=font_family, size=font_size, color='black'),
+        title=dict(text=title) if title else None,
+        showlegend=False,
+        width=width_px,
+        height=height_px,
+        margin=dict(l=90, r=40, t=50 if title else 20, b=75),
+    )
+
     return fig_3_a, fig_3_b
 
 def plot_fig_5(
@@ -4164,8 +4190,6 @@ if __name__ == "__main__":
     fig_2_b.write_html("Figures/relaxation_timescale.html")
     fig_2_b.show()
 
-    exit()
-
     # ------------------------------------------------- #
     # -------- II. Spring-Dashpot Simplification ------ #
     # ------------------------------------------------- #
@@ -4197,9 +4221,8 @@ if __name__ == "__main__":
 
     fig_3_a, fig_3_b = plot_fig_3(
         model_lists, int_params_metadata, ext_params_list, sim_params_list,
-        int_param_name='tau_b', ext_param_name='w0',
-        x_label='x', y_label='y',
-        colorscale='Viridis',
+        int_param_name='tau_b', 
+        ext_param_name='w0',
     )
 
     fig_3_a.write_image("Figures/harmonic_response_tip_amplitude.svg")
@@ -4209,6 +4232,8 @@ if __name__ == "__main__":
     fig_3_b.write_image("Figures/harmonic_response_tip_amplitude_fit.svg")
     fig_3_b.write_html("Figures/harmonic_response_tip_amplitude_fit.html")
     fig_3_b.show()    
+
+    exit()
 
     # ----------------------------------------- #
     # -------- II. Algorithmic Inversion ------ #
