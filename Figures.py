@@ -2088,7 +2088,7 @@ def plot_fig_3(
     ext_param_name='w0',
     sim_param_name='T_eval',
     x_label=r"$w_0$",
-    y_label_a=r"$\frac{|y_{\max}|}{\max_{\tau_b} |y_{\max}|}$",
+        y_label_a=r"$\frac{|y_{\max}|}{\max_{\tau_b} |y_{\max}|}$",
     y_label_b=r"$\tau_{b,inf}$",
     x_label_b=r"$\tau_{b,\mathrm{sim}}$",
     cbar_label=r"$\tau_b$",
@@ -4040,12 +4040,12 @@ if __name__ == "__main__":
         colorscale='Turbo', log_scale=False
     )
 
-    # fig_S1_a.write_image("Figures/analytical_solution_constant_vertical_flow_a.svg")
-    # fig_S1_a.write_html("Figures/analytical_solution_constant_vertical_flow_a.html")
+    fig_S1_a.write_image("Figures/fig_S1a.pdf")
+    fig_S1_a.write_html("Figures/fig_S1a.html")
     # fig_S1_a.show()
 
-    # fig_S1_b.write_image("Figures/analytical_solution_constant_vertical_flow_b.svg")
-    # fig_S1_b.write_html("Figures/analytical_solution_constant_vertical_flow_b.html")
+    fig_S1_b.write_image("Figures/fig_S1b.pdf")
+    fig_S1_b.write_html("Figures/fig_S1b.html")
     # fig_S1_b.show()
 
     # --------------------- #
@@ -4084,13 +4084,13 @@ if __name__ == "__main__":
         colorscale='RdYlBu_r',
     )
 
-    fig_1_a.write_image("Figures/counterbend_a.svg")
-    fig_1_a.write_html("Figures/counterbend_a.html")
-    fig_1_a.show()
+    fig_1_a.write_image("Figures/fig_1a.pdf")
+    fig_1_a.write_html("Figures/fig_1a.html")
+    # fig_1_a.show()
 
-    fig_1_b.write_image("Figures/counterbend_b.svg")
-    fig_1_b.write_html("Figures/counterbend_b.html")
-    fig_1_b.show()
+    fig_1_b.write_image("Figures/fig_1b.pdf")
+    fig_1_b.write_html("Figures/fig_1b.html")
+    # fig_1_b.show()
 
     # ------------------------------------------ #
     # Figure 2: Relaxation of a bending filament #
@@ -4182,12 +4182,12 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    fig_2_a.write_image("Figures/relaxation.svg")
-    fig_2_a.write_html("Figures/relaxation.html")
+    fig_2_a.write_image("Figures/fig_2a.pdf")
+    fig_2_a.write_html("Figures/fig_2a.html")
     fig_2_a.show()
 
-    fig_2_b.write_image("Figures/relaxation_timescale.svg")
-    fig_2_b.write_html("Figures/relaxation_timescale.html")
+    fig_2_b.write_image("Figures/fig_2b.pdf")
+    fig_2_b.write_html("Figures/fig_2a.html")
     fig_2_b.show()
 
     # ------------------------------------------------- #
@@ -4225,15 +4225,15 @@ if __name__ == "__main__":
         ext_param_name='w0',
     )
 
-    fig_3_a.write_image("Figures/harmonic_response_tip_amplitude.svg")
-    fig_3_a.write_html("Figures/harmonic_response_tip_amplitude.html")
+    fig_3_a.write_image("Figures/fig_3a.pdf")
+    fig_3_a.write_html("Figures/fig_3a.html")
     fig_3_a.show()
 
-    fig_3_b.write_image("Figures/harmonic_response_tip_amplitude_fit.svg")
-    fig_3_b.write_html("Figures/harmonic_response_tip_amplitude_fit.html")
+    fig_3_b.write_image("Figures/fig_3b.pdf")
+    fig_3_b.write_html("Figures/fig_3b.html")
     fig_3_b.show()    
 
-    exit()
+    # exit()
 
     # ----------------------------------------- #
     # -------- II. Algorithmic Inversion ------ #
@@ -4323,12 +4323,12 @@ if __name__ == "__main__":
         workflow_output_bending_shear
         )
 
-    fig_5_a.write_image("Figures/elastic_inference_standard_error.svg")
-    fig_5_a.write_html("Figures/elastic_inference_standard_error.html")
+    fig_5_a.write_image("Figures/fig_5a.pdf")
+    fig_5_a.write_html("Figures/fig_5a.html")
     fig_5_a.show()
 
-    fig_5_b.write_image("Figures/elastic_inference_rel_error.svg")
-    fig_5_b.write_html("Figures/harmonic_response_rel_error.html")
+    fig_5_b.write_image("Figures/fig_5b.pdf")
+    fig_5_b.write_html("Figures/fig_5b.html")
     fig_5_b.show()
 
     # ------------------------------------------------ #
@@ -4374,8 +4374,8 @@ if __name__ == "__main__":
         title_a="Distance vs Sp4 (All Amplitudes)",
     )
 
-    fig_S4a.write_image("Figures/loss_vs_Sp4_color_A.svg")
-    fig_S4a.write_html("Figures/loss_vs_Sp4_color_A.html")
+    fig_S4a.write_image("Figures/fig_S4a.pdf")
+    fig_S4a.write_html("Figures/fig_S4a.html")
     fig_S4a.show()
 
     # ============================================================================
@@ -4413,8 +4413,8 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    fig_S4b.write_image("Figures/tip_vs_A_color_Sp4.svg")
-    fig_S4b.write_html("Figures/tip_vs_A_color_Sp4.html")
+    fig_S4b.write_image("Figures/fig_S4b.pdf")
+    fig_S4b.write_html("Figures/fig_S4b.html")
     fig_S4b.show()
 
     # ---------------------------------------------- #
@@ -4463,8 +4463,8 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    fig_S5a.write_image("Figures/loss_vs_Beta_color_A.svg")
-    fig_S5a.write_html("Figures/loss_vs_Beta_color_A.html")
+    fig_S5a.write_image("Figures/fig_S5a.pdf")
+    fig_S5a.write_html("Figures/fig_S5a.html")
     fig_S5a.show()
 
     # ============================================================================
@@ -4501,8 +4501,8 @@ if __name__ == "__main__":
         colorscale='Viridis',
     )
 
-    fig_S5b.write_image("Figures/tip_vs_A_color_Beta.svg")
-    fig_S5b.write_html("Figures/tip_vs_A_color_Beta.html")
+    fig_S5b.write_image("Figures/fig_S5b.pdf")
+    fig_S5b.write_html("Figures/fig_S5b.html")
     fig_S5b.show()
 
     # =========
@@ -4545,7 +4545,7 @@ if __name__ == "__main__":
     )
 
     # Save and display
-    # fig_S5c.write_image("Figures/filament_color_Beta_subplot_A.svg")
+    # fig_S5c.write_image("Figures/filament_color_Beta_subplot_A.pdf")
     # fig_S5c.write_html("Figures/filament_color_Beta_subplot_A.html")
     # fig_S5c.show()
 
@@ -4631,12 +4631,12 @@ if __name__ == "__main__":
         workflow_output_bending_shear_visc
     )
 
-    fig_6_a.write_image("Figures/fig_6_a_std_vs_w0.svg")
-    fig_6_a.write_html("Figures/fig_6_a_std_vs_w0.html")
+    fig_6_a.write_image("Figures/fig_6a.pdf")
+    fig_6_a.write_html("Figures/fig_6a.html")
     fig_6_a.show()
 
-    fig_6_b.write_image("Figures/fig_6_b_err_vs_w0.svg")
-    fig_6_b.write_html("Figures/fig_6_b_err_vs_w0.html")
+    fig_6_b.write_image("Figures/fig_6b.pdf")
+    fig_6_b.write_html("Figures/fig_6b.html")
     fig_6_b.show()
 
     # ----------- #
@@ -4677,8 +4677,8 @@ if __name__ == "__main__":
         metric='std'
     )
 
-    fig_S6a_std.write_image("Figures/std_tau_b_vs_w0.svg")
-    fig_S6a_std.write_html("Figures/std_tau_b_vs_w0.html")
+    fig_S6a_std.write_image("Figures/fig_S6a_1.pdf")
+    fig_S6a_std.write_html("Figures/fig_S6a_1.html")
     fig_S6a_std.show()
 
     # Plot bending viscosity relative error
@@ -4689,8 +4689,8 @@ if __name__ == "__main__":
         metric='rel_error'
     )
 
-    fig_S6a_err.write_image("Figures/err_tau_b_vs_w0.svg")
-    fig_S6a_err.write_html("Figures/err_tau_b_vs_w0.html")
+    fig_S6a_err.write_image("Figures/fig_S6a_2.pdf")
+    fig_S6a_err.write_html("Figures/fig_S6a_2.html")
     fig_S6a_err.show()
 
     # Shear Viscosity (Fixed Shear Elasticity)
@@ -4717,14 +4717,14 @@ if __name__ == "__main__":
 
     # Standard error with scaled x-axis
     fig = plot_fig_S6b(workflow_output, int_param_name='tau_s', ext_param_name='w0', metric='std')
-    fig.write_image("Figures/std_tau_s_vs_w0.svg")
-    fig.write_html("Figures/std_tau_s_vs_w0.html")
+    fig.write_image("Figures/fig_S6b_1.pdf")
+    fig.write_html("Figures/fig_S6b_1.html")
     fig.show()
 
     # Relative error with scaled x-axis
     fig = plot_fig_S6b(workflow_output, int_param_name='tau_s', ext_param_name='w0', metric='rel_error')
-    fig.write_image("Figures/err_tau_s_vs_w0.svg")
-    fig.write_html("Figures/err_tau_s_vs_w0.html")
+    fig.write_image("Figures/fig_S6b_2.pdf")
+    fig.write_html("Figures/fig_S6b_2.html")
     fig.show()
 
     # Bending & Shear Viscosities (Fixed Bending & Shear Elasticities)
@@ -4751,12 +4751,12 @@ if __name__ == "__main__":
 
     # Combined standard error with scaled x-axis
     fig = plot_fig_S6c(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric='std')
-    fig.write_image("Figures/std_tau_b_tau_s_vs_w0.svg")
-    fig.write_html("Figures/std_tau_b_tau_s_vs_w0.html")
+    fig.write_image("Figures/fig_S6c_1.pdf")
+    fig.write_html("Figures/fig_S6c_1.html")
     fig.show()
 
     # Combined relative error with scaled x-axis
     fig = plot_fig_S6c(workflow_output, int_params=['tau_b', 'tau_s'], ext_param_name='w0', metric='rel_error')
-    fig.write_image("Figures/err_tau_b_tau_s_vs_w0.svg")
-    fig.write_html("Figures/err_tau_b_tau_s_vs_w0.html")
+    fig.write_image("Figures/fig_S6c_2.pdf")
+    fig.write_html("Figures/fig_S6c_2.html")
     fig.show()
