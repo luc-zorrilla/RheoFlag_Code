@@ -2317,8 +2317,11 @@ def plot_fig_5(
 
     Returns:
         (fig_5a, fig_5b): fig_5a shows sigma(p_inf)/p_sim vs A,
-                          fig_5b shows (p_inf - p_sim)/p_sim vs A.
+                        fig_5b shows (p_inf - p_sim)/p_sim vs A.
     """
+
+    Sp4_gt = 1e0
+    Beta_gt = 1e0
 
     def to_scalar(v):
         """Convert a scalar, list or array entry to float (or None)."""
@@ -2366,14 +2369,19 @@ def plot_fig_5(
             height=height_px,
             margin=dict(l=90, r=40, t=20, b=75),
             legend=dict(
-                x=0.98, y=0.98,
-                xanchor='right', yanchor='top',
+                x=0.02, y=0.98,
+                xanchor='left', yanchor='top',
                 bgcolor='rgba(255, 255, 255, 0.85)',
                 bordercolor='black',
                 borderwidth=1,
                 font=dict(size=font_size - 3),
             ),
         )
+
+    # Legend labels including internal parameter values
+    LBL_BEND = r"$\mathrm{Sp}^4=%g$" % Sp4_gt
+    LBL_SHEAR = r"$\beta=%g$" % Beta_gt
+    LBL_COMB = r"$(\mathrm{Sp}^4, \beta)=(%g, %g)$" % (Sp4_gt, Beta_gt)
 
     results_1 = workflow_output_1['results_summary']
     results_2 = workflow_output_2['results_summary']
@@ -2401,7 +2409,7 @@ def plot_fig_5(
     sp4_sigma_1 = [normalise_sigma(r.get('Sp4_sigma'), sp4_gt) for r in results_1]
     fig_5a.add_trace(go.Scatter(
         x=A_1, y=sp4_sigma_1,
-        mode='markers+lines', name='Bending (Sp4)',
+        mode='markers+lines', name=LBL_BEND,
         marker=dict(size=7, color=series_style['bending']['color'],
                     symbol=series_style['bending']['symbol']),
         line=dict(color=series_style['bending']['color'], width=2),
@@ -2410,7 +2418,7 @@ def plot_fig_5(
     beta_sigma_2 = [normalise_sigma(r.get('Beta_sigma'), beta_gt) for r in results_2]
     fig_5a.add_trace(go.Scatter(
         x=A_2, y=beta_sigma_2,
-        mode='markers+lines', name='Shear (Beta)',
+        mode='markers+lines', name=LBL_SHEAR,
         marker=dict(size=7, color=series_style['shear']['color'],
                     symbol=series_style['shear']['symbol']),
         line=dict(color=series_style['shear']['color'], width=2),
@@ -2425,7 +2433,7 @@ def plot_fig_5(
     ]
     fig_5a.add_trace(go.Scatter(
         x=A_3, y=combined_sigma_3,
-        mode='markers+lines', name='Combined (Sp4+Beta)',
+        mode='markers+lines', name=LBL_COMB,
         marker=dict(size=7, color=series_style['combined']['color'],
                     symbol=series_style['combined']['symbol']),
         line=dict(color=series_style['combined']['color'], width=2, dash='dash'),
@@ -2447,7 +2455,7 @@ def plot_fig_5(
     sp4_err_1 = [compute_signed_rel_error(m, sp4_gt) for m in sp4_meas_1]
     fig_5b.add_trace(go.Scatter(
         x=A_1, y=sp4_err_1,
-        mode='markers+lines', name='Bending (Sp4)',
+        mode='markers+lines', name=LBL_BEND,
         marker=dict(size=7, color=series_style['bending']['color'],
                     symbol=series_style['bending']['symbol']),
         line=dict(color=series_style['bending']['color'], width=2),
@@ -2457,7 +2465,7 @@ def plot_fig_5(
     beta_err_2 = [compute_signed_rel_error(m, beta_gt) for m in beta_meas_2]
     fig_5b.add_trace(go.Scatter(
         x=A_2, y=beta_err_2,
-        mode='markers+lines', name='Shear (Beta)',
+        mode='markers+lines', name=LBL_SHEAR,
         marker=dict(size=7, color=series_style['shear']['color'],
                     symbol=series_style['shear']['symbol']),
         line=dict(color=series_style['shear']['color'], width=2),
@@ -2474,7 +2482,7 @@ def plot_fig_5(
     ]
     fig_5b.add_trace(go.Scatter(
         x=A_3, y=combined_err_3,
-        mode='markers+lines', name='Combined (Sp4+Beta)',
+        mode='markers+lines', name=LBL_COMB,
         marker=dict(size=7, color=series_style['combined']['color'],
                     symbol=series_style['combined']['symbol']),
         line=dict(color=series_style['combined']['color'], width=2, dash='dash'),
@@ -2492,7 +2500,6 @@ def plot_fig_5(
 
     return fig_5a, fig_5b
 
-
 def plot_fig_S4(
     model_lists: Dict[int, ModelList],
     int_params_metadata: List[Dict[str, Any]],
@@ -2501,15 +2508,19 @@ def plot_fig_S4(
     int_param_name: str = 'Sp4',
     ext_param_name: str = 'A',
     distance_fn: Callable[[Dict[str, Any], Dict[str, Any]], float] = rel_mse,
-    title_a: Optional[str] = None,
-    title_b: Optional[str] = None,
     colorscale: str = 'Viridis',
+    font_family: str = "Times New Roman",
+    font_size: int = 16,
+    width_px: int = 800,
+    height_px: int = 600,
+    x_tick_reference: float = 1.0,
+    x_tick_scale: float = 100.0,
+    x_tick_suffix: str = '%',
 ) -> tuple[go.Figure, go.Figure]:
     """
-    Plot distance and final output across internal and external parameters.
-    Inspired by plot_fig_1, combining plot_model_distance_multi_external and
-    plot_final_output_vs_ext_param_color_int_param.
-    
+    Publication-ready plots of distance and final output across internal and
+    external parameters. No figure titles; log-scale colorbars replace legends.
+
     Args:
         model_lists: Dictionary mapping indices to ModelList objects
         int_params_metadata: List of dicts, each containing internal parameter values
@@ -2518,159 +2529,336 @@ def plot_fig_S4(
         int_param_name: Name of the internal parameter (e.g., 'Sp4', 'Beta')
         ext_param_name: Name of the external parameter (e.g., 'A')
         distance_fn: Distance function(output_1, output_2) -> float
-        title_a: Title for distance figure
-        title_b: Title for final output figure
         colorscale: Plotly colorscale name
-    
+        font_family: Font family for all text
+        font_size: Base font size in points
+        width_px: Figure width in pixels
+        height_px: Figure height in pixels
+        x_tick_reference: Truth value of the internal parameter, shown as 0 on
+                          Figure A's x-axis (1.0 for Sp4 = 1)
+        x_tick_scale: Scale applied to the relative deviation from the reference
+                      (100 -> percent, 1000 -> per-mille)
+        x_tick_suffix: Suffix appended to the scaled tick labels (e.g., '%')
+
     Returns:
         Tuple of (fig_a, fig_b) where:
-            - fig_a: Distance vs internal parameter (multiple lines for each external param)
-            - fig_b: Final output vs external parameter (color-coded by internal param)
+            - fig_a: Normalized loss vs internal parameter (one line per external
+                     param, colored by log10 of the external param)
+            - fig_b: Tip displacement vs external parameter (markers only, colored
+                     by log10 of the internal param, with a log-space linear fit
+                     over the first two thirds of the points and a log-space
+                     constant fit over the last tenth)
     """
+
+    def _log_range(values):
+        log_vals = np.log10(np.asarray(values, dtype=float))
+        lo, hi = float(log_vals.min()), float(log_vals.max())
+        if hi == lo:
+            hi = lo + 1.0  # avoid division by zero for a single value
+        return lo, hi
+
+    def _log_colorbar(lo, hi, title):
+        span = hi - lo
+        exps = np.arange(np.ceil(lo), np.floor(hi) + 1)
+        if len(exps) >= 2:
+            tickvals = ((exps - lo) / span).tolist()
+            ticktext = [f"10<sup>{int(e)}</sup>" for e in exps]
+        else:
+            tickvals = [0.0, 1.0]
+            ticktext = [f"10<sup>{lo:.1f}</sup>", f"10<sup>{hi:.1f}</sup>"]
+        return dict(
+            title=dict(text=rf"${title}$", side='right'),
+            tickmode='array',
+            tickvals=tickvals,
+            ticktext=ticktext,
+            tickfont=dict(size=font_size - 2),
+            ticks='outside',
+            ticklen=4,
+            tickcolor='black',
+            outlinewidth=1,
+            outlinecolor='black',
+            len=0.9,
+            thickness=18,
+            x=1.02,
+        )
+
+    def _style_axes(fig, x_title, y_title, x_log=True, y_log=False):
+        fig.update_xaxes(
+            title_text=x_title, type='log' if x_log else 'linear',
+            showline=True, linewidth=1.2, linecolor='black', mirror=True,
+            ticks='outside', showgrid=False, zeroline=False,
+        )
+        fig.update_yaxes(
+            title_text=y_title, type='log' if y_log else 'linear',
+            showline=True, linewidth=1.2, linecolor='black', mirror=True,
+            ticks='outside', showgrid=False, zeroline=False,
+        )
+
+    def _deviation_ticks(values):
+        """
+        Tick positions at the parameter values (plus the reference value),
+        labelled as the relative deviation from the reference:
+        (value - reference) * scale. The reference therefore reads 0%.
+        """
+        positions = np.unique(np.append(np.asarray(values, dtype=float)[::10], x_tick_reference))
+        ticktext = []
+        for v in positions:
+            dev = (v - x_tick_reference) * x_tick_scale
+            ticktext.append(f"{dev:.3g}{x_tick_suffix}" if abs(dev) > 1e-12 else f"0{x_tick_suffix}")
+        return positions.tolist(), ticktext
+
     int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
     ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
-    
-    n_internal = len(int_param_values)
+
     num_ext_params = len(ext_params_list)
-    
+    sorted_int_keys = sorted(model_lists.keys())
+
     # ============================================================================
-    # FIGURE A: DISTANCE VS INTERNAL PARAMETER (multiple lines for each A)
+    # FIGURE A: LOSS VS INTERNAL PARAMETER (lines colored by log10 of A)
     # ============================================================================
     fig_a = go.Figure()
-    
-    colors_ext = [
-        '#0072B2', '#E69F00', '#CC79A7', '#56B4E9',
-        '#009E73', '#F0E442', '#D55E00', '#999999'
-    ]
-    
+
+    ext_lo, ext_hi = _log_range(ext_param_values)
+    ext_norm = [(np.log10(v) - ext_lo) / (ext_hi - ext_lo) for v in ext_param_values]
+    colors_ext = px.colors.sample_colorscale(colorscale, ext_norm)
+
     ref_models_outputs = [model.sim_output for model in reference_model_list.models]
-    
+
+    # Compute all distances first so they can be normalized jointly
+    distance_matrix = np.zeros((num_ext_params, len(sorted_int_keys)), dtype=float)
     for ext_idx in range(num_ext_params):
-        distances = []
-        
         ref_output = ref_models_outputs[ext_idx]
-        
-        for int_idx in sorted(model_lists.keys()):
-            model_list = model_lists[int_idx]
-            model = model_list.models[ext_idx]
-            model_output = model.sim_output
-            distance = distance_fn(model_output['value'], ref_output['value'])
-            distances.append(distance)
-        
+        for col, int_idx in enumerate(sorted_int_keys):
+            model = model_lists[int_idx].models[ext_idx]
+            distance_matrix[ext_idx, col] = distance_fn(
+                model.sim_output['value'], ref_output['value']
+            )
+
+    # Normalize so the maximum amplitude across all curves combined is 1
+    global_max = np.nanmax(np.abs(distance_matrix))
+    if global_max > 0:
+        distance_matrix = distance_matrix / global_max
+
+    all_x, all_y, all_c, all_ext = [], [], [], []
+
+    for ext_idx in range(num_ext_params):
+        distances = distance_matrix[ext_idx].tolist()
         ext_value = ext_param_values[ext_idx]
-        label = f"{ext_param_name} = {ext_value:.3e}"
-        
+
         fig_a.add_trace(go.Scatter(
             x=int_param_values,
             y=distances,
-            mode='lines+markers',
-            name=label,
-            line=dict(color=colors_ext[ext_idx % len(colors_ext)], width=2),
-            marker=dict(size=6, symbol='circle'),
-            hovertemplate=(
-                f"<b>{int_param_name}:</b> %{{x:.3e}}<br>"
-                f"<b>Relative L2 Error:</b> %{{y:.3e}}<br>"
-                f"<b>{label}</b><extra></extra>"
-            ),
+            mode='lines',
+            line=dict(color=colors_ext[ext_idx], width=2),
+            showlegend=False,
+            hoverinfo='skip',
         ))
-    
-    if title_a is None:
-        title_a = f"Distance vs {int_param_name} (All {ext_param_name} values)"
-    
-    fig_a.update_layout(
-        title=title_a,
-        xaxis_title=int_param_name,
-        yaxis_title="Relative L2 Error",
-        xaxis=dict(type='log'),
-        template='plotly_white',
-        hovermode='closest',
-        width=1000,
-        height=650,
-        legend=dict(x=0.02, y=0.98, bgcolor='rgba(255,255,255,0.8)'),
+
+        all_x.extend(int_param_values)
+        all_y.extend(distances)
+        all_c.extend([(np.log10(ext_value) - ext_lo) / (ext_hi - ext_lo)] * len(distances))
+        all_ext.extend([ext_value] * len(distances))
+
+    # One marker trace carries the colorbar
+    fig_a.add_trace(go.Scatter(
+        x=all_x,
+        y=all_y,
+        mode='markers',
+        marker=dict(
+            opacity=0,
+            size=6,
+            color=all_c,
+            colorscale=colorscale,
+            cmin=0,
+            cmax=1,
+            showscale=True,
+            colorbar=_log_colorbar(ext_lo, ext_hi, ext_param_name),
+        ),
+        customdata=all_ext,
+        showlegend=False,
+        hovertemplate=(
+            f"<b>{int_param_name}:</b> %{{x:.3e}}<br>"
+            f"<b>Normalized Loss:</b> %{{y:.3e}}<br>"
+            f"<b>{ext_param_name}:</b> %{{customdata:.3e}}<extra></extra>"
+        ),
+    ))
+
+    fig_a.add_hline(
+        y=0,
+        line=dict(color='black', width=1.2, dash='dash'),
     )
-    
+
+    _style_axes(
+        fig_a,
+        x_title=(
+            rf"$\mathrm{{{int_param_name}}} - {x_tick_reference:g}$ ({x_tick_suffix})"
+        ),
+        y_title=r'$\mathrm{Loss}(Sp^4,\ Sp^4=1)$ (normalized)',
+        x_log=True,
+        y_log=False,
+    )
+    tickvals_a, ticktext_a = _deviation_ticks(int_param_values)
+    fig_a.update_xaxes(tickmode='array', tickvals=tickvals_a, ticktext=ticktext_a)
+    fig_a.update_layout(
+        template='simple_white',
+        font=dict(family=font_family, size=font_size, color='black'),
+        showlegend=False,
+        hovermode='closest',
+        width=width_px,
+        height=height_px,
+        margin=dict(l=90, r=120, t=20, b=75),
+    )
+
     # ============================================================================
-    # FIGURE B: FINAL OUTPUT VS EXTERNAL PARAMETER (color-coded by internal param)
+    # FIGURE B: TIP DISPLACEMENT VS EXTERNAL PARAMETER (colored by log10 of Sp4)
     # ============================================================================
     fig_b = go.Figure()
-    
-    if len(int_param_values) > 1:
-        int_param_min = min(int_param_values)
-        int_param_max = max(int_param_values)
-        int_param_norm = [
-            (val - int_param_min) / (int_param_max - int_param_min) 
-            for val in int_param_values
-        ]
-    else:
-        int_param_norm = [0]
-    
-    colors_int = px.colors.sample_colorscale(colorscale, int_param_norm)
-    
-    for int_idx in sorted(model_lists.keys()):
-        x_vals = []
-        y_vals = []
-        
+
+    int_lo, int_hi = _log_range(int_param_values)
+    int_norm = [(np.log10(v) - int_lo) / (int_hi - int_lo) for v in int_param_values]
+    colors_int = px.colors.sample_colorscale(colorscale, int_norm)
+
+    all_x, all_y, all_c, all_int = [], [], [], []
+
+    for int_idx in sorted_int_keys:
+        x_vals, y_vals = [], []
         model_list = model_lists[int_idx]
         int_param_val = int_param_values[int_idx]
-        
+
         for ext_idx in range(len(model_list.models)):
             model = model_list.models[ext_idx]
             ext_param_val = ext_param_values[ext_idx]
-            
+
             if model.sim_output is not None:
                 output_data = model.sim_output
                 if isinstance(output_data, dict) and 'value' in output_data:
                     output_data = output_data['value']
-                
-                output_array = np.array(output_data)
-                
+
+                output_array = np.atleast_1d(np.array(output_data))
+
                 if output_array.size > 1:
-                    output_array = np.atleast_1d(output_array)
-                    
                     X_3N = X3N(output_array)
                     N = X_3N.shape[0] // 3
-                    
                     final_y = X_3N[N:int(2*N)][-1, 0]
-                    
+
                     if 'Beta' in int_param_name:
                         final_x = ext_param_val / int_param_val
                     else:  # Sp4 or other
                         final_x = ext_param_val * int_param_val
-                    
+
                     x_vals.append(final_x)
                     y_vals.append(final_y)
-        
+
         if x_vals:
+            # Markers only, no connecting lines
             fig_b.add_trace(go.Scatter(
                 x=x_vals,
                 y=y_vals,
-                mode='lines+markers',
-                name=f"{int_param_name} = {int_param_val:.4f}",
-                hovertemplate=(
-                    f"<b>{ext_param_name}</b>: %{{x:.2e}}<br>"
-                    f"<b>Tip Displacement</b>: %{{y:.6e}}<br>"
-                    f"<b>{int_param_name}</b>: {int_param_val:.4f}<extra></extra>"
-                ),
-                line=dict(width=2, color=colors_int[int_idx]),
+                mode='markers',
                 marker=dict(size=6, color=colors_int[int_idx]),
+                showlegend=False,
+                hoverinfo='skip',
             ))
-    
-    if title_b is None:
-        title_b = f"Tip Displacement vs {ext_param_name} (color-coded by {int_param_name})"
-    
-    fig_b.update_layout(
-        title=title_b,
-        xaxis_title=ext_param_name,
-        yaxis_title="Tip Displacement",
-        xaxis=dict(type='log'),
-        yaxis=dict(type='log'),
-        template='plotly_white',
-        hovermode='closest',
-        width=1000,
-        height=650,
-        legend=dict(title=int_param_name, x=0.02, y=0.98, bgcolor='rgba(255,255,255,0.8)'),
+
+            all_x.extend(x_vals)
+            all_y.extend(y_vals)
+            all_c.extend([(np.log10(int_param_val) - int_lo) / (int_hi - int_lo)] * len(x_vals))
+            all_int.extend([int_param_val] * len(x_vals))
+
+    # One marker trace carries the colorbar
+    fig_b.add_trace(go.Scatter(
+        x=all_x,
+        y=all_y,
+        mode='markers',
+        marker=dict(
+            size=6,
+            color=all_c,
+            colorscale=colorscale,
+            cmin=0,
+            cmax=1,
+            showscale=True,
+            colorbar=_log_colorbar(int_lo, int_hi, int_param_name),
+        ),
+        customdata=all_int,
+        showlegend=False,
+        hovertemplate=(
+            f"<b>{ext_param_name}:</b> %{{x:.2e}}<br>"
+            f"<b>Tip Displacement:</b> %{{y:.6e}}<br>"
+            f"<b>{int_param_name}:</b> %{{customdata:.4f}}<extra></extra>"
+        ),
+    ))
+
+    # Piecewise fits through all markers together, done in log10 space.
+    # Points are sorted by x. Only strictly positive points are used.
+    fit_x = np.asarray(all_x, dtype=float)
+    fit_y = np.abs(np.asarray(all_y, dtype=float))
+    mask = (fit_x > 0) & (fit_y > 0) & np.isfinite(fit_x) & np.isfinite(fit_y)
+
+    if mask.sum() >= 2:
+        order = np.argsort(fit_x[mask])
+        log_x = np.log10(fit_x[mask])[order]
+        log_y = np.log10(fit_y[mask])[order]
+        n = len(log_x)
+
+        # Data limits in log10 units, used for the fit range and axis limits
+        lx_min, lx_max = float(log_x.min()), float(log_x.max())
+        ly_min, ly_max = float(log_y.min()), float(log_y.max())
+
+        # 1) Linear fit in log space over the first two thirds of the data,
+        #    drawn across the full x-range of the data
+        n_lin = int(np.ceil(2 * n / 3))
+        if n_lin >= 2:
+            slope, intercept = np.polyfit(log_x[:n_lin], log_y[:n_lin], 1)
+            lin_log_x = np.linspace(lx_min, lx_max, 200)
+            fig_b.add_trace(go.Scatter(
+                x=10 ** lin_log_x,
+                y=10 ** (slope * lin_log_x + intercept),
+                mode='lines',
+                line=dict(color='black', width=2, dash='dash'),
+                showlegend=False,
+                hoverinfo='skip',
+            ))
+
+        # 2) Constant fit in log space over the last tenth of the data,
+        #    drawn across the full x-range of the data
+        n_const = max(1, int(np.ceil(n / 10)))
+        const_log_y = float(np.mean(log_y[-n_const:]))
+        const_log_x = np.linspace(lx_min, lx_max, 2)
+        fig_b.add_trace(go.Scatter(
+            x=10 ** const_log_x,
+            y=np.full(2, 10 ** const_log_y),
+            mode='lines',
+            line=dict(color='black', width=2, dash='dot'),
+            showlegend=False,
+            hoverinfo='skip',
+        ))
+
+    _style_axes(
+        fig_b,
+        x_title=f'${ext_param_name}$',
+        y_title=r'$|y_{\mathrm{tip}}|$',
+        x_log=True,
+        y_log=True,
     )
-    
+
+    # Fix the axis limits to the data (plus a small margin) so that the fit
+    # lines cannot extend the axes. Anything outside is clipped at the edges.
+    if mask.sum() >= 2:
+        pad_x = max(lx_max - lx_min, 1e-9) * 0.05
+        pad_y = max(ly_max - ly_min, 1e-9) * 0.05
+        fig_b.update_xaxes(range=[lx_min - pad_x, lx_max + pad_x])
+        fig_b.update_yaxes(range=[ly_min - pad_y, ly_max + pad_y])
+
+    fig_b.update_layout(
+        template='simple_white',
+        font=dict(family=font_family, size=font_size, color='black'),
+        showlegend=False,
+        hovermode='closest',
+        width=width_px,
+        height=height_px,
+        margin=dict(l=90, r=120, t=20, b=75),
+    )
+
     return fig_a, fig_b
 
 def plot_fig_S5(
@@ -2681,15 +2869,12 @@ def plot_fig_S5(
     int_param_name: str = 'Beta',
     ext_param_name: str = 'A',
     distance_fn: Callable[[Dict[str, Any], Dict[str, Any]], float] = rel_mse,
-    title_a: Optional[str] = None,
-    title_b: Optional[str] = None,
     colorscale: str = 'Viridis',
 ) -> tuple[go.Figure, go.Figure]:
     """
-    Plot distance and final output across internal and external parameters.
-    Inspired by plot_fig_1, combining plot_model_distance_multi_external and
-    plot_final_output_vs_ext_param_color_int_param.
-    
+    Publication-ready plots of distance and tip displacement across internal and
+    external parameters. No figure titles; log-scale colorbars replace legends.
+
     Args:
         model_lists: Dictionary mapping indices to ModelList objects
         int_params_metadata: List of dicts, each containing internal parameter values
@@ -2698,158 +2883,232 @@ def plot_fig_S5(
         int_param_name: Name of the internal parameter (e.g., 'Beta')
         ext_param_name: Name of the external parameter (e.g., 'A')
         distance_fn: Distance function(output_1, output_2) -> float
-        title_a: Title for distance figure
-        title_b: Title for final output figure
         colorscale: Plotly colorscale name
-    
+
     Returns:
-        Tuple of (fig_S5a, fig_S5b)
+        Tuple of (fig_S5a, fig_S5b) where:
+            - fig_S5a: Normalized loss vs relative deviation of the internal
+                    parameter from 1 (%), one line per external parameter,
+                    colored by log10 of the external parameter
+            - fig_S5b: |y_tip| vs external parameter, markers only, colored by
+                    log10 of the internal parameter
     """
+
+    def _log_range(values):
+        log_vals = np.log10(np.asarray(values, dtype=float))
+        lo, hi = float(log_vals.min()), float(log_vals.max())
+        if hi == lo:
+            hi = lo + 1.0  # avoid division by zero for a single value
+        return lo, hi
+
+    def _log_colorbar(lo, hi, title):
+        span = hi - lo
+        exps = np.arange(np.ceil(lo), np.floor(hi) + 1)
+        if len(exps) >= 2:
+            tickvals = ((exps - lo) / span).tolist()
+            ticktext = [f"10<sup>{int(e)}</sup>" for e in exps]
+        else:
+            tickvals = [0.0, 1.0]
+            ticktext = [f"10<sup>{lo:.1f}</sup>", f"10<sup>{hi:.1f}</sup>"]
+        return dict(
+            title=dict(text=rf"${title}$", side='right'),
+            tickmode='array',
+            tickvals=tickvals,
+            ticktext=ticktext,
+            ticks='outside',
+            ticklen=4,
+            tickcolor='black',
+            outlinewidth=1,
+            outlinecolor='black',
+            len=0.9,
+            thickness=18,
+            x=1.02,
+        )
+
+    def _style_axes(fig, x_title, y_title, x_log=True, y_log=False):
+        fig.update_xaxes(
+            title_text=x_title, type='log' if x_log else 'linear',
+            showline=True, linewidth=1.2, linecolor='black', mirror=True,
+            ticks='outside', showgrid=False, zeroline=False,
+        )
+        fig.update_yaxes(
+            title_text=y_title, type='log' if y_log else 'linear',
+            showline=True, linewidth=1.2, linecolor='black', mirror=True,
+            ticks='outside', showgrid=False, zeroline=False,
+        )
+
     int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
     ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
-    
-    n_internal = len(int_param_values)
+
     num_ext_params = len(ext_params_list)
-    
+    sorted_int_keys = sorted(model_lists.keys())
+
     # ============================================================================
-    # FIGURE S5A: DISTANCE VS INTERNAL PARAMETER (multiple lines for each A)
+    # FIGURE S5A: LOSS VS RELATIVE DEVIATION OF INTERNAL PARAMETER FROM 1
     # ============================================================================
     fig_S5a = go.Figure()
-    
-    colors_ext = [
-        '#0072B2', '#E69F00', '#CC79A7', '#56B4E9',
-        '#009E73', '#F0E442', '#D55E00', '#999999'
-    ]
-    
+
+    ext_lo, ext_hi = _log_range(ext_param_values)
+    ext_norm = [(np.log10(v) - ext_lo) / (ext_hi - ext_lo) for v in ext_param_values]
+    colors_ext = px.colors.sample_colorscale(colorscale, ext_norm)
+
     ref_models_outputs = [model.sim_output for model in reference_model_list.models]
-    
+
+    # Distances for all curves first, so they can be normalized jointly
+    distance_matrix = np.zeros((num_ext_params, len(sorted_int_keys)), dtype=float)
     for ext_idx in range(num_ext_params):
-        distances = []
-        
         ref_output = ref_models_outputs[ext_idx]
-        
-        for int_idx in sorted(model_lists.keys()):
-            model_list = model_lists[int_idx]
-            model = model_list.models[ext_idx]
-            model_output = model.sim_output
-            distance = distance_fn(model_output['value'], ref_output['value'])
-            distances.append(distance)
-        
-        ext_value = ext_param_values[ext_idx]
-        label = f"{ext_param_name} = {ext_value:.3e}"
-        
+        for col, int_idx in enumerate(sorted_int_keys):
+            model = model_lists[int_idx].models[ext_idx]
+            distance_matrix[ext_idx, col] = distance_fn(
+                model.sim_output['value'], ref_output['value']
+            )
+
+    # Normalize by the maximum amplitude of all data points
+    global_max = np.nanmax(np.abs(distance_matrix))
+    if global_max > 0:
+        distance_matrix = distance_matrix / global_max
+
+    # Relative deviation from the truth value (Beta = 1), in percent
+    rel_dev_pct = [(np.asarray(int_param_values[i], dtype=float) - 1.0) * 100.0
+                for i in sorted_int_keys]
+
+    for ext_idx in range(num_ext_params):
         fig_S5a.add_trace(go.Scatter(
-            x=int_param_values,
-            y=distances,
-            mode='lines+markers',
-            name=label,
-            line=dict(color=colors_ext[ext_idx % len(colors_ext)], width=2),
-            marker=dict(size=6, symbol='circle'),
-            hovertemplate=(
-                f"<b>{int_param_name}:</b> %{{x:.3e}}<br>"
-                f"<b>Relative L2 Error:</b> %{{y:.3e}}<br>"
-                f"<b>{label}</b><extra></extra>"
-            ),
+            x=rel_dev_pct,
+            y=distance_matrix[ext_idx].tolist(),
+            mode='lines',
+            line=dict(color=colors_ext[ext_idx], width=2),
+            showlegend=False,
+            hoverinfo='skip',
         ))
-    
-    if title_a is None:
-        title_a = f"Distance vs {int_param_name} (All {ext_param_name} values)"
-    
+
+    # Invisible carrier trace: contains no points, only the log colorbar for A
+    fig_S5a.add_trace(go.Scatter(
+        x=[None],
+        y=[None],
+        mode='markers',
+        marker=dict(
+            color=[0.0],
+            colorscale=colorscale,
+            cmin=0,
+            cmax=1,
+            showscale=True,
+            colorbar=_log_colorbar(ext_lo, ext_hi, ext_param_name),
+        ),
+        showlegend=False,
+        hoverinfo='skip',
+    ))
+
+    _style_axes(
+        fig_S5a,
+        x_title=r'$\beta_{\mathrm{sim}}$ deviation from $\beta = 1$ (%)',
+        y_title=r'$\mathrm{Loss}(\beta_{sim},\ \beta=1)$ (normalized)',
+        x_log=False,
+        y_log=False,
+    )
+
+    rel_grid = np.round(np.asarray(rel_dev_pct, dtype=float), 6)
+    tick_lo = int(np.floor(rel_grid.min()))
+    tick_hi = int(np.ceil(rel_grid.max()))
+    tickvals_a = list(range(tick_lo, tick_hi + 1))
+    fig_S5a.update_xaxes(
+        tickmode='array',
+        tickvals=tickvals_a,
+        ticktext=[f"{v}%" for v in tickvals_a],
+    )
     fig_S5a.update_layout(
-        title=title_a,
-        xaxis_title=int_param_name,
-        yaxis_title="Relative L2 Error",
-        xaxis=dict(type='log'),
         template='plotly_white',
+        showlegend=False,
         hovermode='closest',
         width=1000,
         height=650,
-        legend=dict(x=0.02, y=0.98, bgcolor='rgba(255,255,255,0.8)'),
+        margin=dict(l=90, r=120, t=20, b=75),
     )
-    
+
     # ============================================================================
-    # FIGURE S5B: FINAL OUTPUT VS EXTERNAL PARAMETER (color-coded by internal param)
+    # FIGURE S5B: |y_tip| VS EXTERNAL PARAMETER (markers, colored by log10 Beta)
     # ============================================================================
     fig_S5b = go.Figure()
-    
-    if len(int_param_values) > 1:
-        int_param_min = min(int_param_values)
-        int_param_max = max(int_param_values)
-        int_param_norm = [
-            (val - int_param_min) / (int_param_max - int_param_min) 
-            for val in int_param_values
-        ]
-    else:
-        int_param_norm = [0]
-    
-    colors_int = px.colors.sample_colorscale(colorscale, int_param_norm)
-    
-    for int_idx in sorted(model_lists.keys()):
-        x_vals = []
-        y_vals = []
-        
+
+    int_lo, int_hi = _log_range(int_param_values)
+
+    all_x, all_y, all_c, all_int = [], [], [], []
+
+    for int_idx in sorted_int_keys:
         model_list = model_lists[int_idx]
         int_param_val = int_param_values[int_idx]
-        
+        color_norm = (np.log10(int_param_val) - int_lo) / (int_hi - int_lo)
+
         for ext_idx in range(len(model_list.models)):
             model = model_list.models[ext_idx]
             ext_param_val = ext_param_values[ext_idx]
-            
-            if model.sim_output is not None:
-                output_data = model.sim_output
-                if isinstance(output_data, dict) and 'value' in output_data:
-                    output_data = output_data['value']
-                
-                output_array = np.array(output_data)
-                
-                if output_array.size > 1:
-                    output_array = np.atleast_1d(output_array)
-                    
-                    X_3N = X3N(output_array)
-                    N = X_3N.shape[0] // 3
-                    
-                    final_y = X_3N[int(2*N)-1, 0]
-                    
-                    if 'Beta' in int_param_name:
-                        final_x = ext_param_val / int_param_val
-                    else:  # Sp4 or other
-                        final_x = ext_param_val * int_param_val
-                    
-                    x_vals.append(final_x)
-                    y_vals.append(final_y)
-        
-        if x_vals:
-            fig_S5b.add_trace(go.Scatter(
-                x=x_vals,
-                y=y_vals,
-                mode='lines+markers',
-                name=f"{int_param_name} = {int_param_val:.4f}",
-                hovertemplate=(
-                    f"<b>{ext_param_name}</b>: %{{x:.2e}}<br>"
-                    f"<b>Tip Displacement</b>: %{{y:.6e}}<br>"
-                    f"<b>{int_param_name}</b>: {int_param_val:.4f}<extra></extra>"
-                ),
-                line=dict(width=2, color=colors_int[int_idx]),
-                marker=dict(size=6, color=colors_int[int_idx]),
-            ))
-    
-    if title_b is None:
-        title_b = f"Tip Displacement vs {ext_param_name} (color-coded by {int_param_name})"
-    
+
+            if model.sim_output is None:
+                continue
+
+            output_data = model.sim_output
+            if isinstance(output_data, dict) and 'value' in output_data:
+                output_data = output_data['value']
+
+            output_array = np.atleast_1d(np.array(output_data))
+            if output_array.size <= 1:
+                continue
+
+            X_3N = X3N(output_array)
+            N = X_3N.shape[0] // 3
+            final_y = X_3N[int(2 * N) - 1, 0]
+
+            if 'Beta' in int_param_name:
+                final_x = ext_param_val / int_param_val
+            else:  # Sp4 or other
+                final_x = ext_param_val * int_param_val
+
+            all_x.append(final_x)
+            all_y.append(final_y)
+            all_c.append(color_norm)
+            all_int.append(int_param_val)
+
+    fig_S5b.add_trace(go.Scatter(
+        x=all_x,
+        y=np.abs(all_y).tolist(),
+        mode='markers',
+        marker=dict(
+            size=6,
+            color=all_c,
+            colorscale=colorscale,
+            cmin=0,
+            cmax=1,
+            showscale=True,
+            colorbar=_log_colorbar(int_lo, int_hi, r'$\beta$'),
+        ),
+        customdata=all_int,
+        showlegend=False,
+        hovertemplate=(
+            f"<b>{ext_param_name}:</b> %{{x:.2e}}<br>"
+            f"<b>|y<sub>tip</sub>|:</b> %{{y:.6e}}<br>"
+            f"<b>{int_param_name}:</b> %{{customdata:.4f}}<extra></extra>"
+        ),
+    ))
+
+    _style_axes(
+        fig_S5b,
+        x_title=r'$ A / \beta $',
+        y_title=r'$|y_{\mathrm{tip}}|$',
+        x_log=True,
+        y_log=True,
+    )
     fig_S5b.update_layout(
-        title=title_b,
-        xaxis_title=ext_param_name,
-        yaxis_title="Tip Displacement",
-        xaxis=dict(type='log'),
-        yaxis=dict(type='log'),
         template='plotly_white',
+        showlegend=False,
         hovermode='closest',
         width=1000,
         height=650,
-        legend=dict(title=int_param_name, x=0.02, y=0.98, bgcolor='rgba(255,255,255,0.8)'),
+        margin=dict(l=90, r=120, t=20, b=75),
     )
-    
+
     return fig_S5a, fig_S5b
+
 
 def plot_vid_S5c(
     model_lists: Dict[int, ModelList],
@@ -3101,208 +3360,131 @@ def plot_vid_S5c(
 def plot_fig_6(
     workflow_output_1, workflow_output_2, workflow_output_3
 ) -> tuple[go.Figure, go.Figure]:
-    
+
+    tau_b_gt = 1e0
+    tau_s_gt = 1e0
+    beta_gt = 1.0
+
+    def _first(v):
+        if v is None:
+            return None
+        if isinstance(v, (list, np.ndarray)):
+            return float(v[0]) if len(v) > 0 else None
+        return float(v)
+
+    def _norm(v, scale):
+        return v / abs(scale) if v is not None and np.isfinite(v) else None
+
+    def _combine(a, b):
+        if a is None or b is None or not (np.isfinite(a) and np.isfinite(b)):
+            return None
+        return float(np.sqrt(a**2 + b**2))
+
     def compute_signed_rel_error(measured_val, ground_truth_val):
-        """Compute signed relative error: (measured - ground_truth) / ground_truth"""
-        if ground_truth_val is None or ground_truth_val == 0:
+        """(measured - ground_truth) / ground_truth"""
+        measured = _first(measured_val)
+        gt = _first(ground_truth_val)
+        if measured is None or gt is None or gt == 0:
             return None
-        
-        measured = float(measured_val[0]) if isinstance(measured_val, (list, np.ndarray)) else float(measured_val)
-        gt = float(ground_truth_val[0]) if isinstance(ground_truth_val, (list, np.ndarray)) else float(ground_truth_val)
-        
-        if gt == 0:
-            return None
-        
-        return (measured - gt) / gt
-    
+        return np.abs(measured - gt) / gt
+
+    def _trace(x, y, name, color, symbol, dash=None):
+        line = dict(color=color, width=2.5)
+        if dash is not None:
+            line['dash'] = dash
+        return go.Scatter(
+            x=x, y=y, mode='markers+lines', name=name,
+            marker=dict(size=9, color=color, symbol=symbol,
+                        line=dict(color='black', width=0.5)),
+            line=line,
+        )
+
+    def _style(fig, x_title, y_title, y_log):
+        axis_common = dict(
+            showline=True, linecolor='black', linewidth=1.5, mirror=True,
+            ticks='outside', tickwidth=1.2, ticklen=6,
+            showgrid=False, zeroline=False,
+        )
+        fig.update_layout(
+            template='plotly_white',
+            width=800, height=600,
+            font=dict(family='Times New Roman', size=16, color='black'),
+            margin=dict(l=90, r=30, t=30, b=80),
+            hovermode='closest',
+            legend=dict(
+                x=0.98, y=0.98, xanchor='right', yanchor='top',
+                bgcolor='rgba(255,255,255,0.9)',
+                bordercolor='black', borderwidth=1,
+                font=dict(size=14),
+            ),
+        )
+        fig.update_xaxes(
+            title=dict(text=x_title, font=dict(size=18)),
+            type='log', exponentformat='power', **axis_common,
+        )
+        fig.update_yaxes(
+            title=dict(text=y_title, font=dict(size=18)),
+            type='log' if y_log else 'linear', **axis_common,
+        )
+
+    # Legend labels including internal parameter values
+    LBL_B = r"Bending<br>($\tau_b={:g}$)".format(tau_b_gt)
+    LBL_S = r"Shear<br>($\tau_s={:g}$)".format(tau_s_gt)
+    LBL_C = r"Combined<br>($(\tau_b, \tau_s)=({:g}, {:g})$)".format(tau_b_gt, tau_s_gt)
+
+    X_TITLE = r"$w_0$"
+
     results_1 = workflow_output_1['results_summary']
     results_2 = workflow_output_2['results_summary']
     results_3 = workflow_output_3['results_summary']
-    
-    ext_param_ranges_1 = workflow_output_1['ext_param_ranges']['w0']
-    ext_param_ranges_2 = workflow_output_2['ext_param_ranges']['w0']
-    ext_param_ranges_3 = workflow_output_3['ext_param_ranges']['w0']
-    
-    tau_b_gt = 1e0
-    tau_s_gt = 1e0
 
-    fig_std = go.Figure()
-    
-    tau_b_std_1 = [r.get('tau_b_sigma') for r in results_1]
-    tau_b_std_1 = [float(v[0]) if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v for v in tau_b_std_1]
-    tau_b_norm_std_1 = [v / abs(tau_b_gt) if v is not None and np.isfinite(v) else None for v in tau_b_std_1]
-    
-    fig_std.add_trace(go.Scatter(
-        x=ext_param_ranges_1,
-        y=tau_b_norm_std_1,
-        mode='markers+lines',
-        name='Bending (tau_b)',
-        marker=dict(size=8, color='#1f77b4', opacity=0.7),
-        line=dict(color='#1f77b4', width=2)
-    ))
-    
-    tau_s_std_2 = [r.get('tau_s_sigma') for r in results_2]
-    tau_s_std_2 = [float(v[0]) if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v for v in tau_s_std_2]
-    tau_s_norm_std_2 = [v / abs(tau_s_gt) if v is not None and np.isfinite(v) else None for v in tau_s_std_2]
-    
-    fig_std.add_trace(go.Scatter(
-        x=ext_param_ranges_2,
-        y=tau_s_norm_std_2,
-        mode='markers+lines',
-        name='Shear (tau_s)',
-        marker=dict(size=8, color='#ff7f0e', opacity=0.7),
-        line=dict(color='#ff7f0e', width=2)
-    ))
-    
-    tau_b_std_3 = [r.get('tau_b_sigma') for r in results_3]
-    tau_b_std_3 = [float(v[0]) if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v for v in tau_b_std_3]
-    tau_s_std_3 = [r.get('tau_s_sigma') for r in results_3]
-    tau_s_std_3 = [float(v[0]) if isinstance(v, (list, np.ndarray)) and len(v) > 0 else v for v in tau_s_std_3]
-    
-    tau_b_norm_std_3 = [v / abs(tau_b_gt) if v is not None and np.isfinite(v) else None for v in tau_b_std_3]
-    tau_s_norm_std_3 = [v / abs(tau_s_gt) if v is not None and np.isfinite(v) else None for v in tau_s_std_3]
-    combined_norm_std_3 = [
-        np.sqrt(tau_b**2 + tau_s**2) if tau_b is not None and tau_s is not None and np.isfinite(tau_b) and np.isfinite(tau_s) else None
-        for tau_b, tau_s in zip(tau_b_norm_std_3, tau_s_norm_std_3)
-    ]
-    
-    fig_std.add_trace(go.Scatter(
-        x=ext_param_ranges_3,
-        y=combined_norm_std_3,
-        mode='markers+lines',
-        name='Combined (tau_b+tau_s)',
-        marker=dict(size=8, color='#2ca02c', opacity=0.7, symbol='diamond'),
-        line=dict(color='#2ca02c', width=2, dash='dash')
-    ))
-    
-    fig_std.update_layout(
-        title=dict(
-            text='Normalized Standard Error vs External Parameter w₀',
-            font=dict(size=16, color='black')
-        ),
-        xaxis=dict(
-            title=dict(text='w₀', font=dict(size=12)),
-            type='log',
-            gridwidth=1,
-            gridcolor='rgba(128, 128, 128, 0.2)',
-            showgrid=True
-        ),
-        yaxis=dict(
-            title=dict(text='Normalized Sigma (Std. Error / Internal Parameter)', font=dict(size=12)),
-            type='log',
-            gridwidth=1,
-            gridcolor='rgba(128, 128, 128, 0.2)',
-            showgrid=True
-        ),
-        hovermode='closest',
-        template='plotly_white',
-        width=1000,
-        height=600,
-        font=dict(size=11),
-        legend=dict(
-            x=1.02, y=1,
-            xanchor='left', yanchor='top',
-            bgcolor='rgba(255, 255, 255, 0.8)',
-            bordercolor='black',
-            borderwidth=1
-        )
+    w0_1 = workflow_output_1['ext_param_ranges']['w0']
+    w0_2 = workflow_output_2['ext_param_ranges']['w0']
+    w0_3 = workflow_output_3['ext_param_ranges']['w0']
+
+    # ---------------- Figure A: sigma(tau_inf) / tau_sim ---------------- #
+    tau_b_sig_1 = [_norm(_first(r.get('tau_b_sigma')), tau_b_gt) for r in results_1]
+    tau_s_sig_2 = [_norm(_first(r.get('tau_s_sigma')), tau_s_gt) for r in results_2]
+    tau_b_sig_3 = [_norm(_first(r.get('tau_b_sigma')), tau_b_gt) for r in results_3]
+    tau_s_sig_3 = [_norm(_first(r.get('tau_s_sigma')), tau_s_gt) for r in results_3]
+    comb_sig_3 = [_combine(b, s) for b, s in zip(tau_b_sig_3, tau_s_sig_3)]
+
+    fig_a = go.Figure()
+    fig_a.add_trace(_trace(w0_1, tau_b_sig_1, LBL_B, '#1f77b4', 'circle'))
+    fig_a.add_trace(_trace(w0_2, tau_s_sig_2, LBL_S, '#ff7f0e', 'square'))
+    fig_a.add_trace(_trace(w0_3, comb_sig_3, LBL_C, '#2ca02c', 'diamond', dash='dash'))
+
+    _style(
+        fig_a,
+        x_title=X_TITLE,
+        y_title=r"$\sigma(\tau_{\mathrm{inf}})/\tau_{\mathrm{sim}}$",
+        y_log=True,
     )
-    
-    fig_signed_rel_err = go.Figure()
-    
-    tau_b_measured_1 = [r.get('tau_b_inferred') for r in results_1]
-    tau_b_signed_rel_err_1 = [
-        compute_signed_rel_error(measured, tau_b_gt)
-        if measured is not None else None
-        for measured in tau_b_measured_1
-    ]
-    
-    fig_signed_rel_err.add_trace(go.Scatter(
-        x=ext_param_ranges_1,
-        y=tau_b_signed_rel_err_1,
-        mode='markers+lines',
-        name='Bending (tau_b)',
-        marker=dict(size=8, color='#1f77b4', opacity=0.7),
-        line=dict(color='#1f77b4', width=2)
-    ))
-    
-    tau_s_measured_2 = [r.get('tau_s_inferred') for r in results_2]
-    tau_s_signed_rel_err_2 = [
-        compute_signed_rel_error(measured, tau_s_gt)
-        if measured is not None else None
-        for measured in tau_s_measured_2
-    ]
-    
-    fig_signed_rel_err.add_trace(go.Scatter(
-        x=ext_param_ranges_2,
-        y=tau_s_signed_rel_err_2,
-        mode='markers+lines',
-        name='Shear (tau_s)',
-        marker=dict(size=8, color='#ff7f0e', opacity=0.7),
-        line=dict(color='#ff7f0e', width=2)
-    ))
-    
-    tau_b_measured_3 = [r.get('tau_b_inferred') for r in results_3]
-    tau_b_signed_rel_err_3 = [
-        compute_signed_rel_error(measured, tau_b_gt)
-        if measured is not None else None
-        for measured in tau_b_measured_3
-    ]
-    
-    tau_s_measured_3 = [r.get('tau_s_inferred') for r in results_3]
-    tau_s_signed_rel_err_3 = [
-        compute_signed_rel_error(measured, tau_s_gt)
-        if measured is not None else None
-        for measured in tau_s_measured_3
-    ]
-    
-    combined_signed_rel_err_3 = [
-        np.sqrt(tau_b**2 + tau_s**2) if tau_b is not None and tau_s is not None and np.isfinite(tau_b) and np.isfinite(tau_s) else None
-        for tau_b, tau_s in zip(tau_b_signed_rel_err_3, tau_s_signed_rel_err_3)
-    ]
-    
-    fig_signed_rel_err.add_trace(go.Scatter(
-        x=ext_param_ranges_3,
-        y=combined_signed_rel_err_3,
-        mode='markers+lines',
-        name='Combined (tau_b+tau_s)',
-        marker=dict(size=8, color='#2ca02c', opacity=0.7, symbol='diamond'),
-        line=dict(color='#2ca02c', width=2, dash='dash')
-    ))
-    
-    fig_signed_rel_err.update_layout(
-        title=dict(
-            text='Signed Relative Error vs External Parameter w₀',
-            font=dict(size=16, color='black')
-        ),
-        xaxis=dict(
-            title=dict(text='w₀', font=dict(size=12)),
-            type='log',
-            gridwidth=1,
-            gridcolor='rgba(128, 128, 128, 0.2)',
-            showgrid=True
-        ),
-        yaxis=dict(
-            title=dict(text='Signed Relative Error', font=dict(size=12)),
-            gridwidth=1,
-            gridcolor='rgba(128, 128, 128, 0.2)',
-            showgrid=True
-        ),
-        hovermode='closest',
-        template='plotly_white',
-        width=1000,
-        height=600,
-        font=dict(size=11),
-        legend=dict(
-            x=1.02, y=1,
-            xanchor='left', yanchor='top',
-            bgcolor='rgba(255, 255, 255, 0.8)',
-            bordercolor='black',
-            borderwidth=1
-        )
+
+    # ---------------- Figure B: (tau_inf - tau_sim) / tau_sim ---------- #
+    tau_b_err_1 = [compute_signed_rel_error(r.get('tau_b_inferred'), tau_b_gt) for r in results_1]
+    tau_s_err_2 = [compute_signed_rel_error(r.get('tau_s_inferred'), tau_s_gt) for r in results_2]
+    tau_b_err_3 = [compute_signed_rel_error(r.get('tau_b_inferred'), tau_b_gt) for r in results_3]
+    tau_s_err_3 = [compute_signed_rel_error(r.get('tau_s_inferred'), tau_s_gt) for r in results_3]
+    comb_err_3 = [_combine(b, s) for b, s in zip(tau_b_err_3, tau_s_err_3)]
+
+    fig_b = go.Figure()
+    fig_b.add_trace(_trace(w0_1, tau_b_err_1, LBL_B, '#1f77b4', 'circle'))
+    fig_b.add_trace(_trace(w0_2, tau_s_err_2, LBL_S, '#ff7f0e', 'square'))
+    fig_b.add_trace(_trace(w0_3, comb_err_3, LBL_C, '#2ca02c', 'diamond', dash='dash'))
+
+    _style(
+        fig_b,
+        x_title=X_TITLE,
+        y_title=r"$|\tau_{\mathrm{inf}}-\tau_{\mathrm{sim}}|/\tau_{\mathrm{sim}}$",
+        y_log=True,
     )
-    
-    return fig_std, fig_signed_rel_err
+
+    # Zoom the y-axis
+    fig_b.update_yaxes(type='log')
+
+    return fig_a, fig_b
+
 
 def plot_fig_S6a(workflow_output, int_param_name, ext_param_name='w0', metric='std') -> go.Figure:
     """
@@ -3485,8 +3667,8 @@ def plot_fig_S6a(workflow_output, int_param_name, ext_param_name='w0', metric='s
         height=600,
         font=dict(size=11),
         legend=dict(
-            x=1.02, y=1,
-            xanchor='left', yanchor='top',
+            x=0.98, y=0.98,
+            xanchor='right', yanchor='top',
             bgcolor='rgba(255, 255, 255, 0.8)',
             bordercolor='black',
             borderwidth=1
@@ -3996,19 +4178,19 @@ if __name__ == "__main__":
     int_params_metadata = simulation_output['int_params_metadata']
     ext_params_list = simulation_output['ext_params_list']
 
-    fig_S1_a, fig_S1_b = plot_fig_S1(
-        model_lists, int_params_metadata, ext_params_list,
-        int_param_name='N', ext_param_name='A',
-        x_label='x', y_label='y',
-        colorscale='Turbo', log_scale=False
-    )
+    # fig_S1_a, fig_S1_b = plot_fig_S1(
+    #     model_lists, int_params_metadata, ext_params_list,
+    #     int_param_name='N', ext_param_name='A',
+    #     x_label='x', y_label='y',
+    #     colorscale='Turbo', log_scale=False
+    # )
 
-    fig_S1_a.write_image("Figures/fig_S1a.pdf")
-    fig_S1_a.write_html("Figures/fig_S1a.html")
+    # fig_S1_a.write_image("Figures/fig_S1a.pdf")
+    # fig_S1_a.write_html("Figures/fig_S1a.html")
     # fig_S1_a.show()
 
-    fig_S1_b.write_image("Figures/fig_S1b.pdf")
-    fig_S1_b.write_html("Figures/fig_S1b.html")
+    # fig_S1_b.write_image("Figures/fig_S1b.pdf")
+    # fig_S1_b.write_html("Figures/fig_S1b.html")
     # fig_S1_b.show()
 
     # --------------------- #
@@ -4040,19 +4222,19 @@ if __name__ == "__main__":
     int_params_metadata = simulation_output['int_params_metadata']
     ext_params_list = simulation_output['ext_params_list']
 
-    fig_1_a, fig_1_b = plot_fig_1(
-        model_lists, int_params_metadata, ext_params_list,
-        int_param_name='Beta', ext_param_name='A',
-        x_label='x', y_label='y',
-        colorscale='RdYlBu_r',
-    )
+    # fig_1_a, fig_1_b = plot_fig_1(
+    #     model_lists, int_params_metadata, ext_params_list,
+    #     int_param_name='Beta', ext_param_name='A',
+    #     x_label='x', y_label='y',
+    #     colorscale='RdYlBu_r',
+    # )
 
-    fig_1_a.write_image("Figures/fig_1a.pdf")
-    fig_1_a.write_html("Figures/fig_1a.html")
+    # fig_1_a.write_image("Figures/fig_1a.pdf")
+    # fig_1_a.write_html("Figures/fig_1a.html")
     # fig_1_a.show()
 
-    fig_1_b.write_image("Figures/fig_1b.pdf")
-    fig_1_b.write_html("Figures/fig_1b.html")
+    # fig_1_b.write_image("Figures/fig_1b.pdf")
+    # fig_1_b.write_html("Figures/fig_1b.html")
     # fig_1_b.show()
 
     # ------------------------------------------ #
@@ -4138,19 +4320,19 @@ if __name__ == "__main__":
     ext_params_list = simulation_output['ext_params_list']
     sim_params_list = simulation_output['sim_params_list']
 
-    fig_2_a, fig_2_b = plot_fig_2(
-        model_lists, int_params_metadata, ext_params_list, sim_params_list,
-        int_param_name='tau_b', ext_param_name='A',
-        x_label='time', y_label='y / y_max',
-        colorscale='Viridis',
-    )
+    # fig_2_a, fig_2_b = plot_fig_2(
+    #     model_lists, int_params_metadata, ext_params_list, sim_params_list,
+    #     int_param_name='tau_b', ext_param_name='A',
+    #     x_label='time', y_label='y / y_max',
+    #     colorscale='Viridis',
+    # )
 
-    fig_2_a.write_image("Figures/fig_2a.pdf")
-    fig_2_a.write_html("Figures/fig_2a.html")
+    # fig_2_a.write_image("Figures/fig_2a.pdf")
+    # fig_2_a.write_html("Figures/fig_2a.html")
     # fig_2_a.show()
 
-    fig_2_b.write_image("Figures/fig_2b.pdf")
-    fig_2_b.write_html("Figures/fig_2a.html")
+    # fig_2_b.write_image("Figures/fig_2b.pdf")
+    # fig_2_b.write_html("Figures/fig_2a.html")
     # fig_2_b.show()
 
     # ------------------------------------------------- #
@@ -4182,18 +4364,18 @@ if __name__ == "__main__":
     ext_params_list = simulation_output['ext_params_list']
     sim_params_list = simulation_output['sim_params_list']
 
-    fig_3_a, fig_3_b = plot_fig_3(
-        model_lists, int_params_metadata, ext_params_list, sim_params_list,
-        int_param_name='tau_b', 
-        ext_param_name='w0',
-    )
+    # fig_3_a, fig_3_b = plot_fig_3(
+    #     model_lists, int_params_metadata, ext_params_list, sim_params_list,
+    #     int_param_name='tau_b', 
+    #     ext_param_name='w0',
+    # )
 
-    fig_3_a.write_image("Figures/fig_3a.pdf")
-    fig_3_a.write_html("Figures/fig_3a.html")
+    # fig_3_a.write_image("Figures/fig_3a.pdf")
+    # fig_3_a.write_html("Figures/fig_3a.html")
     # fig_3_a.show()
 
-    fig_3_b.write_image("Figures/fig_3b.pdf")
-    fig_3_b.write_html("Figures/fig_3b.html")
+    # fig_3_b.write_image("Figures/fig_3b.pdf")
+    # fig_3_b.write_html("Figures/fig_3b.html")
     # fig_3_b.show()    
 
     # ----------------------------------------- #
@@ -4286,23 +4468,20 @@ if __name__ == "__main__":
 
     fig_5_a.write_image("Figures/fig_5a.pdf")
     fig_5_a.write_html("Figures/fig_5a.html")
-    # fig_5_a.show()
+    fig_5_a.show()
 
     fig_5_b.write_image("Figures/fig_5b.pdf")
     fig_5_b.write_html("Figures/fig_5b.html")
-    # fig_5_b.show()
-
-    exit()
+    fig_5_b.show()
 
     # ------------------------------------------------ #
     # Figure S4: Hessian decrease for bending filament #
     # ------------------------------------------------ #
 
     # Small logarithmic perturbations around 1
-    epsilon = 0.01  # log-scale offset (in powers of 10)
-    n_points = 5  # number of points on each side of 1
-    log_offsets = np.linspace(-epsilon, epsilon, num=2*n_points + 1)
-    Sp4_vec = np.power(10, log_offsets)  
+    epsilon = 0.001  # log-scale offset (in powers of 10)
+    # Linear perturbations around Sp4 = 1: 0.1% steps, up to 5% on each side
+    Sp4_vec = 1 + epsilon* np.arange(-50, 51)   # 0.950 ... 1.050, 101 points
     int_param_ranges = {'Sp4': Sp4_vec}
 
     A_vec = np.pow(10, np.linspace(start=-6, stop=-1, num=12))
@@ -4326,20 +4505,19 @@ if __name__ == "__main__":
     reference_index = np.argmin(np.abs(Sp4_vec - Sp4_star))
     reference_model_list = model_lists[reference_index]
 
-    fig_S4a, _ = plot_fig_S4(
-        model_lists=model_lists,
-        int_params_metadata=int_params_metadata,
-        ext_params_list=ext_params_list,
-        reference_model_list=reference_model_list,
-        int_param_name='Sp4',
-        ext_param_name='A',
-        distance_fn=rel_mse,
-        title_a="Distance vs Sp4 (All Amplitudes)",
-    )
+    # fig_S4a, _ = plot_fig_S4(
+    #     model_lists=model_lists,
+    #     int_params_metadata=int_params_metadata,
+    #     ext_params_list=ext_params_list,
+    #     reference_model_list=reference_model_list,
+    #     int_param_name='Sp4',
+    #     ext_param_name='A',
+    #     distance_fn=rel_mse,
+    # )
 
-    fig_S4a.write_image("Figures/fig_S4a.pdf")
-    fig_S4a.write_html("Figures/fig_S4a.html")
-    fig_S4a.show()
+    # fig_S4a.write_image("Figures/fig_S4a.pdf")
+    # fig_S4a.write_html("Figures/fig_S4a.html")
+    # fig_S4a.show()
 
     # ============================================================================
     # FIGURE S4B: Tip displacement vs A (color-coded by Sp4)
@@ -4365,32 +4543,28 @@ if __name__ == "__main__":
     int_params_metadata = simulation_output['int_params_metadata']
     ext_params_list = simulation_output['ext_params_list']
 
-    _, fig_S4b = plot_fig_S4(
-        model_lists=model_lists,
-        int_params_metadata=int_params_metadata,
-        ext_params_list=ext_params_list,
-        reference_model_list=reference_model_list,  # Not needed for fig B
-        int_param_name='Sp4',
-        ext_param_name='A',
-        title_b="Tip Displacement vs A (color-coded by Sp4)",
-        colorscale='Viridis',
-    )
+    # _, fig_S4b = plot_fig_S4(
+    #     model_lists=model_lists,
+    #     int_params_metadata=int_params_metadata,
+    #     ext_params_list=ext_params_list,
+    #     reference_model_list=reference_model_list,  # Not needed for fig B
+    #     int_param_name='Sp4',
+    #     ext_param_name='A',
+    #     colorscale='Viridis',
+    # )
 
-    fig_S4b.write_image("Figures/fig_S4b.pdf")
-    fig_S4b.write_html("Figures/fig_S4b.html")
-    fig_S4b.show()
+    # fig_S4b.write_image("Figures/fig_S4b.pdf")
+    # fig_S4b.write_html("Figures/fig_S4b.html")
+    # fig_S4b.show()
 
     # ---------------------------------------------- #
     # Figure S5: Hessian decrease for shear filament #
     # ---------------------------------------------- #
 
-    # Small logarithmic perturbations around 1
-    epsilon = 0.01  # log-scale offset (in powers of 10)
-    n_points = 5  # number of points on each side of 1
-    log_offsets = np.linspace(-epsilon, epsilon, num=2*n_points + 1)
-    Beta_vec =  np.power(10, log_offsets)  
+    # Linear perturbations around Beta = 1: 0.1% steps, up to 5% on each side
+    epsilon = 0.001
+    Beta_vec = 1 + epsilon * np.arange(-50, 51)   # 0.950 ... 1.050, 101 points
     int_param_ranges = {'Beta': Beta_vec}
-
     A_vec = np.pow(10, np.linspace(start=-4, stop=1, num = 12))
     ext_param_ranges = {'A': A_vec}
 
@@ -4414,21 +4588,20 @@ if __name__ == "__main__":
     reference_index = np.argmin(np.abs(Beta_vec - Beta_star))
     reference_model_list = model_lists[reference_index]
 
-    fig_S5a, _ = plot_fig_S5(
-        model_lists=model_lists,
-        int_params_metadata=int_params_metadata,
-        ext_params_list=ext_params_list,
-        reference_model_list=reference_model_list,
-        int_param_name='Beta',
-        ext_param_name='A',
-        distance_fn=rel_mse,
-        title_a="Distance vs Beta (All Amplitudes)",
-        colorscale='Viridis',
-    )
+    # fig_S5a, _ = plot_fig_S5(
+    #     model_lists=model_lists,
+    #     int_params_metadata=int_params_metadata,
+    #     ext_params_list=ext_params_list,
+    #     reference_model_list=reference_model_list,
+    #     int_param_name='Beta',
+    #     ext_param_name='A',
+    #     distance_fn=rel_mse,
+    #     colorscale='Viridis',
+    # )
 
-    fig_S5a.write_image("Figures/fig_S5a.pdf")
-    fig_S5a.write_html("Figures/fig_S5a.html")
-    fig_S5a.show()
+    # fig_S5a.write_image("Figures/fig_S5a.pdf")
+    # fig_S5a.write_html("Figures/fig_S5a.html")
+    # fig_S5a.show()
 
     # ============================================================================
     # FIGURE S5B: Tip Displacement vs A (Color-coded by Beta)
@@ -4451,22 +4624,20 @@ if __name__ == "__main__":
     int_params_metadata = simulation_output['int_params_metadata']
     ext_params_list = simulation_output['ext_params_list']
 
+    # _, fig_S5b = plot_fig_S5(
+    #     model_lists=model_lists,
+    #     int_params_metadata=int_params_metadata,
+    #     ext_params_list=ext_params_list,
+    #     reference_model_list=reference_model_list,
+    #     int_param_name='Beta',
+    #     ext_param_name='A',
+    #     distance_fn=rel_mse,
+    #     colorscale='Viridis',
+    # )
 
-    _, fig_S5b = plot_fig_S5(
-        model_lists=model_lists,
-        int_params_metadata=int_params_metadata,
-        ext_params_list=ext_params_list,
-        reference_model_list=reference_model_list,
-        int_param_name='Beta',
-        ext_param_name='A',
-        distance_fn=rel_mse,
-        title_a="Distance vs Beta (All Amplitudes)",
-        colorscale='Viridis',
-    )
-
-    fig_S5b.write_image("Figures/fig_S5b.pdf")
-    fig_S5b.write_html("Figures/fig_S5b.html")
-    fig_S5b.show()
+    # fig_S5b.write_image("Figures/fig_S5b.pdf")
+    # fig_S5b.write_html("Figures/fig_S5b.html")
+    # fig_S5b.show()
 
     # =========
     # VIDEO S5c
@@ -4495,17 +4666,17 @@ if __name__ == "__main__":
     ext_params_list = simulation_output['ext_params_list']        
 
     # Create figure
-    fig_S5c = plot_vid_S5c(
-        model_lists=model_lists,
-        int_params_metadata=int_params_metadata,
-        ext_params_list=ext_params_list,
-        int_param_name='Beta',
-        ext_param_name='A',
-        x_label='x',
-        y_label='y',
-        colorscale='Viridis',
-        log_scale=False,
-    )
+    # fig_S5c = plot_vid_S5c(
+    #     model_lists=model_lists,
+    #     int_params_metadata=int_params_metadata,
+    #     ext_params_list=ext_params_list,
+    #     int_param_name='Beta',
+    #     ext_param_name='A',
+    #     x_label='x',
+    #     y_label='y',
+    #     colorscale='Viridis',
+    #     log_scale=False,
+    # )
 
     # Save and display
     # fig_S5c.write_image("Figures/filament_color_Beta_subplot_A.pdf")
@@ -4517,7 +4688,7 @@ if __name__ == "__main__":
     # --------------------- #
 
     # ----------- #
-    # Figure 6: ? #
+    # Figure 6    #
     # ----------- #
 
     optimizer = dual_annealing_optimizer_three_pass
@@ -4591,7 +4762,7 @@ if __name__ == "__main__":
     fig_6_a, fig_6_b = plot_fig_6(
         workflow_output_bending_visc,
         workflow_output_shear_visc,
-        workflow_output_bending_shear_visc
+        workflow_output_bending_shear_visc,
     )
 
     fig_6_a.write_image("Figures/fig_6a.pdf")
@@ -4601,6 +4772,8 @@ if __name__ == "__main__":
     fig_6_b.write_image("Figures/fig_6b.pdf")
     fig_6_b.write_html("Figures/fig_6b.html")
     fig_6_b.show()
+    
+    exit()
 
     # ----------- #
     # Figure S6   #
