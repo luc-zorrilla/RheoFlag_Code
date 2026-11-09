@@ -1822,177 +1822,263 @@ def plot_fig_1(
     
     return fig_1_a, fig_1_b
 
-
 def plot_fig_2(
     model_lists: Dict[int, ModelList],
     int_params_metadata: List[Dict[str, Any]],
     ext_params_list: List[Dict[str, Any]],
     sim_params_list: List[Dict[str, Any]],
-    int_param_name: str = 'Sp4',
+    int_param_name: str = 'tau_b',
     ext_param_name: str = 'A',
     sim_param_name: str = 'T_eval',
-    title: Optional[str] = None,
-    x_label: str = "x",
-    y_label: str = "y",
+    x_label: str = "time",
+    y_label: str = "y / y_max",
     colorscale: str = 'Viridis',
-) -> go.Figure:
+) -> Tuple[go.Figure, go.Figure]:
     """
     Args:
         model_lists: Dictionary mapping indices to ModelList objects
         int_params_metadata: List of dicts, each containing internal parameter values
         ext_params_list: List of external parameter dicts (each with 'A' key)
-        int_param_name: Name of the internal parameter for subplots (e.g., 'Sp4')
-        ext_param_name: Name of the external parameter for coloring (e.g., 'A')
-        title: Plot title
-        x_label: X-axis label
-        y_label: Y-axis label
-        log_scale: Whether to use log scale for axes
+        sim_params_list: List of simulation parameter dicts (each with 'T_eval' key)
+        int_param_name: Name of the internal parameter used for coloring (e.g., 'tau_b')
+        ext_param_name: Name of the external parameter (e.g., 'A')
+        sim_param_name: Name of the simulation parameter used as x-data (e.g., 'T_eval')
+        x_label: X-axis label of the trajectory plot
+        y_label: Y-axis label of the trajectory plot
         colorscale: Plotly colorscale name (e.g., 'Viridis', 'Blues', 'Reds')
-    
+
     Returns:
-        Plotly Figure with subplots
+        Tuple of two Plotly figures: trajectories (colored by tau_b on a log scale)
+        and timescales (tau_b_inf versus tau_b_sim)
     """
+    # Publication style shared by both panels
+    font_family = "Times New Roman, Times, serif"
+    axis_style = dict(
+        showline=True,
+        linecolor='black',
+        linewidth=1.2,
+        mirror=True,
+        ticks='outside',
+        tickwidth=1.2,
+        ticklen=6,
+        showgrid=False,
+        zeroline=False,
+        title_font=dict(size=16),
+        tickfont=dict(size=14),
+    )
+
     # Extract internal and external parameter values
     int_param_values = [params_dict[int_param_name] for params_dict in int_params_metadata]
     ext_param_values = [ext_dict[ext_param_name] for ext_dict in ext_params_list]
     sim_param_values = [sim_dict[sim_param_name] for sim_dict in sim_params_list]
-    
-    n_internal = len(int_param_values)
-    
-    # Create plots
+
+    # ---- Logarithmic colormap (all tau_b values are positive) ----
+    log_vals = [np.log10(v) for v in int_param_values]
+    cmin = min(log_vals)
+    cmax = max(log_vals)
+    if cmax == cmin:
+        cmax = cmin + 1.0  # avoid division by zero for a single value
+
+    int_param_norm = [(c - cmin) / (cmax - cmin) for c in log_vals]
+    colors_int = px.colors.sample_colorscale(colorscale, int_param_norm)
+
+    # One colorbar tick per decade
+    decade_min = int(np.ceil(cmin - 1e-9))
+    decade_max = int(np.floor(cmax + 1e-9))
+    tickvals = [float(k) for k in range(decade_min, decade_max + 1)]
+    ticktext = [f"10<sup>{k}</sup>" for k in range(decade_min, decade_max + 1)]
+
     fig_2_a = go.Figure()
     fig_2_b = go.Figure()
-
-    if len(int_param_values) > 1:
-        # Normalize internal parameter values for colormap
-        int_param_min = min(int_param_values)
-        int_param_max = max(int_param_values)
-        int_param_norm = [
-            (val - int_param_min) / (int_param_max - int_param_min) 
-            for val in int_param_values
-        ]
-    else: # Only one internal parameter
-        int_param_norm = [0]
-
-    # Get colors for external parameters
-    colors_int = px.colors.sample_colorscale(
-        colorscale, 
-        int_param_norm,
-    )
 
     tau_b_list = []
     tau_fit_list = []
 
-    # Plot one trace per external parameter in each subplot
     for int_idx in sorted(model_lists.keys()):
         model_list = model_lists[int_idx]
         int_param_val = int_param_values[int_idx]
-        
-        # Iterate through all external parameters
+
         for ext_idx in range(len(model_list.models)):
             model = model_list.models[ext_idx]
             ext_param_val = ext_param_values[ext_idx]
-            sim_param_val = sim_param_values[ext_idx] # sim params depend on ext_params
-            
-            if model.sim_output is not None:
-                output_data = model.sim_output
-                # Handle both array and dict outputs
-                if isinstance(output_data, dict) and 'value' in output_data:
-                    output_data = output_data['value']
-                
-                output_array = np.array(output_data)
-                
-                if output_array.size > 1:
-                    output_array = np.atleast_1d(output_array)
+            sim_param_val = sim_param_values[ext_idx]
 
-                    # Apply X3N transformation
-                    X_3N = np.transpose(np.array([X3N(output_array[:,t]) for t in range(output_array.shape[1])]).squeeze())
-                    
-                    N = X_3N.shape[0] // 3
-                    
-                    # Extract time and tip trajectory
-                    y_tip = X_3N[int(2*N-1), :]/X_3N[int(2*N-1), 0]
-                    T_eval = sim_param_val
+            if model.sim_output is None:
+                continue
 
-                    # Extract timescales: log(y_tip) = -(1/tau) * T_eval + intercept
-                    log_y_tip = np.log(y_tip)
-                    slope, intercept, r_value, p_value, std_err = stats.linregress(T_eval, log_y_tip)
-                    tau_fit_list.append(-1 / slope)
+            output_data = model.sim_output
+            if isinstance(output_data, dict) and 'value' in output_data:
+                output_data = output_data['value']
 
-                    # print(f"Timescale tau: {tau_fit:.6e}")
+            output_array = np.atleast_1d(np.array(output_data))
+            if output_array.size <= 1:
+                continue
 
-                    tau_b_list.append(int_param_val)
+            # Apply X3N transformation
+            X_3N = np.transpose(
+                np.array([X3N(output_array[:, t]) for t in range(output_array.shape[1])]).squeeze()
+            )
+            N = X_3N.shape[0] // 3
 
-                    fig_2_a.add_trace(
-                        go.Scatter(
-                            x = T_eval, # /timescale,
-                            y = y_tip,
-                            mode='lines',
-                            hovertemplate=(
-                                f"<b>{x_label}</b>: %{{x:.6e}}<br>"
-                                f"<b>{y_label}</b>: %{{y:.6e}}<br>"
-                                f"<b>{int_param_name}</b>: {int_param_val:.4f}<br>"
-                                f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
-                            ),
-                            line=dict(width=2, color=colors_int[int_idx]),
-                        ),
-                    )
-        
-        fig_2_b.add_trace(
-            go.Scatter(
-                x = tau_b_list,
-                y = tau_fit_list,
-                mode='markers',
+            # Tip trajectory normalized by its initial value
+            y_tip = X_3N[int(2 * N - 1), :] / X_3N[int(2 * N - 1), 0]
+            T_eval = sim_param_val
+
+            # Normalize by the maximum of the trajectory
+            y_max = np.max(y_tip)
+            y_plot = y_tip / y_max
+
+            # Timescale fit: log(y_tip) = -(1/tau) * T_eval + intercept
+            slope, intercept, r_value, p_value, std_err = stats.linregress(T_eval, np.log(y_tip))
+            tau_fit_list.append(-1 / slope)
+            tau_b_list.append(int_param_val)
+
+            fig_2_a.add_trace(
+                go.Scatter(
+                    x=T_eval,
+                    y=y_plot,
+                    mode='lines',
+                    showlegend=False,
+                    hovertemplate=(
+                        f"<b>{x_label}</b>: %{{x:.6e}}<br>"
+                        f"<b>{y_label}</b>: %{{y:.6e}}<br>"
+                        f"<b>{int_param_name}</b>: {int_param_val:.4e}<br>"
+                        f"<b>{ext_param_name}</b>: {ext_param_val:.2e}<extra></extra>"
+                    ),
+                    line=dict(width=1.8, color=colors_int[int_idx]),
+                )
+            )
+
+    # Invisible trace that carries the continuous logarithmic colorbar
+    fig_2_a.add_trace(
+        go.Scatter(
+            x=[None],
+            y=[None],
+            mode='markers',
+            showlegend=False,
+            hoverinfo='skip',
+            marker=dict(
+                colorscale=colorscale,
+                cmin=cmin,
+                cmax=cmax,
+                color=[cmin],
+                showscale=True,
+                colorbar=dict(
+                    title=dict(text="τ<sub>b</sub>", font=dict(size=16)),
+                    tickmode='array',
+                    tickvals=tickvals,
+                    ticktext=ticktext,
+                    tickfont=dict(size=14),
+                    outlinewidth=1.2,
+                    outlinecolor='black',
+                ),
             ),
         )
+    )
 
+    # Timescale plot: tau_b_inf versus tau_b_sim
+    if tau_fit_list:
+        tau_eh = tau_fit_list[0]
         tau_b_array = np.logspace(-3, 9, int(1e3))
-        tau_eh_array = np.ones_like(tau_b_array) * tau_fit_list[0]
+        tau_eh_array = np.ones_like(tau_b_array) * tau_eh
         tau_sum_array = tau_b_array + tau_eh_array
 
+        # Black dots: fitted tau_b_inf from the simulations
         fig_2_b.add_trace(
             go.Scatter(
-                x = tau_b_array,
-                y = tau_eh_array,
-                mode='lines',
-            ),
+                x=tau_b_list,
+                y=tau_fit_list,
+                mode='markers',
+                name="τ<sub>b,inf</sub>",
+                marker=dict(color='black', size=8),
+            )
         )
-
+        # Dashed line: tau_b_inf = tau_eh
         fig_2_b.add_trace(
             go.Scatter(
-                x = tau_b_array,
-                y = tau_b_array,
+                x=tau_b_array,
+                y=tau_eh_array,
                 mode='lines',
-            ),
+                name="τ<sub>b,inf</sub> = τ<sub>eh</sub>",
+                line=dict(color='black', width=1.8, dash='dash'),
+            )
         )
-
+        # Different dashed line: tau_b_inf = tau_b
         fig_2_b.add_trace(
             go.Scatter(
-                x = tau_b_array,
-                y = tau_sum_array,
+                x=tau_b_array,
+                y=tau_b_array,
                 mode='lines',
-            ),
+                name="τ<sub>b,inf</sub> = τ<sub>b</sub>",
+                line=dict(color='black', width=1.8, dash='dot'),
+            )
+        )
+        # Red line with opacity 0.7: tau_b_inf = tau_eh + tau_b
+        fig_2_b.add_trace(
+            go.Scatter(
+                x=tau_b_array,
+                y=tau_sum_array,
+                mode='lines',
+                name="τ<sub>b,inf</sub> = τ<sub>eh</sub> + τ<sub>b</sub>",
+                line=dict(color='red', width=2),
+                opacity=0.7,
+            )
         )
 
-    # Update axes
-    fig_2_a.update_xaxes(title_text=x_label)
-    fig_2_a.update_yaxes(title_text=y_label, type = 'log')
+    # Axes for the trajectory plot
+    fig_2_a.update_xaxes(title_text=x_label, **axis_style)
+    fig_2_a.update_yaxes(title_text=y_label, type='log', exponentformat='power', **axis_style)
 
-    fig_2_b.update_xaxes(type = 'log')
-    fig_2_b.update_yaxes(type = 'log')    
-    
-    if title is None:
-        title = f"Trajectories color-coded by {int_param_name})"
-    
+    # Axes for the timescale plot
+    fig_2_b.update_xaxes(
+        title_text="τ<sub>b,sim</sub>",
+        type='log',
+        exponentformat='power',
+        **axis_style,
+    )
+    fig_2_b.update_yaxes(
+        title_text="τ<sub>b,inf</sub>",
+        type='log',
+        exponentformat='power',
+        **axis_style,
+    )
+
+    # Layout for both panels: no title, white background, serif font
+    common_layout = dict(
+        template='simple_white',
+        font=dict(family=font_family, size=14, color='black'),
+        paper_bgcolor='white',
+        plot_bgcolor='white',
+        margin=dict(l=90, r=40, t=40, b=80),
+    )
+
     fig_2_a.update_layout(
-        title=title,
+        **common_layout,
+        showlegend=False,
         hovermode='closest',
-        legend=dict(title=int_param_name),
-        height=800,
-        width=1400,
+        height=600,
+        width=900,
+    )
+
+    fig_2_b.update_layout(
+        **common_layout,
+        showlegend=True,
+        legend=dict(
+            x=0.03,
+            y=0.97,
+            xanchor='left',
+            yanchor='top',
+            bgcolor='rgba(255,255,255,1)',
+            bordercolor='black',
+            borderwidth=1,
+            font=dict(size=13),
+        ),
+        height=600,
+        width=700,
     )
 
     return fig_2_a, fig_2_b
+
 
 def plot_fig_3(
     model_lists: Dict[int, ModelList],
@@ -3980,8 +4066,6 @@ if __name__ == "__main__":
     fig_1_b.write_html("Figures/counterbend_b.html")
     fig_1_b.show()
 
-    exit()
-
     # ------------------------------------------ #
     # Figure 2: Relaxation of a bending filament #
     # ------------------------------------------ #
@@ -4037,7 +4121,7 @@ if __name__ == "__main__":
                             X_0_fig_2 = output_array
 
     N_vec = np.array([N])
-    tau_b_vec = np.array([0, 1e0, 1e1, 1e2, 1e3, 1e4, 1e5])
+    tau_b_vec = np.array([1e-3, 1e0, 1e1, 1e2, 1e3, 1e4, 1e5])
     X_0 = [X_0_fig_2]
     int_param_ranges = {'N': N_vec, 'tau_b': tau_b_vec, 'X_0':X_0}
     
@@ -4068,7 +4152,7 @@ if __name__ == "__main__":
     fig_2_a, fig_2_b = plot_fig_2(
         model_lists, int_params_metadata, ext_params_list, sim_params_list,
         int_param_name='tau_b', ext_param_name='A',
-        x_label='x', y_label='y',
+        x_label='time', y_label='y / y_max',
         colorscale='Viridis',
     )
 
@@ -4079,6 +4163,8 @@ if __name__ == "__main__":
     fig_2_b.write_image("Figures/relaxation_timescale.svg")
     fig_2_b.write_html("Figures/relaxation_timescale.html")
     fig_2_b.show()
+
+    exit()
 
     # ------------------------------------------------- #
     # -------- II. Spring-Dashpot Simplification ------ #
