@@ -1,420 +1,906 @@
 {
   "stage": "simulation",
-  "timestamp": "2026-09-26 12:28:15.134404",
+  "timestamp": "2026-11-10 14:03:31.257234",
   "simulation_entries": {
-    "int_2_pair_all": {
-      "task_key": "int_2_pair_all",
+    "int_10_pair_all": {
+      "task_key": "int_10_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:39.693183",
-      "filepath": "artifacts/models/int_2_pair_all.pkl"
-    },
-    "int_0_pair_all": {
-      "task_key": "int_0_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:40.088488",
-      "filepath": "artifacts/models/int_0_pair_all.pkl"
-    },
-    "int_5_pair_all": {
-      "task_key": "int_5_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:40.405583",
-      "filepath": "artifacts/models/int_5_pair_all.pkl"
-    },
-    "int_1_pair_all": {
-      "task_key": "int_1_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:40.815952",
-      "filepath": "artifacts/models/int_1_pair_all.pkl"
-    },
-    "int_4_pair_all": {
-      "task_key": "int_4_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:41.199610",
-      "filepath": "artifacts/models/int_4_pair_all.pkl"
-    },
-    "int_3_pair_all": {
-      "task_key": "int_3_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:41.321079",
-      "filepath": "artifacts/models/int_3_pair_all.pkl"
-    },
-    "int_6_pair_all": {
-      "task_key": "int_6_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:41.577301",
-      "filepath": "artifacts/models/int_6_pair_all.pkl"
-    },
-    "int_7_pair_all": {
-      "task_key": "int_7_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:41.938171",
-      "filepath": "artifacts/models/int_7_pair_all.pkl"
+      "timestamp": "2026-11-10 14:02:53.591760",
+      "filepath": "artifacts/models/int_10_pair_all.pkl"
     },
     "int_8_pair_all": {
       "task_key": "int_8_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:43.529330",
+      "timestamp": "2026-11-10 14:02:53.667200",
       "filepath": "artifacts/models/int_8_pair_all.pkl"
     },
     "int_9_pair_all": {
       "task_key": "int_9_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:43.557309",
+      "timestamp": "2026-11-10 14:02:53.776849",
       "filepath": "artifacts/models/int_9_pair_all.pkl"
-    },
-    "int_11_pair_all": {
-      "task_key": "int_11_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:44.374635",
-      "filepath": "artifacts/models/int_11_pair_all.pkl"
-    },
-    "int_10_pair_all": {
-      "task_key": "int_10_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:44.729009",
-      "filepath": "artifacts/models/int_10_pair_all.pkl"
-    },
-    "int_12_pair_all": {
-      "task_key": "int_12_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:44.752784",
-      "filepath": "artifacts/models/int_12_pair_all.pkl"
-    },
-    "int_13_pair_all": {
-      "task_key": "int_13_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:45.309837",
-      "filepath": "artifacts/models/int_13_pair_all.pkl"
     },
     "int_14_pair_all": {
       "task_key": "int_14_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:45.397662",
+      "timestamp": "2026-11-10 14:02:53.925199",
       "filepath": "artifacts/models/int_14_pair_all.pkl"
+    },
+    "int_2_pair_all": {
+      "task_key": "int_2_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:02:54.290091",
+      "filepath": "artifacts/models/int_2_pair_all.pkl"
+    },
+    "int_1_pair_all": {
+      "task_key": "int_1_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:02:54.343744",
+      "filepath": "artifacts/models/int_1_pair_all.pkl"
+    },
+    "int_13_pair_all": {
+      "task_key": "int_13_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:02:54.351549",
+      "filepath": "artifacts/models/int_13_pair_all.pkl"
     },
     "int_15_pair_all": {
       "task_key": "int_15_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:46.906988",
+      "timestamp": "2026-11-10 14:02:54.462816",
       "filepath": "artifacts/models/int_15_pair_all.pkl"
-    },
-    "int_16_pair_all": {
-      "task_key": "int_16_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:47.620686",
-      "filepath": "artifacts/models/int_16_pair_all.pkl"
-    },
-    "int_17_pair_all": {
-      "task_key": "int_17_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:48.185023",
-      "filepath": "artifacts/models/int_17_pair_all.pkl"
-    },
-    "int_20_pair_all": {
-      "task_key": "int_20_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:48.505369",
-      "filepath": "artifacts/models/int_20_pair_all.pkl"
     },
     "int_18_pair_all": {
       "task_key": "int_18_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:48.878108",
+      "timestamp": "2026-11-10 14:02:54.463852",
       "filepath": "artifacts/models/int_18_pair_all.pkl"
+    },
+    "int_4_pair_all": {
+      "task_key": "int_4_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:02:54.506132",
+      "filepath": "artifacts/models/int_4_pair_all.pkl"
+    },
+    "int_6_pair_all": {
+      "task_key": "int_6_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:02:54.552958",
+      "filepath": "artifacts/models/int_6_pair_all.pkl"
+    },
+    "int_12_pair_all": {
+      "task_key": "int_12_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:02:54.601931",
+      "filepath": "artifacts/models/int_12_pair_all.pkl"
     },
     "int_19_pair_all": {
       "task_key": "int_19_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:48.975292",
+      "timestamp": "2026-11-10 14:02:54.632651",
       "filepath": "artifacts/models/int_19_pair_all.pkl"
     },
-    "int_21_pair_all": {
-      "task_key": "int_21_pair_all",
+    "int_17_pair_all": {
+      "task_key": "int_17_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:49.160338",
-      "filepath": "artifacts/models/int_21_pair_all.pkl"
+      "timestamp": "2026-11-10 14:02:54.634273",
+      "filepath": "artifacts/models/int_17_pair_all.pkl"
+    },
+    "int_3_pair_all": {
+      "task_key": "int_3_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:02:54.701303",
+      "filepath": "artifacts/models/int_3_pair_all.pkl"
+    },
+    "int_16_pair_all": {
+      "task_key": "int_16_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:02:54.878686",
+      "filepath": "artifacts/models/int_16_pair_all.pkl"
+    },
+    "int_5_pair_all": {
+      "task_key": "int_5_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:02:54.935299",
+      "filepath": "artifacts/models/int_5_pair_all.pkl"
+    },
+    "int_11_pair_all": {
+      "task_key": "int_11_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:02:54.938429",
+      "filepath": "artifacts/models/int_11_pair_all.pkl"
+    },
+    "int_7_pair_all": {
+      "task_key": "int_7_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:02:54.945665",
+      "filepath": "artifacts/models/int_7_pair_all.pkl"
+    },
+    "int_0_pair_all": {
+      "task_key": "int_0_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:02:54.955927",
+      "filepath": "artifacts/models/int_0_pair_all.pkl"
     },
     "int_22_pair_all": {
       "task_key": "int_22_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:49.572011",
+      "timestamp": "2026-11-10 14:02:59.471700",
       "filepath": "artifacts/models/int_22_pair_all.pkl"
+    },
+    "int_20_pair_all": {
+      "task_key": "int_20_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:02:59.491197",
+      "filepath": "artifacts/models/int_20_pair_all.pkl"
+    },
+    "int_30_pair_all": {
+      "task_key": "int_30_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:00.121461",
+      "filepath": "artifacts/models/int_30_pair_all.pkl"
     },
     "int_23_pair_all": {
       "task_key": "int_23_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:50.687292",
+      "timestamp": "2026-11-10 14:03:00.144939",
       "filepath": "artifacts/models/int_23_pair_all.pkl"
+    },
+    "int_32_pair_all": {
+      "task_key": "int_32_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:00.167570",
+      "filepath": "artifacts/models/int_32_pair_all.pkl"
     },
     "int_25_pair_all": {
       "task_key": "int_25_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:51.017761",
+      "timestamp": "2026-11-10 14:03:00.312302",
       "filepath": "artifacts/models/int_25_pair_all.pkl"
+    },
+    "int_26_pair_all": {
+      "task_key": "int_26_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:00.335603",
+      "filepath": "artifacts/models/int_26_pair_all.pkl"
+    },
+    "int_21_pair_all": {
+      "task_key": "int_21_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:00.336084",
+      "filepath": "artifacts/models/int_21_pair_all.pkl"
     },
     "int_24_pair_all": {
       "task_key": "int_24_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:51.136738",
+      "timestamp": "2026-11-10 14:03:00.396895",
       "filepath": "artifacts/models/int_24_pair_all.pkl"
     },
     "int_28_pair_all": {
       "task_key": "int_28_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:51.845763",
+      "timestamp": "2026-11-10 14:03:00.582460",
       "filepath": "artifacts/models/int_28_pair_all.pkl"
-    },
-    "int_26_pair_all": {
-      "task_key": "int_26_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:52.267199",
-      "filepath": "artifacts/models/int_26_pair_all.pkl"
-    },
-    "int_27_pair_all": {
-      "task_key": "int_27_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:52.668501",
-      "filepath": "artifacts/models/int_27_pair_all.pkl"
-    },
-    "int_29_pair_all": {
-      "task_key": "int_29_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:52.865387",
-      "filepath": "artifacts/models/int_29_pair_all.pkl"
-    },
-    "int_30_pair_all": {
-      "task_key": "int_30_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:53.325915",
-      "filepath": "artifacts/models/int_30_pair_all.pkl"
-    },
-    "int_31_pair_all": {
-      "task_key": "int_31_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:53.816566",
-      "filepath": "artifacts/models/int_31_pair_all.pkl"
-    },
-    "int_32_pair_all": {
-      "task_key": "int_32_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:54.091687",
-      "filepath": "artifacts/models/int_32_pair_all.pkl"
-    },
-    "int_33_pair_all": {
-      "task_key": "int_33_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:54.341015",
-      "filepath": "artifacts/models/int_33_pair_all.pkl"
-    },
-    "int_34_pair_all": {
-      "task_key": "int_34_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:54.860396",
-      "filepath": "artifacts/models/int_34_pair_all.pkl"
-    },
-    "int_36_pair_all": {
-      "task_key": "int_36_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:55.006051",
-      "filepath": "artifacts/models/int_36_pair_all.pkl"
     },
     "int_35_pair_all": {
       "task_key": "int_35_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:55.131348",
+      "timestamp": "2026-11-10 14:03:00.687255",
       "filepath": "artifacts/models/int_35_pair_all.pkl"
-    },
-    "int_38_pair_all": {
-      "task_key": "int_38_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:55.547076",
-      "filepath": "artifacts/models/int_38_pair_all.pkl"
-    },
-    "int_37_pair_all": {
-      "task_key": "int_37_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:55.613202",
-      "filepath": "artifacts/models/int_37_pair_all.pkl"
     },
     "int_39_pair_all": {
       "task_key": "int_39_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:55.754324",
+      "timestamp": "2026-11-10 14:03:00.730527",
       "filepath": "artifacts/models/int_39_pair_all.pkl"
     },
-    "int_40_pair_all": {
-      "task_key": "int_40_pair_all",
+    "int_37_pair_all": {
+      "task_key": "int_37_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:56.252141",
-      "filepath": "artifacts/models/int_40_pair_all.pkl"
+      "timestamp": "2026-11-10 14:03:00.749927",
+      "filepath": "artifacts/models/int_37_pair_all.pkl"
+    },
+    "int_29_pair_all": {
+      "task_key": "int_29_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:00.794024",
+      "filepath": "artifacts/models/int_29_pair_all.pkl"
+    },
+    "int_34_pair_all": {
+      "task_key": "int_34_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:00.827503",
+      "filepath": "artifacts/models/int_34_pair_all.pkl"
+    },
+    "int_31_pair_all": {
+      "task_key": "int_31_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:00.983775",
+      "filepath": "artifacts/models/int_31_pair_all.pkl"
+    },
+    "int_36_pair_all": {
+      "task_key": "int_36_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:01.063559",
+      "filepath": "artifacts/models/int_36_pair_all.pkl"
+    },
+    "int_33_pair_all": {
+      "task_key": "int_33_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:01.213233",
+      "filepath": "artifacts/models/int_33_pair_all.pkl"
+    },
+    "int_38_pair_all": {
+      "task_key": "int_38_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:01.251999",
+      "filepath": "artifacts/models/int_38_pair_all.pkl"
+    },
+    "int_27_pair_all": {
+      "task_key": "int_27_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:01.252657",
+      "filepath": "artifacts/models/int_27_pair_all.pkl"
     },
     "int_41_pair_all": {
       "task_key": "int_41_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:56.276355",
+      "timestamp": "2026-11-10 14:03:05.007433",
       "filepath": "artifacts/models/int_41_pair_all.pkl"
     },
-    "int_42_pair_all": {
-      "task_key": "int_42_pair_all",
+    "int_40_pair_all": {
+      "task_key": "int_40_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:56.822592",
-      "filepath": "artifacts/models/int_42_pair_all.pkl"
-    },
-    "int_43_pair_all": {
-      "task_key": "int_43_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:57.070915",
-      "filepath": "artifacts/models/int_43_pair_all.pkl"
-    },
-    "int_44_pair_all": {
-      "task_key": "int_44_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:57.105255",
-      "filepath": "artifacts/models/int_44_pair_all.pkl"
+      "timestamp": "2026-11-10 14:03:05.299747",
+      "filepath": "artifacts/models/int_40_pair_all.pkl"
     },
     "int_45_pair_all": {
       "task_key": "int_45_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:57.444843",
+      "timestamp": "2026-11-10 14:03:06.001159",
       "filepath": "artifacts/models/int_45_pair_all.pkl"
     },
-    "int_46_pair_all": {
-      "task_key": "int_46_pair_all",
+    "int_44_pair_all": {
+      "task_key": "int_44_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:57.591905",
-      "filepath": "artifacts/models/int_46_pair_all.pkl"
-    },
-    "int_47_pair_all": {
-      "task_key": "int_47_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:57.667786",
-      "filepath": "artifacts/models/int_47_pair_all.pkl"
+      "timestamp": "2026-11-10 14:03:06.054152",
+      "filepath": "artifacts/models/int_44_pair_all.pkl"
     },
     "int_49_pair_all": {
       "task_key": "int_49_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:58.124174",
+      "timestamp": "2026-11-10 14:03:06.084594",
       "filepath": "artifacts/models/int_49_pair_all.pkl"
+    },
+    "int_43_pair_all": {
+      "task_key": "int_43_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:06.378225",
+      "filepath": "artifacts/models/int_43_pair_all.pkl"
+    },
+    "int_47_pair_all": {
+      "task_key": "int_47_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:06.435313",
+      "filepath": "artifacts/models/int_47_pair_all.pkl"
+    },
+    "int_53_pair_all": {
+      "task_key": "int_53_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:06.531265",
+      "filepath": "artifacts/models/int_53_pair_all.pkl"
+    },
+    "int_42_pair_all": {
+      "task_key": "int_42_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:06.561025",
+      "filepath": "artifacts/models/int_42_pair_all.pkl"
+    },
+    "int_46_pair_all": {
+      "task_key": "int_46_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:06.573419",
+      "filepath": "artifacts/models/int_46_pair_all.pkl"
+    },
+    "int_51_pair_all": {
+      "task_key": "int_51_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:06.585822",
+      "filepath": "artifacts/models/int_51_pair_all.pkl"
+    },
+    "int_52_pair_all": {
+      "task_key": "int_52_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:06.755798",
+      "filepath": "artifacts/models/int_52_pair_all.pkl"
+    },
+    "int_54_pair_all": {
+      "task_key": "int_54_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:06.805369",
+      "filepath": "artifacts/models/int_54_pair_all.pkl"
     },
     "int_48_pair_all": {
       "task_key": "int_48_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:58.360153",
+      "timestamp": "2026-11-10 14:03:06.819211",
       "filepath": "artifacts/models/int_48_pair_all.pkl"
     },
     "int_50_pair_all": {
       "task_key": "int_50_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:59.167405",
+      "timestamp": "2026-11-10 14:03:06.956029",
       "filepath": "artifacts/models/int_50_pair_all.pkl"
-    },
-    "int_52_pair_all": {
-      "task_key": "int_52_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:59.171233",
-      "filepath": "artifacts/models/int_52_pair_all.pkl"
-    },
-    "int_51_pair_all": {
-      "task_key": "int_51_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:59.231232",
-      "filepath": "artifacts/models/int_51_pair_all.pkl"
     },
     "int_55_pair_all": {
       "task_key": "int_55_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:24:59.637109",
+      "timestamp": "2026-11-10 14:03:07.276687",
       "filepath": "artifacts/models/int_55_pair_all.pkl"
-    },
-    "int_54_pair_all": {
-      "task_key": "int_54_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:59.653935",
-      "filepath": "artifacts/models/int_54_pair_all.pkl"
-    },
-    "int_53_pair_all": {
-      "task_key": "int_53_pair_all",
-      "completed": true,
-      "timestamp": "2026-09-26 12:24:59.768168",
-      "filepath": "artifacts/models/int_53_pair_all.pkl"
     },
     "int_56_pair_all": {
       "task_key": "int_56_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:25:00.132811",
+      "timestamp": "2026-11-10 14:03:07.572355",
       "filepath": "artifacts/models/int_56_pair_all.pkl"
     },
     "int_57_pair_all": {
       "task_key": "int_57_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:25:00.484252",
+      "timestamp": "2026-11-10 14:03:07.585629",
       "filepath": "artifacts/models/int_57_pair_all.pkl"
     },
     "int_59_pair_all": {
       "task_key": "int_59_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:25:00.828462",
+      "timestamp": "2026-11-10 14:03:07.633689",
       "filepath": "artifacts/models/int_59_pair_all.pkl"
+    },
+    "int_58_pair_all": {
+      "task_key": "int_58_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:07.650042",
+      "filepath": "artifacts/models/int_58_pair_all.pkl"
     },
     "int_60_pair_all": {
       "task_key": "int_60_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:25:00.973045",
+      "timestamp": "2026-11-10 14:03:10.720280",
       "filepath": "artifacts/models/int_60_pair_all.pkl"
+    },
+    "int_61_pair_all": {
+      "task_key": "int_61_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:10.827630",
+      "filepath": "artifacts/models/int_61_pair_all.pkl"
     },
     "int_62_pair_all": {
       "task_key": "int_62_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:28:14.028138",
+      "timestamp": "2026-11-10 14:03:11.745028",
       "filepath": "artifacts/models/int_62_pair_all.pkl"
+    },
+    "int_64_pair_all": {
+      "task_key": "int_64_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:11.814916",
+      "filepath": "artifacts/models/int_64_pair_all.pkl"
+    },
+    "int_74_pair_all": {
+      "task_key": "int_74_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:11.907463",
+      "filepath": "artifacts/models/int_74_pair_all.pkl"
+    },
+    "int_66_pair_all": {
+      "task_key": "int_66_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:12.045318",
+      "filepath": "artifacts/models/int_66_pair_all.pkl"
+    },
+    "int_68_pair_all": {
+      "task_key": "int_68_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:12.177395",
+      "filepath": "artifacts/models/int_68_pair_all.pkl"
     },
     "int_63_pair_all": {
       "task_key": "int_63_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:28:14.115130",
+      "timestamp": "2026-11-10 14:03:12.243426",
       "filepath": "artifacts/models/int_63_pair_all.pkl"
     },
     "int_65_pair_all": {
       "task_key": "int_65_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:28:14.240303",
+      "timestamp": "2026-11-10 14:03:12.335589",
       "filepath": "artifacts/models/int_65_pair_all.pkl"
     },
-    "int_66_pair_all": {
-      "task_key": "int_66_pair_all",
+    "int_78_pair_all": {
+      "task_key": "int_78_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:28:14.327262",
-      "filepath": "artifacts/models/int_66_pair_all.pkl"
+      "timestamp": "2026-11-10 14:03:12.425675",
+      "filepath": "artifacts/models/int_78_pair_all.pkl"
     },
-    "int_61_pair_all": {
-      "task_key": "int_61_pair_all",
+    "int_70_pair_all": {
+      "task_key": "int_70_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:28:14.503967",
-      "filepath": "artifacts/models/int_61_pair_all.pkl"
+      "timestamp": "2026-11-10 14:03:12.430442",
+      "filepath": "artifacts/models/int_70_pair_all.pkl"
     },
-    "int_67_pair_all": {
-      "task_key": "int_67_pair_all",
+    "int_76_pair_all": {
+      "task_key": "int_76_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:28:14.573072",
-      "filepath": "artifacts/models/int_67_pair_all.pkl"
+      "timestamp": "2026-11-10 14:03:12.481900",
+      "filepath": "artifacts/models/int_76_pair_all.pkl"
     },
-    "int_68_pair_all": {
-      "task_key": "int_68_pair_all",
+    "int_71_pair_all": {
+      "task_key": "int_71_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:28:14.761167",
-      "filepath": "artifacts/models/int_68_pair_all.pkl"
+      "timestamp": "2026-11-10 14:03:12.613128",
+      "filepath": "artifacts/models/int_71_pair_all.pkl"
     },
-    "int_64_pair_all": {
-      "task_key": "int_64_pair_all",
+    "int_72_pair_all": {
+      "task_key": "int_72_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:28:14.785321",
-      "filepath": "artifacts/models/int_64_pair_all.pkl"
+      "timestamp": "2026-11-10 14:03:12.668111",
+      "filepath": "artifacts/models/int_72_pair_all.pkl"
     },
     "int_69_pair_all": {
       "task_key": "int_69_pair_all",
       "completed": true,
-      "timestamp": "2026-09-26 12:28:15.134388",
+      "timestamp": "2026-11-10 14:03:12.681767",
       "filepath": "artifacts/models/int_69_pair_all.pkl"
+    },
+    "int_67_pair_all": {
+      "task_key": "int_67_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:12.853478",
+      "filepath": "artifacts/models/int_67_pair_all.pkl"
+    },
+    "int_77_pair_all": {
+      "task_key": "int_77_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:12.859840",
+      "filepath": "artifacts/models/int_77_pair_all.pkl"
+    },
+    "int_73_pair_all": {
+      "task_key": "int_73_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:12.958005",
+      "filepath": "artifacts/models/int_73_pair_all.pkl"
+    },
+    "int_75_pair_all": {
+      "task_key": "int_75_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:13.048874",
+      "filepath": "artifacts/models/int_75_pair_all.pkl"
+    },
+    "int_79_pair_all": {
+      "task_key": "int_79_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:13.513741",
+      "filepath": "artifacts/models/int_79_pair_all.pkl"
+    },
+    "int_80_pair_all": {
+      "task_key": "int_80_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:16.401579",
+      "filepath": "artifacts/models/int_80_pair_all.pkl"
+    },
+    "int_81_pair_all": {
+      "task_key": "int_81_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:16.481322",
+      "filepath": "artifacts/models/int_81_pair_all.pkl"
+    },
+    "int_83_pair_all": {
+      "task_key": "int_83_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:17.168318",
+      "filepath": "artifacts/models/int_83_pair_all.pkl"
+    },
+    "int_88_pair_all": {
+      "task_key": "int_88_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:17.222781",
+      "filepath": "artifacts/models/int_88_pair_all.pkl"
+    },
+    "int_89_pair_all": {
+      "task_key": "int_89_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:17.262838",
+      "filepath": "artifacts/models/int_89_pair_all.pkl"
+    },
+    "int_98_pair_all": {
+      "task_key": "int_98_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:17.447686",
+      "filepath": "artifacts/models/int_98_pair_all.pkl"
+    },
+    "int_87_pair_all": {
+      "task_key": "int_87_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:17.482511",
+      "filepath": "artifacts/models/int_87_pair_all.pkl"
+    },
+    "int_82_pair_all": {
+      "task_key": "int_82_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:17.488912",
+      "filepath": "artifacts/models/int_82_pair_all.pkl"
+    },
+    "int_84_pair_all": {
+      "task_key": "int_84_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:17.528765",
+      "filepath": "artifacts/models/int_84_pair_all.pkl"
+    },
+    "int_86_pair_all": {
+      "task_key": "int_86_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:17.661913",
+      "filepath": "artifacts/models/int_86_pair_all.pkl"
+    },
+    "int_96_pair_all": {
+      "task_key": "int_96_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:17.874291",
+      "filepath": "artifacts/models/int_96_pair_all.pkl"
+    },
+    "int_90_pair_all": {
+      "task_key": "int_90_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:17.968388",
+      "filepath": "artifacts/models/int_90_pair_all.pkl"
+    },
+    "int_85_pair_all": {
+      "task_key": "int_85_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:18.024522",
+      "filepath": "artifacts/models/int_85_pair_all.pkl"
+    },
+    "int_91_pair_all": {
+      "task_key": "int_91_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:18.034187",
+      "filepath": "artifacts/models/int_91_pair_all.pkl"
+    },
+    "int_93_pair_all": {
+      "task_key": "int_93_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:18.053094",
+      "filepath": "artifacts/models/int_93_pair_all.pkl"
+    },
+    "int_94_pair_all": {
+      "task_key": "int_94_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:18.113690",
+      "filepath": "artifacts/models/int_94_pair_all.pkl"
+    },
+    "int_97_pair_all": {
+      "task_key": "int_97_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:18.286424",
+      "filepath": "artifacts/models/int_97_pair_all.pkl"
+    },
+    "int_99_pair_all": {
+      "task_key": "int_99_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:18.421288",
+      "filepath": "artifacts/models/int_99_pair_all.pkl"
+    },
+    "int_92_pair_all": {
+      "task_key": "int_92_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:18.694162",
+      "filepath": "artifacts/models/int_92_pair_all.pkl"
+    },
+    "int_95_pair_all": {
+      "task_key": "int_95_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:18.731093",
+      "filepath": "artifacts/models/int_95_pair_all.pkl"
+    },
+    "int_100_pair_all": {
+      "task_key": "int_100_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:21.700588",
+      "filepath": "artifacts/models/int_100_pair_all.pkl"
+    },
+    "int_101_pair_all": {
+      "task_key": "int_101_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:21.715916",
+      "filepath": "artifacts/models/int_101_pair_all.pkl"
+    },
+    "int_104_pair_all": {
+      "task_key": "int_104_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:21.999666",
+      "filepath": "artifacts/models/int_104_pair_all.pkl"
+    },
+    "int_108_pair_all": {
+      "task_key": "int_108_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:22.516107",
+      "filepath": "artifacts/models/int_108_pair_all.pkl"
+    },
+    "int_115_pair_all": {
+      "task_key": "int_115_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:22.572351",
+      "filepath": "artifacts/models/int_115_pair_all.pkl"
+    },
+    "int_110_pair_all": {
+      "task_key": "int_110_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:22.626703",
+      "filepath": "artifacts/models/int_110_pair_all.pkl"
+    },
+    "int_103_pair_all": {
+      "task_key": "int_103_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:22.715557",
+      "filepath": "artifacts/models/int_103_pair_all.pkl"
+    },
+    "int_102_pair_all": {
+      "task_key": "int_102_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:22.725141",
+      "filepath": "artifacts/models/int_102_pair_all.pkl"
+    },
+    "int_112_pair_all": {
+      "task_key": "int_112_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:22.761661",
+      "filepath": "artifacts/models/int_112_pair_all.pkl"
+    },
+    "int_113_pair_all": {
+      "task_key": "int_113_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:22.803342",
+      "filepath": "artifacts/models/int_113_pair_all.pkl"
+    },
+    "int_119_pair_all": {
+      "task_key": "int_119_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:22.834191",
+      "filepath": "artifacts/models/int_119_pair_all.pkl"
+    },
+    "int_118_pair_all": {
+      "task_key": "int_118_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:22.915575",
+      "filepath": "artifacts/models/int_118_pair_all.pkl"
+    },
+    "int_106_pair_all": {
+      "task_key": "int_106_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:22.955429",
+      "filepath": "artifacts/models/int_106_pair_all.pkl"
+    },
+    "int_105_pair_all": {
+      "task_key": "int_105_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:22.969866",
+      "filepath": "artifacts/models/int_105_pair_all.pkl"
+    },
+    "int_109_pair_all": {
+      "task_key": "int_109_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:22.996840",
+      "filepath": "artifacts/models/int_109_pair_all.pkl"
+    },
+    "int_107_pair_all": {
+      "task_key": "int_107_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:22.997780",
+      "filepath": "artifacts/models/int_107_pair_all.pkl"
+    },
+    "int_114_pair_all": {
+      "task_key": "int_114_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:23.085567",
+      "filepath": "artifacts/models/int_114_pair_all.pkl"
+    },
+    "int_117_pair_all": {
+      "task_key": "int_117_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:23.112451",
+      "filepath": "artifacts/models/int_117_pair_all.pkl"
+    },
+    "int_111_pair_all": {
+      "task_key": "int_111_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:23.151578",
+      "filepath": "artifacts/models/int_111_pair_all.pkl"
+    },
+    "int_116_pair_all": {
+      "task_key": "int_116_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:23.365655",
+      "filepath": "artifacts/models/int_116_pair_all.pkl"
+    },
+    "int_121_pair_all": {
+      "task_key": "int_121_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:26.289019",
+      "filepath": "artifacts/models/int_121_pair_all.pkl"
+    },
+    "int_122_pair_all": {
+      "task_key": "int_122_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:26.517377",
+      "filepath": "artifacts/models/int_122_pair_all.pkl"
+    },
+    "int_120_pair_all": {
+      "task_key": "int_120_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:26.519120",
+      "filepath": "artifacts/models/int_120_pair_all.pkl"
+    },
+    "int_123_pair_all": {
+      "task_key": "int_123_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:26.529827",
+      "filepath": "artifacts/models/int_123_pair_all.pkl"
+    },
+    "int_130_pair_all": {
+      "task_key": "int_130_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:26.656227",
+      "filepath": "artifacts/models/int_130_pair_all.pkl"
+    },
+    "int_128_pair_all": {
+      "task_key": "int_128_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:26.809610",
+      "filepath": "artifacts/models/int_128_pair_all.pkl"
+    },
+    "int_133_pair_all": {
+      "task_key": "int_133_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:26.894130",
+      "filepath": "artifacts/models/int_133_pair_all.pkl"
+    },
+    "int_127_pair_all": {
+      "task_key": "int_127_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:26.956620",
+      "filepath": "artifacts/models/int_127_pair_all.pkl"
+    },
+    "int_125_pair_all": {
+      "task_key": "int_125_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:27.094333",
+      "filepath": "artifacts/models/int_125_pair_all.pkl"
+    },
+    "int_137_pair_all": {
+      "task_key": "int_137_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:27.133161",
+      "filepath": "artifacts/models/int_137_pair_all.pkl"
+    },
+    "int_135_pair_all": {
+      "task_key": "int_135_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:27.160939",
+      "filepath": "artifacts/models/int_135_pair_all.pkl"
+    },
+    "int_134_pair_all": {
+      "task_key": "int_134_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:27.186053",
+      "filepath": "artifacts/models/int_134_pair_all.pkl"
+    },
+    "int_131_pair_all": {
+      "task_key": "int_131_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:27.211353",
+      "filepath": "artifacts/models/int_131_pair_all.pkl"
+    },
+    "int_138_pair_all": {
+      "task_key": "int_138_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:27.305028",
+      "filepath": "artifacts/models/int_138_pair_all.pkl"
+    },
+    "int_129_pair_all": {
+      "task_key": "int_129_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:27.321351",
+      "filepath": "artifacts/models/int_129_pair_all.pkl"
+    },
+    "int_124_pair_all": {
+      "task_key": "int_124_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:27.395370",
+      "filepath": "artifacts/models/int_124_pair_all.pkl"
+    },
+    "int_136_pair_all": {
+      "task_key": "int_136_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:27.421668",
+      "filepath": "artifacts/models/int_136_pair_all.pkl"
+    },
+    "int_126_pair_all": {
+      "task_key": "int_126_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:27.533659",
+      "filepath": "artifacts/models/int_126_pair_all.pkl"
+    },
+    "int_132_pair_all": {
+      "task_key": "int_132_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:27.579644",
+      "filepath": "artifacts/models/int_132_pair_all.pkl"
+    },
+    "int_139_pair_all": {
+      "task_key": "int_139_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:27.730849",
+      "filepath": "artifacts/models/int_139_pair_all.pkl"
+    },
+    "int_140_pair_all": {
+      "task_key": "int_140_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:30.515985",
+      "filepath": "artifacts/models/int_140_pair_all.pkl"
+    },
+    "int_142_pair_all": {
+      "task_key": "int_142_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:30.650172",
+      "filepath": "artifacts/models/int_142_pair_all.pkl"
+    },
+    "int_143_pair_all": {
+      "task_key": "int_143_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:30.702484",
+      "filepath": "artifacts/models/int_143_pair_all.pkl"
+    },
+    "int_141_pair_all": {
+      "task_key": "int_141_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:30.715088",
+      "filepath": "artifacts/models/int_141_pair_all.pkl"
+    },
+    "int_144_pair_all": {
+      "task_key": "int_144_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:30.742820",
+      "filepath": "artifacts/models/int_144_pair_all.pkl"
+    },
+    "int_146_pair_all": {
+      "task_key": "int_146_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:30.859123",
+      "filepath": "artifacts/models/int_146_pair_all.pkl"
+    },
+    "int_145_pair_all": {
+      "task_key": "int_145_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:30.946451",
+      "filepath": "artifacts/models/int_145_pair_all.pkl"
+    },
+    "int_147_pair_all": {
+      "task_key": "int_147_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:30.963937",
+      "filepath": "artifacts/models/int_147_pair_all.pkl"
+    },
+    "int_149_pair_all": {
+      "task_key": "int_149_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:31.169927",
+      "filepath": "artifacts/models/int_149_pair_all.pkl"
+    },
+    "int_148_pair_all": {
+      "task_key": "int_148_pair_all",
+      "completed": true,
+      "timestamp": "2026-11-10 14:03:31.257224",
+      "filepath": "artifacts/models/int_148_pair_all.pkl"
     }
   },
   "inference_entries": {}

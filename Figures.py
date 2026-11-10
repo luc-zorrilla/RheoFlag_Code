@@ -2535,19 +2535,19 @@ def plot_fig_S4(
         width_px: Figure width in pixels
         height_px: Figure height in pixels
         x_tick_reference: Truth value of the internal parameter, shown as 0 on
-                          Figure A's x-axis (1.0 for Sp4 = 1)
+                        Figure A's x-axis (1.0 for Sp4 = 1)
         x_tick_scale: Scale applied to the relative deviation from the reference
-                      (100 -> percent, 1000 -> per-mille)
+                    (100 -> percent, 1000 -> per-mille)
         x_tick_suffix: Suffix appended to the scaled tick labels (e.g., '%')
 
     Returns:
         Tuple of (fig_a, fig_b) where:
             - fig_a: Normalized loss vs internal parameter (one line per external
-                     param, colored by log10 of the external param)
+                    param, colored by log10 of the external param)
             - fig_b: Tip displacement vs external parameter (markers only, colored
-                     by log10 of the internal param, with a log-space linear fit
-                     over the first two thirds of the points and a log-space
-                     constant fit over the last tenth)
+                    by log10 of the internal param, with a log-space linear fit
+                    over the first two thirds of the points and a log-space
+                    constant fit over the last tenth)
     """
 
     def _log_range(values):
@@ -2691,9 +2691,9 @@ def plot_fig_S4(
     _style_axes(
         fig_a,
         x_title=(
-            rf"$\mathrm{{{int_param_name}}} - {x_tick_reference:g}$ ({x_tick_suffix})"
+            r'$Sp^4 - Sp^4_{\star}$'
         ),
-        y_title=r'$\mathrm{Loss}(Sp^4,\ Sp^4=1)$ (normalized)',
+        y_title=r'$\mathrm{Loss}(Sp^4,\ Sp^4_{\star}=1)$',
         x_log=True,
         y_log=False,
     )
@@ -3002,8 +3002,8 @@ def plot_fig_S5(
 
     _style_axes(
         fig_S5a,
-        x_title=r'$\beta_{\mathrm{sim}}$ deviation from $\beta = 1$ (%)',
-        y_title=r'$\mathrm{Loss}(\beta_{sim},\ \beta=1)$ (normalized)',
+        x_title=r'$\beta - \beta_{\star}$ (%)',
+        y_title=r'$\mathrm{Loss}(\beta,\ \beta_{\star}=1)$',
         x_log=False,
         y_log=False,
     )
@@ -3033,13 +3033,13 @@ def plot_fig_S5(
 
     int_lo, int_hi = _log_range(int_param_values)
 
-    all_x, all_y, all_c, all_int = [], [], [], []
-
     for int_idx in sorted_int_keys:
         model_list = model_lists[int_idx]
         int_param_val = int_param_values[int_idx]
         color_norm = (np.log10(int_param_val) - int_lo) / (int_hi - int_lo)
+        line_color = px.colors.sample_colorscale(colorscale, [color_norm])[0]
 
+        xs, ys = [], []
         for ext_idx in range(len(model_list.models)):
             model = model_list.models[ext_idx]
             ext_param_val = ext_param_values[ext_idx]
@@ -3064,31 +3064,43 @@ def plot_fig_S5(
             else:  # Sp4 or other
                 final_x = ext_param_val * int_param_val
 
-            all_x.append(final_x)
-            all_y.append(final_y)
-            all_c.append(color_norm)
-            all_int.append(int_param_val)
+            xs.append(final_x)
+            ys.append(abs(final_y))
 
+        if not xs:
+            continue
+
+        order = np.argsort(xs)
+        fig_S5b.add_trace(go.Scatter(
+            x=np.asarray(xs)[order],
+            y=np.asarray(ys)[order],
+            mode='markers',
+            # line=dict(color=line_color),
+            marker=dict(color=line_color, size = 3),
+            name=f"{int_param_name} = {int_param_val:g}",
+            showlegend=False,
+            hovertemplate=(
+                f"<b>{int_param_name}:</b> {int_param_val:g}<br>"
+                f"<b>{ext_param_name}-scaled x:</b> %{{x:.2e}}<br>"
+                f"<b>|y<sub>tip</sub>|:</b> %{{y:.6e}}<extra></extra>"
+            ),
+        ))
+
+    # Invisible carrier trace: contains no data, only the log colorbar for Beta
     fig_S5b.add_trace(go.Scatter(
-        x=all_x,
-        y=np.abs(all_y).tolist(),
+        x=[None],
+        y=[None],
         mode='markers',
         marker=dict(
-            size=6,
-            color=all_c,
+            color=[0.0],
             colorscale=colorscale,
             cmin=0,
             cmax=1,
             showscale=True,
-            colorbar=_log_colorbar(int_lo, int_hi, r'$\beta$'),
+            colorbar=_log_colorbar(int_lo, int_hi, r'\beta'),
         ),
-        customdata=all_int,
         showlegend=False,
-        hovertemplate=(
-            f"<b>{ext_param_name}:</b> %{{x:.2e}}<br>"
-            f"<b>|y<sub>tip</sub>|:</b> %{{y:.6e}}<br>"
-            f"<b>{int_param_name}:</b> %{{customdata:.4f}}<extra></extra>"
-        ),
+        hoverinfo='skip',
     ))
 
     _style_axes(
@@ -3098,6 +3110,7 @@ def plot_fig_S5(
         x_log=True,
         y_log=True,
     )
+    
     fig_S5b.update_layout(
         template='plotly_white',
         showlegend=False,
@@ -4460,19 +4473,19 @@ if __name__ == "__main__":
         checkpoint_str=checkpoint_str,
         )
 
-    fig_5_a, fig_5_b = plot_fig_5(
-        workflow_output_bending, 
-        workflow_output_shear, 
-        workflow_output_bending_shear
-        )
+    # fig_5_a, fig_5_b = plot_fig_5(
+    #     workflow_output_bending, 
+    #     workflow_output_shear, 
+    #     workflow_output_bending_shear
+    #     )
 
-    fig_5_a.write_image("Figures/fig_5a.pdf")
-    fig_5_a.write_html("Figures/fig_5a.html")
-    fig_5_a.show()
+    # fig_5_a.write_image("Figures/fig_5a.pdf")
+    # fig_5_a.write_html("Figures/fig_5a.html")
+    # fig_5_a.show()
 
-    fig_5_b.write_image("Figures/fig_5b.pdf")
-    fig_5_b.write_html("Figures/fig_5b.html")
-    fig_5_b.show()
+    # fig_5_b.write_image("Figures/fig_5b.pdf")
+    # fig_5_b.write_html("Figures/fig_5b.html")
+    # fig_5_b.show()
 
     # ------------------------------------------------ #
     # Figure S4: Hessian decrease for bending filament #
@@ -4606,11 +4619,11 @@ if __name__ == "__main__":
     # ============================================================================
     # FIGURE S5B: Tip Displacement vs A (Color-coded by Beta)
     # ============================================================================
-    log_offsets = np.linspace(-3, 3, num=70)
+    log_offsets = np.linspace(-3, 1, num=150)
     Beta_vec = np.power(10, log_offsets)  
     int_param_ranges = {'Beta': Beta_vec}
 
-    A_vec = np.pow(10, np.linspace(start=-4, stop=1, num=12))
+    A_vec = np.pow(10, np.linspace(start=-4, stop=0, num=200)) # num = 12, stop = 1
     ext_param_ranges = {'A': A_vec}
 
     simulation_output = workflow_elastic_viscous_simulation(
@@ -4623,6 +4636,7 @@ if __name__ == "__main__":
     model_lists = simulation_output['model_lists']
     int_params_metadata = simulation_output['int_params_metadata']
     ext_params_list = simulation_output['ext_params_list']
+    reference_model_list = model_lists[0]
 
     # _, fig_S5b = plot_fig_S5(
     #     model_lists=model_lists,
@@ -4632,7 +4646,7 @@ if __name__ == "__main__":
     #     int_param_name='Beta',
     #     ext_param_name='A',
     #     distance_fn=rel_mse,
-    #     colorscale='Viridis',
+    #     colorscale='RdYlBu_r',
     # )
 
     # fig_S5b.write_image("Figures/fig_S5b.pdf")
@@ -4666,22 +4680,24 @@ if __name__ == "__main__":
     ext_params_list = simulation_output['ext_params_list']        
 
     # Create figure
-    # fig_S5c = plot_vid_S5c(
-    #     model_lists=model_lists,
-    #     int_params_metadata=int_params_metadata,
-    #     ext_params_list=ext_params_list,
-    #     int_param_name='Beta',
-    #     ext_param_name='A',
-    #     x_label='x',
-    #     y_label='y',
-    #     colorscale='Viridis',
-    #     log_scale=False,
-    # )
+    fig_S5c = plot_vid_S5c(
+        model_lists=model_lists,
+        int_params_metadata=int_params_metadata,
+        ext_params_list=ext_params_list,
+        int_param_name='Beta',
+        ext_param_name='A',
+        x_label='x',
+        y_label='y',
+        colorscale='Viridis',
+        log_scale=False,
+    )
 
     # Save and display
-    # fig_S5c.write_image("Figures/filament_color_Beta_subplot_A.pdf")
-    # fig_S5c.write_html("Figures/filament_color_Beta_subplot_A.html")
-    # fig_S5c.show()
+    fig_S5c.write_image("Figures/filament_color_Beta_subplot_A.pdf")
+    fig_S5c.write_html("Figures/filament_color_Beta_subplot_A.html")
+    fig_S5c.show()
+
+    exit()
 
     # --------------------- #
     # B. Viscous Inferences #
@@ -4759,19 +4775,19 @@ if __name__ == "__main__":
         n_jobs_per_pass=1,
     )
 
-    fig_6_a, fig_6_b = plot_fig_6(
-        workflow_output_bending_visc,
-        workflow_output_shear_visc,
-        workflow_output_bending_shear_visc,
-    )
+    # fig_6_a, fig_6_b = plot_fig_6(
+    #     workflow_output_bending_visc,
+    #     workflow_output_shear_visc,
+    #     workflow_output_bending_shear_visc,
+    # )
 
-    fig_6_a.write_image("Figures/fig_6a.pdf")
-    fig_6_a.write_html("Figures/fig_6a.html")
-    fig_6_a.show()
+    # fig_6_a.write_image("Figures/fig_6a.pdf")
+    # fig_6_a.write_html("Figures/fig_6a.html")
+    # fig_6_a.show()
 
-    fig_6_b.write_image("Figures/fig_6b.pdf")
-    fig_6_b.write_html("Figures/fig_6b.html")
-    fig_6_b.show()
+    # fig_6_b.write_image("Figures/fig_6b.pdf")
+    # fig_6_b.write_html("Figures/fig_6b.html")
+    # fig_6_b.show()
     
     exit()
 
